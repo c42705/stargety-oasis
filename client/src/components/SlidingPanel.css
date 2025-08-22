@@ -1,0 +1,287 @@
+/* Sliding Panel Styles */
+.sliding-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 320px;
+  height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  color: white;
+  overflow: hidden;
+}
+
+.sliding-panel.open {
+  transform: translateX(0);
+}
+
+.sliding-panel.closed {
+  transform: translateX(100%);
+}
+
+/* Panel Overlay */
+.sliding-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  backdrop-filter: blur(2px);
+}
+
+/* Panel Header */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.panel-title h3 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: white;
+}
+
+.user-indicator {
+  font-size: 0.85rem;
+  opacity: 0.9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.admin-badge-small {
+  background: #ff6b6b;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.panel-close-button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+}
+
+.panel-close-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Panel Tabs */
+.panel-tabs {
+  display: flex;
+  background: rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.panel-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 12px 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  position: relative;
+}
+
+.panel-tab:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.panel-tab.active {
+  color: white;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.panel-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #4ecdc4;
+}
+
+.tab-icon {
+  font-size: 1.2rem;
+}
+
+.tab-label {
+  font-weight: 500;
+}
+
+/* Panel Content */
+.panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.tab-content-wrapper {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Panel Chat Module Styles */
+.panel-chat-module {
+  height: 100%;
+  border: none;
+  border-radius: 0;
+}
+
+.panel-chat-module .channels-sidebar {
+  border-radius: 0;
+}
+
+.panel-chat-module .chat-header {
+  border-radius: 0;
+}
+
+/* Panel Toggle Button */
+.panel-toggle {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.panel-toggle:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.panel-toggle.open {
+  background: #ff6b6b;
+}
+
+/* Chat Icon Animation */
+.chat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.message-icon {
+  color: white;
+  transition: all 0.3s ease;
+}
+
+.close-icon {
+  color: white;
+  transition: all 0.3s ease;
+}
+
+.panel-toggle:hover .message-icon {
+  transform: scale(1.1);
+}
+
+.panel-toggle:hover .close-icon {
+  transform: scale(1.1) rotate(90deg);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .sliding-panel {
+    width: 100vw;
+    max-width: 320px;
+  }
+
+  .panel-toggle {
+    bottom: 15px;
+    right: 15px;
+    width: 52px;
+    height: 52px;
+  }
+}
+
+@media (max-width: 480px) {
+  .sliding-panel {
+    width: 100vw;
+  }
+
+  .panel-header {
+    padding: 16px;
+  }
+
+  .panel-title h3 {
+    font-size: 1.2rem;
+  }
+
+  .panel-toggle {
+    bottom: 12px;
+    right: 12px;
+    width: 48px;
+    height: 48px;
+  }
+
+  .message-icon {
+    font-size: 1.3rem;
+  }
+
+  .close-icon {
+    font-size: 1.1rem;
+  }
+}
+
+/* Scrollbar Styling */
+.panel-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.panel-content::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.panel-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.panel-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}

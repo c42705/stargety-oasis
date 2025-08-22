@@ -1,0 +1,291 @@
+/* Video Service Modal Styles */
+.video-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 3000;
+  backdrop-filter: blur(4px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.video-modal-overlay.expanded {
+  background: rgba(0, 0, 0, 0.95);
+}
+
+.video-service-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80%;
+  max-width: 900px;
+  height: 70%;
+  max-height: 600px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+  z-index: 3001;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.video-service-modal.expanded {
+  top: 0;
+  left: 0;
+  transform: none;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+}
+
+/* Loading Screen */
+.video-loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: white;
+  color: #333;
+}
+
+.loading-content {
+  text-align: center;
+  max-width: 400px;
+  padding: 40px;
+}
+
+.loading-spinner-large {
+  margin-bottom: 30px;
+  display: flex;
+  justify-content: center;
+}
+
+.spinner-ring {
+  width: 60px;
+  height: 60px;
+  border: 6px solid #f3f3f3;
+  border-top: 6px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-content h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.loading-content p {
+  margin: 0 0 30px 0;
+  color: #666;
+  font-size: 1rem;
+}
+
+/* Progress Bar */
+.progress-container {
+  margin-top: 30px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: #f0f0f0;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.9rem;
+  color: #666;
+  font-weight: 500;
+}
+
+/* Modal Header */
+.video-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 16px 16px 0 0;
+}
+
+.video-service-modal.expanded .video-modal-header {
+  border-radius: 0;
+}
+
+.modal-title h3 {
+  margin: 0 0 4px 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.service-indicator {
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.modal-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.expand-button,
+.collapse-button,
+.close-button {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+}
+
+.expand-button:hover,
+.collapse-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.close-button:hover {
+  background: rgba(255, 107, 107, 0.3);
+}
+
+/* Video Service Container */
+.video-service-container {
+  flex: 1;
+  overflow: hidden;
+  background: #f8f9fa;
+}
+
+.video-service-content {
+  height: 100%;
+  border: none;
+  border-radius: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .video-service-modal {
+    width: 95%;
+    height: 80%;
+    max-width: none;
+  }
+
+  .video-modal-header {
+    padding: 16px 20px;
+  }
+
+  .modal-title h3 {
+    font-size: 1.2rem;
+  }
+
+  .loading-content {
+    padding: 30px 20px;
+  }
+
+  .loading-content h3 {
+    font-size: 1.3rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .video-service-modal {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    top: 0;
+    left: 0;
+    transform: none;
+  }
+
+  .video-modal-header {
+    border-radius: 0;
+    padding: 12px 16px;
+  }
+
+  .modal-title h3 {
+    font-size: 1.1rem;
+  }
+
+  .service-indicator {
+    font-size: 0.8rem;
+  }
+
+  .expand-button,
+  .collapse-button,
+  .close-button {
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+  }
+
+  .loading-content {
+    padding: 20px 16px;
+  }
+
+  .spinner-ring {
+    width: 50px;
+    height: 50px;
+    border-width: 5px;
+  }
+}
+
+/* Animation for modal appearance */
+.video-service-modal {
+  animation: modalSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -60%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+.video-service-modal.expanded {
+  animation: modalExpand 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes modalExpand {
+  from {
+    transform: translate(-50%, -50%);
+    border-radius: 16px;
+  }
+  to {
+    transform: none;
+    border-radius: 0;
+  }
+}

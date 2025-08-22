@@ -1,0 +1,585 @@
+/* Common Panel Tab Styles */
+.channels-tab,
+.people-tab,
+.profile-tab {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  color: white;
+}
+
+/* Section Headers */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.section-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.add-button {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+}
+
+.add-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Channels Tab Styles */
+.channels-section,
+.direct-messages-section {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.channels-list,
+.dm-list {
+  padding: 0 8px;
+}
+
+.channel-item,
+.dm-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  margin: 2px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.channel-item:hover,
+.dm-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.channel-item.selected,
+.dm-item.selected {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.channel-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.channel-icon {
+  font-size: 1rem;
+  opacity: 0.8;
+}
+
+.channel-name {
+  font-weight: 500;
+  flex: 1;
+}
+
+.member-count {
+  font-size: 0.8rem;
+  opacity: 0.7;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.unread-badge {
+  background: #ff6b6b;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* Direct Messages Styles */
+.dm-avatar {
+  position: relative;
+  margin-right: 12px;
+}
+
+.avatar-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: white;
+}
+
+.status-indicator {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  font-size: 0.7rem;
+  background: rgba(102, 126, 234, 0.9);
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dm-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.dm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.dm-name {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.dm-timestamp {
+  font-size: 0.75rem;
+  opacity: 0.6;
+}
+
+.dm-preview {
+  font-size: 0.8rem;
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* People Tab Styles */
+.people-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.people-stats {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.online-count {
+  font-weight: 600;
+  color: #4ecdc4;
+}
+
+.total-count {
+  opacity: 0.7;
+  font-size: 0.9rem;
+}
+
+.people-controls {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.search-box {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 12px 8px 36px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 0.9rem;
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.6;
+}
+
+.filter-select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 0.9rem;
+}
+
+.people-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.person-item {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  margin: 4px 0;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.person-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.person-avatar {
+  position: relative;
+  margin-right: 12px;
+}
+
+.person-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.person-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.person-name {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.admin-badge-mini {
+  background: #ff6b6b;
+  color: white;
+  padding: 1px 4px;
+  border-radius: 6px;
+  font-size: 0.6rem;
+  font-weight: 600;
+}
+
+.person-role {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  margin-bottom: 2px;
+}
+
+.person-status {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.person-location {
+  font-size: 0.75rem;
+  opacity: 0.6;
+  margin-top: 2px;
+}
+
+.person-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.action-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+}
+
+.action-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Profile Tab Styles */
+.profile-header {
+  padding: 20px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.profile-avatar-large {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 16px;
+}
+
+.avatar-circle-large {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 1.8rem;
+  color: white;
+}
+
+.status-overlay {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  font-size: 1.2rem;
+  background: rgba(102, 126, 234, 0.9);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-name {
+  margin: 0 0 4px 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.profile-username {
+  margin: 0 0 8px 0;
+  opacity: 0.7;
+  font-size: 0.9rem;
+}
+
+.admin-badge-profile {
+  background: #ff6b6b;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-block;
+  margin-bottom: 8px;
+}
+
+.profile-room {
+  margin: 0;
+  opacity: 0.8;
+  font-size: 0.85rem;
+}
+
+.profile-section {
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.section-title {
+  margin: 0 0 16px 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.status-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.status-select,
+.status-message-input {
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 0.9rem;
+}
+
+.status-message-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.preferences-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preference-item {
+  display: flex;
+  align-items: center;
+}
+
+.preference-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.preference-select {
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 0.85rem;
+}
+
+.edit-button {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background-color 0.2s ease;
+}
+
+.edit-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.preference-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.save-btn,
+.cancel-btn {
+  flex: 1;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+}
+
+.save-btn {
+  background: #4ecdc4;
+  color: white;
+}
+
+.save-btn:hover {
+  background: #44a08d;
+}
+
+.cancel-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.account-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.account-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+  text-align: left;
+}
+
+.account-btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.account-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.account-btn.danger {
+  background: rgba(255, 107, 107, 0.2);
+  color: #ff6b6b;
+}
+
+.account-btn.danger:hover {
+  background: rgba(255, 107, 107, 0.3);
+}
+
+/* Quick Actions */
+.quick-actions,
+.people-quick-actions {
+  padding: 16px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.action-button,
+.quick-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+}
+
+.action-button:hover,
+.quick-action-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.action-icon {
+  font-size: 1rem;
+}
