@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Hash, Lock, Circle, MessageCircle, Phone } from 'lucide-react';
 import './PanelTabs.css';
 
 interface Channel {
@@ -76,11 +77,11 @@ export const ChannelsTab: React.FC = () => {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'online': return '🟢';
-      case 'busy': return '🔴';
-      case 'away': return '🟡';
-      case 'offline': return '⚫';
-      default: return '⚫';
+      case 'online': return <Circle size={10} className="status-online" fill="currentColor" />;
+      case 'busy': return <Circle size={10} className="status-busy" fill="currentColor" />;
+      case 'away': return <Circle size={10} className="status-away" fill="currentColor" />;
+      case 'offline': return <Circle size={10} className="status-offline" fill="currentColor" />;
+      default: return <Circle size={10} className="status-offline" fill="currentColor" />;
     }
   };
 
@@ -112,7 +113,7 @@ export const ChannelsTab: React.FC = () => {
             >
               <div className="channel-info">
                 <span className="channel-icon">
-                  {channel.type === 'private' ? '🔒' : '#'}
+                  {channel.type === 'private' ? <Lock size={14} /> : <Hash size={14} />}
                 </span>
                 <span className="channel-name">{channel.name}</span>
                 <span className="member-count">{channel.memberCount}</span>
@@ -171,11 +172,15 @@ export const ChannelsTab: React.FC = () => {
       {/* Quick Actions */}
       <div className="quick-actions">
         <button className="action-button">
-          <span className="action-icon">💬</span>
+          <span className="action-icon">
+            <MessageCircle size={16} />
+          </span>
           <span>Start Conversation</span>
         </button>
         <button className="action-button">
-          <span className="action-icon">📞</span>
+          <span className="action-icon">
+            <Phone size={16} />
+          </span>
           <span>Start Call</span>
         </button>
       </div>

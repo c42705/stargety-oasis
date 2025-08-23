@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Video, Globe, Settings, MessageCircle, Users, User } from 'lucide-react';
+import { Video, Globe, Settings, MessageCircle, Users, User, Star, LogOut } from 'lucide-react';
 import { EventBusProvider } from './shared/EventBusContext';
 import { SettingsProvider, useSettings } from './shared/SettingsContext';
 import { AuthProvider, useAuth } from './shared/AuthContext';
@@ -149,13 +149,15 @@ const AppContent: React.FC = () => {
         />
 
         <header className="App-header">
-          <h1>🌟 Stargety Oasis</h1>
+          <h1>
+            <Star size={24} className="app-logo" /> Stargety Oasis
+          </h1>
           <div className="user-info">
             <span>Welcome, {user.displayName}</span>
             <span>Room: {user.roomId}</span>
             {user.isAdmin && <span className="admin-badge">Admin</span>}
             <button className="logout-button" onClick={handleLogout}>
-              🚪 Logout
+              <LogOut size={16} /> Logout
             </button>
           </div>
         </header>
@@ -176,10 +178,6 @@ const AppContent: React.FC = () => {
         <main className={`main-content ${isPanelOpen ? 'panel-open' : ''}`}>
           {renderActiveModule()}
         </main>
-
-        <footer className="App-footer">
-          <p>Stargety Oasis - Virtual World Platform</p>
-        </footer>
       </div>
     </EventBusProvider>
   );

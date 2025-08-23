@@ -1,221 +1,157 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Smile } from 'lucide-react';
+import { Send, Smile, Laugh, Heart, ThumbsUp, ThumbsDown, PartyPopper, Frown } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import { useEventBus } from '../../shared/EventBusContext';
 import './ChatModule.css';
 
-interface ChatMessage {
-  id: string;
-  message: string;
-  user: string;
-  timestamp: Date;
-  type: 'message' | 'system' | 'emoji';
-}
-
-interface User {
-  id: string;
-  name: string;
-  isOnline: boolean;
-  lastSeen?: Date;
-}
-
-
-
 interface ChatModuleProps {
-  serverUrl?: string;
-  roomId?: string;
-  currentUser: string;
   className?: string;
+  roomId?: string;
+  currentUser?: string;
 }
 
-export const ChatModule: React.FC<ChatModuleProps> = ({
-  serverUrl = 'http://localhost:3001',
+interface Message {
+  id: string;
+  user: string;
+  message: string;
+  timestamp: Date;
+  type: 'user' | 'system';
+}
+
+export const ChatModule: React.FC<ChatModuleProps> = ({ 
+  className = '', 
   roomId = 'general',
-  currentUser,
-  className = '',
+  currentUser = 'Anonymous'
 }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  // State management
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isConnected, setIsConnected] = useState(false);
+  const [users, setUsers] = useState<string[]>([]);
   const [isTyping, setIsTyping] = useState<string[]>([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [socket, setSocket] = useState<Socket | null>(null);
 
-
-  const socketRef = useRef<Socket | null>(null);
+  // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const eventBus = useEventBus();
 
-  // Common emojis for quick access
-  const commonEmojis = ['😀', '😂', '😍', '🤔', '👍', '👎', '❤️', '🎉', '😢', '😮'];
-
-
+  // Common emoji icons for quick access
+  const commonEmojiIcons = [
+    { icon: <Smile size={16} />, label: 'smile' },
+    { icon: <Laugh size={16} />, label: 'laugh' },
+    { icon: <Heart size={16} />, label: 'heart' },
+    { icon: <ThumbsUp size={16} />, label: 'thumbs-up' },
+    { icon: <ThumbsDown size={16} />, label: 'thumbs-down' },
+    { icon: <PartyPopper size={16} />, label: 'party' },
+    { icon: <Frown size={16} />, label: 'sad' },
+  ];
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-
-
-  const addMessage = useCallback((message: ChatMessage) => {
-    setMessages(prev => [...prev, message]);
-    eventBus.publish('chat:message', {
-      message: message.message,
-      user: message.user,
-      timestamp: message.timestamp,
-    });
-  }, [eventBus]);
-
-  const handleUserJoined = useCallback((user: string) => {
-    setUsers(prev => {
-      const existingUser = prev.find(u => u.name === user);
-      if (existingUser) {
-        return prev.map(u => u.name === user ? { ...u, isOnline: true } : u);
-      }
-      return [...prev, { id: Date.now().toString(), name: user, isOnline: true }];
-    });
-
-    addMessage({
-      id: Date.now().toString(),
-      message: `${user} joined the chat`,
-      user: 'System',
-      timestamp: new Date(),
-      type: 'system',
-    });
-
-    eventBus.publish('chat:userJoined', { user });
-  }, [addMessage, eventBus]);
-
-  const handleUserLeft = useCallback((user: string) => {
-    setUsers(prev => prev.map(u =>
-      u.name === user ? { ...u, isOnline: false, lastSeen: new Date() } : u
-    ));
-
-    addMessage({
-      id: Date.now().toString(),
-      message: `${user} left the chat`,
-      user: 'System',
-      timestamp: new Date(),
-      type: 'system',
-    });
-
-    eventBus.publish('chat:userLeft', { user });
-  }, [addMessage, eventBus]);
-
-  // Initialize socket connection
-  useEffect(() => {
-    socketRef.current = io(serverUrl, {
-      transports: ['websocket'],
-    });
-
-    const socket = socketRef.current;
-
-    socket.on('connect', () => {
-      setIsConnected(true);
-      socket.emit('join-room', { roomId, user: currentUser });
-    });
-
-    socket.on('disconnect', () => {
-      setIsConnected(false);
-    });
-
-    socket.on('chat-message', (data: {
-      id: string;
-      message: string;
-      user: string;
-      timestamp: string;
-      type?: string;
-    }) => {
-      addMessage({
-        ...data,
-        timestamp: new Date(data.timestamp),
-        type: (data.type as 'message' | 'system' | 'emoji') || 'message',
-      });
-    });
-
-    socket.on('user-joined', handleUserJoined);
-    socket.on('user-left', handleUserLeft);
-
-    socket.on('user-typing', (data: { user: string; isTyping: boolean }) => {
-      setIsTyping(prev => {
-        if (data.isTyping && !prev.includes(data.user)) {
-          return [...prev, data.user];
-        } else if (!data.isTyping) {
-          return prev.filter(user => user !== data.user);
-        }
-        return prev;
-      });
-    });
-
-    socket.on('users-list', (usersList: string[]) => {
-      setUsers(usersList.map(user => ({
-        id: Date.now().toString() + user,
-        name: user,
-        isOnline: true,
-      })));
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, [serverUrl, roomId, currentUser, addMessage, handleUserJoined, handleUserLeft]);
-
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  const sendMessage = useCallback(() => {
-    if (!inputMessage.trim() || !socketRef.current || !isConnected) return;
+  // Socket connection
+  useEffect(() => {
+    const newSocket = io('http://localhost:3001');
+    setSocket(newSocket);
 
-    const messageData = {
+    newSocket.on('connect', () => {
+      setIsConnected(true);
+      newSocket.emit('join-room', { roomId, user: currentUser });
+    });
+
+    newSocket.on('disconnect', () => {
+      setIsConnected(false);
+    });
+
+    newSocket.on('message', (message: Message) => {
+      setMessages(prev => [...prev, message]);
+    });
+
+    newSocket.on('user-joined', (data: { user: string; users: string[] }) => {
+      setUsers(data.users);
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        user: 'System',
+        message: `${data.user} joined the chat`,
+        timestamp: new Date(),
+        type: 'system'
+      }]);
+    });
+
+    newSocket.on('user-left', (data: { user: string; users: string[] }) => {
+      setUsers(data.users);
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        user: 'System',
+        message: `${data.user} left the chat`,
+        timestamp: new Date(),
+        type: 'system'
+      }]);
+    });
+
+    newSocket.on('typing', (data: { user: string; isTyping: boolean }) => {
+      setIsTyping(prev => {
+        if (data.isTyping) {
+          return prev.includes(data.user) ? prev : [...prev, data.user];
+        } else {
+          return prev.filter(user => user !== data.user);
+        }
+      });
+    });
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, [roomId, currentUser]);
+
+  const sendMessage = useCallback(() => {
+    if (!inputMessage.trim() || !socket || !isConnected) return;
+
+    const message: Message = {
       id: Date.now().toString(),
-      message: inputMessage.trim(),
       user: currentUser,
-      timestamp: new Date().toISOString(),
-      roomId,
+      message: inputMessage.trim(),
+      timestamp: new Date(),
+      type: 'user'
     };
 
-    socketRef.current.emit('send-message', messageData);
+    socket.emit('message', { roomId, message });
     setInputMessage('');
     setShowEmojiPicker(false);
-
-    // Stop typing indicator
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    socketRef.current.emit('typing', { user: currentUser, isTyping: false });
-  }, [inputMessage, currentUser, roomId, isConnected]);
+  }, [inputMessage, socket, isConnected, roomId, currentUser]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setInputMessage(e.target.value);
-
-    // Typing indicator
-    if (socketRef.current && isConnected) {
-      socketRef.current.emit('typing', { user: currentUser, isTyping: true });
-
+    
+    if (socket && isConnected) {
+      socket.emit('typing', { roomId, user: currentUser, isTyping: true });
+      
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
-
+      
       typingTimeoutRef.current = setTimeout(() => {
-        if (socketRef.current) {
-          socketRef.current.emit('typing', { user: currentUser, isTyping: false });
-        }
+        socket.emit('typing', { roomId, user: currentUser, isTyping: false });
       }, 1000);
     }
-  }, [currentUser, isConnected]);
+  }, [socket, isConnected, roomId, currentUser]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
       e.preventDefault();
       sendMessage();
     }
   }, [sendMessage]);
 
-  const addEmoji = useCallback((emoji: string) => {
-    setInputMessage(prev => prev + emoji);
+  const addEmoji = useCallback((emojiLabel: string) => {
+    setInputMessage(prev => prev + `:${emojiLabel}: `);
     setShowEmojiPicker(false);
   }, []);
 
@@ -225,7 +161,6 @@ export const ChatModule: React.FC<ChatModuleProps> = ({
 
   return (
     <div className={`chat-module ${className}`}>
-      {/* Main Chat Area */}
       <div className="chat-main">
         <div className="chat-header">
           <h3>Chat - {roomId}</h3>
@@ -239,77 +174,79 @@ export const ChatModule: React.FC<ChatModuleProps> = ({
 
         <div className="chat-content">
           <div className="messages-container">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`message ${message.type} ${
-                message.user === currentUser ? 'own-message' : ''
-              }`}
-            >
-              {message.type !== 'system' && (
-                <div className="message-header">
-                  <span className="username">{message.user}</span>
-                  <span className="timestamp">{formatTimestamp(message.timestamp)}</span>
-                </div>
-              )}
-              <div className="message-content">{message.message}</div>
-            </div>
-          ))}
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`message ${message.type} ${
+                  message.user === currentUser ? 'own-message' : ''
+                }`}
+              >
+                {message.type !== 'system' && (
+                  <div className="message-header">
+                    <span className="username">{message.user}</span>
+                    <span className="timestamp">{formatTimestamp(message.timestamp)}</span>
+                  </div>
+                )}
+                <div className="message-content">{message.message}</div>
+              </div>
+            ))}
 
-          {isTyping.length > 0 && (
-            <div className="typing-indicator">
-              {isTyping.join(', ')} {isTyping.length === 1 ? 'is' : 'are'} typing...
-            </div>
-          )}
+            {isTyping.length > 0 && (
+              <div className="typing-indicator">
+                {isTyping.join(', ')} {isTyping.length === 1 ? 'is' : 'are'} typing...
+              </div>
+            )}
 
-          <div ref={messagesEndRef} />
-        </div>
-
+            <div ref={messagesEndRef} />
+          </div>
         </div>
 
         <div className="chat-input-container">
-        {showEmojiPicker && (
-          <div className="emoji-picker">
-            {commonEmojis.map((emoji) => (
-              <button
-                key={emoji}
-                className="emoji-button"
-                onClick={() => addEmoji(emoji)}
-              >
-                {emoji}
-              </button>
-            ))}
+          {showEmojiPicker && (
+            <div className="emoji-picker">
+              {commonEmojiIcons.map((emojiIcon) => (
+                <button
+                  key={emojiIcon.label}
+                  className="emoji-button"
+                  onClick={() => addEmoji(emojiIcon.label)}
+                  title={emojiIcon.label}
+                >
+                  {emojiIcon.icon}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="input-row">
+            <button
+              className="emoji-toggle"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            >
+              <Smile size={20} />
+            </button>
+
+            <input
+              type="text"
+              value={inputMessage}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message..."
+              disabled={!isConnected}
+              className="message-input"
+            />
+
+            <button
+              onClick={sendMessage}
+              disabled={!inputMessage.trim() || !isConnected}
+              className="send-button"
+            >
+              <Send size={20} />
+            </button>
           </div>
-        )}
-
-        <div className="input-row">
-          <button
-            className="emoji-toggle"
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-          >
-            <Smile size={20} />
-          </button>
-
-          <input
-            type="text"
-            value={inputMessage}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
-            disabled={!isConnected}
-            className="message-input"
-          />
-
-          <button
-            onClick={sendMessage}
-            disabled={!inputMessage.trim() || !isConnected}
-            className="send-button"
-          >
-            <Send size={20} />
-          </button>
-        </div>
         </div>
       </div>
     </div>
   );
 };
+
+export default ChatModule;

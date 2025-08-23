@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { Star, ChevronUp, ChevronDown, AlertTriangle, Eye, EyeOff, Rocket, Lightbulb } from 'lucide-react';
 import { useAuth } from '../../shared/AuthContext';
 import './LoginModule.css';
 
@@ -141,7 +142,9 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
         {/* Header */}
         <div className="login-header">
           <div className="logo">
-            <div className="logo-icon">🌟</div>
+            <div className="logo-icon">
+              <Star size={32} />
+            </div>
             <h1>Stargety Oasis</h1>
           </div>
           <p className="tagline">Your collaborative digital workspace</p>
@@ -155,7 +158,11 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
             onClick={() => setShowTestAccounts(!showTestAccounts)}
             disabled={isSubmitting || isLoading}
           >
-            {showTestAccounts ? '🔼' : '🔽'} Demo Accounts
+            {showTestAccounts ? (
+              <ChevronUp size={16} />
+            ) : (
+              <ChevronDown size={16} />
+            )} Demo Accounts
           </button>
 
           {showTestAccounts && (
@@ -199,7 +206,9 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
           {/* General Error */}
           {errors.general && (
             <div className="error-message general-error">
-              <span className="error-icon">⚠️</span>
+              <span className="error-icon">
+                <AlertTriangle size={16} />
+              </span>
               {errors.general}
             </div>
           )}
@@ -222,7 +231,9 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
             />
             {errors.username && (
               <div className="error-message">
-                <span className="error-icon">⚠️</span>
+                <span className="error-icon">
+                  <AlertTriangle size={16} />
+                </span>
                 {errors.username}
               </div>
             )}
@@ -252,7 +263,11 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
                 disabled={isSubmitting || isLoading}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                {showPassword ? '👁️' : '👁️‍🗨️'}
+                {showPassword ? (
+                  <EyeOff size={16} />
+                ) : (
+                  <Eye size={16} />
+                )}
               </button>
             </div>
             {errors.password && (
@@ -317,7 +332,7 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
               </>
             ) : (
               <>
-                🚀 Sign In
+                <Rocket size={16} /> Sign In
               </>
             )}
           </button>
@@ -327,7 +342,7 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
         {/* Footer */}
         <div className="login-footer">
           <p>
-            💡 <strong>Demo Mode:</strong> Any username/password combination works,
+            <Lightbulb size={16} className="demo-icon" /> <strong>Demo Mode:</strong> Any username/password combination works,
             or use the demo accounts above for testing specific features.
           </p>
         </div>

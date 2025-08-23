@@ -3,16 +3,17 @@
   position: fixed;
   top: 0;
   right: 0;
-  width: 320px;
+  width: var(--sidebar-width, 380px);
   height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+  background: var(--color-bg-secondary);
+  border-left: 1px solid var(--color-border-light);
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
   transform: translateX(100%);
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  color: white;
+  color: var(--color-text-primary);
   overflow: hidden;
 }
 
@@ -41,45 +42,44 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.1);
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border-light);
+  background: var(--color-bg-tertiary);
 }
 
 .panel-title h3 {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   font-weight: 600;
-  color: white;
+  color: var(--color-text-primary);
 }
 
 .user-indicator {
-  font-size: 0.85rem;
-  opacity: 0.9;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 4px;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
 }
 
 .admin-badge-small {
-  background: #ff6b6b;
-  color: white;
-  padding: 2px 6px;
-  border-radius: 10px;
-  font-size: 0.7rem;
+  background: var(--color-accent);
+  color: var(--color-text-primary);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--spacing-sm);
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
 .panel-close-button {
   background: none;
   border: none;
-  color: white;
-  font-size: 1.5rem;
+  color: var(--color-text-secondary);
   cursor: pointer;
-  padding: 8px;
+  padding: var(--spacing-sm);
   border-radius: 50%;
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -88,40 +88,41 @@
 }
 
 .panel-close-button:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
 }
 
 /* Panel Tabs */
 .panel-tabs {
   display: flex;
-  background: rgba(255, 255, 255, 0.1);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border-light);
 }
 
 .panel-tab {
   flex: 1;
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.7);
-  padding: 12px 8px;
+  color: var(--color-text-secondary);
+  padding: var(--spacing-md) var(--spacing-sm);
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  font-size: 0.85rem;
+  gap: var(--spacing-xs);
+  font-size: 0.875rem;
   position: relative;
 }
 
 .panel-tab:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
 }
 
 .panel-tab.active {
-  color: white;
-  background: rgba(255, 255, 255, 0.15);
+  color: var(--color-accent);
+  background: var(--color-bg-secondary);
 }
 
 .panel-tab.active::after {
@@ -131,7 +132,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: #4ecdc4;
+  background: var(--color-accent);
 }
 
 .tab-icon {
@@ -173,11 +174,11 @@
 /* Panel Toggle Button */
 .panel-toggle {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
+  bottom: var(--spacing-lg);
+  right: var(--spacing-lg);
   width: 56px;
   height: 56px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-accent);
   border: none;
   border-radius: 50%;
   cursor: pointer;
@@ -185,17 +186,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   transition: all 0.3s ease;
 }
 
 .panel-toggle:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+  background: var(--color-accent-hover);
 }
 
 .panel-toggle.open {
-  background: #ff6b6b;
+  background: var(--color-bg-tertiary);
+  border: 2px solid var(--color-border);
 }
 
 /* Chat Icon Animation */

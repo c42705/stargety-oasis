@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { Settings, Save, RotateCcw, AlertTriangle, Check, X } from 'lucide-react';
 import { useSettings, VideoServiceType } from '../../shared/SettingsContext';
 import './SettingsModule.css';
 
@@ -88,7 +89,9 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ className = '' }
   return (
     <div className={`settings-module ${className}`}>
       <div className="settings-header">
-        <h2>⚙️ Admin Settings</h2>
+        <h2>
+          <Settings size={24} className="settings-icon" /> Admin Settings
+        </h2>
         <p className="settings-subtitle">Configure video calling service and application preferences</p>
       </div>
 
@@ -154,7 +157,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ className = '' }
               </>
             ) : (
               <>
-                💾 {hasChanges ? 'Apply Changes' : 'No Changes'}
+                <Save size={16} /> {hasChanges ? 'Apply Changes' : 'No Changes'}
               </>
             )}
           </button>
@@ -164,14 +167,18 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ className = '' }
             className="reset-button"
             disabled={isSaving}
           >
-            🔄 Reset to Defaults
+            <RotateCcw size={16} /> Reset to Defaults
           </button>
         </div>
 
         {/* Status Messages */}
         {saveMessage && (
           <div className={`save-message ${saveMessage.includes('Failed') ? 'error' : 'success'}`}>
-            {saveMessage.includes('Failed') ? '❌' : '✅'} {saveMessage}
+            {saveMessage.includes('Failed') ? (
+              <X size={16} className="error-icon" />
+            ) : (
+              <Check size={16} className="success-icon" />
+            )} {saveMessage}
           </div>
         )}
       </div>
@@ -180,7 +187,9 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ className = '' }
       {showConfirmDialog && (
         <div className="confirmation-overlay">
           <div className="confirmation-dialog">
-            <h3>⚠️ Confirm Service Change</h3>
+            <h3>
+              <AlertTriangle size={20} className="warning-icon" /> Confirm Service Change
+            </h3>
             <p>
               You are about to change the video calling service from{' '}
               <strong>{videoServiceOptions.find(o => o.value === settings.videoService)?.label}</strong> to{' '}
@@ -191,10 +200,10 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ className = '' }
             </p>
             <div className="confirmation-actions">
               <button onClick={handleConfirmChange} className="confirm-button">
-                ✅ Confirm Change
+                <Check size={16} /> Confirm Change
               </button>
               <button onClick={handleCancelChange} className="cancel-button">
-                ❌ Cancel
+                <X size={16} /> Cancel
               </button>
             </div>
           </div>

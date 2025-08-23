@@ -18,7 +18,7 @@ export const CHAT_CONFIG = {
   MAX_MESSAGES_HISTORY: 100,
   TYPING_TIMEOUT: 1000,
   RECONNECT_INTERVAL: 5000,
-  EMOJI_LIST: ['😀', '😂', '😍', '🤔', '👍', '👎', '❤️', '🎉', '😢', '😮'],
+  EMOJI_LIST: ['😀', '😂', '😍', '🤔', '👍', '👎', '❤️', '🎉', '😢', '😮'], // Note: These are kept as emojis for chat functionality
 } as const;
 
 // Video Call Configuration

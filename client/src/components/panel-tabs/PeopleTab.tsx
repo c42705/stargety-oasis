@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Hash, Lock, Plus, Circle } from 'lucide-react';
+import { Hash, Lock, Plus, Circle, Search, MessageCircle, Phone, MoreHorizontal, Users, Clipboard } from 'lucide-react';
 import './PanelTabs.css';
 
 interface Channel {
@@ -315,7 +315,9 @@ export const PeopleTab: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
           />
-          <span className="search-icon">🔍</span>
+          <span className="search-icon">
+            <Search size={16} />
+          </span>
         </div>
         
         <div className="status-filter">
@@ -359,20 +361,20 @@ export const PeopleTab: React.FC = () => {
               </div>
               {member.location && (
                 <div className="person-location">
-                  📍 {member.location}
+                  <span className="location-icon">📍</span> {member.location}
                 </div>
               )}
             </div>
             
             <div className="person-actions">
               <button className="action-btn" title="Send Message">
-                💬
+                <MessageCircle size={16} />
               </button>
               <button className="action-btn" title="Start Call">
-                📞
+                <Phone size={16} />
               </button>
               <button className="action-btn" title="More Options">
-                ⋯
+                <MoreHorizontal size={16} />
               </button>
             </div>
           </div>
@@ -382,11 +384,15 @@ export const PeopleTab: React.FC = () => {
           {/* Quick Actions */}
           <div className="people-quick-actions">
             <button className="quick-action-btn">
-              <span className="action-icon">👥</span>
+              <span className="action-icon">
+                <Users size={16} />
+              </span>
               <span>Invite People</span>
             </button>
             <button className="quick-action-btn">
-              <span className="action-icon">📋</span>
+              <span className="action-icon">
+                <Clipboard size={16} />
+              </span>
               <span>Manage Team</span>
             </button>
           </div>

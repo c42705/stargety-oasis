@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Phaser from 'phaser';
 import { useEventBus } from '../../shared/EventBusContext';
-import { useSettings } from '../../shared/SettingsContext';
+
 import { VideoServiceModal } from '../../components/VideoServiceModal';
 import './WorldModule.css';
 
@@ -22,17 +22,7 @@ interface InteractiveArea {
   icon: string;
 }
 
-interface MeetingRoomData {
-  id: string;
-  name: string;
-  description: string;
-  participants: Array<{
-    id: string;
-    name: string;
-    avatar: string;
-  }>;
-  onlineCount: number;
-}
+
 
 class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite;
@@ -344,12 +334,12 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
 }) => {
   const gameRef = useRef<HTMLDivElement>(null);
   const phaserGameRef = useRef<Phaser.Game | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [selectedArea, setSelectedArea] = useState<InteractiveArea | null>(null);
   const [isLoadingVideo, setIsLoadingVideo] = useState(false);
   const eventBus = useEventBus();
-  const { settings } = useSettings();
+
 
   const handleAreaClick = (areaId: string) => {
     const areas: InteractiveArea[] = [
@@ -431,7 +421,6 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
     };
 
     phaserGameRef.current = new Phaser.Game(config);
-    setIsLoaded(true);
 
     return () => {
       if (phaserGameRef.current) {
@@ -441,81 +430,14 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
     };
   }, [eventBus, playerId]);
 
-  // Mock meeting data
-  const getMeetingData = (areaId: string): MeetingRoomData => {
-    const meetingData: Record<string, MeetingRoomData> = {
-      'meeting-room': {
-        id: 'meeting-room',
-        name: 'Meeting Room',
-        description: 'Join the weekly team sync',
-        participants: [
-          { id: '1', name: 'Alice Johnson', avatar: 'AJ' },
-          { id: '2', name: 'Bob Smith', avatar: 'BS' },
-          { id: '3', name: 'Charlie Davis', avatar: 'CD' }
-        ],
-        onlineCount: 3
-      },
-      'presentation-hall': {
-        id: 'presentation-hall',
-        name: 'Presentation Hall',
-        description: 'Watch presentations and demos',
-        participants: [
-          { id: '1', name: 'Diana Wilson', avatar: 'DW' },
-          { id: '2', name: 'Emma Brown', avatar: 'EB' }
-        ],
-        onlineCount: 2
-      },
-      'coffee-corner': {
-        id: 'coffee-corner',
-        name: 'Coffee Corner',
-        description: 'Casual conversations',
-        participants: [
-          { id: '1', name: 'Frank Miller', avatar: 'FM' }
-        ],
-        onlineCount: 1
-      },
-      'game-zone': {
-        id: 'game-zone',
-        name: 'Game Zone',
-        description: 'Fun and games',
-        participants: [
-          { id: '1', name: 'Grace Lee', avatar: 'GL' },
-          { id: '2', name: 'Henry Kim', avatar: 'HK' },
-          { id: '3', name: 'Ivy Chen', avatar: 'IC' }
-        ],
-        onlineCount: 3
-      }
-    };
 
-    return meetingData[areaId] || meetingData['meeting-room'];
-  };
 
-  const currentMeetingData = selectedArea ? getMeetingData(selectedArea.id) : null;
+
 
   return (
     <div className={`world-module ${className}`}>
-      <div className="world-header">
-        <h3>Virtual World</h3>
-        <div className="world-info">
-          <span>Player: {playerId}</span>
-          <span className={`status ${isLoaded ? 'loaded' : 'loading'}`}>
-            {isLoaded ? '🟢 Ready' : '🟡 Loading...'}
-          </span>
-        </div>
-      </div>
-
       <div className="world-container">
         <div ref={gameRef} className="game-canvas" />
-
-        <div className="world-controls">
-          <div className="controls-info">
-            <h4>Controls:</h4>
-            <p>🖱️ Click to move</p>
-            <p>⌨️ Arrow keys</p>
-            <p>🟢 You (Green)</p>
-            <p>🎯 Click colored areas to join meetings</p>
-          </div>
-        </div>
       </div>
 
       {/* Video Service Modal */}

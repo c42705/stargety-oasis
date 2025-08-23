@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Circle, Save, Edit, Lock, Mail, LogOut } from 'lucide-react';
 import { useAuth } from '../../shared/AuthContext';
 import { useSettings } from '../../shared/SettingsContext';
 import './PanelTabs.css';
@@ -44,11 +45,11 @@ export const MyProfileTab: React.FC = () => {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'online': return '🟢';
-      case 'busy': return '🔴';
-      case 'away': return '🟡';
-      case 'offline': return '⚫';
-      default: return '🟢';
+      case 'online': return <Circle size={10} className="status-online" fill="currentColor" />;
+      case 'busy': return <Circle size={10} className="status-busy" fill="currentColor" />;
+      case 'away': return <Circle size={10} className="status-away" fill="currentColor" />;
+      case 'offline': return <Circle size={10} className="status-offline" fill="currentColor" />;
+      default: return <Circle size={10} className="status-online" fill="currentColor" />;
     }
   };
 
@@ -86,10 +87,10 @@ export const MyProfileTab: React.FC = () => {
             onChange={(e) => handlePreferenceChange('status', e.target.value)}
             className="status-select"
           >
-            <option value="online">🟢 Online</option>
-            <option value="busy">🔴 Busy</option>
-            <option value="away">🟡 Away</option>
-            <option value="offline">⚫ Offline</option>
+            <option value="online">● Online</option>
+            <option value="busy">● Busy</option>
+            <option value="away">● Away</option>
+            <option value="offline">● Offline</option>
           </select>
           
           <input
@@ -110,7 +111,15 @@ export const MyProfileTab: React.FC = () => {
             className="edit-button"
             onClick={() => setIsEditing(!isEditing)}
           >
-            {isEditing ? '💾 Save' : '✏️ Edit'}
+            {isEditing ? (
+              <>
+                <Save size={16} /> Save
+              </>
+            ) : (
+              <>
+                <Edit size={16} /> Edit
+              </>
+            )}
           </button>
         </div>
         
@@ -212,15 +221,21 @@ export const MyProfileTab: React.FC = () => {
         <h4 className="section-title">Account</h4>
         <div className="account-actions">
           <button className="account-btn secondary">
-            <span className="action-icon">🔒</span>
+            <span className="action-icon">
+              <Lock size={16} />
+            </span>
             <span>Change Password</span>
           </button>
           <button className="account-btn secondary">
-            <span className="action-icon">📧</span>
+            <span className="action-icon">
+              <Mail size={16} />
+            </span>
             <span>Update Email</span>
           </button>
           <button className="account-btn danger" onClick={logout}>
-            <span className="action-icon">🚪</span>
+            <span className="action-icon">
+              <LogOut size={16} />
+            </span>
             <span>Sign Out</span>
           </button>
         </div>
