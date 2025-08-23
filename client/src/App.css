@@ -11,7 +11,7 @@
 .App-header {
   background: var(--color-bg-secondary);
   color: var(--color-text-primary);
-  padding: var(--spacing-md) var(--spacing-lg);
+  padding: var(--spacing-xs) var(--spacing-xs);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -22,7 +22,7 @@
 
 .App-header h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1rem;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -111,48 +111,7 @@
   100% { transform: rotate(360deg); }
 }
 
-.module-nav {
-  display: flex;
-  background: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border-light);
-  padding: 0;
-}
-
-.nav-button {
-  background: none;
-  border: none;
-  padding: var(--spacing-md) var(--spacing-lg);
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-}
-
-.nav-icon {
-  display: flex;
-  align-items: center;
-}
-
-.nav-label {
-  display: flex;
-  align-items: center;
-}
-
-.nav-button:hover {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-primary);
-}
-
-.nav-button.active {
-  color: var(--color-accent);
-  border-bottom-color: var(--color-accent);
-  background: var(--color-bg-primary);
-}
+/* Module navigation removed - Virtual World is now the default and only module */
 
 .main-content {
   flex: 1;
@@ -191,17 +150,19 @@
   --color-border-light: #2d3748;
 
   /* Layout */
-  --sidebar-width: 380px;
-  --header-height: 60px;
+  --sidebar-width: 480px;
+  --header-height: 50px;
 }
 
-/* Panel Integration Styles */
+/* Panel Integration Styles - Push Layout */
 .main-content {
-  transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 100%;
 }
 
 .main-content.panel-open {
-  margin-right: var(--sidebar-width);
+  width: calc(100% - var(--sidebar-width));
+  margin-right: 0;
 }
 
 /* Responsive design */
@@ -214,46 +175,24 @@
     flex-direction: column;
     gap: var(--spacing-sm);
     text-align: center;
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: var(--spacing-xs) var(--spacing-xs);
   }
 
   .user-info {
     justify-content: center;
   }
 
-  .module-nav {
-    flex-direction: column;
-  }
-
-  .nav-button {
-    padding: var(--spacing-sm) var(--spacing-md);
-    border-bottom: none;
-    border-right: 2px solid transparent;
-  }
-
-  .nav-button.active {
-    border-bottom: none;
-    border-right-color: var(--color-accent);
-  }
-
-  /* Mobile panel adjustments */
+  /* Mobile panel adjustments - Keep push layout */
   .main-content.panel-open {
+    width: calc(100% - 100vw);
     margin-right: 0;
   }
 }
 
 @media (max-width: 480px) {
-  .App-header h1 {
-    font-size: 1.25rem;
-  }
-
+  
   .user-info {
     flex-direction: column;
     gap: var(--spacing-sm);
-  }
-
-  .nav-button {
-    padding: var(--spacing-sm) var(--spacing-md);
-    font-size: 0.875rem;
   }
 }

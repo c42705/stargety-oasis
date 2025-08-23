@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
-import { Video, Globe, Settings, MessageCircle, Users, User, Star, LogOut } from 'lucide-react';
+import { MessageCircle, Users, User, Star, LogOut, Settings } from 'lucide-react';
 import { EventBusProvider } from './shared/EventBusContext';
-import { SettingsProvider, useSettings } from './shared/SettingsContext';
+import { SettingsProvider } from './shared/SettingsContext';
 import { AuthProvider, useAuth } from './shared/AuthContext';
 import { ChatModule } from './modules/chat/ChatModule';
-import { VideoCallModule } from './modules/video-call/VideoCallModule';
 import { WorldModule } from './modules/world/WorldModule';
-import { RingCentralModule } from './modules/ringcentral/RingCentralModule';
 import { SettingsModule } from './modules/settings/SettingsModule';
 import { LoginModule } from './modules/login/LoginModule';
 import { SlidingPanel, PanelToggle, PanelTab } from './components/SlidingPanel';
@@ -14,13 +12,9 @@ import { PeopleTab } from './components/panel-tabs/PeopleTab';
 import { MyProfileTab } from './components/panel-tabs/MyProfileTab';
 import './App.css';
 
-type ActiveModule = 'video' | 'world' | 'ringcentral' | 'settings';
-
 // Inner App component that uses both auth and settings context
 const AppContent: React.FC = () => {
   const { user, logout } = useAuth();
-  const { settings } = useSettings();
-  const [activeModule, setActiveModule] = useState<ActiveModule>('world');
   const [isPanelOpen, setIsPanelOpen] = useState(false);
 
   // If no user is authenticated, this shouldn't render
@@ -28,71 +22,7 @@ const AppContent: React.FC = () => {
     return null;
   }
 
-  const renderActiveModule = () => {
-    switch (activeModule) {
-      case 'video':
-        // Show the selected video service based on settings
-        if (settings.videoService === 'jitsi') {
-          return (
-            <VideoCallModule
-              roomId={user.roomId}
-              userName={user.username}
-              className="module-content"
-            />
-          );
-        } else {
-          return (
-            <RingCentralModule
-              userName={user.username}
-              className="module-content"
-            />
-          );
-        }
-      case 'world':
-        return (
-          <WorldModule
-            playerId={user.username}
-            className="module-content"
-          />
-        );
-      case 'settings':
-        return (
-          <SettingsModule
-            className="module-content"
-          />
-        );
-      default:
-        return null;
-    }
-  };
 
-  // Get available navigation tabs based on admin status
-  const getNavigationTabs = () => {
-    const baseTabs = [
-      // Chat is now accessible through the side panel, so removed from main navigation
-      {
-        id: 'video' as ActiveModule,
-        label: `${settings.videoService === 'jitsi' ? 'Jitsi Meet' : 'RingCentral'}`,
-        icon: <Video size={18} />
-      },
-      {
-        id: 'world' as ActiveModule,
-        label: 'Virtual World',
-        icon: <Globe size={18} />
-      },
-    ];
-
-    // Add settings tab for admin users
-    if (user.isAdmin) {
-      baseTabs.push({
-        id: 'settings' as ActiveModule,
-        label: 'Settings',
-        icon: <Settings size={18} />
-      });
-    }
-
-    return baseTabs;
-  };
 
   // Handle logout
   const handleLogout = () => {
@@ -132,6 +62,20 @@ const AppContent: React.FC = () => {
     }
   ];
 
+  // Add settings tab for admin users
+  if (user.isAdmin) {
+    panelTabs.push({
+      id: 'settings',
+      label: 'Settings',
+      icon: <Settings size={16} />,
+      component: (
+        <SettingsModule
+          className="panel-settings-module"
+        />
+      )
+    });
+  }
+
   return (
     <EventBusProvider>
       <div className="App">
@@ -162,21 +106,11 @@ const AppContent: React.FC = () => {
           </div>
         </header>
 
-        <nav className="module-nav">
-          {getNavigationTabs().map((tab) => (
-            <button
-              key={tab.id}
-              className={`nav-button ${activeModule === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveModule(tab.id)}
-            >
-              <span className="nav-icon">{tab.icon}</span>
-              <span className="nav-label">{tab.label}</span>
-            </button>
-          ))}
-        </nav>
-
         <main className={`main-content ${isPanelOpen ? 'panel-open' : ''}`}>
-          {renderActiveModule()}
+          <WorldModule
+            playerId={user.username}
+            className="module-content"
+          />
         </main>
       </div>
     </EventBusProvider>

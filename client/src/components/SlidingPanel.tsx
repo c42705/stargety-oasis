@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, X } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { useAuth } from '../shared/AuthContext';
 import './SlidingPanel.css';
 
@@ -62,16 +62,7 @@ export const SlidingPanel: React.FC<SlidingPanelProps> = ({
 
   return (
     <>
-      {/* Overlay for mobile */}
-      {isOpen && (
-        <div 
-          className="sliding-panel-overlay"
-          onClick={onToggle}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Panel */}
+      {/* Panel - No overlay for push layout */}
       <div className={`sliding-panel ${isOpen ? 'open' : 'closed'} ${className}`}>
         {/* Panel Header */}
         <div className="panel-header">
@@ -131,19 +122,20 @@ export const PanelToggle: React.FC<PanelToggleProps> = ({
   onToggle,
   className = ''
 }) => {
+  // Only render the floating button when the panel is closed
+  if (isOpen) {
+    return null;
+  }
+
   return (
     <button
-      className={`panel-toggle ${isOpen ? 'open' : ''} ${className}`}
+      className={`panel-toggle ${className}`}
       onClick={onToggle}
-      aria-label={isOpen ? 'Close chat panel' : 'Open chat panel'}
-      aria-expanded={isOpen}
+      aria-label="Open chat panel"
+      aria-expanded={false}
     >
       <div className="chat-icon">
-        {isOpen ? (
-          <X size={20} className="close-icon" />
-        ) : (
-          <MessageCircle size={20} className="message-icon" />
-        )}
+        <MessageCircle size={20} className="message-icon" />
       </div>
     </button>
   );

@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Smile, Laugh, Heart, ThumbsUp, ThumbsDown, PartyPopper, Frown } from 'lucide-react';
-import { io, Socket } from 'socket.io-client';
-import { useEventBus } from '../../shared/EventBusContext';
 import './ChatModule.css';
 
 interface ChatModuleProps {
@@ -24,18 +22,22 @@ export const ChatModule: React.FC<ChatModuleProps> = ({
   currentUser = 'Anonymous'
 }) => {
   // State management
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      user: 'System',
+      message: 'Welcome to the chat! Start a conversation...',
+      timestamp: new Date(),
+      type: 'system'
+    }
+  ]);
   const [inputMessage, setInputMessage] = useState('');
-  const [isConnected, setIsConnected] = useState(false);
-  const [users, setUsers] = useState<string[]>([]);
-  const [isTyping, setIsTyping] = useState<string[]>([]);
+  const [isConnected, setIsConnected] = useState(true); // Mock as always connected
+  const [users] = useState<string[]>([currentUser, 'Alice', 'Bob']);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [socket, setSocket] = useState<Socket | null>(null);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const eventBus = useEventBus();
 
   // Common emoji icons for quick access
   const commonEmojiIcons = [
@@ -56,63 +58,27 @@ export const ChatModule: React.FC<ChatModuleProps> = ({
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // Socket connection
+  // Mock connection - no socket needed for now
   useEffect(() => {
-    const newSocket = io('http://localhost:3001');
-    setSocket(newSocket);
+    // Simulate connection
+    setIsConnected(true);
 
-    newSocket.on('connect', () => {
-      setIsConnected(true);
-      newSocket.emit('join-room', { roomId, user: currentUser });
-    });
-
-    newSocket.on('disconnect', () => {
-      setIsConnected(false);
-    });
-
-    newSocket.on('message', (message: Message) => {
-      setMessages(prev => [...prev, message]);
-    });
-
-    newSocket.on('user-joined', (data: { user: string; users: string[] }) => {
-      setUsers(data.users);
-      setMessages(prev => [...prev, {
-        id: Date.now().toString(),
-        user: 'System',
-        message: `${data.user} joined the chat`,
-        timestamp: new Date(),
-        type: 'system'
-      }]);
-    });
-
-    newSocket.on('user-left', (data: { user: string; users: string[] }) => {
-      setUsers(data.users);
-      setMessages(prev => [...prev, {
-        id: Date.now().toString(),
-        user: 'System',
-        message: `${data.user} left the chat`,
-        timestamp: new Date(),
-        type: 'system'
-      }]);
-    });
-
-    newSocket.on('typing', (data: { user: string; isTyping: boolean }) => {
-      setIsTyping(prev => {
-        if (data.isTyping) {
-          return prev.includes(data.user) ? prev : [...prev, data.user];
-        } else {
-          return prev.filter(user => user !== data.user);
-        }
-      });
-    });
-
-    return () => {
-      newSocket.disconnect();
-    };
-  }, [roomId, currentUser]);
+    // Add a welcome message when component mounts
+    if (messages.length === 1) { // Only the initial system message
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          user: 'System',
+          message: `Welcome ${currentUser}! You're now connected to ${roomId}.`,
+          timestamp: new Date(),
+          type: 'system'
+        }]);
+      }, 1000);
+    }
+  }, [roomId, currentUser, messages.length]);
 
   const sendMessage = useCallback(() => {
-    if (!inputMessage.trim() || !socket || !isConnected) return;
+    if (!inputMessage.trim() || !isConnected) return;
 
     const message: Message = {
       id: Date.now().toString(),
@@ -122,26 +88,43 @@ export const ChatModule: React.FC<ChatModuleProps> = ({
       type: 'user'
     };
 
-    socket.emit('message', { roomId, message });
+    // Add message to local state (mock functionality)
+    setMessages(prev => [...prev, message]);
     setInputMessage('');
     setShowEmojiPicker(false);
-  }, [inputMessage, socket, isConnected, roomId, currentUser]);
+
+    // Simulate a response from another user occasionally
+    if (Math.random() > 0.7) {
+      setTimeout(() => {
+        const responses = [
+          "That's interesting!",
+          "I agree!",
+          "Good point!",
+          "Thanks for sharing!",
+          "👍",
+          "😊"
+        ];
+        const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+        const responseMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          user: 'Alice',
+          message: randomResponse,
+          timestamp: new Date(),
+          type: 'user'
+        };
+        setMessages(prev => [...prev, responseMessage]);
+      }, 1000 + Math.random() * 2000);
+    }
+  }, [inputMessage, isConnected, currentUser]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setInputMessage(e.target.value);
-    
-    if (socket && isConnected) {
-      socket.emit('typing', { roomId, user: currentUser, isTyping: true });
-      
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-      
-      typingTimeoutRef.current = setTimeout(() => {
-        socket.emit('typing', { roomId, user: currentUser, isTyping: false });
-      }, 1000);
+
+    // Mock typing indicator (simplified for now)
+    if (isConnected) {
+      // Could implement typing indicator logic here if needed
     }
-  }, [socket, isConnected, roomId, currentUser]);
+  }, [isConnected]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -172,33 +155,25 @@ export const ChatModule: React.FC<ChatModuleProps> = ({
           </div>
         </div>
 
-        <div className="chat-content">
-          <div className="messages-container">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`message ${message.type} ${
-                  message.user === currentUser ? 'own-message' : ''
-                }`}
-              >
-                {message.type !== 'system' && (
-                  <div className="message-header">
-                    <span className="username">{message.user}</span>
-                    <span className="timestamp">{formatTimestamp(message.timestamp)}</span>
-                  </div>
-                )}
-                <div className="message-content">{message.message}</div>
-              </div>
-            ))}
+        <div className="messages-container">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`message ${message.type} ${
+                message.user === currentUser ? 'own-message' : ''
+              }`}
+            >
+              {message.type !== 'system' && (
+                <div className="message-header">
+                  <span className="username">{message.user}</span>
+                  <span className="timestamp">{formatTimestamp(message.timestamp)}</span>
+                </div>
+              )}
+              <div className="message-content">{message.message}</div>
+            </div>
+          ))}
 
-            {isTyping.length > 0 && (
-              <div className="typing-indicator">
-                {isTyping.join(', ')} {isTyping.length === 1 ? 'is' : 'are'} typing...
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
+          <div ref={messagesEndRef} />
         </div>
 
         <div className="chat-input-container">
