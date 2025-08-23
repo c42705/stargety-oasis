@@ -34,6 +34,18 @@ class GameScene extends Phaser.Scene {
   private onAreaClick: (areaId: string) => void;
   private currentArea: string | null = null;
 
+  // Interactive controls
+  private spaceKey!: Phaser.Input.Keyboard.Key;
+  private xKey!: Phaser.Input.Keyboard.Key;
+  private oKey!: Phaser.Input.Keyboard.Key;
+
+  // Animation states
+  private isJumping: boolean = false;
+  private isRotating: boolean = false;
+  private originalY: number = 0;
+  private fireEffects: Phaser.GameObjects.Graphics[] = [];
+  private rotationTween?: Phaser.Tweens.Tween;
+
   constructor(eventBus: any, playerId: string, onAreaClick: (areaId: string) => void) {
     super({ key: 'GameScene' });
     this.eventBus = eventBus;
@@ -171,11 +183,12 @@ class GameScene extends Phaser.Scene {
     bg.fillRect(0, 0, 800, 600);
 
     // Add instructions
-    this.add.text(20, 20, 'Use arrow keys to move around\nWalk into colored areas to interact', {
-      fontSize: '14px',
+    this.add.text(20, 20, 'Controls:\n• Arrow keys: Move around\n• SPACEBAR: Jump\n• X: Fire\n• O: Toggle rotation\n• Walk into colored areas to interact', {
+      fontSize: '12px',
       color: '#333333',
-      backgroundColor: 'rgba(255, 255, 255, 0.8)',
-      padding: { x: 8, y: 6 }
+      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      padding: { x: 10, y: 8 },
+      lineSpacing: 2
     });
 
     // Create interactive areas first
@@ -187,6 +200,14 @@ class GameScene extends Phaser.Scene {
 
     // Create cursor keys
     this.cursors = this.input.keyboard!.createCursorKeys();
+
+    // Create custom key bindings for interactive controls
+    this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.xKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.X);
+    this.oKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.O);
+
+    // Set up key event handlers
+    this.setupKeyHandlers();
 
     // Handle click movement (but not on interactive areas)
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer, currentlyOver: Phaser.GameObjects.GameObject[]) => {
@@ -207,6 +228,9 @@ class GameScene extends Phaser.Scene {
       }
     });
 
+    // Store original Y position for jump animation
+    this.originalY = this.player.y;
+
     // Announce player joined
     this.eventBus.publish('world:playerJoined', {
       playerId: this.playerId,
@@ -215,40 +239,243 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  private setupKeyHandlers() {
+    // Jump action (Spacebar)
+    this.spaceKey.on('down', () => {
+      this.performJump();
+    });
+
+    // Fire action (X key)
+    this.xKey.on('down', () => {
+      this.performFire();
+    });
+
+    // Rotation toggle (O key)
+    this.oKey.on('down', () => {
+      this.toggleRotation();
+    });
+  }
+
+  private performJump() {
+    if (this.isJumping) return; // Prevent multiple jumps
+
+    this.isJumping = true;
+    const jumpHeight = 60;
+    const jumpDuration = 600;
+
+    // Create jump animation using tweens
+    this.tweens.add({
+      targets: this.player,
+      y: this.originalY - jumpHeight,
+      duration: jumpDuration / 2,
+      ease: 'Power2',
+      yoyo: true,
+      onComplete: () => {
+        this.isJumping = false;
+        this.originalY = this.player.y; // Update original position
+      }
+    });
+
+    // Add visual effect for jump
+    this.createJumpEffect();
+  }
+
+  private performFire() {
+    // Create fire effect
+    this.createFireEffect();
+
+    // Add brief cooldown to prevent spam
+    this.xKey.enabled = false;
+    this.time.delayedCall(200, () => {
+      this.xKey.enabled = true;
+    });
+  }
+
+  private toggleRotation() {
+    if (this.isRotating) {
+      // Stop rotation
+      this.isRotating = false;
+      if (this.rotationTween) {
+        this.rotationTween.stop();
+        this.rotationTween = undefined;
+      }
+      // Reset rotation smoothly
+      this.tweens.add({
+        targets: this.player,
+        rotation: 0,
+        duration: 300,
+        ease: 'Power2'
+      });
+    } else {
+      // Start continuous rotation
+      this.isRotating = true;
+      this.rotationTween = this.tweens.add({
+        targets: this.player,
+        rotation: Math.PI * 2,
+        duration: 2000,
+        ease: 'Linear',
+        repeat: -1
+      });
+    }
+  }
+
+  private createJumpEffect() {
+    // Create dust cloud effect at player's feet
+    const dustCloud = this.add.graphics();
+    dustCloud.fillStyle(0xD2B48C, 0.6);
+    dustCloud.fillCircle(this.player.x, this.originalY + 16, 20);
+    dustCloud.setDepth(5);
+
+    // Animate dust cloud
+    this.tweens.add({
+      targets: dustCloud,
+      scaleX: 2,
+      scaleY: 2,
+      alpha: 0,
+      duration: 400,
+      ease: 'Power2',
+      onComplete: () => {
+        dustCloud.destroy();
+      }
+    });
+  }
+
+  private createFireEffect() {
+    // Create projectile/fire effect
+    const projectile = this.add.graphics();
+    projectile.fillStyle(0xFF4500, 0.8);
+    projectile.fillCircle(0, 0, 8);
+    projectile.setPosition(this.player.x, this.player.y);
+    projectile.setDepth(8);
+
+    // Determine direction based on player's last movement or default to right
+    const direction = this.player.scaleX < 0 ? -1 : 1;
+    const targetX = this.player.x + (direction * 150);
+
+    // Animate projectile
+    this.tweens.add({
+      targets: projectile,
+      x: targetX,
+      duration: 500,
+      ease: 'Power2',
+      onComplete: () => {
+        // Create explosion effect
+        this.createExplosionEffect(targetX, this.player.y);
+        projectile.destroy();
+      }
+    });
+
+    // Add fire trail effect
+    const trail = this.add.graphics();
+    trail.lineStyle(4, 0xFF6347, 0.6);
+    trail.beginPath();
+    trail.moveTo(this.player.x, this.player.y);
+    trail.lineTo(targetX, this.player.y);
+    trail.strokePath();
+    trail.setDepth(7);
+
+    // Fade out trail
+    this.tweens.add({
+      targets: trail,
+      alpha: 0,
+      duration: 600,
+      onComplete: () => {
+        trail.destroy();
+      }
+    });
+  }
+
+  private createExplosionEffect(x: number, y: number) {
+    // Create explosion particles
+    for (let i = 0; i < 8; i++) {
+      const particle = this.add.graphics();
+      particle.fillStyle(0xFF4500, 0.8);
+      particle.fillCircle(0, 0, 4);
+      particle.setPosition(x, y);
+      particle.setDepth(9);
+
+      const angle = (i / 8) * Math.PI * 2;
+      const distance = 40 + Math.random() * 20;
+      const targetX = x + Math.cos(angle) * distance;
+      const targetY = y + Math.sin(angle) * distance;
+
+      this.tweens.add({
+        targets: particle,
+        x: targetX,
+        y: targetY,
+        alpha: 0,
+        duration: 300 + Math.random() * 200,
+        ease: 'Power2',
+        onComplete: () => {
+          particle.destroy();
+        }
+      });
+    }
+  }
+
   update() {
-    const speed = 200;
-    let moved = false;
+    // Only allow movement if not jumping (to prevent interference with jump animation)
+    if (!this.isJumping) {
+      const speed = 200;
+      let moved = false;
+      let verticalMovement = false;
 
-    if (this.cursors.left.isDown) {
-      this.player.x -= speed * this.game.loop.delta / 1000;
-      moved = true;
-    } else if (this.cursors.right.isDown) {
-      this.player.x += speed * this.game.loop.delta / 1000;
-      moved = true;
+      if (this.cursors.left.isDown) {
+        this.player.x -= speed * this.game.loop.delta / 1000;
+        this.player.setFlipX(true); // Face left
+        moved = true;
+      } else if (this.cursors.right.isDown) {
+        this.player.x += speed * this.game.loop.delta / 1000;
+        this.player.setFlipX(false); // Face right
+        moved = true;
+      }
+
+      if (this.cursors.up.isDown) {
+        this.player.y -= speed * this.game.loop.delta / 1000;
+        moved = true;
+        verticalMovement = true;
+      } else if (this.cursors.down.isDown) {
+        this.player.y += speed * this.game.loop.delta / 1000;
+        moved = true;
+        verticalMovement = true;
+      }
+
+      // Keep player within bounds
+      this.player.x = Phaser.Math.Clamp(this.player.x, 16, 784);
+      this.player.y = Phaser.Math.Clamp(this.player.y, 16, 584);
+
+      // Update original Y position when moving vertically (but not during jump)
+      if (verticalMovement) {
+        this.originalY = this.player.y;
+      }
+
+      if (moved) {
+        this.eventBus.publish('world:playerMoved', {
+          playerId: this.playerId,
+          x: this.player.x,
+          y: this.player.y,
+        });
+      }
     }
-
-    if (this.cursors.up.isDown) {
-      this.player.y -= speed * this.game.loop.delta / 1000;
-      moved = true;
-    } else if (this.cursors.down.isDown) {
-      this.player.y += speed * this.game.loop.delta / 1000;
-      moved = true;
-    }
-
-    // Keep player within bounds
-    this.player.x = Phaser.Math.Clamp(this.player.x, 16, 784);
-    this.player.y = Phaser.Math.Clamp(this.player.y, 16, 584);
 
     // Check for collision with interactive areas
     this.checkAreaCollisions();
+  }
 
-    if (moved) {
-      this.eventBus.publish('world:playerMoved', {
-        playerId: this.playerId,
-        x: this.player.x,
-        y: this.player.y,
-      });
+  shutdown() {
+    // Clean up rotation tween if it exists
+    if (this.rotationTween) {
+      this.rotationTween.stop();
+      this.rotationTween = undefined;
     }
+
+    // Clean up fire effects
+    this.fireEffects.forEach(effect => {
+      if (effect && effect.scene) {
+        effect.destroy();
+      }
+    });
+    this.fireEffects = [];
   }
 
   private checkAreaCollisions() {
@@ -416,7 +643,7 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
       width: 800,
       height: 600,
       parent: gameRef.current,
-      backgroundColor: '#87CEEB',
+      backgroundColor: '#020811ff',
       scene: new GameScene(eventBus, playerId, handleAreaClick),
     };
 
