@@ -4,6 +4,7 @@ import { MessageCircle, Users, User, Star, LogOut, Settings, MapPin } from 'luci
 import { EventBusProvider } from './shared/EventBusContext';
 import { SettingsProvider } from './shared/SettingsContext';
 import { AuthProvider, useAuth } from './shared/AuthContext';
+import { MapDataProvider } from './shared/MapDataContext';
 import { ChatModule } from './modules/chat/ChatModule';
 import { WorldModule } from './modules/world/WorldModule';
 import { SettingsModule } from './modules/settings/SettingsModule';
@@ -141,7 +142,9 @@ const AuthenticatedApp: React.FC = () => {
   return (
     <SettingsProvider currentUser={user.username}>
       <EventBusProvider>
-        <AppContent />
+        <MapDataProvider>
+          <AppContent />
+        </MapDataProvider>
       </EventBusProvider>
     </SettingsProvider>
   );

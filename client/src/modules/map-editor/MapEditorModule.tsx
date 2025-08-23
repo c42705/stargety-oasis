@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import * as fabric from 'fabric';
+import { useMapData } from '../../shared/MapDataContext';
 import {
   Map,
   Plus,
@@ -19,7 +21,9 @@ import {
   Maximize,
   Undo,
   Redo,
-  Grid3X3
+  Grid3X3,
+  Shield,
+  Eraser
 } from 'lucide-react';
 import './MapEditorModule.css';
 
@@ -27,18 +31,7 @@ interface MapEditorModuleProps {
   className?: string;
 }
 
-interface InteractiveArea {
-  id: string;
-  name: string;
-  type: 'meeting-room' | 'presentation-hall' | 'coffee-corner' | 'game-zone' | 'custom';
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: string;
-  description: string;
-  icon: string;
-}
+// Interfaces are now imported from shared context
 
 interface GridConfig {
   spacing: 10 | 20 | 50 | 100;
@@ -49,7 +42,7 @@ interface GridConfig {
 }
 
 interface EditorState {
-  tool: 'select' | 'move' | 'resize' | 'delete';
+  tool: 'select' | 'move' | 'resize' | 'delete' | 'draw-collision' | 'erase-collision';
   zoom: number;
   mousePosition: { x: number; y: number };
   saveStatus: 'saved' | 'unsaved' | 'saving';
@@ -60,8 +53,11 @@ interface EditorState {
 export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   className = ''
 }) => {
-  const [activeTab, setActiveTab] = useState<'areas' | 'terrain' | 'assets' | 'settings'>('areas');
+  const { mapData, updateInteractiveAreas, updateImpassableAreas } = useMapData();
+  const [activeTab, setActiveTab] = useState<'areas' | 'terrain' | 'assets' | 'settings' | 'collision'>('areas');
   const [previewMode, setPreviewMode] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
 
   // Enhanced editor state
   const [editorState, setEditorState] = useState<EditorState>({
@@ -81,37 +77,14 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
     visible: true,
     snapToGrid: false
   });
-  const [areas] = useState<InteractiveArea[]>([
-    {
-      id: 'meeting-room-1',
-      name: 'Meeting Room',
-      type: 'meeting-room',
-      x: 150,
-      y: 150,
-      width: 120,
-      height: 80,
-      color: '#4A90E2',
-      description: 'Join the weekly team sync',
-      icon: '🏢'
-    },
-    {
-      id: 'coffee-corner-1',
-      name: 'Coffee Corner',
-      type: 'coffee-corner',
-      x: 300,
-      y: 350,
-      width: 100,
-      height: 80,
-      color: '#D2691E',
-      description: 'Casual conversations',
-      icon: '☕'
-    }
-  ]);
+  // Use shared map data
+  const { interactiveAreas: areas, impassableAreas } = mapData;
 
   const tabs = [
     { id: 'areas' as const, label: 'Interactive Areas', icon: <Grid size={16} /> },
     { id: 'terrain' as const, label: 'Terrain', icon: <Layers size={16} /> },
     { id: 'assets' as const, label: 'Assets', icon: <Palette size={16} /> },
+    { id: 'collision' as const, label: 'Collision', icon: <Shield size={16} /> },
     { id: 'settings' as const, label: 'Settings', icon: <Settings size={16} /> }
   ];
 
@@ -160,6 +133,34 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
     setEditorState(prev => ({ ...prev, mousePosition: { x, y } }));
   }, []);
 
+  // Initialize Fabric.js canvas
+  useEffect(() => {
+    if (canvasRef.current && !fabricCanvasRef.current) {
+      const canvas = new fabric.Canvas(canvasRef.current, {
+        width: mapData.worldDimensions.width,
+        height: mapData.worldDimensions.height,
+        backgroundColor: 'transparent'
+      });
+
+      fabricCanvasRef.current = canvas;
+
+      // Initialize canvas with current map data
+      initializeCanvasObjects();
+
+      return () => {
+        canvas.dispose();
+        fabricCanvasRef.current = null;
+      };
+    }
+  }, []);
+
+  // Update canvas when map data changes
+  useEffect(() => {
+    if (fabricCanvasRef.current) {
+      updateCanvasObjects();
+    }
+  }, [mapData]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -173,28 +174,132 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [toggleGrid]);
 
-  // SVG Grid Pattern Component
-  const renderGridPattern = () => (
-    <svg className="grid-pattern" style={{ display: gridConfig.visible ? 'block' : 'none' }}>
-      <defs>
-        <pattern
-          id="grid"
-          width={gridConfig.spacing}
-          height={gridConfig.spacing}
-          patternUnits="userSpaceOnUse"
-        >
-          <path
-            d={`M ${gridConfig.spacing} 0 L 0 0 0 ${gridConfig.spacing}`}
-            fill="none"
-            stroke={gridConfig.color}
-            strokeWidth="1"
-            opacity={gridConfig.opacity / 100}
-          />
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#grid)" />
-    </svg>
-  );
+  // Initialize canvas objects
+  const initializeCanvasObjects = () => {
+    if (!fabricCanvasRef.current) return;
+
+    const canvas = fabricCanvasRef.current;
+    canvas.clear();
+
+    // Add grid pattern if visible
+    if (gridConfig.visible) {
+      addGridToCanvas();
+    }
+
+    // Add interactive areas
+    areas.forEach(area => {
+      addInteractiveAreaToCanvas(area);
+    });
+
+    // Add impassable areas
+    impassableAreas.forEach(area => {
+      addImpassableAreaToCanvas(area);
+    });
+
+    canvas.renderAll();
+  };
+
+  // Update canvas objects when data changes
+  const updateCanvasObjects = () => {
+    initializeCanvasObjects();
+  };
+
+  // Add grid to canvas
+  const addGridToCanvas = () => {
+    if (!fabricCanvasRef.current) return;
+
+    const canvas = fabricCanvasRef.current;
+    const { width, height } = mapData.worldDimensions;
+    const spacing = gridConfig.spacing;
+
+    // Create vertical lines
+    for (let x = 0; x <= width; x += spacing) {
+      const line = new fabric.Line([x, 0, x, height], {
+        stroke: gridConfig.color,
+        strokeWidth: 1,
+        opacity: gridConfig.opacity / 100,
+        selectable: false,
+        evented: false
+      });
+      canvas.add(line);
+    }
+
+    // Create horizontal lines
+    for (let y = 0; y <= height; y += spacing) {
+      const line = new fabric.Line([0, y, width, y], {
+        stroke: gridConfig.color,
+        strokeWidth: 1,
+        opacity: gridConfig.opacity / 100,
+        selectable: false,
+        evented: false
+      });
+      canvas.add(line);
+    }
+  };
+
+  // Add interactive area to canvas
+  const addInteractiveAreaToCanvas = (area: any) => {
+    if (!fabricCanvasRef.current) return;
+
+    const rect = new fabric.Rect({
+      left: area.x,
+      top: area.y,
+      width: area.width,
+      height: area.height,
+      fill: area.color,
+      opacity: 0.7,
+      stroke: area.color,
+      strokeWidth: 2,
+      selectable: true,
+      hasControls: true,
+      hasBorders: true
+    });
+
+    // Add text label
+    const text = new fabric.Text(area.name, {
+      left: area.x + area.width / 2,
+      top: area.y + area.height / 2,
+      fontSize: 12,
+      fill: 'white',
+      textAlign: 'center',
+      originX: 'center',
+      originY: 'center',
+      selectable: false,
+      evented: false
+    });
+
+    const group = new fabric.Group([rect, text], {
+      selectable: true,
+      hasControls: true,
+      hasBorders: true
+    });
+
+    group.set('areaData', area);
+    fabricCanvasRef.current.add(group);
+  };
+
+  // Add impassable area to canvas
+  const addImpassableAreaToCanvas = (area: any) => {
+    if (!fabricCanvasRef.current) return;
+
+    const rect = new fabric.Rect({
+      left: area.x,
+      top: area.y,
+      width: area.width,
+      height: area.height,
+      fill: 'rgba(239, 68, 68, 0.3)',
+      stroke: '#ef4444',
+      strokeWidth: 2,
+      selectable: true,
+      hasControls: true,
+      hasBorders: true
+    });
+
+    rect.set('collisionData', area);
+    fabricCanvasRef.current.add(rect);
+  };
+
+  // Fabric.js canvas replaces the SVG grid pattern
 
   // Toolbar Component
   const renderToolbar = () => (
@@ -228,6 +333,26 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
           title="Delete Tool (D)"
         >
           <Trash2 size={16} />
+        </button>
+      </div>
+
+      <div className="toolbar-divider" />
+
+      <div className="toolbar-section">
+        <span className="toolbar-label">Collision:</span>
+        <button
+          className={`toolbar-btn ${editorState.tool === 'draw-collision' ? 'active' : ''}`}
+          onClick={() => handleToolChange('draw-collision')}
+          title="Draw Impassable Area"
+        >
+          <Shield size={16} />
+        </button>
+        <button
+          className={`toolbar-btn ${editorState.tool === 'erase-collision' ? 'active' : ''}`}
+          onClick={() => handleToolChange('erase-collision')}
+          title="Erase Impassable Area"
+        >
+          <Eraser size={16} />
         </button>
       </div>
 
@@ -316,6 +441,9 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         <span>Areas: {areas.length}</span>
       </div>
       <div className="status-section">
+        <span>Collision: {impassableAreas.length}</span>
+      </div>
+      <div className="status-section">
         <span className={`save-status ${editorState.saveStatus}`}>
           {editorState.saveStatus === 'saved' && '● Saved'}
           {editorState.saveStatus === 'unsaved' && '● Unsaved changes'}
@@ -393,6 +521,42 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
     </div>
   );
 
+  const renderCollisionTab = () => (
+    <div className="editor-tab-content">
+      <div className="tab-header">
+        <h3>Collision Areas Management</h3>
+        <button className="btn btn-primary">
+          <Plus size={16} /> Add Collision Area
+        </button>
+      </div>
+
+      <div className="areas-list">
+        {impassableAreas.map(area => (
+          <div key={area.id} className="area-item collision-area">
+            <div className="area-info">
+              <span className="area-icon collision-icon">
+                <Shield size={20} />
+              </span>
+              <div className="area-details">
+                <h4>{area.name || `Collision Area ${area.id}`}</h4>
+                <p>Position: ({area.x}, {area.y}) | Size: {area.width}×{area.height}</p>
+                <p className="area-description">Impassable collision area</p>
+              </div>
+            </div>
+            <div className="area-actions">
+              <button className="btn btn-secondary">
+                <Edit3 size={14} /> Edit
+              </button>
+              <button className="btn btn-danger">
+                <Trash2 size={14} /> Delete
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   const renderSettingsTab = () => (
     <div className="editor-tab-content">
       <div className="tab-header">
@@ -423,34 +587,49 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
       {/* Enhanced Toolbar */}
       {renderToolbar()}
 
-      <nav className="editor-nav">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            className={`nav-tab ${activeTab === tab.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.icon}
-            <span>{tab.label}</span>
-          </button>
-        ))}
-      </nav>
+      <div className="editor-layout">
+        <main
+          className="editor-main"
+          onMouseMove={handleMouseMove}
+          style={{ position: 'relative' }}
+        >
+          {/* Fabric.js Canvas */}
+          <div className="canvas-container">
+            <canvas
+              ref={canvasRef}
+              className="fabric-canvas"
+            />
+          </div>
 
-      <main
-        className="editor-main"
-        onMouseMove={handleMouseMove}
-        style={{ position: 'relative' }}
-      >
-        {/* SVG Grid Background */}
-        {renderGridPattern()}
+          <div className="editor-content">
+            {activeTab === 'areas' && renderAreasTab()}
+            {activeTab === 'terrain' && renderTerrainTab()}
+            {activeTab === 'assets' && renderAssetsTab()}
+            {activeTab === 'collision' && renderCollisionTab()}
+            {activeTab === 'settings' && renderSettingsTab()}
+          </div>
+        </main>
 
-        <div className="editor-content">
-          {activeTab === 'areas' && renderAreasTab()}
-          {activeTab === 'terrain' && renderTerrainTab()}
-          {activeTab === 'assets' && renderAssetsTab()}
-          {activeTab === 'settings' && renderSettingsTab()}
-        </div>
-      </main>
+        {/* Vertical Sidebar Navigation */}
+        <nav className="editor-sidebar">
+          <div className="sidebar-header">
+            <h3>Tools</h3>
+          </div>
+          <div className="sidebar-tabs">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                className={`sidebar-tab ${activeTab === tab.id ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab.id)}
+                title={tab.label}
+              >
+                <div className="tab-icon">{tab.icon}</div>
+                <span className="tab-label">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        </nav>
+      </div>
 
       {/* Enhanced Status Bar */}
       {renderStatusBar()}
