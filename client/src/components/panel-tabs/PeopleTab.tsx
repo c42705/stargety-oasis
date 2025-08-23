@@ -1,5 +1,25 @@
 import React, { useState } from 'react';
+import { Hash, Lock, Plus, Circle } from 'lucide-react';
 import './PanelTabs.css';
+
+interface Channel {
+  id: string;
+  name: string;
+  type: 'public' | 'private';
+  memberCount: number;
+  unreadCount?: number;
+  isActive?: boolean;
+}
+
+interface DirectMessage {
+  id: string;
+  username: string;
+  displayName: string;
+  status: 'online' | 'offline' | 'busy' | 'away';
+  unreadCount?: number;
+  lastMessage?: string;
+  timestamp?: string;
+}
 
 interface TeamMember {
   id: string;
@@ -13,6 +33,47 @@ interface TeamMember {
   lastSeen?: string;
   isAdmin?: boolean;
 }
+
+// Mock data for channels
+const mockChannels: Channel[] = [
+  { id: 'general', name: 'general', type: 'public', memberCount: 3, unreadCount: 0, isActive: true },
+  { id: 'random', name: 'random', type: 'public', memberCount: 2, unreadCount: 0 },
+  { id: 'development', name: 'development', type: 'public', memberCount: 7, unreadCount: 2 },
+  { id: 'design', name: 'design', type: 'public', memberCount: 1, unreadCount: 0 },
+  { id: 'marketing', name: 'marketing', type: 'private', memberCount: 4, unreadCount: 1 },
+  { id: 'leadership', name: 'leadership', type: 'private', memberCount: 3, unreadCount: 0 }
+];
+
+// Mock data for direct messages
+const mockDirectMessages: DirectMessage[] = [
+  {
+    id: 'alice',
+    username: 'alice.johnson',
+    displayName: 'Alice Johnson',
+    status: 'online',
+    unreadCount: 2,
+    lastMessage: 'Hey, can we discuss the project?',
+    timestamp: '2 min ago'
+  },
+  {
+    id: 'bob',
+    username: 'bob.smith',
+    displayName: 'Bob Smith',
+    status: 'busy',
+    unreadCount: 0,
+    lastMessage: 'Thanks for the update!',
+    timestamp: '1 hour ago'
+  },
+  {
+    id: 'charlie',
+    username: 'charlie.davis',
+    displayName: 'Charlie Davis',
+    status: 'away',
+    unreadCount: 1,
+    lastMessage: 'I\'ll be back in 30 minutes',
+    timestamp: '3 hours ago'
+  }
+];
 
 // Mock data for team members
 const mockTeamMembers: TeamMember[] = [
@@ -83,15 +144,30 @@ const mockTeamMembers: TeamMember[] = [
 export const PeopleTab: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedChannel, setSelectedChannel] = useState<string>('general');
+  const [selectedDM, setSelectedDM] = useState<string>('');
+  const [activeSection, setActiveSection] = useState<'channels' | 'dms' | 'people'>('channels');
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'online': return '🟢';
-      case 'busy': return '🔴';
-      case 'away': return '🟡';
-      case 'offline': return '⚫';
-      default: return '⚫';
+      case 'online': return <Circle size={10} className="status-online" fill="currentColor" />;
+      case 'busy': return <Circle size={10} className="status-busy" fill="currentColor" />;
+      case 'away': return <Circle size={10} className="status-away" fill="currentColor" />;
+      case 'offline': return <Circle size={10} className="status-offline" fill="currentColor" />;
+      default: return <Circle size={10} className="status-offline" fill="currentColor" />;
     }
+  };
+
+  const handleChannelClick = (channelId: string) => {
+    setSelectedChannel(channelId);
+    setSelectedDM('');
+    // TODO: Integrate with ChatModule to switch channels
+  };
+
+  const handleDMClick = (dmId: string) => {
+    setSelectedDM(dmId);
+    setSelectedChannel('');
+    // TODO: Integrate with ChatModule to switch to DM
   };
 
   const getStatusText = (status: string, lastSeen?: string) => {
@@ -116,13 +192,118 @@ export const PeopleTab: React.FC = () => {
 
   return (
     <div className="people-tab">
-      {/* Header with stats */}
-      <div className="people-header">
-        <div className="people-stats">
-          <span className="online-count">{onlineCount} online</span>
-          <span className="total-count">of {totalCount} members</span>
-        </div>
+      {/* Section Navigation */}
+      <div className="section-navigation">
+        <button
+          className={`section-btn ${activeSection === 'channels' ? 'active' : ''}`}
+          onClick={() => setActiveSection('channels')}
+        >
+          Channels
+        </button>
+        <button
+          className={`section-btn ${activeSection === 'dms' ? 'active' : ''}`}
+          onClick={() => setActiveSection('dms')}
+        >
+          Messages
+        </button>
+        <button
+          className={`section-btn ${activeSection === 'people' ? 'active' : ''}`}
+          onClick={() => setActiveSection('people')}
+        >
+          People
+        </button>
       </div>
+
+      {/* Channels Section */}
+      {activeSection === 'channels' && (
+        <div className="channels-section">
+          <div className="section-header">
+            <h4>Channels</h4>
+            <button className="add-button" title="Add Channel">
+              <Plus size={14} />
+            </button>
+          </div>
+
+          <div className="channels-list">
+            {mockChannels.map((channel) => (
+              <div
+                key={channel.id}
+                className={`channel-item ${selectedChannel === channel.id ? 'selected' : ''}`}
+                onClick={() => handleChannelClick(channel.id)}
+              >
+                <div className="channel-info">
+                  <span className="channel-icon">
+                    {channel.type === 'private' ? <Lock size={14} /> : <Hash size={14} />}
+                  </span>
+                  <span className="channel-name">{channel.name}</span>
+                  <span className="member-count">{channel.memberCount}</span>
+                </div>
+                {channel.unreadCount && channel.unreadCount > 0 && (
+                  <span className="unread-badge">{channel.unreadCount}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Direct Messages Section */}
+      {activeSection === 'dms' && (
+        <div className="direct-messages-section">
+          <div className="section-header">
+            <h4>Direct Messages</h4>
+            <button className="add-button" title="New Message">
+              <Plus size={14} />
+            </button>
+          </div>
+
+          <div className="dm-list">
+            {mockDirectMessages.map((dm) => (
+              <div
+                key={dm.id}
+                className={`dm-item ${selectedDM === dm.id ? 'selected' : ''}`}
+                onClick={() => handleDMClick(dm.id)}
+              >
+                <div className="dm-avatar">
+                  <div className="avatar-circle">
+                    {dm.displayName.split(' ').map(n => n[0]).join('')}
+                  </div>
+                  <span className="status-indicator">
+                    {getStatusIcon(dm.status)}
+                  </span>
+                </div>
+
+                <div className="dm-info">
+                  <div className="dm-header">
+                    <span className="dm-name">{dm.displayName}</span>
+                    {dm.timestamp && (
+                      <span className="dm-timestamp">{dm.timestamp}</span>
+                    )}
+                  </div>
+                  {dm.lastMessage && (
+                    <div className="dm-preview">{dm.lastMessage}</div>
+                  )}
+                </div>
+
+                {dm.unreadCount && dm.unreadCount > 0 && (
+                  <span className="unread-badge">{dm.unreadCount}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* People Section */}
+      {activeSection === 'people' && (
+        <>
+          {/* Header with stats */}
+          <div className="people-header">
+            <div className="people-stats">
+              <span className="online-count">{onlineCount} online</span>
+              <span className="total-count">of {totalCount} members</span>
+            </div>
+          </div>
 
       {/* Search and Filter */}
       <div className="people-controls">
@@ -198,17 +379,19 @@ export const PeopleTab: React.FC = () => {
         ))}
       </div>
 
-      {/* Quick Actions */}
-      <div className="people-quick-actions">
-        <button className="quick-action-btn">
-          <span className="action-icon">👥</span>
-          <span>Invite People</span>
-        </button>
-        <button className="quick-action-btn">
-          <span className="action-icon">📋</span>
-          <span>Manage Team</span>
-        </button>
-      </div>
+          {/* Quick Actions */}
+          <div className="people-quick-actions">
+            <button className="quick-action-btn">
+              <span className="action-icon">👥</span>
+              <span>Invite People</span>
+            </button>
+            <button className="quick-action-btn">
+              <span className="action-icon">📋</span>
+              <span>Manage Team</span>
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 };
