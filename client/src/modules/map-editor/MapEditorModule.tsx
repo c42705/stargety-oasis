@@ -603,22 +603,20 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
 
         {/* Integrated Sidebar with Toolbar and Content */}
         <aside className="editor-sidebar">
-          {/* Navigation Tabs */}
-          <nav className="sidebar-navigation">            
-            <div className="sidebar-tabs">
-              {tabs.map(tab => (
-                <button
-                  key={tab.id}
-                  className={`sidebar-tab ${activeTab === tab.id ? 'active' : ''}`}
-                  onClick={() => setActiveTab(tab.id)}
-                  title={tab.label}
-                >
-                  <div className="tab-icon">{tab.icon}</div>
-                  <span className="tab-label">{tab.label}</span>
-                </button>
-              ))}
-            </div>
-          </nav>
+          {/* Navigation Tabs - Panel Tab Style */}
+          <div className="editor-panel-tabs">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                className={`editor-panel-tab ${activeTab === tab.id ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab.id)}
+                aria-selected={activeTab === tab.id}
+              >
+                <span className="tab-icon">{tab.icon}</span>
+                <span className="tab-label">{tab.label}</span>
+              </button>
+            ))}
+          </div>
 
           {/* Tab Content Area */}
           <div className="sidebar-content">
