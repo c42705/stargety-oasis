@@ -234,7 +234,7 @@ export class PhaserMapRenderer {
     const text = this.scene.add.text(
       area.x + area.width / 2,
       area.y + area.height / 2,
-      `${area.icon} ${area.name}`,
+      area.name,
       {
         fontSize: '14px',
         color: '#ffffff',

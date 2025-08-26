@@ -680,7 +680,7 @@ export class SharedMapSystem {
           height: 80,
           color: '#4A90E2',
           description: 'Join the weekly team sync',
-          icon: '🏢'
+          maxParticipants: 10
         },
         {
           id: 'coffee-corner-default',
@@ -692,7 +692,7 @@ export class SharedMapSystem {
           height: 80,
           color: '#D2691E',
           description: 'Casual conversations',
-          icon: '☕'
+          maxParticipants: 6
         }
       ],
       impassableAreas: [

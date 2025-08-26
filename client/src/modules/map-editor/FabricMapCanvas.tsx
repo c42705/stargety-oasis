@@ -28,6 +28,9 @@ interface FabricMapCanvasProps {
   gridOpacity: number;
   onSelectionChanged?: (selectedObjects: fabric.Object[]) => void;
   onObjectModified?: (object: fabric.Object) => void;
+  onAreaDrawn?: (bounds: { x: number; y: number; width: number; height: number }) => void;
+  drawingMode?: boolean;
+  drawingAreaData?: Partial<InteractiveArea>;
   className?: string;
 }
 
@@ -44,6 +47,8 @@ export interface FabricMapCanvasRef {
   renderGrid: () => void;
   renderInteractiveAreas: () => void;
   renderCollisionAreas: () => void;
+  enterDrawingMode: (areaData: Partial<InteractiveArea>) => void;
+  exitDrawingMode: () => void;
 }
 
 export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
@@ -55,14 +60,157 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   gridOpacity,
   onSelectionChanged,
   onObjectModified,
+  onAreaDrawn,
+  drawingMode = false,
+  drawingAreaData,
   className = ''
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawingRect, setDrawingRect] = useState<fabric.Rect | null>(null);
+  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Use shared map system
   const sharedMap = useSharedMap({ source: 'editor', autoSave: true });
+
+  // Handle object modification and sync with shared map (with debouncing)
+  const handleObjectModified = useCallback(async (object: CanvasObject) => {
+    if (!object.mapElementId || !object.mapElementType) return;
+
+    // Clear existing timeout
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+
+    // Debounce updates to avoid excessive localStorage writes
+    updateTimeoutRef.current = setTimeout(async () => {
+      try {
+        const updates = {
+          x: Math.round(object.left || 0),
+          y: Math.round(object.top || 0),
+          width: Math.round((object.width || 0) * (object.scaleX || 1)),
+          height: Math.round((object.height || 0) * (object.scaleY || 1))
+        };
+
+        if (object.mapElementType === 'interactive' && object.mapElementId) {
+          await sharedMap.updateInteractiveArea(object.mapElementId, updates);
+        } else if (object.mapElementType === 'collision' && object.mapElementId) {
+          await sharedMap.updateCollisionArea(object.mapElementId, updates);
+        }
+      } catch (error) {
+        console.error('Failed to update map element:', error);
+      }
+    }, 300); // 300ms debounce
+  }, [sharedMap]);
+
+  // Handle real-time object movement (immediate visual feedback)
+  const handleObjectMoving = useCallback((object: CanvasObject) => {
+    // Snap to grid if enabled
+    if (gridVisible && gridSpacing > 0) {
+      snapToGrid(object, gridSpacing);
+    }
+
+    // Trigger immediate update for real-time feedback (without persistence)
+    onObjectModified?.(object);
+  }, [gridVisible, gridSpacing, onObjectModified]);
+
+  // Handle real-time object scaling (immediate visual feedback)
+  const handleObjectScaling = useCallback((object: CanvasObject) => {
+    // Maintain aspect ratio for certain objects if needed
+    maintainAspectRatio(object);
+
+    // Trigger immediate update for real-time feedback (without persistence)
+    onObjectModified?.(object);
+  }, [onObjectModified]);
+
+  // Snap object to grid
+  const snapToGrid = useCallback((object: fabric.Object, spacing: number) => {
+    const left = Math.round((object.left || 0) / spacing) * spacing;
+    const top = Math.round((object.top || 0) / spacing) * spacing;
+    object.set({ left, top });
+  }, []);
+
+  // Maintain aspect ratio for specific objects
+  const maintainAspectRatio = useCallback((object: fabric.Object) => {
+    // Implementation for maintaining aspect ratio
+    // This can be customized based on object type
+  }, []);
+
+  // Drawing mode handlers
+  const handleDrawingStart = useCallback((pointer: fabric.Point) => {
+    if (!fabricCanvasRef.current || !drawingMode) return;
+
+    const canvas = fabricCanvasRef.current;
+    setIsDrawing(true);
+    setStartPoint({ x: pointer.x, y: pointer.y });
+
+    // Create preview rectangle
+    const rect = new fabric.Rect({
+      left: pointer.x,
+      top: pointer.y,
+      width: 0,
+      height: 0,
+      fill: drawingAreaData?.color || '#4A90E2',
+      fillOpacity: 0.3,
+      stroke: drawingAreaData?.color || '#4A90E2',
+      strokeWidth: 2,
+      strokeDashArray: [5, 5],
+      selectable: false,
+      evented: false
+    });
+
+    setDrawingRect(rect);
+    canvas.add(rect);
+    canvas.renderAll();
+  }, [drawingMode, drawingAreaData]);
+
+  const handleDrawingMove = useCallback((pointer: fabric.Point) => {
+    if (!fabricCanvasRef.current || !isDrawing || !startPoint || !drawingRect) return;
+
+    const width = Math.abs(pointer.x - startPoint.x);
+    const height = Math.abs(pointer.y - startPoint.y);
+    const left = Math.min(pointer.x, startPoint.x);
+    const top = Math.min(pointer.y, startPoint.y);
+
+    drawingRect.set({
+      left,
+      top,
+      width,
+      height
+    });
+
+    fabricCanvasRef.current.renderAll();
+  }, [isDrawing, startPoint, drawingRect]);
+
+  const handleDrawingEnd = useCallback(() => {
+    if (!fabricCanvasRef.current || !isDrawing || !startPoint || !drawingRect) return;
+
+    const canvas = fabricCanvasRef.current;
+    const bounds = {
+      x: Math.round(drawingRect.left || 0),
+      y: Math.round(drawingRect.top || 0),
+      width: Math.round(drawingRect.width || 0),
+      height: Math.round(drawingRect.height || 0)
+    };
+
+    // Remove preview rectangle
+    canvas.remove(drawingRect);
+
+    // Reset drawing state
+    setIsDrawing(false);
+    setStartPoint(null);
+    setDrawingRect(null);
+
+    // Only create area if it has meaningful size
+    if (bounds.width > 10 && bounds.height > 10) {
+      onAreaDrawn?.(bounds);
+    }
+
+    canvas.renderAll();
+  }, [isDrawing, startPoint, drawingRect, onAreaDrawn]);
 
   // Initialize Fabric.js canvas
   useEffect(() => {
@@ -133,72 +281,41 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
     // Object movement events
     canvas.on('object:moving', (e) => {
-      const object = e.target;
+      const object = e.target as CanvasObject;
       if (object) {
-        // Snap to grid if enabled
-        if (gridVisible && gridSpacing > 0) {
-          snapToGrid(object, gridSpacing);
-        }
+        handleObjectMoving(object);
       }
     });
 
     // Object scaling events
     canvas.on('object:scaling', (e) => {
-      const object = e.target;
+      const object = e.target as CanvasObject;
       if (object) {
-        // Maintain aspect ratio for certain objects
-        maintainAspectRatio(object);
+        handleObjectScaling(object);
       }
     });
 
-    // Mouse events for custom interactions
+    // Mouse events for drawing mode and custom interactions
     canvas.on('mouse:down', (e) => {
-      // Handle custom mouse interactions
+      if (drawingMode && e.pointer) {
+        handleDrawingStart(e.pointer);
+      }
     });
 
     canvas.on('mouse:up', (e) => {
-      // Handle mouse up events
+      if (drawingMode && isDrawing) {
+        handleDrawingEnd();
+      }
     });
 
     canvas.on('mouse:move', (e) => {
-      // Handle mouse move events for real-time feedback
-    });
-  }, [gridVisible, gridSpacing, onSelectionChanged, onObjectModified]);
-
-  // Handle object modification and sync with shared map
-  const handleObjectModified = useCallback(async (object: CanvasObject) => {
-    if (!object.mapElementId || !object.mapElementType) return;
-
-    try {
-      const updates = {
-        x: Math.round(object.left || 0),
-        y: Math.round(object.top || 0),
-        width: Math.round((object.width || 0) * (object.scaleX || 1)),
-        height: Math.round((object.height || 0) * (object.scaleY || 1))
-      };
-
-      if (object.mapElementType === 'interactive') {
-        await sharedMap.updateInteractiveArea(object.mapElementId, updates);
-      } else if (object.mapElementType === 'collision') {
-        await sharedMap.updateCollisionArea(object.mapElementId, updates);
+      if (drawingMode && isDrawing && e.pointer) {
+        handleDrawingMove(e.pointer);
       }
-    } catch (error) {
-      console.error('Failed to update map element:', error);
-    }
-  }, [sharedMap]);
+    });
+  }, [gridVisible, gridSpacing, onSelectionChanged, onObjectModified, drawingMode, isDrawing, startPoint, drawingRect, onAreaDrawn, drawingAreaData]);
 
-  // Snap object to grid
-  const snapToGrid = useCallback((object: fabric.Object, spacing: number) => {
-    const left = Math.round((object.left || 0) / spacing) * spacing;
-    const top = Math.round((object.top || 0) / spacing) * spacing;
-    object.set({ left, top });
-  }, []);
 
-  // Maintain aspect ratio for specific objects
-  const maintainAspectRatio = useCallback((object: fabric.Object) => {
-    // Implementation for maintaining aspect ratio
-    // This can be customized based on object type
-  }, []);
 
   // Update canvas size
   useEffect(() => {
@@ -207,6 +324,69 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       fabricCanvasRef.current.renderAll();
     }
   }, [width, height]);
+
+  // Update canvas selection behavior based on drawing mode
+  useEffect(() => {
+    if (fabricCanvasRef.current) {
+      const canvas = fabricCanvasRef.current;
+      canvas.selection = !drawingMode;
+      canvas.defaultCursor = drawingMode ? 'crosshair' : 'default';
+      canvas.hoverCursor = drawingMode ? 'crosshair' : 'move';
+
+      // Disable object selection in drawing mode
+      canvas.forEachObject((obj) => {
+        obj.selectable = !drawingMode;
+        obj.evented = !drawingMode;
+      });
+
+      canvas.renderAll();
+    }
+  }, [drawingMode]);
+
+  // Keyboard event handling for delete functionality
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        const canvas = fabricCanvasRef.current;
+        if (canvas && !drawingMode) {
+          const activeObjects = canvas.getActiveObjects();
+          if (activeObjects.length > 0) {
+            // Show confirmation dialog for deletion
+            const areaNames = activeObjects
+              .map(obj => (obj as CanvasObject).mapElementData?.name)
+              .filter(Boolean)
+              .join(', ');
+
+            if (areaNames && window.confirm(`Delete ${activeObjects.length > 1 ? 'areas' : 'area'}: ${areaNames}?`)) {
+              // Inline delete functionality to avoid dependency issues
+              for (const obj of activeObjects) {
+                const canvasObj = obj as CanvasObject;
+                if (canvasObj.mapElementId && canvasObj.mapElementType) {
+                  try {
+                    if (canvasObj.mapElementType === 'interactive') {
+                      await sharedMap.removeInteractiveArea(canvasObj.mapElementId);
+                    } else if (canvasObj.mapElementType === 'collision') {
+                      await sharedMap.removeCollisionArea(canvasObj.mapElementId);
+                    }
+                  } catch (error) {
+                    console.error('Failed to remove map element:', error);
+                  }
+                }
+                canvas.remove(obj);
+              }
+
+              canvas.discardActiveObject();
+              canvas.renderAll();
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [drawingMode, sharedMap]);
 
   // Render grid
   const renderGrid = useCallback(() => {
@@ -381,7 +561,9 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   const deleteSelected = useCallback(async () => {
     if (!fabricCanvasRef.current) return;
 
-    const activeObjects = fabricCanvasRef.current.getActiveObjects();
+    const canvas = fabricCanvasRef.current;
+    const activeObjects = canvas.getActiveObjects();
+
     for (const obj of activeObjects) {
       const canvasObj = obj as CanvasObject;
       if (canvasObj.mapElementId && canvasObj.mapElementType) {
@@ -395,10 +577,29 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
           console.error('Failed to remove map element:', error);
         }
       }
-      fabricCanvasRef.current!.remove(obj);
+      canvas.remove(obj);
     }
-    fabricCanvasRef.current.renderAll();
+
+    canvas.discardActiveObject();
+    canvas.renderAll();
   }, [sharedMap]);
+
+  // Public methods for drawing mode
+  const enterDrawingMode = useCallback((areaData: Partial<InteractiveArea>) => {
+    // This will be handled by the parent component through props
+    console.log('Enter drawing mode with area data:', areaData);
+  }, []);
+
+  const exitDrawingMode = useCallback(() => {
+    // Clean up any drawing state
+    if (drawingRect && fabricCanvasRef.current) {
+      fabricCanvasRef.current.remove(drawingRect);
+      fabricCanvasRef.current.renderAll();
+    }
+    setIsDrawing(false);
+    setStartPoint(null);
+    setDrawingRect(null);
+  }, [drawingRect]);
 
   // Public methods available via props callbacks
   // TODO: Implement ref-based API when needed

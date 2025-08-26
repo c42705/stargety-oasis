@@ -12,7 +12,7 @@ export interface InteractiveArea {
   height: number;
   color: string;
   description: string;
-  icon: string;
+  maxParticipants?: number; // New property for participant limit
 }
 
 export interface ImpassableArea {
@@ -60,7 +60,7 @@ const defaultMapData: MapData = {
       height: 80,
       color: '#4A90E2',
       description: 'Join the weekly team sync',
-      icon: '🏢'
+      maxParticipants: 10
     },
     {
       id: 'presentation-hall',
@@ -72,7 +72,7 @@ const defaultMapData: MapData = {
       height: 100,
       color: '#9B59B6',
       description: 'Watch presentations and demos',
-      icon: '📊'
+      maxParticipants: 50
     },
     {
       id: 'coffee-corner',
@@ -84,7 +84,7 @@ const defaultMapData: MapData = {
       height: 80,
       color: '#D2691E',
       description: 'Casual conversations',
-      icon: '☕'
+      maxParticipants: 6
     },
     {
       id: 'game-zone',
@@ -96,7 +96,7 @@ const defaultMapData: MapData = {
       height: 90,
       color: '#E74C3C',
       description: 'Fun and games',
-      icon: '🎮'
+      maxParticipants: 8
     }
   ],
   impassableAreas: [
