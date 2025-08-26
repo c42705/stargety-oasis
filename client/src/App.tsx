@@ -5,6 +5,7 @@ import { EventBusProvider } from './shared/EventBusContext';
 import { SettingsProvider } from './shared/SettingsContext';
 import { AuthProvider, useAuth } from './shared/AuthContext';
 import { MapDataProvider } from './shared/MapDataContext';
+import { MapSynchronizer } from './shared/MapSynchronizer';
 import { ChatModule } from './modules/chat/ChatModule';
 import { WorldModule } from './modules/world/WorldModule';
 import { SettingsModule } from './modules/settings/SettingsModule';
@@ -143,7 +144,18 @@ const AuthenticatedApp: React.FC = () => {
     <SettingsProvider currentUser={user.username}>
       <EventBusProvider>
         <MapDataProvider>
-          <AppContent />
+          <MapSynchronizer
+            enableCrossTabSync={true}
+            syncDebounceMs={100}
+            onSyncError={(error) => {
+              console.error('Map synchronization error:', error);
+            }}
+            onSyncSuccess={() => {
+              console.log('Map synchronized successfully');
+            }}
+          >
+            <AppContent />
+          </MapSynchronizer>
         </MapDataProvider>
       </EventBusProvider>
     </SettingsProvider>

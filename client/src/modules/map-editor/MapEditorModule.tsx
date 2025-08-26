@@ -1,13 +1,18 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as fabric from 'fabric';
 import { useMapData } from '../../shared/MapDataContext';
+import { useSharedMap } from '../../shared/useSharedMap';
+import { InteractiveArea } from '../../shared/MapDataContext';
+import { FabricMapCanvas } from './FabricMapCanvas';
+import { MapDataManager } from '../../components/MapDataManager';
+import { SaveStatusIndicator } from '../../components/SaveStatusIndicator';
+import { AreaFormModal } from '../../components/AreaFormModal';
+import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 import {
   Map,
   Plus,
   Edit3,
   Trash2,
-  Save,
-  Upload,
   Eye,
   Settings,
   Grid,
@@ -34,8 +39,8 @@ interface MapEditorModuleProps {
 // Interfaces are now imported from shared context
 
 interface GridConfig {
-  spacing: 10 | 20 | 50 | 100;
-  opacity: 10 | 25 | 50;
+  spacing: number;
+  opacity: number;
   color: string;
   visible: boolean;
   snapToGrid: boolean;
@@ -53,11 +58,22 @@ interface EditorState {
 export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   className = ''
 }) => {
-  const { mapData, updateInteractiveAreas, updateImpassableAreas } = useMapData();
+  const { mapData } = useMapData();
+  const sharedMap = useSharedMap({ source: 'editor', autoSave: true });
   const [activeTab, setActiveTab] = useState<'areas' | 'terrain' | 'assets' | 'settings' | 'collision'>('areas');
   const [previewMode, setPreviewMode] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
+
+  // Modal states
+  const [showAreaModal, setShowAreaModal] = useState(false);
+  const [editingArea, setEditingArea] = useState<InteractiveArea | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [areaToDelete, setAreaToDelete] = useState<InteractiveArea | null>(null);
+
+  // Drawing mode states
+  const [drawingMode, setDrawingMode] = useState(false);
+  const [pendingAreaData, setPendingAreaData] = useState<Partial<InteractiveArea> | null>(null);
 
   // Enhanced editor state
   const [editorState, setEditorState] = useState<EditorState>({
@@ -132,6 +148,91 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
     const y = Math.round(e.clientY - rect.top);
     setEditorState(prev => ({ ...prev, mousePosition: { x, y } }));
   }, []);
+
+  // Area management handlers
+  const handleCreateNewArea = useCallback(() => {
+    setEditingArea(null);
+    setShowAreaModal(true);
+  }, []);
+
+  const handleEditArea = useCallback((area: InteractiveArea) => {
+    setEditingArea(area);
+    setShowAreaModal(true);
+  }, []);
+
+  const handleDeleteArea = useCallback((area: InteractiveArea) => {
+    setAreaToDelete(area);
+    setShowDeleteConfirm(true);
+  }, []);
+
+  const handleSaveArea = useCallback(async (areaData: Partial<InteractiveArea>) => {
+    try {
+      if (editingArea) {
+        // Update existing area
+        await sharedMap.updateInteractiveArea(editingArea.id, areaData);
+        setShowAreaModal(false);
+        setEditingArea(null);
+      } else {
+        // For new areas, enter drawing mode
+        setPendingAreaData(areaData);
+        setDrawingMode(true);
+        setShowAreaModal(false);
+      }
+    } catch (error) {
+      console.error('Failed to save area:', error);
+      // TODO: Show error message to user
+    }
+  }, [editingArea, sharedMap]);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (areaToDelete) {
+      try {
+        await sharedMap.removeInteractiveArea(areaToDelete.id);
+        setAreaToDelete(null);
+      } catch (error) {
+        console.error('Failed to delete area:', error);
+        // TODO: Show error message to user
+      }
+    }
+  }, [areaToDelete, sharedMap]);
+
+  const handleCloseModals = useCallback(() => {
+    setShowAreaModal(false);
+    setShowDeleteConfirm(false);
+    setEditingArea(null);
+    setAreaToDelete(null);
+
+    // Exit drawing mode if active
+    if (drawingMode) {
+      setDrawingMode(false);
+      setPendingAreaData(null);
+    }
+  }, [drawingMode]);
+
+  const handleAreaDrawn = useCallback(async (bounds: { x: number; y: number; width: number; height: number }) => {
+    if (!pendingAreaData) return;
+
+    try {
+      // Create new area with drawn bounds
+      const newArea: InteractiveArea = {
+        id: `area_${Date.now()}`,
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        ...pendingAreaData
+      } as InteractiveArea;
+
+      await sharedMap.addInteractiveArea(newArea);
+
+      // Exit drawing mode
+      setDrawingMode(false);
+      setPendingAreaData(null);
+    } catch (error) {
+      console.error('Failed to create area:', error);
+      // TODO: Show error message to user
+    }
+  }, [pendingAreaData, sharedMap]);
 
   // Initialize Fabric.js canvas
   useEffect(() => {
@@ -407,13 +508,18 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
 
       <div className="toolbar-divider" />
 
-      <div className="toolbar-section">
-        <button className="toolbar-btn" title="Load Map">
-          <Upload size={16} />
-        </button>
-        <button className="toolbar-btn" title="Save Map">
-          <Save size={16} />
-        </button>
+      <div className="toolbar-section save-section">
+        <SaveStatusIndicator
+          className="compact"
+          showManualSave={true}
+          showAutoSaveToggle={false}
+          onSaveSuccess={() => {
+            console.log('Map saved successfully');
+          }}
+          onSaveError={(error) => {
+            console.error('Save error:', error);
+          }}
+        />
         <button
           className={`toolbar-btn ${previewMode ? 'active' : ''}`}
           onClick={() => setPreviewMode(!previewMode)}
@@ -443,12 +549,12 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
       <div className="status-section">
         <span>Collision: {impassableAreas.length}</span>
       </div>
-      <div className="status-section">
-        <span className={`save-status ${editorState.saveStatus}`}>
-          {editorState.saveStatus === 'saved' && '● Saved'}
-          {editorState.saveStatus === 'unsaved' && '● Unsaved changes'}
-          {editorState.saveStatus === 'saving' && '● Saving...'}
-        </span>
+      <div className="status-section save-status-section">
+        <SaveStatusIndicator
+          className="compact"
+          showManualSave={false}
+          showAutoSaveToggle={true}
+        />
       </div>
     </div>
   );
@@ -457,7 +563,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
     <div className="editor-tab-content">
       <div className="tab-header">
         <h3>Interactive Areas Management</h3>
-        <button className="btn btn-primary">
+        <button className="btn btn-primary" onClick={handleCreateNewArea}>
           <Plus size={16} /> Add New Area
         </button>
       </div>
@@ -466,18 +572,20 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         {areas.map(area => (
           <div key={area.id} className="area-item">
             <div className="area-info">
-              <span className="area-icon">{area.icon}</span>
               <div className="area-details">
                 <h4>{area.name}</h4>
                 <p>Position: ({area.x}, {area.y}) | Size: {area.width}×{area.height}</p>
                 <p className="area-description">{area.description}</p>
+                {area.maxParticipants && (
+                  <p className="area-participants">Max participants: {area.maxParticipants}</p>
+                )}
               </div>
             </div>
             <div className="area-actions">
-              <button className="btn btn-secondary">
+              <button className="btn btn-secondary" onClick={() => handleEditArea(area)}>
                 <Edit3 size={14} /> Edit
               </button>
-              <button className="btn btn-danger">
+              <button className="btn btn-danger" onClick={() => handleDeleteArea(area)}>
                 <Trash2 size={14} /> Delete
               </button>
             </div>
@@ -560,16 +668,90 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   const renderSettingsTab = () => (
     <div className="editor-tab-content">
       <div className="tab-header">
-        <h3>Map Configuration</h3>
+        <h3>Settings & Data Management</h3>
       </div>
-      <div className="placeholder-content">
-        <p>⚙️ Map settings and configuration:</p>
-        <ul>
-          <li>World dimensions and boundaries</li>
-          <li>Player spawn points</li>
-          <li>Physics and collision settings</li>
-          <li>Performance optimization options</li>
-        </ul>
+
+      <div className="settings-grid">
+        {/* Map Data Management */}
+        <div className="setting-group">
+          <MapDataManager
+            onMapLoaded={() => {
+              console.log('Map loaded successfully');
+            }}
+            onMapSaved={() => {
+              console.log('Map saved successfully');
+            }}
+            onError={(error) => {
+              console.error('Map operation error:', error);
+            }}
+          />
+        </div>
+
+        {/* Grid Settings */}
+        <div className="setting-group">
+          <h4>Grid Settings</h4>
+          <div className="setting-item">
+            <label>
+              <input
+                type="checkbox"
+                checked={gridConfig.visible}
+                onChange={(e) => setGridConfig(prev => ({ ...prev, visible: e.target.checked }))}
+              />
+              Show Grid
+            </label>
+          </div>
+          <div className="setting-item">
+            <label>
+              Grid Spacing
+              <input
+                type="range"
+                min="10"
+                max="100"
+                value={gridConfig.spacing}
+                onChange={(e) => setGridConfig(prev => ({ ...prev, spacing: parseInt(e.target.value) }))}
+              />
+              <span>{gridConfig.spacing}px</span>
+            </label>
+          </div>
+          <div className="setting-item">
+            <label>
+              Grid Opacity
+              <input
+                type="range"
+                min="10"
+                max="100"
+                value={gridConfig.opacity}
+                onChange={(e) => setGridConfig(prev => ({ ...prev, opacity: parseInt(e.target.value) }))}
+              />
+              <span>{gridConfig.opacity}%</span>
+            </label>
+          </div>
+          <div className="setting-item">
+            <label>
+              Grid Color
+              <input
+                type="color"
+                value={gridConfig.color}
+                onChange={(e) => setGridConfig(prev => ({ ...prev, color: e.target.value }))}
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* Editor Settings */}
+        <div className="setting-group">
+          <h4>Editor Settings</h4>
+          <div className="setting-item">
+            <label>
+              <input
+                type="checkbox"
+                checked={previewMode}
+                onChange={(e) => setPreviewMode(e.target.checked)}
+              />
+              Preview Mode
+            </label>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -592,13 +774,25 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
           onMouseMove={handleMouseMove}
           style={{ position: 'relative' }}
         >
-          {/* Fabric.js Canvas */}
-          <div className="canvas-container">
-            <canvas
-              ref={canvasRef}
-              className="fabric-canvas"
-            />
-          </div>
+          {/* Enhanced Fabric.js Canvas */}
+          <FabricMapCanvas
+            width={mapData.worldDimensions.width}
+            height={mapData.worldDimensions.height}
+            gridVisible={gridConfig.visible}
+            gridSpacing={gridConfig.spacing}
+            gridColor={gridConfig.color}
+            gridOpacity={gridConfig.opacity}
+            drawingMode={drawingMode}
+            drawingAreaData={pendingAreaData || undefined}
+            onSelectionChanged={(objects) => {
+              console.log('Selection changed:', objects);
+            }}
+            onObjectModified={(object) => {
+              console.log('Object modified:', object);
+            }}
+            onAreaDrawn={handleAreaDrawn}
+            className="map-editor-canvas"
+          />
         </main>
 
         {/* Integrated Sidebar with Toolbar and Content */}
@@ -642,6 +836,44 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
           </div>
         </div>
       )}
+
+      {drawingMode && (
+        <div className="drawing-overlay">
+          <div className="drawing-notice">
+            <Square size={20} />
+            <span>Drawing Mode: Click and drag to create area</span>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                setDrawingMode(false);
+                setPendingAreaData(null);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Area Form Modal */}
+      <AreaFormModal
+        isOpen={showAreaModal}
+        onClose={handleCloseModals}
+        onSave={handleSaveArea}
+        editingArea={editingArea}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showDeleteConfirm}
+        onClose={handleCloseModals}
+        onConfirm={handleConfirmDelete}
+        title="Delete Interactive Area"
+        message={`Are you sure you want to delete "${areaToDelete?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+      />
     </div>
   );
 };

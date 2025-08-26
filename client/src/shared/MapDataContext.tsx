@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { useSharedMap } from './useSharedMap';
 
 // Shared interfaces for map data
 export interface InteractiveArea {
@@ -11,7 +12,7 @@ export interface InteractiveArea {
   height: number;
   color: string;
   description: string;
-  icon: string;
+  maxParticipants?: number; // New property for participant limit
 }
 
 export interface ImpassableArea {
@@ -59,7 +60,7 @@ const defaultMapData: MapData = {
       height: 80,
       color: '#4A90E2',
       description: 'Join the weekly team sync',
-      icon: '🏢'
+      maxParticipants: 10
     },
     {
       id: 'presentation-hall',
@@ -71,7 +72,7 @@ const defaultMapData: MapData = {
       height: 100,
       color: '#9B59B6',
       description: 'Watch presentations and demos',
-      icon: '📊'
+      maxParticipants: 50
     },
     {
       id: 'coffee-corner',
@@ -83,7 +84,7 @@ const defaultMapData: MapData = {
       height: 80,
       color: '#D2691E',
       description: 'Casual conversations',
-      icon: '☕'
+      maxParticipants: 6
     },
     {
       id: 'game-zone',
@@ -95,7 +96,7 @@ const defaultMapData: MapData = {
       height: 90,
       color: '#E74C3C',
       description: 'Fun and games',
-      icon: '🎮'
+      maxParticipants: 8
     }
   ],
   impassableAreas: [
@@ -123,60 +124,114 @@ const defaultMapData: MapData = {
 };
 
 export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // Use the shared map system instead of local state
+  const sharedMap = useSharedMap({ source: 'editor', autoSave: true });
   const [mapData, setMapData] = useState<MapData>(defaultMapData);
 
-  const updateInteractiveAreas = (areas: InteractiveArea[]) => {
+  // Sync with shared map system
+  useEffect(() => {
+    if (sharedMap.mapData) {
+      setMapData({
+        interactiveAreas: sharedMap.interactiveAreas,
+        impassableAreas: sharedMap.collisionAreas,
+        worldDimensions: sharedMap.mapData.worldDimensions
+      });
+    }
+  }, [sharedMap.mapData, sharedMap.interactiveAreas, sharedMap.collisionAreas]);
+
+  // Wrapper functions that use the shared map system
+  const updateInteractiveAreas = async (areas: InteractiveArea[]) => {
+    // For bulk updates, we'll need to handle this differently
+    // For now, update local state and TODO: implement bulk update in shared system
     setMapData(prev => ({ ...prev, interactiveAreas: areas }));
   };
 
-  const updateImpassableAreas = (areas: ImpassableArea[]) => {
+  const updateImpassableAreas = async (areas: ImpassableArea[]) => {
+    // For bulk updates, we'll need to handle this differently
+    // For now, update local state and TODO: implement bulk update in shared system
     setMapData(prev => ({ ...prev, impassableAreas: areas }));
   };
 
-  const addInteractiveArea = (area: InteractiveArea) => {
-    setMapData(prev => ({
-      ...prev,
-      interactiveAreas: [...prev.interactiveAreas, area]
-    }));
+  const addInteractiveArea = async (area: InteractiveArea) => {
+    try {
+      await sharedMap.addInteractiveArea(area);
+    } catch (error) {
+      console.error('Failed to add interactive area:', error);
+      // Fallback to local state update
+      setMapData(prev => ({
+        ...prev,
+        interactiveAreas: [...prev.interactiveAreas, area]
+      }));
+    }
   };
 
-  const removeInteractiveArea = (id: string) => {
-    setMapData(prev => ({
-      ...prev,
-      interactiveAreas: prev.interactiveAreas.filter(area => area.id !== id)
-    }));
+  const removeInteractiveArea = async (id: string) => {
+    try {
+      await sharedMap.removeInteractiveArea(id);
+    } catch (error) {
+      console.error('Failed to remove interactive area:', error);
+      // Fallback to local state update
+      setMapData(prev => ({
+        ...prev,
+        interactiveAreas: prev.interactiveAreas.filter(area => area.id !== id)
+      }));
+    }
   };
 
-  const addImpassableArea = (area: ImpassableArea) => {
-    setMapData(prev => ({
-      ...prev,
-      impassableAreas: [...prev.impassableAreas, area]
-    }));
+  const addImpassableArea = async (area: ImpassableArea) => {
+    try {
+      await sharedMap.addCollisionArea(area);
+    } catch (error) {
+      console.error('Failed to add collision area:', error);
+      // Fallback to local state update
+      setMapData(prev => ({
+        ...prev,
+        impassableAreas: [...prev.impassableAreas, area]
+      }));
+    }
   };
 
-  const removeImpassableArea = (id: string) => {
-    setMapData(prev => ({
-      ...prev,
-      impassableAreas: prev.impassableAreas.filter(area => area.id !== id)
-    }));
+  const removeImpassableArea = async (id: string) => {
+    try {
+      await sharedMap.removeCollisionArea(id);
+    } catch (error) {
+      console.error('Failed to remove collision area:', error);
+      // Fallback to local state update
+      setMapData(prev => ({
+        ...prev,
+        impassableAreas: prev.impassableAreas.filter(area => area.id !== id)
+      }));
+    }
   };
 
-  const updateInteractiveArea = (id: string, updates: Partial<InteractiveArea>) => {
-    setMapData(prev => ({
-      ...prev,
-      interactiveAreas: prev.interactiveAreas.map(area =>
-        area.id === id ? { ...area, ...updates } : area
-      )
-    }));
+  const updateInteractiveArea = async (id: string, updates: Partial<InteractiveArea>) => {
+    try {
+      await sharedMap.updateInteractiveArea(id, updates);
+    } catch (error) {
+      console.error('Failed to update interactive area:', error);
+      // Fallback to local state update
+      setMapData(prev => ({
+        ...prev,
+        interactiveAreas: prev.interactiveAreas.map(area =>
+          area.id === id ? { ...area, ...updates } : area
+        )
+      }));
+    }
   };
 
-  const updateImpassableArea = (id: string, updates: Partial<ImpassableArea>) => {
-    setMapData(prev => ({
-      ...prev,
-      impassableAreas: prev.impassableAreas.map(area =>
-        area.id === id ? { ...area, ...updates } : area
-      )
-    }));
+  const updateImpassableArea = async (id: string, updates: Partial<ImpassableArea>) => {
+    try {
+      await sharedMap.updateCollisionArea(id, updates);
+    } catch (error) {
+      console.error('Failed to update collision area:', error);
+      // Fallback to local state update
+      setMapData(prev => ({
+        ...prev,
+        impassableAreas: prev.impassableAreas.map(area =>
+          area.id === id ? { ...area, ...updates } : area
+        )
+      }));
+    }
   };
 
   const value: MapDataContextType = {
