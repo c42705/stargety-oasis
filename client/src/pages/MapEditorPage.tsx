@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapEditorModule } from '../modules/map-editor/MapEditorModule';
 import { useAuth } from '../shared/AuthContext';
+import { MapDataProvider } from '../shared/MapDataContext';
 import './MapEditorPage.css';
 
 export const MapEditorPage: React.FC = () => {
@@ -34,7 +35,9 @@ export const MapEditorPage: React.FC = () => {
 
   return (
     <div className="map-editor-page">
-      <MapEditorModule />
+      <MapDataProvider>
+        <MapEditorModule />
+      </MapDataProvider>
     </div>
   );
 };

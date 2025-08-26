@@ -581,11 +581,10 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
           <Map size={24} className="editor-icon" />
           <h1>Map Editor</h1>
           <span className="editor-subtitle">Stargety Oasis World Designer</span>
+          {/* Toolbar Section */}
         </div>
+        {renderToolbar()}
       </header>
-
-      {/* Enhanced Toolbar */}
-      {renderToolbar()}
 
       <div className="editor-layout">
         <main
@@ -600,35 +599,38 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
               className="fabric-canvas"
             />
           </div>
-
-          <div className="editor-content">
-            {activeTab === 'areas' && renderAreasTab()}
-            {activeTab === 'terrain' && renderTerrainTab()}
-            {activeTab === 'assets' && renderAssetsTab()}
-            {activeTab === 'collision' && renderCollisionTab()}
-            {activeTab === 'settings' && renderSettingsTab()}
-          </div>
         </main>
 
-        {/* Vertical Sidebar Navigation */}
-        <nav className="editor-sidebar">
-          <div className="sidebar-header">
-            <h3>Tools</h3>
+        {/* Integrated Sidebar with Toolbar and Content */}
+        <aside className="editor-sidebar">
+          {/* Navigation Tabs */}
+          <nav className="sidebar-navigation">            
+            <div className="sidebar-tabs">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  className={`sidebar-tab ${activeTab === tab.id ? 'active' : ''}`}
+                  onClick={() => setActiveTab(tab.id)}
+                  title={tab.label}
+                >
+                  <div className="tab-icon">{tab.icon}</div>
+                  <span className="tab-label">{tab.label}</span>
+                </button>
+              ))}
+            </div>
+          </nav>
+
+          {/* Tab Content Area */}
+          <div className="sidebar-content">
+            <div className="tab-content-container">
+              {activeTab === 'areas' && renderAreasTab()}
+              {activeTab === 'terrain' && renderTerrainTab()}
+              {activeTab === 'assets' && renderAssetsTab()}
+              {activeTab === 'collision' && renderCollisionTab()}
+              {activeTab === 'settings' && renderSettingsTab()}
+            </div>
           </div>
-          <div className="sidebar-tabs">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                className={`sidebar-tab ${activeTab === tab.id ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
-                title={tab.label}
-              >
-                <div className="tab-icon">{tab.icon}</div>
-                <span className="tab-label">{tab.label}</span>
-              </button>
-            ))}
-          </div>
-        </nav>
+        </aside>
       </div>
 
       {/* Enhanced Status Bar */}
