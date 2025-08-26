@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Phaser from 'phaser';
 import { useEventBus } from '../../shared/EventBusContext';
+import { PhaserMapRenderer } from './PhaserMapRenderer';
+import { InteractiveArea } from '../../shared/MapDataContext';
+import { SharedMapSystem } from '../../shared/SharedMapSystem';
 
 import { VideoServiceModal } from '../../components/VideoServiceModal';
 import './WorldModule.css';
@@ -10,18 +13,6 @@ interface WorldModuleProps {
   className?: string;
 }
 
-interface InteractiveArea {
-  id: string;
-  name: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: number;
-  description: string;
-  icon: string;
-}
-
 
 
 class GameScene extends Phaser.Scene {
@@ -29,10 +20,10 @@ class GameScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private eventBus: any;
   private playerId: string;
-  private interactiveAreas: Phaser.GameObjects.Rectangle[] = [];
-  private areaLabels: Phaser.GameObjects.Text[] = [];
   private onAreaClick: (areaId: string) => void;
   private currentArea: string | null = null;
+  private mapRenderer!: PhaserMapRenderer;
+  private sharedMapSystem!: SharedMapSystem;
 
   // Interactive controls
   private spaceKey!: Phaser.Input.Keyboard.Key;
@@ -51,6 +42,7 @@ class GameScene extends Phaser.Scene {
     this.eventBus = eventBus;
     this.playerId = playerId;
     this.onAreaClick = onAreaClick;
+    this.sharedMapSystem = SharedMapSystem.getInstance();
   }
 
   preload() {
@@ -61,120 +53,7 @@ class GameScene extends Phaser.Scene {
       .generateTexture('player', 32, 32);
   }
 
-  private createInteractiveAreas() {
-    const areas: InteractiveArea[] = [
-      {
-        id: 'meeting-room',
-        name: 'Meeting Room',
-        x: 150,
-        y: 150,
-        width: 120,
-        height: 80,
-        color: 0x4A90E2,
-        description: 'Join the weekly team sync',
-        icon: '🏢'
-      },
-      {
-        id: 'presentation-hall',
-        name: 'Presentation Hall',
-        x: 500,
-        y: 120,
-        width: 140,
-        height: 100,
-        color: 0x7B68EE,
-        description: 'Watch presentations and demos',
-        icon: '📊'
-      },
-      {
-        id: 'coffee-corner',
-        name: 'Coffee Corner',
-        x: 300,
-        y: 350,
-        width: 100,
-        height: 80,
-        color: 0xD2691E,
-        description: 'Casual conversations',
-        icon: '☕'
-      },
-      {
-        id: 'game-zone',
-        name: 'Game Zone',
-        x: 100,
-        y: 450,
-        width: 120,
-        height: 90,
-        color: 0xFF6347,
-        description: 'Fun and games',
-        icon: '🎮'
-      }
-    ];
 
-    areas.forEach(area => {
-      // Create interactive area rectangle
-      const rect = this.add.rectangle(
-        area.x + area.width / 2,
-        area.y + area.height / 2,
-        area.width,
-        area.height,
-        area.color,
-        0.7
-      );
-
-      rect.setStrokeStyle(3, 0xffffff, 0.8);
-      rect.setInteractive();
-      rect.setData('areaId', area.id);
-      rect.setData('areaData', area);
-
-      // Add hover effects
-      rect.on('pointerover', () => {
-        rect.setAlpha(0.9);
-        rect.setStrokeStyle(4, 0xffffff, 1);
-      });
-
-      rect.on('pointerout', () => {
-        rect.setAlpha(0.7);
-        rect.setStrokeStyle(3, 0xffffff, 0.8);
-      });
-
-      rect.on('pointerdown', () => {
-        this.onAreaClick(area.id);
-      });
-
-      // Create area label
-      const label = this.add.text(
-        area.x + area.width / 2,
-        area.y + area.height / 2 - 10,
-        `${area.icon}\n${area.name}`,
-        {
-          fontSize: '14px',
-          color: '#ffffff',
-          align: 'center',
-          fontStyle: 'bold',
-          stroke: '#000000',
-          strokeThickness: 2
-        }
-      );
-      label.setOrigin(0.5);
-
-      // Add "You" indicator if player is in this area
-      const youIndicator = this.add.text(
-        area.x + 10,
-        area.y + 10,
-        'You',
-        {
-          fontSize: '12px',
-          color: '#00ff00',
-          backgroundColor: '#000000',
-          padding: { x: 4, y: 2 }
-        }
-      );
-      youIndicator.setVisible(false);
-      youIndicator.setData('areaId', area.id);
-
-      this.interactiveAreas.push(rect);
-      this.areaLabels.push(label);
-    });
-  }
 
   create() {
     // Create world background with gradient effect
@@ -191,8 +70,24 @@ class GameScene extends Phaser.Scene {
       lineSpacing: 2
     });
 
-    // Create interactive areas first
-    this.createInteractiveAreas();
+    // Initialize map renderer to load map data from localStorage
+    this.mapRenderer = new PhaserMapRenderer({
+      scene: this,
+      enablePhysics: false,
+      enableInteractions: true,
+      debugMode: false
+    });
+
+    // Initialize and render map from localStorage
+    this.mapRenderer.initialize().catch(error => {
+      console.error('Failed to load map data from localStorage:', error);
+      // Continue with empty map if loading fails
+    });
+
+    // Set up interactive area click handling
+    this.events.on('interactiveAreaClicked', (area: InteractiveArea) => {
+      this.onAreaClick(area.id);
+    });
 
     // Create player sprite
     this.player = this.add.sprite(400, 300, 'player');
@@ -211,9 +106,9 @@ class GameScene extends Phaser.Scene {
 
     // Handle click movement (but not on interactive areas)
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer, currentlyOver: Phaser.GameObjects.GameObject[]) => {
-      // Check if clicking on an interactive area
+      // Check if clicking on an interactive area by checking if any object has areaId data
       const clickedOnArea = currentlyOver.some(obj =>
-        this.interactiveAreas.includes(obj as Phaser.GameObjects.Rectangle)
+        obj.getData && obj.getData('areaId')
       );
 
       if (!clickedOnArea) {
@@ -463,6 +358,11 @@ class GameScene extends Phaser.Scene {
   }
 
   shutdown() {
+    // Clean up map renderer
+    if (this.mapRenderer) {
+      this.mapRenderer.destroy();
+    }
+
     // Clean up rotation tween if it exists
     if (this.rotationTween) {
       this.rotationTween.stop();
@@ -479,52 +379,14 @@ class GameScene extends Phaser.Scene {
   }
 
   private checkAreaCollisions() {
-    const areas = [
-      {
-        id: 'meeting-room',
-        name: 'Meeting Room',
-        x: 150,
-        y: 150,
-        width: 120,
-        height: 80,
-        color: 0x4A90E2,
-        description: 'Join the weekly team sync',
-        icon: '🏢'
-      },
-      {
-        id: 'presentation-hall',
-        name: 'Presentation Hall',
-        x: 500,
-        y: 120,
-        width: 140,
-        height: 100,
-        color: 0x7B68EE,
-        description: 'Watch presentations and demos',
-        icon: '📊'
-      },
-      {
-        id: 'coffee-corner',
-        name: 'Coffee Corner',
-        x: 300,
-        y: 350,
-        width: 100,
-        height: 80,
-        color: 0xD2691E,
-        description: 'Casual conversations',
-        icon: '☕'
-      },
-      {
-        id: 'game-zone',
-        name: 'Game Zone',
-        x: 100,
-        y: 450,
-        width: 120,
-        height: 90,
-        color: 0xFF6347,
-        description: 'Fun and games',
-        icon: '🎮'
-      }
-    ];
+    // Get areas from SharedMapSystem (localStorage) instead of hardcoded data
+    const mapData = this.sharedMapSystem.getMapData();
+
+    if (!mapData) {
+      return; // No map data available
+    }
+
+    const areas = mapData.interactiveAreas;
 
     areas.forEach(area => {
       // Check if player is within area bounds
@@ -569,63 +431,22 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
 
 
   const handleAreaClick = (areaId: string) => {
-    const areas: InteractiveArea[] = [
-      {
-        id: 'meeting-room',
-        name: 'Meeting Room',
-        x: 150,
-        y: 150,
-        width: 120,
-        height: 80,
-        color: 0x4A90E2,
-        description: 'Join the weekly team sync',
-        icon: '🏢'
-      },
-      {
-        id: 'presentation-hall',
-        name: 'Presentation Hall',
-        x: 500,
-        y: 120,
-        width: 140,
-        height: 100,
-        color: 0x7B68EE,
-        description: 'Watch presentations and demos',
-        icon: '📊'
-      },
-      {
-        id: 'coffee-corner',
-        name: 'Coffee Corner',
-        x: 300,
-        y: 350,
-        width: 100,
-        height: 80,
-        color: 0xD2691E,
-        description: 'Casual conversations',
-        icon: '☕'
-      },
-      {
-        id: 'game-zone',
-        name: 'Game Zone',
-        x: 100,
-        y: 450,
-        width: 120,
-        height: 90,
-        color: 0xFF6347,
-        description: 'Fun and games',
-        icon: '🎮'
+    // Get area data from SharedMapSystem (localStorage)
+    const sharedMapSystem = SharedMapSystem.getInstance();
+    const mapData = sharedMapSystem.getMapData();
+
+    if (mapData) {
+      const area = mapData.interactiveAreas.find(a => a.id === areaId);
+      if (area) {
+        setSelectedArea(area);
+        setIsLoadingVideo(true);
+        setShowVideoModal(true);
+
+        // Simulate loading time for video service connection
+        setTimeout(() => {
+          setIsLoadingVideo(false);
+        }, 2500); // Longer loading time for more realistic experience
       }
-    ];
-
-    const area = areas.find(a => a.id === areaId);
-    if (area) {
-      setSelectedArea(area);
-      setIsLoadingVideo(true);
-      setShowVideoModal(true);
-
-      // Simulate loading time for video service connection
-      setTimeout(() => {
-        setIsLoadingVideo(false);
-      }, 2500); // Longer loading time for more realistic experience
     }
   };
 
