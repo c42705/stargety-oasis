@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as fabric from 'fabric';
 import { useMapData } from '../../shared/MapDataContext';
+import { useSharedMap } from '../../shared/useSharedMap';
+import { FabricMapCanvas } from './FabricMapCanvas';
+import { MapDataManager } from '../../components/MapDataManager';
+import { SaveStatusIndicator } from '../../components/SaveStatusIndicator';
 import {
   Map,
   Plus,
@@ -34,8 +38,8 @@ interface MapEditorModuleProps {
 // Interfaces are now imported from shared context
 
 interface GridConfig {
-  spacing: 10 | 20 | 50 | 100;
-  opacity: 10 | 25 | 50;
+  spacing: number;
+  opacity: number;
   color: string;
   visible: boolean;
   snapToGrid: boolean;
@@ -407,13 +411,18 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
 
       <div className="toolbar-divider" />
 
-      <div className="toolbar-section">
-        <button className="toolbar-btn" title="Load Map">
-          <Upload size={16} />
-        </button>
-        <button className="toolbar-btn" title="Save Map">
-          <Save size={16} />
-        </button>
+      <div className="toolbar-section save-section">
+        <SaveStatusIndicator
+          className="compact"
+          showManualSave={true}
+          showAutoSaveToggle={false}
+          onSaveSuccess={() => {
+            console.log('Map saved successfully');
+          }}
+          onSaveError={(error) => {
+            console.error('Save error:', error);
+          }}
+        />
         <button
           className={`toolbar-btn ${previewMode ? 'active' : ''}`}
           onClick={() => setPreviewMode(!previewMode)}
@@ -443,12 +452,12 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
       <div className="status-section">
         <span>Collision: {impassableAreas.length}</span>
       </div>
-      <div className="status-section">
-        <span className={`save-status ${editorState.saveStatus}`}>
-          {editorState.saveStatus === 'saved' && '● Saved'}
-          {editorState.saveStatus === 'unsaved' && '● Unsaved changes'}
-          {editorState.saveStatus === 'saving' && '● Saving...'}
-        </span>
+      <div className="status-section save-status-section">
+        <SaveStatusIndicator
+          className="compact"
+          showManualSave={false}
+          showAutoSaveToggle={true}
+        />
       </div>
     </div>
   );
@@ -560,16 +569,90 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   const renderSettingsTab = () => (
     <div className="editor-tab-content">
       <div className="tab-header">
-        <h3>Map Configuration</h3>
+        <h3>Settings & Data Management</h3>
       </div>
-      <div className="placeholder-content">
-        <p>⚙️ Map settings and configuration:</p>
-        <ul>
-          <li>World dimensions and boundaries</li>
-          <li>Player spawn points</li>
-          <li>Physics and collision settings</li>
-          <li>Performance optimization options</li>
-        </ul>
+
+      <div className="settings-grid">
+        {/* Map Data Management */}
+        <div className="setting-group">
+          <MapDataManager
+            onMapLoaded={() => {
+              console.log('Map loaded successfully');
+            }}
+            onMapSaved={() => {
+              console.log('Map saved successfully');
+            }}
+            onError={(error) => {
+              console.error('Map operation error:', error);
+            }}
+          />
+        </div>
+
+        {/* Grid Settings */}
+        <div className="setting-group">
+          <h4>Grid Settings</h4>
+          <div className="setting-item">
+            <label>
+              <input
+                type="checkbox"
+                checked={gridConfig.visible}
+                onChange={(e) => setGridConfig(prev => ({ ...prev, visible: e.target.checked }))}
+              />
+              Show Grid
+            </label>
+          </div>
+          <div className="setting-item">
+            <label>
+              Grid Spacing
+              <input
+                type="range"
+                min="10"
+                max="100"
+                value={gridConfig.spacing}
+                onChange={(e) => setGridConfig(prev => ({ ...prev, spacing: parseInt(e.target.value) }))}
+              />
+              <span>{gridConfig.spacing}px</span>
+            </label>
+          </div>
+          <div className="setting-item">
+            <label>
+              Grid Opacity
+              <input
+                type="range"
+                min="10"
+                max="100"
+                value={gridConfig.opacity}
+                onChange={(e) => setGridConfig(prev => ({ ...prev, opacity: parseInt(e.target.value) }))}
+              />
+              <span>{gridConfig.opacity}%</span>
+            </label>
+          </div>
+          <div className="setting-item">
+            <label>
+              Grid Color
+              <input
+                type="color"
+                value={gridConfig.color}
+                onChange={(e) => setGridConfig(prev => ({ ...prev, color: e.target.value }))}
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* Editor Settings */}
+        <div className="setting-group">
+          <h4>Editor Settings</h4>
+          <div className="setting-item">
+            <label>
+              <input
+                type="checkbox"
+                checked={previewMode}
+                onChange={(e) => setPreviewMode(e.target.checked)}
+              />
+              Preview Mode
+            </label>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -592,13 +675,22 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
           onMouseMove={handleMouseMove}
           style={{ position: 'relative' }}
         >
-          {/* Fabric.js Canvas */}
-          <div className="canvas-container">
-            <canvas
-              ref={canvasRef}
-              className="fabric-canvas"
-            />
-          </div>
+          {/* Enhanced Fabric.js Canvas */}
+          <FabricMapCanvas
+            width={mapData.worldDimensions.width}
+            height={mapData.worldDimensions.height}
+            gridVisible={gridConfig.visible}
+            gridSpacing={gridConfig.spacing}
+            gridColor={gridConfig.color}
+            gridOpacity={gridConfig.opacity}
+            onSelectionChanged={(objects) => {
+              console.log('Selection changed:', objects);
+            }}
+            onObjectModified={(object) => {
+              console.log('Object modified:', object);
+            }}
+            className="map-editor-canvas"
+          />
         </main>
 
         {/* Integrated Sidebar with Toolbar and Content */}

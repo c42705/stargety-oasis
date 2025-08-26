@@ -119,6 +119,28 @@
   text-align: center;
 }
 
+/* Save Section in Toolbar */
+.toolbar-section.save-section {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.toolbar-section.save-section .save-status-indicator {
+  background: transparent;
+  border: none;
+  padding: 0;
+  min-width: auto;
+}
+
+.save-status-section .save-status-indicator {
+  background: transparent;
+  border: none;
+  padding: 0;
+  min-width: auto;
+}
+
 /* Editor Layout */
 .editor-layout {
   display: flex;
