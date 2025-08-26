@@ -11,7 +11,10 @@ interface VideoCallParticipant {
 interface VideoCallRoom extends Room {
   type: 'video';
   participantDetails: VideoCallParticipant[];
-  jitsiRoomId: string;
+  // Self-hosted Jitsi room identifier
+  selfHostedJitsiRoomId: string;
+  // Backwards-compat alias (deprecated): will be removed in future
+  jitsiRoomId?: string;
 }
 
 // In-memory storage for video call state
@@ -31,6 +34,7 @@ export class VideoCallController {
 
     // Create video room if it doesn't exist
     if (!videoRooms.has(roomId)) {
+      const generatedRoomId = `stargety-oasis-${roomId}-${Date.now()}`.replace(/[^a-zA-Z0-9-_]/g, '');
       videoRooms.set(roomId, {
         id: roomId,
         name: `Video Call - ${roomId}`,
@@ -40,7 +44,9 @@ export class VideoCallController {
         createdAt: new Date(),
         isPrivate: false,
         maxParticipants: 10,
-        jitsiRoomId: `stargety-oasis-${roomId}-${Date.now()}`
+        selfHostedJitsiRoomId: generatedRoomId,
+        // Keep legacy field to avoid breaking older clients
+        jitsiRoomId: generatedRoomId,
       });
     }
 
@@ -81,7 +87,9 @@ export class VideoCallController {
     // Send room info to new participant
     socket.emit('video-call-joined', {
       roomId,
-      jitsiRoomId: room.jitsiRoomId,
+      selfHostedJitsiRoomId: room.selfHostedJitsiRoomId,
+      // legacy alias
+      jitsiRoomId: room.jitsiRoomId || room.selfHostedJitsiRoomId,
       participants: room.participantDetails.map(p => ({
         id: p.id,
         name: p.name,
@@ -156,7 +164,9 @@ export class VideoCallController {
       name: room.name,
       participantCount: room.participantDetails.length,
       createdAt: room.createdAt,
-      jitsiRoomId: room.jitsiRoomId
+      selfHostedJitsiRoomId: room.selfHostedJitsiRoomId,
+      // legacy alias
+      jitsiRoomId: room.jitsiRoomId || room.selfHostedJitsiRoomId,
     }));
   }
 }

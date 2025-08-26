@@ -6,11 +6,17 @@ export const API_CONFIG = {
   RETRY_ATTEMPTS: 3,
 } as const;
 
-// Jitsi Configuration
-export const JITSI_CONFIG = {
-  DOMAIN: process.env.REACT_APP_JITSI_DOMAIN || 'meet.jit.si',
+// Jitsi (Self-hosted) Configuration
+export const JITSI_SELF_HOSTED_CONFIG = {
+  // Use env to point to your self-hosted Jitsi Meet server domain (e.g., jitsi.example.com or jitsi.example.com:8443)
+  DOMAIN: process.env.REACT_APP_JITSI_DOMAIN || process.env.REACT_APP_SELF_HOSTED_JITSI_DOMAIN || 'localhost',
+  // Protocol to use when loading the external API script
+  PROTOCOL: process.env.REACT_APP_JITSI_PROTOCOL || 'https',
   DEFAULT_ROOM_PREFIX: 'stargety-oasis-',
 } as const;
+
+// Backwards-compatible alias (prefer JITSI_SELF_HOSTED_CONFIG going forward)
+export const JITSI_CONFIG = JITSI_SELF_HOSTED_CONFIG;
 
 // Chat Configuration
 export const CHAT_CONFIG = {

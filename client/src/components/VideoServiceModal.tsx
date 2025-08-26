@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSettings } from '../shared/SettingsContext';
 import { useAuth } from '../shared/AuthContext';
 import { VideoCallModule } from '../modules/video-call/VideoCallModule';
+import { JITSI_CONFIG } from '../shared/constants';
 import { RingCentralModule } from '../modules/ringcentral/RingCentralModule';
 import './VideoServiceModal.css';
 
@@ -100,6 +101,7 @@ export const VideoServiceModal: React.FC<VideoServiceModalProps> = ({
           className="video-service-content"
           roomId={videoRoomId}
           userName={user.username}
+          serverUrl={JITSI_CONFIG.DOMAIN}
         />
       );
     } else {
@@ -155,7 +157,7 @@ export const VideoServiceModal: React.FC<VideoServiceModalProps> = ({
               <div className="modal-title">
                 <h3>{areaName}</h3>
                 <span className="service-indicator">
-                  {settings.videoService === 'jitsi' ? '📹 Jitsi Meet' : '📞 RingCentral'}
+                  {settings.videoService === 'jitsi' ? '📹 Jitsi (Self‑Hosted)' : '📞 RingCentral'}
                 </span>
               </div>
               

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useEventBus } from '../../shared/EventBusContext';
+import { JITSI_CONFIG } from '../../shared/constants';
+
 import './VideoCallModule.css';
 
 interface VideoCallModuleProps {
@@ -24,7 +26,8 @@ declare global {
 export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
   roomId,
   userName,
-  serverUrl = 'meet.jit.si',
+  // Domain of the self-hosted Jitsi Meet server (host[:port], no protocol)
+  serverUrl = JITSI_CONFIG.DOMAIN,
   className = '',
 }) => {
   const [isJoined, setIsJoined] = useState(false);
@@ -36,7 +39,8 @@ export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
   const apiRef = useRef<JitsiAPI | null>(null);
   const eventBus = useEventBus();
 
-  const cleanRoomId = roomId.replace(/[^a-zA-Z0-9]/g, '');
+  // Allow alphanumeric, hyphen and underscore for self-hosted room names
+  const cleanRoomId = roomId.replace(/[^a-zA-Z0-9-_]/g, '');
 
   const loadJitsiScript = useCallback(() => {
     return new Promise<void>((resolve, reject) => {
@@ -45,7 +49,8 @@ export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
         return;
       }
       const script = document.createElement('script');
-      script.src = `https://${serverUrl}/external_api.js`;
+      const protocol = (JITSI_CONFIG as any).PROTOCOL || 'https';
+      script.src = `${protocol}://${serverUrl}/external_api.js`;
       script.async = true;
       script.onload = () => resolve();
       script.onerror = () => reject(new Error('Failed to load Jitsi Meet API'));

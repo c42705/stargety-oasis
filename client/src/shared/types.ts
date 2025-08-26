@@ -59,7 +59,10 @@ export interface VideoCallRoom {
   maxParticipants?: number;
   isRecording: boolean;
   recordingStartedAt?: Date;
-  jitsiRoomId: string;
+  // Self-hosted Jitsi room identifier
+  selfHostedJitsiRoomId?: string;
+  // Legacy alias for backwards compatibility
+  jitsiRoomId?: string;
 }
 
 // World module types
