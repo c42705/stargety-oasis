@@ -12,7 +12,6 @@ This document summarizes the improvements made to the Map Editor's interactive a
 
 **Solution**:
 - Removed `icon` property from `InteractiveArea` interface
-- Added `maxParticipants` property for better functionality
 - Updated all components to display only area names without emojis
 - Ensured consistent display across editor, game, and all interfaces
 
@@ -150,8 +149,7 @@ export interface InteractiveArea {
   width: number;
   height: number;
   color: string;
-  description: string;
-  maxParticipants?: number; // ✅ Added
+  description: string;  
 }
 ```
 

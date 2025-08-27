@@ -196,25 +196,7 @@
   background: var(--color-bg-primary);
 }
 
-/* Status Bar */
-.editor-status-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--spacing-sm) var(--spacing-lg);
-  background: var(--color-bg-tertiary);
-  border-top: 1px solid var(--color-border-light);
-  font-size: 0.875rem;
-  position: sticky;
-  bottom: 0;
-  z-index: 100;
-}
-
-.status-section {
-  display: flex;
-  align-items: center;
-  color: var(--color-text-secondary);
-}
+/* Status Bar - Now using Ant Design Flex component */
 
 .save-status.saved {
   color: #10b981;
@@ -228,29 +210,7 @@
   color: var(--color-accent);
 }
 
-.editor-tab-content {
-  padding: var(--spacing-md);
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.tab-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacing-md);
-  padding-bottom: var(--spacing-sm);
-  border-bottom: 1px solid var(--color-border-light);
-  flex-shrink: 0;
-}
-
-.tab-header h3 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
+/* Tab content - Now using Ant Design Card and Space components */
 
 /* Buttons */
 .btn {
@@ -312,94 +272,9 @@
   border-color: #dc2626;
 }
 
-/* Areas List - Optimized for sidebar */
-.areas-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  flex: 1;
-  overflow-y: auto;
-}
+/* Areas List - Now using Ant Design List component */
 
-.area-item {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm);
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--spacing-sm);
-  transition: all 0.2s ease;
-}
-
-.area-item:hover {
-  border-color: var(--color-accent);
-  background: var(--color-bg-tertiary);
-}
-
-.area-info {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-sm);
-  flex: 1;
-}
-
-.area-icon {
-  font-size: 1.25rem;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-bg-primary);
-  border-radius: var(--spacing-sm);
-  flex-shrink: 0;
-}
-
-.area-details {
-  flex: 1;
-  min-width: 0;
-}
-
-.area-details h4 {
-  margin: 0 0 var(--spacing-xs) 0;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.area-details p {
-  margin: 0;
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  line-height: 1.3;
-}
-
-.area-description {
-  font-style: italic;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.area-actions {
-  display: flex;
-  gap: var(--spacing-xs);
-  justify-content: flex-end;
-}
-
-/* Collision Area Styles */
-.collision-area {
-  border-left: 4px solid #ef4444;
-}
-
-.collision-icon {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-}
+/* Area styles - Now handled by Ant Design List.Item.Meta */
 
 /* Impassable Area SVG Styles */
 .impassable-area {
@@ -525,55 +400,13 @@
     max-height: 30vh;
   }
 
-  .editor-tab-content {
-    padding: var(--spacing-sm);
-  }
-
-  .tab-header h3 {
-    font-size: 0.875rem;
-  }
-
-  .area-item {
-    padding: var(--spacing-xs);
-  }
-
-  .area-details h4 {
-    font-size: 0.75rem;
-  }
-
-  .area-details p {
-    font-size: 0.625rem;
-  }
+  /* Tab and area styles now handled by Ant Design responsive components */
 
   .editor-content {
     padding: var(--spacing-md);
   }
 
-  .editor-status-bar {
-    flex-wrap: wrap;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm) var(--spacing-md);
-  }
-
-  .status-section {
-    font-size: 0.75rem;
-  }
-
-  .tab-header {
-    flex-direction: column;
-    gap: var(--spacing-md);
-    align-items: stretch;
-  }
-
-  .area-item {
-    flex-direction: column;
-    gap: var(--spacing-md);
-    align-items: stretch;
-  }
-
-  .area-actions {
-    justify-content: center;
-  }
+  /* Responsive styles now handled by Ant Design components */
 }
 
 /* Drawing Mode Overlay */

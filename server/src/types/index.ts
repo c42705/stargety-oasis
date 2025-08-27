@@ -15,7 +15,6 @@ export interface Room {
   participants: string[];
   createdAt: Date;
   isPrivate: boolean;
-  maxParticipants?: number;
 }
 
 export interface ChatMessage {

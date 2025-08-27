@@ -16,7 +16,6 @@ export interface Room {
   participants: string[];
   createdAt: Date;
   isPrivate: boolean;
-  maxParticipants?: number;
 }
 
 // Chat module types
@@ -56,7 +55,6 @@ export interface VideoCallRoom {
   participantDetails: VideoCallParticipant[];
   createdAt: Date;
   isPrivate: boolean;
-  maxParticipants?: number;
   isRecording: boolean;
   recordingStartedAt?: Date;
   jitsiRoomId: string;
@@ -118,7 +116,6 @@ export interface AppConfig {
   socketUrl: string;
   jitsiDomain: string;
   maxMessageLength: number;
-  maxRoomParticipants: number;
   worldDimensions: { width: number; height: number };
   enableDebugMode: boolean;
 }

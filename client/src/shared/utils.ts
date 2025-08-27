@@ -99,7 +99,8 @@ export const getRoomDisplayName = (room: Room): string => {
 };
 
 export const isRoomFull = (room: Room): boolean => {
-  return room.maxParticipants ? room.participants.length >= room.maxParticipants : false;
+  // No participant limits - rooms are never considered "full"
+  return false;
 };
 
 // Error utilities

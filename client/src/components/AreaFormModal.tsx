@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Input, InputNumber, Select, Button, Space, ColorPicker, Row, Col, Typography } from 'antd';
+import { Modal, Form, Input, Select, Button, Space, ColorPicker, Row, Col, Typography } from 'antd';
 import { SaveOutlined } from '@ant-design/icons';
 import { InteractiveArea } from '../shared/MapDataContext';
 
@@ -17,7 +17,6 @@ interface AreaFormModalProps {
 
 interface FormData {
   name: string;
-  maxParticipants: number;
   description: string;
   type: InteractiveArea['type'];
   color: string;
@@ -58,7 +57,6 @@ export const AreaFormModal: React.FC<AreaFormModalProps> = ({
       if (editingArea) {
         form.setFieldsValue({
           name: editingArea.name,
-          maxParticipants: editingArea.maxParticipants || 10,
           description: editingArea.description,
           type: editingArea.type,
           color: editingArea.color
@@ -66,7 +64,6 @@ export const AreaFormModal: React.FC<AreaFormModalProps> = ({
       } else {
         form.setFieldsValue({
           name: '',
-          maxParticipants: 10,
           description: '',
           type: 'custom',
           color: '#4A90E2'
@@ -81,7 +78,6 @@ export const AreaFormModal: React.FC<AreaFormModalProps> = ({
     try {
       const areaData: Partial<InteractiveArea> = {
         name: values.name.trim(),
-        maxParticipants: values.maxParticipants,
         description: values.description.trim(),
         type: values.type,
         color: values.color
@@ -119,7 +115,6 @@ export const AreaFormModal: React.FC<AreaFormModalProps> = ({
         onFinish={handleSubmit}
         initialValues={{
           name: '',
-          maxParticipants: 10,
           description: '',
           type: 'custom',
           color: '#4A90E2'
@@ -136,21 +131,7 @@ export const AreaFormModal: React.FC<AreaFormModalProps> = ({
           <Input placeholder="Enter room name" />
         </Form.Item>
 
-        <Form.Item
-          label="Maximum Participants"
-          name="maxParticipants"
-          rules={[
-            { required: true, message: 'Maximum participants is required' },
-            { type: 'number', min: 1, max: 100, message: 'Must be between 1 and 100' }
-          ]}
-        >
-          <InputNumber
-            min={1}
-            max={100}
-            placeholder="Enter maximum participants"
-            style={{ width: '100%' }}
-          />
-        </Form.Item>
+
 
         <Form.Item
           label="Description"
