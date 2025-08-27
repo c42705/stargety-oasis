@@ -172,7 +172,7 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
   // Settings panel content
   const settingsContent = (
     <div style={{ padding: '8px', minWidth: '200px' }}>
-      <Space direction="vertical" style={{ width: '100%' }}>
+      <Space direction="horizontal" style={{ width: '100%' }}>
         <Space>
           <Switch
             checked={saveState.autoSaveEnabled}
@@ -200,7 +200,7 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
         borderColor: 'var(--color-border-light)'
       }}
     >
-      <Space direction="vertical" size="small" style={{ width: '100%' }}>
+      <Space direction="horizontal" size="small" style={{ width: '100%' }}>
         {/* Main Status Display */}
         <Space>
           {saveState.isSaving ? (
