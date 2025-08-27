@@ -1,15 +1,18 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { ThemeType } from '../theme/theme-system';
 
 export type VideoServiceType = 'ringcentral' | 'jitsi';
 
 export interface AppSettings {
   videoService: VideoServiceType;
   adminMode: boolean;
+  theme: ThemeType;
 }
 
 interface SettingsContextType {
   settings: AppSettings;
   updateVideoService: (service: VideoServiceType) => void;
+  updateTheme: (theme: ThemeType) => void;
   isAdmin: (username: string) => boolean;
   saveSettings: () => void;
   resetSettings: () => void;
@@ -18,6 +21,7 @@ interface SettingsContextType {
 const defaultSettings: AppSettings = {
   videoService: 'ringcentral',
   adminMode: false,
+  theme: 'dark',
 };
 
 const STORAGE_KEY = 'stargetyOasisSettings';
@@ -82,11 +86,20 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children, cu
     }));
   }, []);
 
+  // Update theme preference
+  const updateTheme = useCallback((theme: ThemeType) => {
+    setSettings(prev => ({
+      ...prev,
+      theme: theme,
+    }));
+  }, []);
+
   // Save settings to localStorage
   const saveSettings = useCallback(() => {
     try {
       const settingsToSave = {
         videoService: settings.videoService,
+        theme: settings.theme,
         // Don't save adminMode as it's calculated based on username
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsToSave));
@@ -109,6 +122,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children, cu
   const contextValue: SettingsContextType = {
     settings,
     updateVideoService,
+    updateTheme,
     isAdmin,
     saveSettings,
     resetSettings,

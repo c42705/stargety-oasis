@@ -7,6 +7,7 @@ import { EventBusProvider } from './shared/EventBusContext';
 import { SettingsProvider } from './shared/SettingsContext';
 import { AuthProvider, useAuth } from './shared/AuthContext';
 import { MapDataProvider } from './shared/MapDataContext';
+import { ThemeProvider, useTheme } from './shared/ThemeContext';
 import { MapSynchronizer } from './shared/MapSynchronizer';
 import { ChatModule } from './modules/chat/ChatModule';
 import { WorldModule } from './modules/world/WorldModule';
@@ -16,7 +17,7 @@ import { SlidingPanel, PanelToggle, PanelTab } from './components/SlidingPanel';
 import { PeopleTab } from './components/panel-tabs/PeopleTab';
 import { MyProfileTab } from './components/panel-tabs/MyProfileTab';
 import { MapEditorPage } from './pages/MapEditorPage';
-import { stargetyOasisTheme } from './theme/antd-theme';
+
 import './App.css';
 
 // Inner App component that uses both auth and settings context
@@ -247,14 +248,25 @@ const App: React.FC = () => {
   );
 };
 
-// Main App wrapper with all providers
-const AppWithProviders: React.FC = () => {
+// Theme-aware ConfigProvider wrapper
+const ThemedApp: React.FC = () => {
+  const { currentTheme } = useTheme();
+
   return (
-    <ConfigProvider theme={stargetyOasisTheme}>
+    <ConfigProvider theme={currentTheme.antdConfig}>
       <AuthProvider>
         <App />
       </AuthProvider>
     </ConfigProvider>
+  );
+};
+
+// Main App wrapper with all providers
+const AppWithProviders: React.FC = () => {
+  return (
+    <ThemeProvider>
+      <ThemedApp />
+    </ThemeProvider>
   );
 };
 

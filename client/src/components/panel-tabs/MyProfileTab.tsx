@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, Form, Input, Switch, Select, Button, Space, Typography, Badge, Avatar } from 'antd';
 import { SaveOutlined, EditOutlined, UserOutlined, LogoutOutlined } from '@ant-design/icons';
 import { Lock, Mail } from 'lucide-react';
 import { useAuth } from '../../shared/AuthContext';
 import { useSettings } from '../../shared/SettingsContext';
+import { useTheme } from '../../shared/ThemeContext';
+import { ThemeType } from '../../theme/theme-system';
 
 interface UserPreferences {
   notifications: boolean;
   soundEnabled: boolean;
-  theme: 'light' | 'dark' | 'auto';
   language: string;
   timezone: string;
   status: 'online' | 'busy' | 'away' | 'offline';
@@ -17,17 +18,24 @@ interface UserPreferences {
 
 export const MyProfileTab: React.FC = () => {
   const { user, logout } = useAuth();
-  const { settings, updateVideoService } = useSettings();
-  
+  const { settings, updateVideoService, updateTheme } = useSettings();
+  const { currentTheme, setTheme, availableThemes } = useTheme();
+
   const [preferences, setPreferences] = useState<UserPreferences>({
     notifications: true,
     soundEnabled: true,
-    theme: 'auto',
     language: 'en',
     timezone: 'UTC',
     status: 'online',
     statusMessage: 'Working on exciting projects!'
   });
+
+  // Sync theme with settings
+  useEffect(() => {
+    if (settings.theme !== currentTheme.id) {
+      setTheme(settings.theme);
+    }
+  }, [settings.theme, currentTheme.id, setTheme]);
 
   const [isEditing, setIsEditing] = useState(false);
 
@@ -43,6 +51,30 @@ export const MyProfileTab: React.FC = () => {
     setIsEditing(false);
     console.log('Preferences saved:', preferences);
   };
+
+  const handleThemeChange = (themeType: ThemeType) => {
+    setTheme(themeType);
+    updateTheme(themeType);
+  };
+
+  // Get theme options for the select
+  const themeOptions = availableThemes.map(theme => ({
+    value: theme.id,
+    label: (
+      <Space>
+        <div
+          style={{
+            width: 12,
+            height: 12,
+            borderRadius: '50%',
+            backgroundColor: theme.preview.primary,
+            border: '1px solid var(--color-border)',
+          }}
+        />
+        {theme.name}
+      </Space>
+    ),
+  }));
 
 
 
@@ -171,16 +203,13 @@ export const MyProfileTab: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography.Text>Theme</Typography.Text>
                 <Select
-                  value={preferences.theme}
-                  onChange={(value) => handlePreferenceChange('theme', value)}
+                  value={currentTheme.id}
+                  onChange={handleThemeChange}
                   disabled={!isEditing}
                   size="small"
-                  style={{ width: 100 }}
-                  options={[
-                    { value: 'light', label: 'Light' },
-                    { value: 'dark', label: 'Dark' },
-                    { value: 'auto', label: 'Auto' }
-                  ]}
+                  style={{ width: 150 }}
+                  options={themeOptions}
+                  placeholder="Select theme"
                 />
               </div>
 
