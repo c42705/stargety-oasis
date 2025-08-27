@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as fabric from 'fabric';
+import { Button, Space, Typography, Divider, Tooltip } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useMapData } from '../../shared/MapDataContext';
 import { useSharedMap } from '../../shared/useSharedMap';
 import { InteractiveArea } from '../../shared/MapDataContext';
@@ -10,9 +12,6 @@ import { AreaFormModal } from '../../components/AreaFormModal';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 import {
   Map,
-  Plus,
-  Edit3,
-  Trash2,
   Eye,
   Settings,
   Grid,
@@ -28,7 +27,8 @@ import {
   Redo,
   Grid3X3,
   Shield,
-  Eraser
+  Eraser,
+  Trash2
 } from 'lucide-react';
 import './MapEditorModule.css';
 
@@ -404,111 +404,207 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
 
   // Toolbar Component
   const renderToolbar = () => (
-    <div className="editor-toolbar">
-      <div className="toolbar-section">
-        <span className="toolbar-label">Tools:</span>
-        <button
-          className={`toolbar-btn ${editorState.tool === 'select' ? 'active' : ''}`}
-          onClick={() => handleToolChange('select')}
-          title="Select Tool (S)"
-        >
-          <MousePointer size={16} />
-        </button>
-        <button
-          className={`toolbar-btn ${editorState.tool === 'move' ? 'active' : ''}`}
-          onClick={() => handleToolChange('move')}
-          title="Move Tool (M)"
-        >
-          <Move size={16} />
-        </button>
-        <button
-          className={`toolbar-btn ${editorState.tool === 'resize' ? 'active' : ''}`}
-          onClick={() => handleToolChange('resize')}
-          title="Resize Tool (R)"
-        >
-          <Square size={16} />
-        </button>
-        <button
-          className={`toolbar-btn ${editorState.tool === 'delete' ? 'active' : ''}`}
-          onClick={() => handleToolChange('delete')}
-          title="Delete Tool (D)"
-        >
-          <Trash2 size={16} />
-        </button>
-      </div>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      padding: '8px 16px',
+      backgroundColor: 'var(--color-bg-secondary)',
+      borderBottom: '1px solid var(--color-border-light)',
+      gap: '8px'
+    }}>
+      <Space size="small">
+        <Typography.Text style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>
+          Tools:
+        </Typography.Text>
+        <Space.Compact>
+          <Tooltip title="Select Tool (S)">
+            <Button
+              type={editorState.tool === 'select' ? 'primary' : 'default'}
+              icon={<MousePointer size={16} />}
+              onClick={() => handleToolChange('select')}
+              style={{
+                backgroundColor: editorState.tool === 'select' ? 'var(--color-accent)' : 'var(--color-bg-tertiary)',
+                borderColor: 'var(--color-border)',
+                color: editorState.tool === 'select' ? 'white' : 'var(--color-text-primary)'
+              }}
+            />
+          </Tooltip>
+          <Tooltip title="Move Tool (M)">
+            <Button
+              type={editorState.tool === 'move' ? 'primary' : 'default'}
+              icon={<Move size={16} />}
+              onClick={() => handleToolChange('move')}
+              style={{
+                backgroundColor: editorState.tool === 'move' ? 'var(--color-accent)' : 'var(--color-bg-tertiary)',
+                borderColor: 'var(--color-border)',
+                color: editorState.tool === 'move' ? 'white' : 'var(--color-text-primary)'
+              }}
+            />
+          </Tooltip>
+          <Tooltip title="Resize Tool (R)">
+            <Button
+              type={editorState.tool === 'resize' ? 'primary' : 'default'}
+              icon={<Square size={16} />}
+              onClick={() => handleToolChange('resize')}
+              style={{
+                backgroundColor: editorState.tool === 'resize' ? 'var(--color-accent)' : 'var(--color-bg-tertiary)',
+                borderColor: 'var(--color-border)',
+                color: editorState.tool === 'resize' ? 'white' : 'var(--color-text-primary)'
+              }}
+            />
+          </Tooltip>
+          <Tooltip title="Delete Tool (D)">
+            <Button
+              type={editorState.tool === 'delete' ? 'primary' : 'default'}
+              icon={<Trash2 size={16} />}
+              onClick={() => handleToolChange('delete')}
+              style={{
+                backgroundColor: editorState.tool === 'delete' ? 'var(--color-accent)' : 'var(--color-bg-tertiary)',
+                borderColor: 'var(--color-border)',
+                color: editorState.tool === 'delete' ? 'white' : 'var(--color-text-primary)'
+              }}
+            />
+          </Tooltip>
+        </Space.Compact>
+      </Space>
 
-      <div className="toolbar-divider" />
+      <Divider type="vertical" style={{ height: '24px', borderColor: 'var(--color-border)' }} />
 
-      <div className="toolbar-section">
-        <span className="toolbar-label">Collision:</span>
-        <button
-          className={`toolbar-btn ${editorState.tool === 'draw-collision' ? 'active' : ''}`}
-          onClick={() => handleToolChange('draw-collision')}
-          title="Draw Impassable Area"
-        >
-          <Shield size={16} />
-        </button>
-        <button
-          className={`toolbar-btn ${editorState.tool === 'erase-collision' ? 'active' : ''}`}
-          onClick={() => handleToolChange('erase-collision')}
-          title="Erase Impassable Area"
-        >
-          <Eraser size={16} />
-        </button>
-      </div>
+      <Space size="small">
+        <Typography.Text style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>
+          Collision:
+        </Typography.Text>
+        <Space.Compact>
+          <Tooltip title="Draw Impassable Area">
+            <Button
+              type={editorState.tool === 'draw-collision' ? 'primary' : 'default'}
+              icon={<Shield size={16} />}
+              onClick={() => handleToolChange('draw-collision')}
+              style={{
+                backgroundColor: editorState.tool === 'draw-collision' ? 'var(--color-accent)' : 'var(--color-bg-tertiary)',
+                borderColor: 'var(--color-border)',
+                color: editorState.tool === 'draw-collision' ? 'white' : 'var(--color-text-primary)'
+              }}
+            />
+          </Tooltip>
+          <Tooltip title="Erase Impassable Area">
+            <Button
+              type={editorState.tool === 'erase-collision' ? 'primary' : 'default'}
+              icon={<Eraser size={16} />}
+              onClick={() => handleToolChange('erase-collision')}
+              style={{
+                backgroundColor: editorState.tool === 'erase-collision' ? 'var(--color-accent)' : 'var(--color-bg-tertiary)',
+                borderColor: 'var(--color-border)',
+                color: editorState.tool === 'erase-collision' ? 'white' : 'var(--color-text-primary)'
+              }}
+            />
+          </Tooltip>
+        </Space.Compact>
+      </Space>
 
-      <div className="toolbar-divider" />
+      <Divider type="vertical" style={{ height: '24px', borderColor: 'var(--color-border)' }} />
 
-      <div className="toolbar-section">
-        <span className="toolbar-label">Zoom:</span>
-        <button className="toolbar-btn" onClick={handleZoomIn} title="Zoom In (+)">
-          <ZoomIn size={16} />
-        </button>
-        <button className="toolbar-btn" onClick={handleZoomOut} title="Zoom Out (-)">
-          <ZoomOut size={16} />
-        </button>
-        <button className="toolbar-btn" onClick={handleFitToScreen} title="Fit to Screen (0)">
-          <Maximize size={16} />
-        </button>
-        <span className="zoom-display">{editorState.zoom}%</span>
-      </div>
+      <Space size="small">
+        <Typography.Text style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>
+          Zoom:
+        </Typography.Text>
+        <Space.Compact>
+          <Tooltip title="Zoom In (+)">
+            <Button
+              icon={<ZoomIn size={16} />}
+              onClick={handleZoomIn}
+              style={{
+                backgroundColor: 'var(--color-bg-tertiary)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)'
+              }}
+            />
+          </Tooltip>
+          <Tooltip title="Zoom Out (-)">
+            <Button
+              icon={<ZoomOut size={16} />}
+              onClick={handleZoomOut}
+              style={{
+                backgroundColor: 'var(--color-bg-tertiary)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)'
+              }}
+            />
+          </Tooltip>
+          <Tooltip title="Fit to Screen (0)">
+            <Button
+              icon={<Maximize size={16} />}
+              onClick={handleFitToScreen}
+              style={{
+                backgroundColor: 'var(--color-bg-tertiary)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)'
+              }}
+            />
+          </Tooltip>
+        </Space.Compact>
+        <Typography.Text style={{
+          color: 'var(--color-text-primary)',
+          fontSize: '12px',
+          marginLeft: '8px',
+          minWidth: '40px',
+          textAlign: 'center'
+        }}>
+          {editorState.zoom}%
+        </Typography.Text>
+      </Space>
 
-      <div className="toolbar-divider" />
+      <Divider type="vertical" style={{ height: '24px', borderColor: 'var(--color-border)' }} />
 
-      <div className="toolbar-section">
-        <button
-          className={`toolbar-btn ${gridConfig.visible ? 'active' : ''}`}
-          onClick={toggleGrid}
-          title="Toggle Grid (G)"
-        >
-          <Grid3X3 size={16} />
-        </button>
-      </div>
+      <Space size="small">
+        <Tooltip title="Toggle Grid (G)">
+          <Button
+            type={gridConfig.visible ? 'primary' : 'default'}
+            icon={<Grid3X3 size={16} />}
+            onClick={toggleGrid}
+            style={{
+              backgroundColor: gridConfig.visible ? 'var(--color-accent)' : 'var(--color-bg-tertiary)',
+              borderColor: 'var(--color-border)',
+              color: gridConfig.visible ? 'white' : 'var(--color-text-primary)'
+            }}
+          />
+        </Tooltip>
+      </Space>
 
-      <div className="toolbar-divider" />
+      <Divider type="vertical" style={{ height: '24px', borderColor: 'var(--color-border)' }} />
 
-      <div className="toolbar-section">
-        <button
-          className={`toolbar-btn ${!editorState.canUndo ? 'disabled' : ''}`}
-          onClick={handleUndo}
-          disabled={!editorState.canUndo}
-          title="Undo (Ctrl+Z)"
-        >
-          <Undo size={16} />
-        </button>
-        <button
-          className={`toolbar-btn ${!editorState.canRedo ? 'disabled' : ''}`}
-          onClick={handleRedo}
-          disabled={!editorState.canRedo}
-          title="Redo (Ctrl+Y)"
-        >
-          <Redo size={16} />
-        </button>
-      </div>
+      <Space size="small">
+        <Space.Compact>
+          <Tooltip title="Undo (Ctrl+Z)">
+            <Button
+              icon={<Undo size={16} />}
+              onClick={handleUndo}
+              disabled={!editorState.canUndo}
+              style={{
+                backgroundColor: 'var(--color-bg-tertiary)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)'
+              }}
+            />
+          </Tooltip>
+          <Tooltip title="Redo (Ctrl+Y)">
+            <Button
+              icon={<Redo size={16} />}
+              onClick={handleRedo}
+              disabled={!editorState.canRedo}
+              style={{
+                backgroundColor: 'var(--color-bg-tertiary)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)'
+              }}
+            />
+          </Tooltip>
+        </Space.Compact>
+      </Space>
 
-      <div className="toolbar-divider" />
+      <Divider type="vertical" style={{ height: '24px', borderColor: 'var(--color-border)' }} />
 
-      <div className="toolbar-section save-section">
+      <Space size="small">
         <SaveStatusIndicator
           className="compact"
           showManualSave={true}
@@ -520,14 +616,19 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
             console.error('Save error:', error);
           }}
         />
-        <button
-          className={`toolbar-btn ${previewMode ? 'active' : ''}`}
-          onClick={() => setPreviewMode(!previewMode)}
-          title="Preview Mode"
-        >
-          <Eye size={16} />
-        </button>
-      </div>
+        <Tooltip title="Preview Mode">
+          <Button
+            type={previewMode ? 'primary' : 'default'}
+            icon={<Eye size={16} />}
+            onClick={() => setPreviewMode(!previewMode)}
+            style={{
+              backgroundColor: previewMode ? 'var(--color-accent)' : 'var(--color-bg-tertiary)',
+              borderColor: 'var(--color-border)',
+              color: previewMode ? 'white' : 'var(--color-text-primary)'
+            }}
+          />
+        </Tooltip>
+      </Space>
     </div>
   );
 
@@ -562,10 +663,16 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   const renderAreasTab = () => (
     <div className="editor-tab-content">
       <div className="tab-header">
-        <h3>Interactive Areas Management</h3>
-        <button className="btn btn-primary" onClick={handleCreateNewArea}>
-          <Plus size={16} /> Add New Area
-        </button>
+        <Typography.Title level={4} style={{ margin: 0, color: 'var(--color-text-primary)' }}>
+          Interactive Areas Management
+        </Typography.Title>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={handleCreateNewArea}
+        >
+          Add New Area
+        </Button>
       </div>
       
       <div className="areas-list">
@@ -582,12 +689,23 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
               </div>
             </div>
             <div className="area-actions">
-              <button className="btn btn-secondary" onClick={() => handleEditArea(area)}>
-                <Edit3 size={14} /> Edit
-              </button>
-              <button className="btn btn-danger" onClick={() => handleDeleteArea(area)}>
-                <Trash2 size={14} /> Delete
-              </button>
+              <Space>
+                <Button
+                  icon={<EditOutlined />}
+                  onClick={() => handleEditArea(area)}
+                  size="small"
+                >
+                  Edit
+                </Button>
+                <Button
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => handleDeleteArea(area)}
+                  size="small"
+                >
+                  Delete
+                </Button>
+              </Space>
             </div>
           </div>
         ))}
@@ -632,10 +750,12 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   const renderCollisionTab = () => (
     <div className="editor-tab-content">
       <div className="tab-header">
-        <h3>Collision Areas Management</h3>
-        <button className="btn btn-primary">
-          <Plus size={16} /> Add Collision Area
-        </button>
+        <Typography.Title level={4} style={{ margin: 0, color: 'var(--color-text-primary)' }}>
+          Collision Areas Management
+        </Typography.Title>
+        <Button type="primary" icon={<PlusOutlined />}>
+          Add Collision Area
+        </Button>
       </div>
 
       <div className="areas-list">
@@ -652,12 +772,14 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
               </div>
             </div>
             <div className="area-actions">
-              <button className="btn btn-secondary">
-                <Edit3 size={14} /> Edit
-              </button>
-              <button className="btn btn-danger">
-                <Trash2 size={14} /> Delete
-              </button>
+              <Space>
+                <Button icon={<EditOutlined />} size="small">
+                  Edit
+                </Button>
+                <Button danger icon={<DeleteOutlined />} size="small">
+                  Delete
+                </Button>
+              </Space>
             </div>
           </div>
         ))}

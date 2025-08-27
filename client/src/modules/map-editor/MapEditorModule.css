@@ -48,91 +48,7 @@
   gap: var(--spacing-sm);
 }
 
-/* Enhanced Toolbar - Now integrated in sidebar */
-.editor-toolbar {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm);
-  background: var(--color-bg-primary);
-  border-bottom: 1px solid var(--color-border-light);
-  overflow-x: auto;
-  flex-wrap: wrap;
-}
-
-.toolbar-section {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  white-space: nowrap;
-}
-
-.toolbar-label {
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-}
-
-.toolbar-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--spacing-xs);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.toolbar-btn:hover:not(.disabled) {
-  background: var(--color-bg-secondary);
-  border-color: var(--color-accent);
-  color: var(--color-text-primary);
-}
-
-.toolbar-btn.active {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: var(--color-text-primary);
-}
-
-.toolbar-btn.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.toolbar-divider {
-  width: 1px;
-  height: 24px;
-  background: var(--color-border);
-  margin: 0 var(--spacing-xs);
-}
-
-.zoom-display {
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
-  min-width: 40px;
-  text-align: center;
-}
-
-/* Save Section in Toolbar */
-.toolbar-section.save-section {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-}
-
-.toolbar-section.save-section .save-status-indicator {
-  background: transparent;
-  border: none;
-  padding: 0;
-  min-width: auto;
-}
+/* Toolbar styles migrated to Ant Design components */
 
 .save-status-section .save-status-indicator {
   background: transparent;
@@ -554,23 +470,7 @@
     justify-content: center;
   }
 
-  .editor-toolbar {
-    padding: var(--spacing-xs);
-    gap: var(--spacing-xs);
-  }
-
-  .toolbar-section {
-    gap: var(--spacing-xs);
-  }
-
-  .toolbar-label {
-    display: none;
-  }
-
-  .toolbar-btn {
-    width: 28px;
-    height: 28px;
-  }
+  /* Toolbar responsive styles migrated to Ant Design */
 
   .editor-layout {
     flex-direction: column;

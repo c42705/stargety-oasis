@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Hash, Lock, Plus, Circle, Search, MessageCircle, Phone, MoreHorizontal, Users, Clipboard } from 'lucide-react';
-import './PanelTabs.css';
+import { List, Input, Button, Space, Typography, Badge, Avatar, Dropdown, Tabs } from 'antd';
+import { SearchOutlined, MessageOutlined, PhoneOutlined, MoreOutlined, UserOutlined, PlusOutlined } from '@ant-design/icons';
+import { Hash, Lock } from 'lucide-react';
 
 interface Channel {
   id: string;
@@ -143,20 +144,10 @@ const mockTeamMembers: TeamMember[] = [
 
 export const PeopleTab: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+
   const [selectedChannel, setSelectedChannel] = useState<string>('general');
   const [selectedDM, setSelectedDM] = useState<string>('');
   const [activeSection, setActiveSection] = useState<'channels' | 'dms' | 'people'>('channels');
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'online': return <Circle size={10} className="status-online" fill="currentColor" />;
-      case 'busy': return <Circle size={10} className="status-busy" fill="currentColor" />;
-      case 'away': return <Circle size={10} className="status-away" fill="currentColor" />;
-      case 'offline': return <Circle size={10} className="status-offline" fill="currentColor" />;
-      default: return <Circle size={10} className="status-offline" fill="currentColor" />;
-    }
-  };
 
   const handleChannelClick = (channelId: string) => {
     setSelectedChannel(channelId);
@@ -170,234 +161,275 @@ export const PeopleTab: React.FC = () => {
     // TODO: Integrate with ChatModule to switch to DM
   };
 
-  const getStatusText = (status: string, lastSeen?: string) => {
-    switch (status) {
-      case 'online': return 'Online';
-      case 'busy': return 'Busy';
-      case 'away': return 'Away';
-      case 'offline': return lastSeen ? `Last seen ${lastSeen}` : 'Offline';
-      default: return 'Unknown';
-    }
-  };
-
   const filteredMembers = mockTeamMembers.filter(member => {
     const matchesSearch = member.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          member.role.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || member.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    return matchesSearch;
   });
 
   const onlineCount = mockTeamMembers.filter(m => m.status === 'online').length;
   const totalCount = mockTeamMembers.length;
 
-  return (
-    <div className="people-tab">
-      {/* Section Navigation */}
-      <div className="section-navigation">
-        <button
-          className={`section-btn ${activeSection === 'channels' ? 'active' : ''}`}
-          onClick={() => setActiveSection('channels')}
-        >
-          Channels
-        </button>
-        <button
-          className={`section-btn ${activeSection === 'dms' ? 'active' : ''}`}
-          onClick={() => setActiveSection('dms')}
-        >
-          Messages
-        </button>
-        <button
-          className={`section-btn ${activeSection === 'people' ? 'active' : ''}`}
-          onClick={() => setActiveSection('people')}
-        >
-          People
-        </button>
-      </div>
+  const handleCallMember = (memberId: string) => {
+    console.log('Calling member:', memberId);
+    // TODO: Integrate with video calling system
+  };
 
-      {/* Channels Section */}
-      {activeSection === 'channels' && (
-        <div className="channels-section">
-          <div className="section-header">
-            <h4>Channels</h4>
-            <button className="add-button" title="Add Channel">
-              <Plus size={14} />
-            </button>
+  const handleMemberAction = (memberId: string, action: string) => {
+    console.log('Member action:', action, 'for member:', memberId);
+    // TODO: Implement member actions
+  };
+
+  const tabItems = [
+    {
+      key: 'channels',
+      label: 'Channels',
+      children: (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <Typography.Title level={5} style={{ margin: 0, color: 'var(--color-text-primary)' }}>
+              Channels
+            </Typography.Title>
+            <Button
+              size="small"
+              icon={<PlusOutlined />}
+              title="Add Channel"
+              style={{
+                backgroundColor: 'var(--color-bg-tertiary)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)'
+              }}
+            />
           </div>
-
-          <div className="channels-list">
-            {mockChannels.map((channel) => (
-              <div
-                key={channel.id}
-                className={`channel-item ${selectedChannel === channel.id ? 'selected' : ''}`}
+          <List
+            dataSource={mockChannels}
+            renderItem={(channel) => (
+              <List.Item
+                style={{
+                  cursor: 'pointer',
+                  backgroundColor: selectedChannel === channel.id ? 'var(--color-bg-tertiary)' : 'transparent',
+                  borderRadius: '4px',
+                  padding: '8px 12px'
+                }}
                 onClick={() => handleChannelClick(channel.id)}
               >
-                <div className="channel-info">
-                  <span className="channel-icon">
-                    {channel.type === 'private' ? <Lock size={14} /> : <Hash size={14} />}
-                  </span>
-                  <span className="channel-name">{channel.name}</span>
-                  <span className="member-count">{channel.memberCount}</span>
-                </div>
+                <List.Item.Meta
+                  avatar={
+                    <div style={{ color: 'var(--color-text-secondary)' }}>
+                      {channel.type === 'private' ? <Lock size={14} /> : <Hash size={14} />}
+                    </div>
+                  }
+                  title={
+                    <Space>
+                      <Typography.Text style={{ color: 'var(--color-text-primary)' }}>
+                        {channel.name}
+                      </Typography.Text>
+                      <Typography.Text type="secondary" style={{ fontSize: '11px' }}>
+                        {channel.memberCount}
+                      </Typography.Text>
+                    </Space>
+                  }
+                />
                 {channel.unreadCount && channel.unreadCount > 0 && (
-                  <span className="unread-badge">{channel.unreadCount}</span>
+                  <Badge count={channel.unreadCount} size="small" />
                 )}
-              </div>
-            ))}
-          </div>
+              </List.Item>
+            )}
+          />
         </div>
-      )}
-
-      {/* Direct Messages Section */}
-      {activeSection === 'dms' && (
-        <div className="direct-messages-section">
-          <div className="section-header">
-            <h4>Direct Messages</h4>
-            <button className="add-button" title="New Message">
-              <Plus size={14} />
-            </button>
+      )
+    },
+    {
+      key: 'dms',
+      label: 'Messages',
+      children: (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <Typography.Title level={5} style={{ margin: 0, color: 'var(--color-text-primary)' }}>
+              Direct Messages
+            </Typography.Title>
+            <Button
+              size="small"
+              icon={<PlusOutlined />}
+              title="New Message"
+              style={{
+                backgroundColor: 'var(--color-bg-tertiary)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)'
+              }}
+            />
           </div>
-
-          <div className="dm-list">
-            {mockDirectMessages.map((dm) => (
-              <div
-                key={dm.id}
-                className={`dm-item ${selectedDM === dm.id ? 'selected' : ''}`}
+          <List
+            dataSource={mockDirectMessages}
+            renderItem={(dm) => (
+              <List.Item
+                style={{
+                  cursor: 'pointer',
+                  backgroundColor: selectedDM === dm.id ? 'var(--color-bg-tertiary)' : 'transparent',
+                  borderRadius: '4px',
+                  padding: '8px 12px'
+                }}
                 onClick={() => handleDMClick(dm.id)}
               >
-                <div className="dm-avatar">
-                  <div className="avatar-circle">
-                    {dm.displayName.split(' ').map(n => n[0]).join('')}
-                  </div>
-                  <span className="status-indicator">
-                    {getStatusIcon(dm.status)}
-                  </span>
-                </div>
-
-                <div className="dm-info">
-                  <div className="dm-header">
-                    <span className="dm-name">{dm.displayName}</span>
-                    {dm.timestamp && (
-                      <span className="dm-timestamp">{dm.timestamp}</span>
-                    )}
-                  </div>
-                  {dm.lastMessage && (
-                    <div className="dm-preview">{dm.lastMessage}</div>
-                  )}
-                </div>
-
+                <List.Item.Meta
+                  avatar={
+                    <Badge
+                      dot
+                      status={dm.status === 'online' ? 'success' :
+                             dm.status === 'busy' ? 'error' :
+                             dm.status === 'away' ? 'warning' : 'default'}
+                      offset={[-8, 8]}
+                    >
+                      <Avatar size="small" icon={<UserOutlined />}>
+                        {dm.displayName.charAt(0)}
+                      </Avatar>
+                    </Badge>
+                  }
+                  title={
+                    <Typography.Text style={{ color: 'var(--color-text-primary)' }}>
+                      {dm.displayName}
+                    </Typography.Text>
+                  }
+                  description={
+                    dm.lastMessage && (
+                      <Typography.Text type="secondary" style={{ fontSize: '11px' }}>
+                        {dm.lastMessage}
+                      </Typography.Text>
+                    )
+                  }
+                />
                 {dm.unreadCount && dm.unreadCount > 0 && (
-                  <span className="unread-badge">{dm.unreadCount}</span>
+                  <Badge count={dm.unreadCount} size="small" />
                 )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* People Section */}
-      {activeSection === 'people' && (
-        <>
-          {/* Header with stats */}
-          <div className="people-header">
-            <div className="people-stats">
-              <span className="online-count">{onlineCount} online</span>
-              <span className="total-count">of {totalCount} members</span>
-            </div>
-          </div>
-
-      {/* Search and Filter */}
-      <div className="people-controls">
-        <div className="search-box">
-          <input
-            type="text"
-            placeholder="Search people..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
+              </List.Item>
+            )}
           />
-          <span className="search-icon">
-            <Search size={16} />
-          </span>
         </div>
-        
-        <div className="status-filter">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="filter-select"
-          >
-            <option value="all">All Status</option>
-            <option value="online">Online</option>
-            <option value="busy">Busy</option>
-            <option value="away">Away</option>
-            <option value="offline">Offline</option>
-          </select>
+      )
+    },
+    {
+      key: 'people',
+      label: 'People',
+      children: (
+        <div>
+          <div style={{ marginBottom: '16px' }}>
+            <Input
+              placeholder="Search people..."
+              prefix={<SearchOutlined />}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                backgroundColor: 'var(--color-bg-tertiary)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)'
+              }}
+            />
+          </div>
+          <div style={{ marginBottom: '16px' }}>
+            <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
+              {onlineCount} of {totalCount} online
+            </Typography.Text>
+          </div>
+          <List
+            dataSource={filteredMembers}
+            renderItem={(member) => (
+              <List.Item
+                style={{ padding: '8px 12px' }}
+                actions={[
+                  <Button
+                    key="message"
+                    size="small"
+                    icon={<MessageOutlined />}
+                    type="text"
+                    onClick={() => handleDMClick(member.id)}
+                  />,
+                  <Button
+                    key="call"
+                    size="small"
+                    icon={<PhoneOutlined />}
+                    type="text"
+                    onClick={() => handleCallMember(member.id)}
+                  />,
+                  <Dropdown
+                    key="more"
+                    menu={{
+                      items: [
+                        { key: 'profile', label: 'View Profile' },
+                        { key: 'mention', label: 'Mention in Channel' },
+                        { key: 'copy', label: 'Copy Username' }
+                      ],
+                      onClick: ({ key }) => handleMemberAction(member.id, key)
+                    }}
+                    trigger={['click']}
+                  >
+                    <Button size="small" icon={<MoreOutlined />} type="text" />
+                  </Dropdown>
+                ]}
+              >
+                <List.Item.Meta
+                  avatar={
+                    <Badge
+                      dot
+                      status={member.status === 'online' ? 'success' :
+                             member.status === 'busy' ? 'error' :
+                             member.status === 'away' ? 'warning' : 'default'}
+                      offset={[-8, 8]}
+                    >
+                      <Avatar icon={<UserOutlined />}>
+                        {member.displayName.charAt(0)}
+                      </Avatar>
+                    </Badge>
+                  }
+                  title={
+                    <Space>
+                      <Typography.Text style={{ color: 'var(--color-text-primary)' }}>
+                        {member.displayName}
+                      </Typography.Text>
+                      {member.isAdmin && (
+                        <Badge
+                          count="Admin"
+                          style={{
+                            backgroundColor: 'var(--color-accent)',
+                            fontSize: '10px'
+                          }}
+                        />
+                      )}
+                    </Space>
+                  }
+                  description={
+                    <Space direction="vertical" size="small">
+                      <Typography.Text type="secondary" style={{ fontSize: '11px' }}>
+                        {member.role}
+                      </Typography.Text>
+                      {member.location && (
+                        <Typography.Text type="secondary" style={{ fontSize: '10px' }}>
+                          {member.location}
+                        </Typography.Text>
+                      )}
+                    </Space>
+                  }
+                />
+              </List.Item>
+            )}
+          />
         </div>
-      </div>
+      )
+    }
+  ];
 
-      {/* People List */}
-      <div className="people-list">
-        {filteredMembers.map((member) => (
-          <div key={member.id} className="person-item">
-            <div className="person-avatar">
-              <div className="avatar-circle">
-                {member.displayName.split(' ').map(n => n[0]).join('')}
-              </div>
-              <span className="status-indicator">
-                {getStatusIcon(member.status)}
-              </span>
-            </div>
-            
-            <div className="person-info">
-              <div className="person-header">
-                <span className="person-name">{member.displayName}</span>
-                {member.isAdmin && (
-                  <span className="admin-badge-mini">Admin</span>
-                )}
-              </div>
-              <div className="person-role">{member.role}</div>
-              <div className="person-status">
-                {getStatusText(member.status, member.lastSeen)}
-              </div>
-              {member.location && (
-                <div className="person-location">
-                  <span className="location-icon">📍</span> {member.location}
-                </div>
-              )}
-            </div>
-            
-            <div className="person-actions">
-              <button className="action-btn" title="Send Message">
-                <MessageCircle size={16} />
-              </button>
-              <button className="action-btn" title="Start Call">
-                <Phone size={16} />
-              </button>
-              <button className="action-btn" title="More Options">
-                <MoreHorizontal size={16} />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-          {/* Quick Actions */}
-          <div className="people-quick-actions">
-            <button className="quick-action-btn">
-              <span className="action-icon">
-                <Users size={16} />
-              </span>
-              <span>Invite People</span>
-            </button>
-            <button className="quick-action-btn">
-              <span className="action-icon">
-                <Clipboard size={16} />
-              </span>
-              <span>Manage Team</span>
-            </button>
-          </div>
-        </>
-      )}
+  return (
+    <div style={{ height: '100%', backgroundColor: 'var(--color-bg-primary)' }}>
+      <Tabs
+        activeKey={activeSection}
+        onChange={(key) => setActiveSection(key as 'channels' | 'dms' | 'people')}
+        items={tabItems}
+        style={{ height: '100%' }}
+        tabBarStyle={{
+          backgroundColor: 'var(--color-bg-secondary)',
+          margin: 0,
+          padding: '0 16px'
+        }}
+      />
     </div>
   );
 };

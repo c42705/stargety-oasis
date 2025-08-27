@@ -1,7 +1,8 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { Star, ChevronUp, ChevronDown, AlertTriangle, Eye, EyeOff, Rocket, Lightbulb } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Card, Form, Input, Button, Checkbox, Alert, Collapse, Space, Typography, Divider } from 'antd';
+import { UserOutlined, LockOutlined, RocketOutlined, DownOutlined, BulbOutlined } from '@ant-design/icons';
+import { Star } from 'lucide-react';
 import { useAuth } from '../../shared/AuthContext';
-import './LoginModule.css';
 
 interface LoginModuleProps {
   className?: string;
@@ -11,28 +12,14 @@ interface FormData {
   username: string;
   password: string;
   roomId: string;
-}
-
-interface FormErrors {
-  username?: string;
-  password?: string;
-  roomId?: string;
-  general?: string;
+  rememberMe: boolean;
 }
 
 export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
   const { login, isLoading, rememberUsername, setRememberUsername, savedUsername } = useAuth();
-
-  const [formData, setFormData] = useState<FormData>({
-    username: savedUsername || '',
-    password: '',
-    roomId: 'general',
-  });
-
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [showPassword, setShowPassword] = useState(false);
+  const [form] = Form.useForm();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showTestAccounts, setShowTestAccounts] = useState(false);
+  const [loginError, setLoginError] = useState<string>('');
 
   // Test accounts for easy access
   const testAccounts = [
@@ -42,311 +29,253 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
     { username: 'mike.admin', password: 'admin789', type: 'Admin User', description: 'Another admin account for testing admin features' },
   ];
 
-  // Update username when savedUsername changes
+  // Initialize form with saved username
   useEffect(() => {
-    if (savedUsername && !formData.username) {
-      setFormData(prev => ({ ...prev, username: savedUsername }));
+    if (savedUsername) {
+      form.setFieldsValue({ username: savedUsername, rememberMe: rememberUsername });
     }
-  }, [savedUsername, formData.username]);
-
-  // Validate form
-  const validateForm = useCallback((): boolean => {
-    const newErrors: FormErrors = {};
-
-    if (!formData.username.trim()) {
-      newErrors.username = 'Username is required';
-    } else if (formData.username.trim().length < 2) {
-      newErrors.username = 'Username must be at least 2 characters';
-    }
-
-    if (!formData.password.trim()) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.trim().length < 3) {
-      newErrors.password = 'Password must be at least 3 characters';
-    }
-
-    if (!formData.roomId.trim()) {
-      newErrors.roomId = 'Room ID cannot be empty';
-    } else if (!/^[a-zA-Z0-9._-]+$/.test(formData.roomId.trim())) {
-      newErrors.roomId = 'Room ID can only contain letters, numbers, dots, hyphens, and underscores';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }, [formData]);
-
-  // Handle input changes
-  const handleInputChange = useCallback((field: keyof FormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-
-    // Clear field-specific error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
-    }
-
-    // Clear general error
-    if (errors.general) {
-      setErrors(prev => ({ ...prev, general: undefined }));
-    }
-  }, [errors]);
+  }, [savedUsername, rememberUsername, form]);
 
   // Handle form submission
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validateForm()) {
-      return;
-    }
-
+  const handleSubmit = async (values: FormData) => {
     setIsSubmitting(true);
-    setErrors({});
+    setLoginError('');
 
     try {
       const success = await login(
-        formData.username.trim(),
-        formData.password.trim(),
-        formData.roomId.trim()
+        values.username.trim(),
+        values.password.trim(),
+        values.roomId?.trim() || 'general'
       );
 
       if (!success) {
-        setErrors({ general: 'Invalid username or password. Please try again.' });
+        setLoginError('Invalid username or password. Please try again.');
       }
+
+      // Handle remember username
+      setRememberUsername(values.rememberMe || false);
     } catch (error) {
-      setErrors({ general: 'Login failed. Please try again later.' });
+      setLoginError('Login failed. Please try again later.');
       console.error('Login error:', error);
     } finally {
       setIsSubmitting(false);
     }
-  }, [formData, login, validateForm]);
+  };
 
   // Quick login with test account
-  const handleQuickLogin = useCallback((testAccount: typeof testAccounts[0]) => {
-    setFormData({
+  const handleQuickLogin = (testAccount: typeof testAccounts[0]) => {
+    form.setFieldsValue({
       username: testAccount.username,
       password: testAccount.password,
       roomId: 'general',
+      rememberMe: rememberUsername
     });
-    setErrors({});
-    // Collapse the test accounts section after selection
-    setShowTestAccounts(false);
-  }, []);
-
-  // Handle remember username toggle
-  const handleRememberUsernameChange = useCallback((checked: boolean) => {
-    setRememberUsername(checked);
-  }, [setRememberUsername]);
+    setLoginError('');
+  };
 
   return (
-    <div className={`login-module ${className}`}>
-      <div className="login-container">
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '1rem'
+    }}>
+      <Card
+        style={{
+          width: '100%',
+          maxWidth: 480,
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)'
+        }}
+      >
         {/* Header */}
-        <div className="login-header">
-          <div className="logo">
-            <div className="logo-icon">
-              <Star size={32} />
-            </div>
-            <h1>Stargety Oasis</h1>
-          </div>
-          <p className="tagline">Your collaborative digital workspace</p>
+        <div style={{
+          textAlign: 'center',
+          marginBottom: '2rem',
+          padding: '1rem 0'
+        }}>
+          <Space direction="vertical" size="small">
+            <Star size={48} style={{ color: '#667eea' }} />
+            <Typography.Title level={2} style={{ margin: 0, color: '#667eea' }}>
+              Stargety Oasis
+            </Typography.Title>
+            <Typography.Text type="secondary">
+              Your collaborative digital workspace
+            </Typography.Text>
+          </Space>
         </div>
 
         {/* Test Accounts Section */}
-        <div className="test-accounts-section">
-          <button
-            type="button"
-            className="test-accounts-toggle"
-            onClick={() => setShowTestAccounts(!showTestAccounts)}
-            disabled={isSubmitting || isLoading}
-          >
-            {showTestAccounts ? (
-              <ChevronUp size={16} />
-            ) : (
-              <ChevronDown size={16} />
-            )} Demo Accounts
-          </button>
+        <Collapse
+          style={{ marginBottom: '1.5rem' }}
+          items={[
+            {
+              key: 'demo-accounts',
+              label: (
+                <Space>
+                  <DownOutlined />
+                  Demo Accounts
+                </Space>
+              ),
+              children: (
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Typography.Text type="secondary">
+                    Quick login with pre-configured test accounts:
+                  </Typography.Text>
+                  {testAccounts.map((account, index) => (
+                    <Card key={index} size="small" style={{ marginBottom: '8px' }}>
+                      <Space direction="vertical" style={{ width: '100%' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                          <Typography.Text strong>{account.username}</Typography.Text>
+                          <Typography.Text
+                            type={account.type.includes('Admin') ? 'warning' : 'secondary'}
+                            style={{ fontSize: '12px' }}
+                          >
+                            {account.type}
+                          </Typography.Text>
+                        </div>
+                        <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
+                          {account.description}
+                        </Typography.Text>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                          <Typography.Text code style={{ fontSize: '12px' }}>
+                            Password: {account.password}
+                          </Typography.Text>
+                          <Button
+                            size="small"
+                            type="primary"
+                            onClick={() => handleQuickLogin(account)}
+                            disabled={isSubmitting || isLoading}
+                          >
+                            Use Account
+                          </Button>
+                        </div>
+                      </Space>
+                    </Card>
+                  ))}
+                </Space>
+              )
+            }
+          ]}
+        />
 
-          {showTestAccounts && (
-            <div className="test-accounts-list">
-              <p className="test-accounts-description">
-                Quick login with pre-configured test accounts:
-              </p>
-              {testAccounts.map((account, index) => (
-                <div key={index} className="test-account-item">
-                  <div className="test-account-info">
-                    <div className="test-account-header">
-                      <span className="test-account-username">{account.username}</span>
-                      <span className={`test-account-type ${account.type.includes('Admin') ? 'admin' : 'user'}`}>
-                        {account.type}
-                      </span>
-                    </div>
-                    <div className="test-account-description">{account.description}</div>
-                    <div className="test-account-credentials">
-                      Password: <code>{account.password}</code>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="quick-login-button"
-                    onClick={() => handleQuickLogin(account)}
-                    disabled={isSubmitting || isLoading}
-                  >
-                    Use Account
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        
         {/* Login Form */}
-        <form className="login-form" onSubmit={handleSubmit}>
-          <h2>Welcome Back</h2>
-          <p className="form-subtitle">Sign in to access your workspace</p>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <Typography.Title level={3} style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
+            Welcome Back
+          </Typography.Title>
+          <Typography.Text type="secondary" style={{ display: 'block', textAlign: 'center', marginBottom: '1.5rem' }}>
+            Sign in to access your workspace
+          </Typography.Text>
 
           {/* General Error */}
-          {errors.general && (
-            <div className="error-message general-error">
-              <span className="error-icon">
-                <AlertTriangle size={16} />
-              </span>
-              {errors.general}
-            </div>
+          {loginError && (
+            <Alert
+              message={loginError}
+              type="error"
+              showIcon
+              style={{ marginBottom: '1rem' }}
+            />
           )}
 
-          {/* Username Field */}
-          <div className="form-group">
-            <label htmlFor="username" className="form-label">
-              Username
-              <span className="required">*</span>
-            </label>
-            <input
-              id="username"
-              type="text"
-              className={`form-input ${errors.username ? 'error' : ''}`}
-              placeholder="Enter your username"
-              value={formData.username}
-              onChange={(e) => handleInputChange('username', e.target.value)}
-              disabled={isSubmitting || isLoading}
-              autoComplete="username"
-            />
-            {errors.username && (
-              <div className="error-message">
-                <span className="error-icon">
-                  <AlertTriangle size={16} />
-                </span>
-                {errors.username}
-              </div>
-            )}
-          </div>
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleSubmit}
+            initialValues={{
+              username: savedUsername || '',
+              password: '',
+              roomId: 'general',
+              rememberMe: rememberUsername
+            }}
+          >
+            {/* Username Field */}
+            <Form.Item
+              name="username"
+              label="Username"
+              rules={[
+                { required: true, message: 'Username is required' },
+                { min: 2, message: 'Username must be at least 2 characters' }
+              ]}
+            >
+              <Input
+                prefix={<UserOutlined />}
+                placeholder="Enter your username"
+                disabled={isSubmitting || isLoading}
+                autoComplete="username"
+              />
+            </Form.Item>
 
-          {/* Password Field */}
-          <div className="form-group">
-            <label htmlFor="password" className="form-label">
-              Password
-              <span className="required">*</span>
-            </label>
-            <div className="password-input-container">
-              <input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                className={`form-input ${errors.password ? 'error' : ''}`}
+            {/* Password Field */}
+            <Form.Item
+              name="password"
+              label="Password"
+              rules={[
+                { required: true, message: 'Password is required' },
+                { min: 3, message: 'Password must be at least 3 characters' }
+              ]}
+            >
+              <Input.Password
+                prefix={<LockOutlined />}
                 placeholder="Enter your password"
-                value={formData.password}
-                onChange={(e) => handleInputChange('password', e.target.value)}
                 disabled={isSubmitting || isLoading}
                 autoComplete="current-password"
               />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowPassword(!showPassword)}
-                disabled={isSubmitting || isLoading}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword ? (
-                  <EyeOff size={16} />
-                ) : (
-                  <Eye size={16} />
-                )}
-              </button>
-            </div>
-            {errors.password && (
-              <div className="error-message">
-                <span className="error-icon">⚠️</span>
-                {errors.password}
-              </div>
-            )}
-          </div>
+            </Form.Item>
 
-          {/* Room ID Field */}
-          <div className="form-group">
-            <label htmlFor="roomId" className="form-label">
-              Room ID
-              <span className="optional">(optional)</span>
-            </label>
-            <input
-              id="roomId"
-              type="text"
-              className={`form-input ${errors.roomId ? 'error' : ''}`}
-              placeholder="general"
-              value={formData.roomId}
-              onChange={(e) => handleInputChange('roomId', e.target.value)}
-              disabled={isSubmitting || isLoading}
-              autoComplete="off"
-            />
-            <div className="field-hint">
-              Leave empty or use "general" for the default room
-            </div>
-            {errors.roomId && (
-              <div className="error-message">
-                <span className="error-icon">⚠️</span>
-                {errors.roomId}
-              </div>
-            )}
-          </div>
-
-          {/* Remember Username */}
-          <div className="form-group checkbox-group">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={rememberUsername}
-                onChange={(e) => handleRememberUsernameChange(e.target.checked)}
+            {/* Room ID Field */}
+            <Form.Item
+              name="roomId"
+              label="Room ID (optional)"
+              rules={[
+                { pattern: /^[a-zA-Z0-9._-]*$/, message: 'Room ID can only contain letters, numbers, dots, hyphens, and underscores' }
+              ]}
+            >
+              <Input
+                placeholder="general"
                 disabled={isSubmitting || isLoading}
+                autoComplete="off"
               />
-              <span className="checkbox-custom"></span>
-              Remember my username
-            </label>
-          </div>
+            </Form.Item>
+            <Typography.Text type="secondary" style={{ fontSize: '12px', marginTop: '-16px', display: 'block', marginBottom: '16px' }}>
+              Leave empty or use "general" for the default room
+            </Typography.Text>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            className="login-button"
-            disabled={isSubmitting || isLoading}
-          >
-            {isSubmitting || isLoading ? (
-              <>
-                <span className="spinner"></span>
-                Signing in...
-              </>
-            ) : (
-              <>
-                <Rocket size={16} /> Sign In
-              </>
-            )}
-          </button>
-        </form>
+            {/* Remember Username */}
+            <Form.Item name="rememberMe" valuePropName="checked">
+              <Checkbox disabled={isSubmitting || isLoading}>
+                Remember my username
+              </Checkbox>
+            </Form.Item>
 
+            {/* Submit Button */}
+            <Form.Item>
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={isSubmitting || isLoading}
+                icon={<RocketOutlined />}
+                size="large"
+                style={{ width: '100%' }}
+              >
+                {isSubmitting || isLoading ? 'Signing in...' : 'Sign In'}
+              </Button>
+            </Form.Item>
+          </Form>
+        </div>
 
         {/* Footer */}
-        <div className="login-footer">
-          <p>
-            <Lightbulb size={16} className="demo-icon" /> <strong>Demo Mode:</strong> Any username/password combination works,
-            or use the demo accounts above for testing specific features.
-          </p>
+        <Divider />
+        <div style={{ textAlign: 'center' }}>
+          <Space>
+            <BulbOutlined style={{ color: '#faad14' }} />
+            <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
+              <strong>Demo Mode:</strong> Any username/password combination works, or use the demo accounts above for testing specific features.
+            </Typography.Text>
+          </Space>
         </div>
-      </div>
+      </Card>
     </div>
   );
 };
