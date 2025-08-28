@@ -115,7 +115,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       <Flex align="center" gap="middle">
         <Space size="small">
           <Text type="secondary" style={{ fontSize: '12px' }}>Zoom:</Text>
-          <Button.Group>
+          <Space.Compact>
             <Tooltip title="Zoom Out (-)">
               <Button icon={<ZoomOut size={16} />} onClick={onZoomOut} />
             </Tooltip>
@@ -125,7 +125,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             <Tooltip title="Fit to Screen (0)">
               <Button icon={<Maximize size={16} />} onClick={onFitToScreen} />
             </Tooltip>
-          </Button.Group>
+          </Space.Compact>
           <Text strong style={{ minWidth: '50px', textAlign: 'center' }}>
             {editorState.zoom}%
           </Text>
@@ -143,7 +143,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
         <Divider type="vertical" style={{ height: '24px' }} />
 
-        <Button.Group>
+        <Space.Compact>
           <Tooltip title="Undo (Ctrl+Z)">
             <Button
               icon={<Undo size={16} />}
@@ -158,7 +158,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               disabled={!editorState.canRedo}
             />
           </Tooltip>
-        </Button.Group>
+        </Space.Compact>
 
         <Divider type="vertical" style={{ height: '24px' }} />
 

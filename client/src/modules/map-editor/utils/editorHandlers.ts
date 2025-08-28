@@ -133,7 +133,8 @@ export const createAreaDrawnHandler = (
   pendingAreaData: Partial<InteractiveArea> | null,
   sharedMap: any,
   setDrawingMode: React.Dispatch<React.SetStateAction<boolean>>,
-  setPendingAreaData: React.Dispatch<React.SetStateAction<Partial<InteractiveArea> | null>>
+  setPendingAreaData: React.Dispatch<React.SetStateAction<Partial<InteractiveArea> | null>>,
+  onAreaCreated?: () => void
 ) => {
   return async (bounds: AreaBounds) => {
     if (!pendingAreaData) return;
@@ -154,6 +155,11 @@ export const createAreaDrawnHandler = (
       // Exit drawing mode
       setDrawingMode(false);
       setPendingAreaData(null);
+
+      // Trigger immediate re-render callback
+      if (onAreaCreated) {
+        onAreaCreated();
+      }
     } catch (error) {
       console.error('Failed to create area:', error);
       // TODO: Show error message to user

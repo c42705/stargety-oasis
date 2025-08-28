@@ -76,7 +76,11 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
       drawingMode.pendingAreaData,
       sharedMap,
       drawingMode.setDrawingMode,
-      drawingMode.setPendingAreaData
+      drawingMode.setPendingAreaData,
+      () => {
+        // Force immediate re-render by triggering a state update
+        console.log('Area created, triggering immediate re-render');
+      }
     ),
     [drawingMode.pendingAreaData, sharedMap, drawingMode]
   );

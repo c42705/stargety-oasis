@@ -361,6 +361,7 @@ export class SharedMapSystem {
 
     this.markAsChanged();
     this.emit('map:element:added', { element: area, type: 'interactive', source });
+    this.emit('map:changed', { mapData: this.mapData, source });
   }
 
   /**
@@ -395,6 +396,7 @@ export class SharedMapSystem {
       type: 'interactive',
       source
     });
+    this.emit('map:changed', { mapData: this.mapData, source });
   }
 
   /**
@@ -425,6 +427,7 @@ export class SharedMapSystem {
 
     this.markAsChanged();
     this.emit('map:element:removed', { element: removedArea, type: 'interactive', source });
+    this.emit('map:changed', { mapData: this.mapData, source });
   }
 
   /**
