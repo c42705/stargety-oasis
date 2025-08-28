@@ -77,29 +77,22 @@ export const AreasTab: React.FC<AreasTabProps> = ({
 
               {/* Description */}
               {area.description && (
-                <div
-                  style={{
-                    fontSize: '11px',
-                    color: '#8c8c8c',
-                    marginBottom: '4px',
-                    lineHeight: '1.3',
-                    overflow: 'hidden',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical'
-                  }}
+                <Typography.Paragraph
+                  type="secondary"
+                  style={{ marginBottom: 4 }}
+                  ellipsis={{ rows: 2 }}
                 >
                   {area.description}
-                </div>
+                </Typography.Paragraph>
               )}
 
               {/* Compact info */}
-              <div style={{ fontSize: '10px', color: '#8c8c8c' }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>
                 <Space size={8} split={<span>•</span>}>
                   <span>(X{area.x}, Y{area.y})</span>
                   <span>{area.width}×{area.height}</span>
                 </Space>
-              </div>
+              </Text>
             </div>
           </List.Item>
         )}
