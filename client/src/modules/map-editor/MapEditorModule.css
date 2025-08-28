@@ -161,7 +161,8 @@
 }
 
 .tab-content-container {
-  height: 100%;
+  
+  padding: var(--spacing-sm);
 }
 
 /* Main Content */

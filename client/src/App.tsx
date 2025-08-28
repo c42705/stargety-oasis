@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { ConfigProvider, Layout, Space, Button, Badge, Typography } from 'antd';
+import { ConfigProvider, Layout, Space, Button, Badge, Typography, App as AntdApp } from 'antd';
 import { LogoutOutlined } from '@ant-design/icons';
 import { MessageCircle, Users, User, Star, MapPin, Settings } from 'lucide-react';
 import { EventBusProvider } from './shared/EventBusContext';
@@ -254,9 +254,12 @@ const ThemedApp: React.FC = () => {
 
   return (
     <ConfigProvider theme={currentTheme.antdConfig}>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
+      {/* Ant Design App provider enables context-driven components like message, modal, notification */}
+      <AntdApp>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </AntdApp>
     </ConfigProvider>
   );
 };

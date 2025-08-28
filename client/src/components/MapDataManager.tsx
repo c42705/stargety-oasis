@@ -13,10 +13,11 @@
  * - Add batch operations for multiple maps
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
+import { App, Alert, Button, Card, Descriptions, Space, Typography, Upload } from 'antd';
+import { UploadOutlined, SaveOutlined, DownloadOutlined, InboxOutlined, CopyOutlined, UndoOutlined } from '@ant-design/icons';
 import { useSharedMap } from '../shared/useSharedMap';
 import { SharedMapSystem } from '../shared/SharedMapSystem';
-import './MapDataManager.css';
 
 interface MapDataManagerProps {
   className?: string;
@@ -32,8 +33,7 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
   onError
 }) => {
   const sharedMap = useSharedMap({ source: 'editor' });
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -92,21 +92,20 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
   /**
    * Handle file input change
    */
-  const handleFileInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      handleImportMap(file);
-    }
-    // Reset input value to allow importing the same file again
-    event.target.value = '';
-  }, [handleImportMap]);
+  const uploadProps = {
+    accept: '.json',
+    maxCount: 1,
+    showUploadList: false,
+    beforeUpload: async (file: File) => {
+      await handleImportMap(file);
+      return Upload.LIST_IGNORE; // prevent auto-upload
+    },
+  } as const;
 
   /**
    * Trigger file input click
    */
-  const triggerFileInput = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
+
 
   /**
    * Save current map data
@@ -186,147 +185,94 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
    */
   const mapStats = sharedMap.getMapStatistics();
 
+  const { message } = App.useApp();
+
   return (
-    <div className={`map-data-manager ${className}`}>
-      <div className="manager-header">
-        <h4>Map Data Management</h4>
-        {mapStats && (
-          <div className="map-stats">
-            <span>Version: {mapStats.version}</span>
-            <span>Areas: {mapStats.interactiveAreasCount}</span>
-            <span>Collisions: {mapStats.collisionAreasCount}</span>
-          </div>
-        )}
-      </div>
-
-      {/* File Operations */}
-      <div className="manager-section">
-        <h5>File Operations</h5>
-        <div className="button-group">
-          <button
-            onClick={handleSaveMap}
-            disabled={isSaving || sharedMap.isLoading}
-            className="manager-button primary"
-          >
-            {isSaving ? '💾 Saving...' : '💾 Save Map'}
-          </button>
-          
-          <button
-            onClick={handleExportMap}
-            disabled={isExporting || sharedMap.isLoading}
-            className="manager-button"
-          >
-            {isExporting ? '📤 Exporting...' : '📤 Export Map'}
-          </button>
-          
-          <button
-            onClick={triggerFileInput}
-            disabled={isImporting || sharedMap.isLoading}
-            className="manager-button"
-          >
-            {isImporting ? '📥 Importing...' : '📥 Import Map'}
-          </button>
-        </div>
-      </div>
-
-      {/* Clipboard Operations */}
-      <div className="manager-section">
-        <h5>Clipboard Operations</h5>
-        <div className="button-group">
-          <button
-            onClick={handleCopyToClipboard}
-            disabled={sharedMap.isLoading}
-            className="manager-button"
-          >
-            📋 Copy to Clipboard
-          </button>
-          
-          <button
-            onClick={handlePasteFromClipboard}
-            disabled={isImporting || sharedMap.isLoading}
-            className="manager-button"
-          >
-            {isImporting ? '📋 Pasting...' : '📋 Paste from Clipboard'}
-          </button>
-        </div>
-      </div>
-
-      {/* Backup Operations */}
-      <div className="manager-section">
-        <h5>Backup & Recovery</h5>
-        <div className="button-group">
-          <button
-            onClick={handleRestoreBackup}
-            disabled={isRestoring || sharedMap.isLoading}
-            className="manager-button warning"
-          >
-            {isRestoring ? '🔄 Restoring...' : '🔄 Restore Backup'}
-          </button>
-        </div>
-        <p className="backup-info">
-          Restores the last automatically saved backup. This will overwrite current changes.
-        </p>
-      </div>
-
-      {/* Map Information */}
+    <Card size="small" className={className} title={<Typography.Title level={4} style={{ margin: 0 }}>Map Data Management</Typography.Title>}>
       {mapStats && (
-        <div className="manager-section">
-          <h5>Map Information</h5>
-          <div className="map-info">
-            <div className="info-row">
-              <span className="info-label">Last Modified:</span>
-              <span className="info-value">
-                {mapStats.lastModified.toLocaleString()}
-              </span>
-            </div>
-            <div className="info-row">
-              <span className="info-label">Interactive Areas:</span>
-              <span className="info-value">{mapStats.interactiveAreasCount}</span>
-            </div>
-            <div className="info-row">
-              <span className="info-label">Collision Areas:</span>
-              <span className="info-value">{mapStats.collisionAreasCount}</span>
-            </div>
-            <div className="info-row">
-              <span className="info-label">Total Elements:</span>
-              <span className="info-value">{mapStats.totalElements}</span>
-            </div>
-            <div className="info-row">
-              <span className="info-label">Layers:</span>
-              <span className="info-value">{mapStats.layersCount}</span>
-            </div>
-          </div>
-        </div>
+        <Descriptions size="small" column={3} style={{ marginBottom: 16 }}>
+          <Descriptions.Item label="Version">{mapStats.version}</Descriptions.Item>
+          <Descriptions.Item label="Areas">{mapStats.interactiveAreasCount}</Descriptions.Item>
+          <Descriptions.Item label="Collisions">{mapStats.collisionAreasCount}</Descriptions.Item>
+        </Descriptions>
       )}
 
-      {/* Error Display */}
+      <Card size="small" type="inner" title="File Operations" style={{ marginBottom: 16 }}>
+        <Space wrap>
+          <Button type="primary" icon={<SaveOutlined />} loading={isSaving} disabled={sharedMap.isLoading} onClick={handleSaveMap}>
+            Save Map
+          </Button>
+          <Button icon={<DownloadOutlined />} loading={isExporting} disabled={sharedMap.isLoading} onClick={handleExportMap}>
+            Export Map
+          </Button>
+          <Upload {...uploadProps}>
+            <Button icon={<UploadOutlined />} loading={isImporting} disabled={sharedMap.isLoading}>
+              Import Map
+            </Button>
+          </Upload>
+        </Space>
+      </Card>
+
+      <Card size="small" type="inner" title="Clipboard Operations" style={{ marginBottom: 16 }}>
+        <Space wrap>
+          <Button icon={<CopyOutlined />} disabled={sharedMap.isLoading} onClick={async () => {
+            await handleCopyToClipboard();
+            message.success('Map data copied to clipboard');
+          }}>
+            Copy to Clipboard
+          </Button>
+          <Button icon={<InboxOutlined />} loading={isImporting} disabled={sharedMap.isLoading} onClick={handlePasteFromClipboard}>
+            Paste from Clipboard
+          </Button>
+        </Space>
+      </Card>
+
+      <Card size="small" type="inner" title="Backup & Recovery" style={{ marginBottom: 16 }}>
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Button danger icon={<UndoOutlined />} loading={isRestoring} disabled={sharedMap.isLoading} onClick={handleRestoreBackup}>
+            Restore Backup
+          </Button>
+          <Typography.Text type="secondary">
+            Restores the last automatically saved backup. This will overwrite current changes.
+          </Typography.Text>
+        </Space>
+      </Card>
+
+      {mapStats && (
+        <Card size="small" type="inner" title="Map Information" style={{ marginBottom: 16 }}>
+          <Descriptions size="small" column={2}>
+            <Descriptions.Item label="Last Modified">{mapStats.lastModified.toLocaleString()}</Descriptions.Item>
+            <Descriptions.Item label="Interactive Areas">{mapStats.interactiveAreasCount}</Descriptions.Item>
+            <Descriptions.Item label="Collision Areas">{mapStats.collisionAreasCount}</Descriptions.Item>
+            <Descriptions.Item label="Total Elements">{mapStats.totalElements}</Descriptions.Item>
+            <Descriptions.Item label="Layers">{mapStats.layersCount}</Descriptions.Item>
+          </Descriptions>
+        </Card>
+      )}
+
       {sharedMap.error && (
-        <div className="manager-error">
-          <span>⚠️ {sharedMap.error}</span>
-          <button onClick={sharedMap.clearError} className="error-close">×</button>
-        </div>
+        <Alert
+          type="error"
+          showIcon
+          message="Map Error"
+          description={sharedMap.error}
+          closable
+          onClose={sharedMap.clearError}
+          style={{ marginBottom: 16 }}
+        />
       )}
 
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".json"
-        onChange={handleFileInputChange}
-        style={{ display: 'none' }}
-      />
 
-      {/* TODO Notice */}
-      <div className="todo-notice">
-        <h6>🚧 Future Enhancements</h6>
-        <ul>
+
+      <Card size="small" type="inner" title="Future Enhancements">
+        <ul style={{ marginBottom: 0 }}>
           <li>Cloud storage integration for map sharing</li>
           <li>Map versioning and diff visualization</li>
           <li>Collaborative editing with conflict resolution</li>
           <li>Map templates and preset library</li>
           <li>Database migration for persistent storage</li>
         </ul>
-      </div>
-    </div>
+      </Card>
+    </Card>
   );
 };
