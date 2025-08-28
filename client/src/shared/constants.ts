@@ -23,7 +23,6 @@ export const CHAT_CONFIG = {
 
 // Video Call Configuration
 export const VIDEO_CONFIG = {
-  MAX_PARTICIPANTS: 10,
   DEFAULT_AUDIO_MUTED: false,
   DEFAULT_VIDEO_MUTED: false,
   SCREEN_SHARE_ENABLED: true,
@@ -36,7 +35,6 @@ export const WORLD_CONFIG = {
   DEFAULT_HEIGHT: 600,
   PLAYER_SPEED: 200,
   PLAYER_SIZE: 32,
-  MAX_PLAYERS: 20,
   SYNC_INTERVAL: 100,
   BOUNDS_PADDING: 16,
 } as const;

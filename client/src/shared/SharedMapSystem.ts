@@ -361,6 +361,7 @@ export class SharedMapSystem {
 
     this.markAsChanged();
     this.emit('map:element:added', { element: area, type: 'interactive', source });
+    this.emit('map:changed', { mapData: this.mapData, source });
   }
 
   /**
@@ -395,6 +396,7 @@ export class SharedMapSystem {
       type: 'interactive',
       source
     });
+    this.emit('map:changed', { mapData: this.mapData, source });
   }
 
   /**
@@ -425,6 +427,7 @@ export class SharedMapSystem {
 
     this.markAsChanged();
     this.emit('map:element:removed', { element: removedArea, type: 'interactive', source });
+    this.emit('map:changed', { mapData: this.mapData, source });
   }
 
   /**
@@ -679,8 +682,7 @@ export class SharedMapSystem {
           width: 120,
           height: 80,
           color: '#4A90E2',
-          description: 'Join the weekly team sync',
-          maxParticipants: 10
+          description: 'Join the weekly team sync'
         },
         {
           id: 'coffee-corner-default',
@@ -691,8 +693,7 @@ export class SharedMapSystem {
           width: 100,
           height: 80,
           color: '#D2691E',
-          description: 'Casual conversations',
-          maxParticipants: 6
+          description: 'Casual conversations'
         }
       ],
       impassableAreas: [

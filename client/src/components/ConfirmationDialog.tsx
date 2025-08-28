@@ -1,6 +1,6 @@
-import React from 'react';
-import { AlertTriangle, X } from 'lucide-react';
-import './ConfirmationDialog.css';
+import React, { useEffect } from 'react';
+import { Modal } from 'antd';
+import { ExclamationCircleOutlined, WarningOutlined, InfoCircleOutlined } from '@ant-design/icons';
 
 interface ConfirmationDialogProps {
   isOpen: boolean;
@@ -23,45 +23,40 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   cancelText = 'Cancel',
   type = 'warning'
 }) => {
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (isOpen) {
+      const getIcon = () => {
+        switch (type) {
+          case 'danger':
+            return <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />;
+          case 'warning':
+            return <WarningOutlined style={{ color: '#faad14' }} />;
+          case 'info':
+            return <InfoCircleOutlined style={{ color: '#1890ff' }} />;
+          default:
+            return <WarningOutlined style={{ color: '#faad14' }} />;
+        }
+      };
 
-  const handleConfirm = () => {
-    onConfirm();
-    onClose();
-  };
+      Modal.confirm({
+        title,
+        icon: getIcon(),
+        content: message,
+        okText: confirmText,
+        cancelText,
+        okType: type === 'danger' ? 'danger' : 'primary',
+        onOk: () => {
+          onConfirm();
+          onClose();
+        },
+        onCancel: onClose,
+        centered: true,
+        maskClosable: true,
+        width: 400,
+      });
+    }
+  }, [isOpen, onClose, onConfirm, title, message, confirmText, cancelText, type]);
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content confirmation-dialog" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="dialog-icon-title">
-            <div className={`dialog-icon ${type}`}>
-              <AlertTriangle size={20} />
-            </div>
-            <h2>{title}</h2>
-          </div>
-          <button className="modal-close-btn" onClick={onClose}>
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="dialog-content">
-          <p>{message}</p>
-        </div>
-
-        <div className="modal-actions">
-          <button type="button" className="btn btn-secondary" onClick={onClose}>
-            {cancelText}
-          </button>
-          <button 
-            type="button" 
-            className={`btn ${type === 'danger' ? 'btn-danger' : 'btn-warning'}`}
-            onClick={handleConfirm}
-          >
-            {confirmText}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  // Return null since Modal.confirm() handles the rendering
+  return null;
 };

@@ -26,8 +26,7 @@ export class ChatController {
         type: 'chat',
         participants: [],
         createdAt: new Date(),
-        isPrivate: false,
-        maxParticipants: 50
+        isPrivate: false
       });
       messages.set(roomId, []);
     }

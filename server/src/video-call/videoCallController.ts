@@ -39,18 +39,11 @@ export class VideoCallController {
         participantDetails: [],
         createdAt: new Date(),
         isPrivate: false,
-        maxParticipants: 10,
         jitsiRoomId: `stargety-oasis-${roomId}-${Date.now()}`
       });
     }
 
     const room = videoRooms.get(roomId)!;
-
-    // Check if room is full
-    if (room.participantDetails.length >= (room.maxParticipants || 10)) {
-      socket.emit('video-call-error', { message: 'Room is full' });
-      return;
-    }
 
     // Create participant
     const participant: VideoCallParticipant = {

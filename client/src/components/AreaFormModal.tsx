@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, AlertCircle } from 'lucide-react';
+import { Modal, Form, Input, Select, Button, Space, ColorPicker, Row, Col, Typography } from 'antd';
+import { SaveOutlined } from '@ant-design/icons';
 import { InteractiveArea } from '../shared/MapDataContext';
-import './AreaFormModal.css';
+
+const { TextArea } = Input;
+const { Option } = Select;
+const { Text } = Typography;
 
 interface AreaFormModalProps {
   isOpen: boolean;
@@ -13,18 +17,9 @@ interface AreaFormModalProps {
 
 interface FormData {
   name: string;
-  maxParticipants: number;
   description: string;
   type: InteractiveArea['type'];
   color: string;
-}
-
-interface FormErrors {
-  name?: string;
-  maxParticipants?: string;
-  description?: string;
-  type?: string;
-  color?: string;
 }
 
 const AREA_TYPES: { value: InteractiveArea['type']; label: string }[] = [
@@ -53,209 +48,165 @@ export const AreaFormModal: React.FC<AreaFormModalProps> = ({
   editingArea,
   title
 }) => {
-  const [formData, setFormData] = useState<FormData>({
-    name: '',
-    maxParticipants: 10,
-    description: '',
-    type: 'custom',
-    color: '#4A90E2'
-  });
-
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
 
   // Reset form when modal opens/closes or editing area changes
   useEffect(() => {
     if (isOpen) {
       if (editingArea) {
-        setFormData({
+        form.setFieldsValue({
           name: editingArea.name,
-          maxParticipants: editingArea.maxParticipants || 10,
           description: editingArea.description,
           type: editingArea.type,
           color: editingArea.color
         });
       } else {
-        setFormData({
+        form.setFieldsValue({
           name: '',
-          maxParticipants: 10,
           description: '',
           type: 'custom',
           color: '#4A90E2'
         });
       }
-      setErrors({});
     }
-  }, [isOpen, editingArea]);
+  }, [isOpen, editingArea, form]);
 
-  const validateForm = (): boolean => {
-    const newErrors: FormErrors = {};
+  const handleSubmit = async (values: FormData) => {
+    setLoading(true);
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'Room name is required';
-    }
+    try {
+      const areaData: Partial<InteractiveArea> = {
+        name: values.name.trim(),
+        description: values.description.trim(),
+        type: values.type,
+        color: values.color
+      };
 
-    if (formData.maxParticipants < 1) {
-      newErrors.maxParticipants = 'Must be at least 1 participant';
-    } else if (formData.maxParticipants > 100) {
-      newErrors.maxParticipants = 'Cannot exceed 100 participants';
-    }
+      // If editing, include the ID
+      if (editingArea) {
+        areaData.id = editingArea.id;
+      }
 
-    if (!formData.description.trim()) {
-      newErrors.description = 'Description is required';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-
-    const areaData: Partial<InteractiveArea> = {
-      name: formData.name.trim(),
-      maxParticipants: formData.maxParticipants,
-      description: formData.description.trim(),
-      type: formData.type,
-      color: formData.color
-    };
-
-    // If editing, include the ID
-    if (editingArea) {
-      areaData.id = editingArea.id;
-    }
-
-    onSave(areaData);
-  };
-
-  const handleInputChange = (field: keyof FormData, value: string | number) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-
-    // Clear error for this field when user starts typing
-    if (errors[field as keyof FormErrors]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
+      onSave(areaData);
+      form.resetFields();
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (!isOpen) return null;
+  const handleCancel = () => {
+    form.resetFields();
+    onClose();
+  };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content area-form-modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>{title || (editingArea ? 'Edit Area' : 'Create New Area')}</h2>
-          <button className="modal-close-btn" onClick={onClose}>
-            <X size={20} />
-          </button>
-        </div>
+    <Modal
+      title={title || (editingArea ? 'Edit Area' : 'Create New Area')}
+      open={isOpen}
+      onCancel={handleCancel}
+      width={600}
+      footer={null}
+      destroyOnHidden
+    >
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={handleSubmit}
+        initialValues={{
+          name: '',
+          description: '',
+          type: 'custom',
+          color: '#4A90E2'
+        }}
+      >
+        <Form.Item
+          label="Room Name"
+          name="name"
+          rules={[
+            { required: true, message: 'Room name is required' },
+            { min: 2, message: 'Room name must be at least 2 characters' }
+          ]}
+        >
+          <Input placeholder="Enter room name" />
+        </Form.Item>
 
-        <form onSubmit={handleSubmit} className="area-form">
-          <div className="form-group">
-            <label htmlFor="area-name">Room Name *</label>
-            <input
-              id="area-name"
-              type="text"
-              value={formData.name}
-              onChange={e => handleInputChange('name', e.target.value)}
-              placeholder="Enter room name"
-              className={errors.name ? 'error' : ''}
-            />
-            {errors.name && (
-              <span className="error-message">
-                <AlertCircle size={14} />
-                {errors.name}
-              </span>
-            )}
-          </div>
 
-          <div className="form-group">
-            <label htmlFor="max-participants">Maximum Participants *</label>
-            <input
-              id="max-participants"
-              type="number"
-              min="1"
-              max="100"
-              value={formData.maxParticipants}
-              onChange={e => handleInputChange('maxParticipants', parseInt(e.target.value) || 1)}
-              className={errors.maxParticipants ? 'error' : ''}
-            />
-            {errors.maxParticipants && (
-              <span className="error-message">
-                <AlertCircle size={14} />
-                {errors.maxParticipants}
-              </span>
-            )}
-          </div>
 
-          <div className="form-group">
-            <label htmlFor="area-description">Description *</label>
-            <textarea
-              id="area-description"
-              value={formData.description}
-              onChange={e => handleInputChange('description', e.target.value)}
-              placeholder="Enter area description"
-              rows={3}
-              className={errors.description ? 'error' : ''}
-            />
-            {errors.description && (
-              <span className="error-message">
-                <AlertCircle size={14} />
-                {errors.description}
-              </span>
-            )}
-          </div>
+        <Form.Item
+          label="Description"
+          name="description"
+          rules={[
+            { required: true, message: 'Description is required' },
+            { min: 5, message: 'Description must be at least 5 characters' }
+          ]}
+        >
+          <TextArea
+            rows={3}
+            placeholder="Enter area description"
+          />
+        </Form.Item>
 
-          <div className="form-group">
-            <label htmlFor="area-type">Area Type</label>
-            <select
-              id="area-type"
-              value={formData.type}
-              onChange={e => handleInputChange('type', e.target.value as InteractiveArea['type'])}
-            >
-              {AREA_TYPES.map(type => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-          </div>
+        <Form.Item
+          label="Area Type"
+          name="type"
+        >
+          <Select placeholder="Select area type">
+            {AREA_TYPES.map(type => (
+              <Option key={type.value} value={type.value}>
+                {type.label}
+              </Option>
+            ))}
+          </Select>
+        </Form.Item>
 
-          <div className="form-group">
-            <label>Area Color</label>
-            <div className="color-picker">
+        <Form.Item
+          label="Area Color"
+          name="color"
+        >
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Text type="secondary">Choose from preset colors:</Text>
+            <Row gutter={[8, 8]}>
               {DEFAULT_COLORS.map(color => (
-                <button
-                  key={color}
-                  type="button"
-                  className={`color-option ${formData.color === color ? 'selected' : ''}`}
-                  style={{ backgroundColor: color }}
-                  onClick={() => handleInputChange('color', color)}
-                  title={color}
-                />
+                <Col key={color}>
+                  <Button
+                    style={{
+                      backgroundColor: color,
+                      borderColor: color,
+                      width: 40,
+                      height: 40,
+                      padding: 0
+                    }}
+                    onClick={() => form.setFieldValue('color', color)}
+                  />
+                </Col>
               ))}
-            </div>
-            <input
-              type="color"
-              value={formData.color}
-              onChange={e => handleInputChange('color', e.target.value)}
-              className="color-input"
+            </Row>
+            <Text type="secondary">Or pick a custom color:</Text>
+            <ColorPicker
+              value={form.getFieldValue('color')}
+              onChange={(color) => form.setFieldValue('color', color.toHexString())}
+              showText
             />
-          </div>
+          </Space>
+        </Form.Item>
 
-          <div className="modal-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
+        <Form.Item style={{ marginBottom: 0, marginTop: 24 }}>
+          <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+            <Button onClick={handleCancel}>
               Cancel
-            </button>
-            <button type="submit" className="btn btn-primary">
-              <Save size={16} />
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={loading}
+              icon={<SaveOutlined />}
+            >
               {editingArea ? 'Update Area' : 'Create Area'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+            </Button>
+          </Space>
+        </Form.Item>
+      </Form>
+    </Modal>
   );
 };

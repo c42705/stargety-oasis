@@ -25,8 +25,7 @@ export class WorldController {
         type: 'world',
         participants: [],
         createdAt: new Date(),
-        isPrivate: false,
-        maxParticipants: 20
+        isPrivate: false
       });
       roomPlayers.set(roomId, new Set());
     }

@@ -13,9 +13,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { Card, Button, Space, Typography, Badge, Spin, Switch, Popover, Alert } from 'antd';
+import { SaveOutlined, CheckCircleOutlined, ExclamationCircleOutlined, SettingOutlined } from '@ant-design/icons';
+import { Clock } from 'lucide-react';
 import { SharedMapSystem } from '../shared/SharedMapSystem';
-import { Save, AlertCircle, CheckCircle, Clock, Settings } from 'lucide-react';
-import './SaveStatusIndicator.css';
 
 interface SaveStatusIndicatorProps {
   className?: string;
@@ -41,7 +42,6 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
   });
 
   const [isManualSaving, setIsManualSaving] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
 
   // Get SharedMapSystem instance
   const mapSystem = SharedMapSystem.getInstance();
@@ -115,7 +115,6 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
   const getStatusInfo = () => {
     if (saveState.isSaving || isManualSaving) {
       return {
-        icon: <Clock className="animate-spin" size={16} />,
         text: 'Saving...',
         className: 'saving'
       };
@@ -123,7 +122,6 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
 
     if (saveState.saveError) {
       return {
-        icon: <AlertCircle size={16} />,
         text: `Error: ${saveState.saveError}`,
         className: 'error'
       };
@@ -131,7 +129,6 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
 
     if (saveState.hasUnsavedChanges) {
       return {
-        icon: <AlertCircle size={16} />,
         text: 'Unsaved changes',
         className: 'unsaved'
       };
@@ -140,14 +137,12 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
     if (saveState.lastSaveTime) {
       const timeAgo = getTimeAgo(saveState.lastSaveTime);
       return {
-        icon: <CheckCircle size={16} />,
         text: `Saved ${timeAgo}`,
         className: 'saved'
       };
     }
 
     return {
-      icon: <Save size={16} />,
       text: 'Ready to save',
       className: 'ready'
     };
@@ -174,75 +169,117 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
 
   const statusInfo = getStatusInfo();
 
-  return (
-    <div className={`save-status-indicator ${className}`}>
-      {/* Main Status Display */}
-      <div className={`status-display ${statusInfo.className}`}>
-        <span className="status-icon">{statusInfo.icon}</span>
-        <span className="status-text">{statusInfo.text}</span>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="status-actions">
-        {showManualSave && (
-          <button
-            onClick={handleManualSave}
-            disabled={isManualSaving || saveState.isSaving}
-            className="save-button"
-            title="Save map manually"
-          >
-            <Save size={14} />
-            {isManualSaving ? 'Saving...' : 'Save'}
-          </button>
-        )}
-
-        {showAutoSaveToggle && (
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="settings-button"
-            title="Save settings"
-          >
-            <Settings size={14} />
-          </button>
-        )}
-      </div>
-
-      {/* Settings Panel */}
-      {showSettings && (
-        <div className="save-settings">
-          <div className="setting-item">
-            <label>
-              <input
-                type="checkbox"
-                checked={saveState.autoSaveEnabled}
-                onChange={handleAutoSaveToggle}
-              />
-              Auto-save enabled
-            </label>
-          </div>
-          <div className="setting-info">
-            <p>Auto-save triggers 2 seconds after changes</p>
-          </div>
-        </div>
-      )}
-
-      {/* Detailed Status (when expanded) */}
-      {saveState.lastSaveTime && (
-        <div className="detailed-status">
-          <div className="status-detail">
-            <span className="detail-label">Last saved:</span>
-            <span className="detail-value">
-              {saveState.lastSaveTime.toLocaleString()}
-            </span>
-          </div>
-          {saveState.autoSaveEnabled && (
-            <div className="status-detail">
-              <span className="detail-label">Auto-save:</span>
-              <span className="detail-value">Enabled</span>
-            </div>
-          )}
-        </div>
-      )}
+  // Settings panel content
+  const settingsContent = (
+    <div style={{ padding: '8px', minWidth: '200px' }}>
+      <Space direction="horizontal" style={{ width: '100%' }}>
+        <Space>
+          <Switch
+            checked={saveState.autoSaveEnabled}
+            onChange={handleAutoSaveToggle}
+            size="small"
+          />
+          <Typography.Text style={{ fontSize: '12px' }}>
+            Auto-save enabled
+          </Typography.Text>
+        </Space>
+        <Typography.Text type="secondary" style={{ fontSize: '11px' }}>
+          Auto-save triggers 2 seconds after changes
+        </Typography.Text>
+      </Space>
     </div>
+  );
+
+  return (
+    <Card
+      size="small"
+      className={className}
+      style={{
+        minWidth: 200,
+        backgroundColor: 'var(--color-bg-secondary)',
+        borderColor: 'var(--color-border-light)'
+      }}
+    >
+      <Space direction="horizontal" size="small" style={{ width: '100%' }}>
+        {/* Main Status Display */}
+        <Space>
+          {saveState.isSaving ? (
+            <Spin size="small" />
+          ) : saveState.saveError ? (
+            <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />
+          ) : saveState.hasUnsavedChanges ? (
+            <Clock size={16} style={{ color: '#faad14' }} />
+          ) : saveState.lastSaveTime ? (
+            <CheckCircleOutlined style={{ color: '#52c41a' }} />
+          ) : (
+            <SaveOutlined style={{ color: 'var(--color-text-secondary)' }} />
+          )}
+
+          <Typography.Text style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}>
+            {statusInfo.text}
+          </Typography.Text>
+        </Space>
+
+        {/* Action Buttons */}
+        <Space>
+          {showManualSave && (
+            <Button
+              size="small"
+              icon={<SaveOutlined />}
+              onClick={handleManualSave}
+              loading={isManualSaving || saveState.isSaving}
+              style={{
+                backgroundColor: 'var(--color-accent)',
+                borderColor: 'var(--color-accent)',
+                color: 'white'
+              }}
+            >
+              {isManualSaving ? 'Saving...' : 'Save'}
+            </Button>
+          )}
+
+          {showAutoSaveToggle && (
+            <Popover
+              content={settingsContent}
+              trigger="click"
+              placement="bottomLeft"
+              title="Save Settings"
+            >
+              <Button
+                size="small"
+                icon={<SettingOutlined />}
+                style={{
+                  backgroundColor: 'var(--color-bg-tertiary)',
+                  borderColor: 'var(--color-border)',
+                  color: 'var(--color-text-primary)'
+                }}
+              />
+            </Popover>
+          )}
+        </Space>
+
+        {/* Error Display */}
+        {saveState.saveError && (
+          <Alert
+            message={saveState.saveError}
+            type="error"
+            showIcon
+            style={{ fontSize: '11px' }}
+          />
+        )}
+
+        {/* Detailed Status */}
+        {saveState.lastSaveTime && (
+          <Space direction="vertical" size="small" style={{ fontSize: '11px' }}>
+            <Typography.Text type="secondary" style={{ fontSize: '11px' }}>
+              Last saved: {saveState.lastSaveTime.toLocaleString()}
+            </Typography.Text>
+            {saveState.autoSaveEnabled && (
+              <Badge status="success" text="Auto-save enabled" style={{ fontSize: '11px' }} />
+            )}
+          </Space>
+        )}
+      </Space>
+    </Card>
   );
 };

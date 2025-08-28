@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Smile, Laugh, Heart, ThumbsUp, ThumbsDown, PartyPopper, Frown } from 'lucide-react';
-import './ChatModule.css';
+import { List, Input, Button, Space, Typography, Badge, Avatar, Popover } from 'antd';
+import { SendOutlined, SmileOutlined, UserOutlined } from '@ant-design/icons';
+import { Smile, Laugh, Heart, ThumbsUp, ThumbsDown, PartyPopper, Frown } from 'lucide-react';
 
 interface ChatModuleProps {
   className?: string;
@@ -16,8 +17,7 @@ interface Message {
   type: 'user' | 'system';
 }
 
-export const ChatModule: React.FC<ChatModuleProps> = ({ 
-  className = '', 
+export const ChatModule: React.FC<ChatModuleProps> = ({
   roomId = 'general',
   currentUser = 'Anonymous'
 }) => {
@@ -126,12 +126,7 @@ export const ChatModule: React.FC<ChatModuleProps> = ({
     }
   }, [isConnected]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      sendMessage();
-    }
-  }, [sendMessage]);
+
 
   const addEmoji = useCallback((emojiLabel: string) => {
     setInputMessage(prev => prev + `:${emojiLabel}: `);
@@ -142,83 +137,153 @@ export const ChatModule: React.FC<ChatModuleProps> = ({
     return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Emoji picker content
+  const emojiPickerContent = (
+    <div style={{ padding: '8px' }}>
+      <Space wrap>
+        {commonEmojiIcons.map((emojiIcon) => (
+          <Button
+            key={emojiIcon.label}
+            type="text"
+            size="small"
+            onClick={() => addEmoji(emojiIcon.label)}
+            title={emojiIcon.label}
+            style={{ padding: '4px' }}
+          >
+            {emojiIcon.icon}
+          </Button>
+        ))}
+      </Space>
+    </div>
+  );
+
   return (
-    <div className={`chat-module ${className}`}>
-      <div className="chat-main">
-        <div className="chat-header">
-          <h3>Chat - {roomId}</h3>
-          <div className="connection-status">
-            <span className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`}>
-              {isConnected ? 'Connected' : 'Disconnected'}
-            </span>
-            <span className="user-count">{users.length} users online</span>
-          </div>
-        </div>
-
-        <div className="messages-container">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`message ${message.type} ${
-                message.user === currentUser ? 'own-message' : ''
-              }`}
-            >
-              {message.type !== 'system' && (
-                <div className="message-header">
-                  <span className="username">{message.user}</span>
-                  <span className="timestamp">{formatTimestamp(message.timestamp)}</span>
-                </div>
-              )}
-              <div className="message-content">{message.message}</div>
-            </div>
-          ))}
-
-          <div ref={messagesEndRef} />
-        </div>
-
-        <div className="chat-input-container">
-          {showEmojiPicker && (
-            <div className="emoji-picker">
-              {commonEmojiIcons.map((emojiIcon) => (
-                <button
-                  key={emojiIcon.label}
-                  className="emoji-button"
-                  onClick={() => addEmoji(emojiIcon.label)}
-                  title={emojiIcon.label}
-                >
-                  {emojiIcon.icon}
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="input-row">
-            <button
-              className="emoji-toggle"
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            >
-              <Smile size={20} />
-            </button>
-
-            <input
-              type="text"
-              value={inputMessage}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              placeholder="Type a message..."
-              disabled={!isConnected}
-              className="message-input"
+    <div style={{
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      backgroundColor: 'var(--color-bg-primary)'
+    }}>
+      {/* Chat Header */}
+      <div style={{
+        padding: '16px',
+        borderBottom: '1px solid var(--color-border-light)',
+        backgroundColor: 'var(--color-bg-secondary)'
+      }}>
+        <Space direction="vertical" size="small" style={{ width: '100%' }}>
+          <Typography.Title level={4} style={{ margin: 0, color: 'var(--color-text-primary)' }}>
+            Chat - {roomId}
+          </Typography.Title>
+          <Space>
+            <Badge
+              status={isConnected ? 'success' : 'error'}
+              text={isConnected ? 'Connected' : 'Disconnected'}
             />
+            <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
+              {users.length} users online
+            </Typography.Text>
+          </Space>
+        </Space>
+      </div>
 
-            <button
-              onClick={sendMessage}
-              disabled={!inputMessage.trim() || !isConnected}
-              className="send-button"
-            >
-              <Send size={20} />
-            </button>
-          </div>
-        </div>
+      {/* Messages List */}
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        <List
+          dataSource={messages}
+          style={{ height: '100%', overflow: 'auto', padding: '8px' }}
+          renderItem={(message) => (
+            <List.Item style={{ border: 'none', padding: '8px 16px' }}>
+              <List.Item.Meta
+                avatar={
+                  message.type !== 'system' ? (
+                    <Avatar
+                      size="small"
+                      icon={<UserOutlined />}
+                      style={{
+                        backgroundColor: message.user === currentUser ? 'var(--color-accent)' : 'var(--color-bg-tertiary)'
+                      }}
+                    >
+                      {message.user.charAt(0).toUpperCase()}
+                    </Avatar>
+                  ) : null
+                }
+                title={
+                  message.type !== 'system' ? (
+                    <Space>
+                      <Typography.Text strong style={{ color: 'var(--color-text-primary)' }}>
+                        {message.user}
+                      </Typography.Text>
+                      <Typography.Text type="secondary" style={{ fontSize: '11px' }}>
+                        {formatTimestamp(message.timestamp)}
+                      </Typography.Text>
+                    </Space>
+                  ) : null
+                }
+                description={
+                  <Typography.Text
+                    style={{
+                      color: message.type === 'system' ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
+                      fontStyle: message.type === 'system' ? 'italic' : 'normal'
+                    }}
+                  >
+                    {message.message}
+                  </Typography.Text>
+                }
+              />
+            </List.Item>
+          )}
+        />
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Chat Input */}
+      <div style={{
+        padding: '16px',
+        borderTop: '1px solid var(--color-border-light)',
+        backgroundColor: 'var(--color-bg-secondary)'
+      }}>
+        <Space.Compact style={{ width: '100%' }}>
+          <Popover
+            content={emojiPickerContent}
+            trigger="click"
+            placement="topLeft"
+            open={showEmojiPicker}
+            onOpenChange={setShowEmojiPicker}
+          >
+            <Button
+              icon={<SmileOutlined />}
+              style={{
+                backgroundColor: 'var(--color-bg-tertiary)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)'
+              }}
+            />
+          </Popover>
+
+          <Input
+            value={inputMessage}
+            onChange={handleInputChange}
+            onPressEnter={sendMessage}
+            placeholder="Type a message..."
+            disabled={!isConnected}
+            style={{
+              backgroundColor: 'var(--color-bg-tertiary)',
+              borderColor: 'var(--color-border)',
+              color: 'var(--color-text-primary)'
+            }}
+          />
+
+          <Button
+            type="primary"
+            icon={<SendOutlined />}
+            onClick={sendMessage}
+            disabled={!inputMessage.trim() || !isConnected}
+            style={{
+              backgroundColor: 'var(--color-accent)',
+              borderColor: 'var(--color-accent)'
+            }}
+          />
+        </Space.Compact>
       </div>
     </div>
   );
