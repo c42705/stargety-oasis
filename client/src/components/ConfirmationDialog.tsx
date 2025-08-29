@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Modal } from 'antd';
+import { Modal, App } from 'antd';
 import { ExclamationCircleOutlined, WarningOutlined, InfoCircleOutlined } from '@ant-design/icons';
 
 interface ConfirmationDialogProps {
@@ -23,6 +23,8 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   cancelText = 'Cancel',
   type = 'warning'
 }) => {
+  const { modal } = App.useApp();
+
   useEffect(() => {
     if (isOpen) {
       const getIcon = () => {
@@ -38,7 +40,8 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
         }
       };
 
-      Modal.confirm({
+      console.log('[ConfirmationDialog] open', { title, message, type });
+      modal.confirm({
         title,
         icon: getIcon(),
         content: message,
@@ -46,16 +49,20 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
         cancelText,
         okType: type === 'danger' ? 'danger' : 'primary',
         onOk: () => {
+          console.log('[ConfirmationDialog] confirmed');
           onConfirm();
           onClose();
         },
-        onCancel: onClose,
+        onCancel: () => {
+          console.log('[ConfirmationDialog] cancelled');
+          onClose();
+        },
         centered: true,
         maskClosable: true,
         width: 400,
       });
     }
-  }, [isOpen, onClose, onConfirm, title, message, confirmText, cancelText, type]);
+  }, [isOpen, onClose, onConfirm, title, message, confirmText, cancelText, type, modal]);
 
   // Return null since Modal.confirm() handles the rendering
   return null;

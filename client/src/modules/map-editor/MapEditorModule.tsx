@@ -259,7 +259,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
       <ConfirmationDialog
         isOpen={modalState.showDeleteConfirm}
         onClose={handleCloseModals}
-        onConfirm={handleConfirmDelete}
+        onConfirm={() => { console.log('[MapEditorModule] Confirm delete'); handleConfirmDelete(); }}
         title="Delete Interactive Area"
         message={`Are you sure you want to delete "${modalState.areaToDelete?.name}"? This action cannot be undone.`}
         confirmText="Delete"

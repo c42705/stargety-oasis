@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Form, Input, Button, Checkbox, Alert, Collapse, Space, Typography, Divider } from 'antd';
 import { UserOutlined, LockOutlined, RocketOutlined, DownOutlined, BulbOutlined } from '@ant-design/icons';
-import { Star } from 'lucide-react';
 import { useAuth } from '../../shared/AuthContext';
+import appLogo from '../../assets/app-logo.png';
+import magicalBg from '../../assets/magical_bg.png';
 
 interface LoginModuleProps {
   className?: string;
@@ -79,24 +80,30 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: '1rem'
+      backgroundImage: `linear-gradient(35deg, #667eea 0%, #764ba2 100%), url(${magicalBg})`,
+      backgroundBlendMode: 'overlay',
+      backgroundSize: 'cover, cover',
+      backgroundPosition: 'center, center',
+      backgroundRepeat: 'no-repeat, no-repeat',
+      padding: '0.5rem'
     }}>
       <Card
         style={{
           width: '100%',
           maxWidth: 480,
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)'
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
+          background: 'rgba(32, 32, 32, 0.27)',          
+          backdropFilter: 'blur(25px)'
         }}
       >
         {/* Header */}
         <div style={{
           textAlign: 'center',
-          marginBottom: '2rem',
+          marginBottom: '1rem',
           padding: '1rem 0'
         }}>
-          <Space direction="vertical" size="small">
-            <Star size={48} style={{ color: '#667eea' }} />
+          <Space direction="vertical" size="small" align="center">
+            <img src={appLogo} alt="Stargety Oasis" width={128} height={128} style={{ borderRadius: 8 }} />
             <Typography.Title level={2} style={{ margin: 0, color: '#667eea' }}>
               Stargety Oasis
             </Typography.Title>
@@ -114,7 +121,6 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
               key: 'demo-accounts',
               label: (
                 <Space>
-                  <DownOutlined />
                   Demo Accounts
                 </Space>
               ),

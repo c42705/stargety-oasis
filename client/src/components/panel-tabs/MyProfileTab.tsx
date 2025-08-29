@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Input, Switch, Select, Button, Space, Typography, Badge, Avatar } from 'antd';
+import { Card, Form, Input, Switch, Select, Button, Space, Typography, Badge, Avatar, message } from 'antd';
 import { SaveOutlined, EditOutlined, UserOutlined, LogoutOutlined } from '@ant-design/icons';
 import { Lock, Mail } from 'lucide-react';
 import { useAuth } from '../../shared/AuthContext';
 import { useSettings } from '../../shared/SettingsContext';
 import { useTheme } from '../../shared/ThemeContext';
 import { ThemeType } from '../../theme/theme-system';
+import AvatarCustomizerModal from '../avatar/AvatarCustomizerModal';
+import { AvatarConfig, DEFAULT_AVATAR_CONFIG } from '../avatar/avatarTypes';
+import { loadAvatarConfig, saveAvatarConfig } from '../avatar/avatarStorage';
+import { composeAvatarDataUrl } from '../avatar/composeAvatar';
 
 interface UserPreferences {
   notifications: boolean;
@@ -75,6 +79,36 @@ export const MyProfileTab: React.FC = () => {
       </Space>
     ),
   }));
+  // Avatar customization state
+  const [isCustomizerOpen, setCustomizerOpen] = useState(false);
+  const [avatarConfig, setAvatarConfig] = useState<AvatarConfig>(DEFAULT_AVATAR_CONFIG);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // Load saved avatar config for this user
+  useEffect(() => {
+    if (!user) return;
+    const cfg = loadAvatarConfig(user.username);
+    setAvatarConfig(cfg);
+  }, [user?.username]);
+
+  // Compose preview whenever config changes
+  useEffect(() => {
+    (async () => {
+      const url = await composeAvatarDataUrl(avatarConfig);
+      setAvatarUrl(url);
+    })();
+  }, [avatarConfig]);
+
+  const handleCustomizerSave = async (config: AvatarConfig) => {
+    setAvatarConfig(config);
+    if (user) {
+      saveAvatarConfig(user.username, config);
+    }
+    setCustomizerOpen(false);
+    message.success('Character updated');
+  };
+  const handleCustomizerCancel = () => setCustomizerOpen(false);
+
 
 
 
@@ -95,6 +129,7 @@ export const MyProfileTab: React.FC = () => {
             >
               <Avatar
                 size={64}
+                src={avatarUrl || undefined}
                 icon={<UserOutlined />}
                 style={{
                   backgroundColor: 'var(--color-accent)',
@@ -262,6 +297,12 @@ export const MyProfileTab: React.FC = () => {
           size="small"
           style={{ backgroundColor: 'var(--color-bg-secondary)', borderColor: 'var(--color-border-light)' }}
         >
+        <AvatarCustomizerModal
+          open={isCustomizerOpen}
+          initialConfig={avatarConfig}
+          onOk={handleCustomizerSave}
+          onCancel={handleCustomizerCancel}
+        />
           <Space direction="vertical" style={{ width: '100%' }}>
             <Button
               icon={<Lock size={16} />}

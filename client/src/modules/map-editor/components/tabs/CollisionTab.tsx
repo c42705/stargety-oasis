@@ -1,7 +1,8 @@
 import React from 'react';
-import { Button, List, Typography, Flex, Card, Avatar, Tag, Space } from 'antd';
+import { Button, List, Typography, Flex, Card, Avatar, Tag, Space, Modal } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Shield } from 'lucide-react';
+import { useSharedMap } from '../../../../shared/useSharedMap';
 
 const { Title, Text } = Typography;
 
@@ -12,6 +13,25 @@ interface CollisionTabProps {
 export const CollisionTab: React.FC<CollisionTabProps> = ({
   impassableAreas
 }) => {
+  const sharedMap = useSharedMap({ source: 'editor', autoSave: true });
+
+  const handleDelete = async (area: any) => {
+    Modal.confirm({
+      title: 'Delete Collision Area',
+      content: `Are you sure you want to delete "${area.name || 'Collision Area'}"? This action cannot be undone.`,
+      okText: 'Delete',
+      cancelText: 'Cancel',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await sharedMap.removeCollisionArea(area.id);
+        } catch (e) {
+          console.error('Failed to delete collision area', e);
+        }
+      }
+    });
+  };
+
   return (
     <Card
       title={
@@ -46,7 +66,7 @@ export const CollisionTab: React.FC<CollisionTabProps> = ({
                 </div>
                 <Space size={4}>
                   <Button type="default" icon={<EditOutlined />} size="small" style={{ padding: 4, minWidth: 'auto' }} />
-                  <Button type="default" danger icon={<DeleteOutlined />} size="small" style={{ padding: 4, minWidth: 'auto' }} />
+                  <Button type="default" danger icon={<DeleteOutlined />} size="small" style={{ padding: 4, minWidth: 'auto' }} onClick={() => handleDelete(area)} />
                 </Space>
               </Flex>
 

@@ -57,7 +57,7 @@ export interface UseSharedMapReturn {
 export const useSharedMap = (options: UseSharedMapOptions = {}): UseSharedMapReturn => {
   const {
     autoSave = true,
-    saveDelay = 1000,
+    saveDelay = 18000,
     source = 'editor'
   } = options;
 
@@ -97,11 +97,16 @@ export const useSharedMap = (options: UseSharedMapOptions = {}): UseSharedMapRet
     if (!mapSystemRef.current) return;
 
     const handleMapChanged = (event: any) => {
-      setMapData(event.mapData);
+      // Force new references so React detects changes even when arrays are mutated in place
+      const md = event.mapData;
+      const cloned = md ? { ...md, interactiveAreas: [...(md.interactiveAreas || [])], impassableAreas: [...(md.impassableAreas || [])] } : md;
+      setMapData(cloned);
     };
 
     const handleMapLoaded = (event: any) => {
-      setMapData(event.mapData);
+      const md = event.mapData;
+      const cloned = md ? { ...md, interactiveAreas: [...(md.interactiveAreas || [])], impassableAreas: [...(md.impassableAreas || [])] } : md;
+      setMapData(cloned);
     };
 
     const handleMapSaved = (event: any) => {
