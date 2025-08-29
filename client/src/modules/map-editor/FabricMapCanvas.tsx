@@ -17,7 +17,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import * as fabric from 'fabric';
 import { useSharedMap } from '../../shared/useSharedMap';
 import { InteractiveArea, ImpassableArea } from '../../shared/MapDataContext';
-import { AreaDeletionDialog } from './components/AreaDeletionDialog';
+import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 import './FabricMapCanvas.css';
 
 interface FabricMapCanvasProps {
@@ -860,12 +860,30 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         </div>
       )}
 
-      <AreaDeletionDialog
+      <ConfirmationDialog
         isOpen={showDeleteDialog}
-        areaCount={areasToDelete.length}
-        areaNames={areasToDelete.map(area => area.name)}
+        onClose={handleCancelDeletion}
         onConfirm={handleConfirmDeletion}
-        onCancel={handleCancelDeletion}
+        title={areasToDelete.length === 1 ? 'Delete Area' : `Delete ${areasToDelete.length} Areas`}
+        content={
+          <div>
+            <div style={{ marginBottom: areasToDelete.length > 1 ? 8 : 0 }}>
+              {areasToDelete.length === 1
+                ? `Are you sure you want to delete "${areasToDelete[0]?.name}"?`
+                : `Are you sure you want to delete the following ${areasToDelete.length} areas?`}
+            </div>
+            {areasToDelete.length > 1 && (
+              <div style={{ maxHeight: 150, overflowY: 'auto', padding: 8, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
+                {areasToDelete.map((a, i) => (
+                  <div key={i} style={{ padding: '2px 0' }}>• {a.name}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        }
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
       />
 
       {/* Size validation feedback during drawing */}

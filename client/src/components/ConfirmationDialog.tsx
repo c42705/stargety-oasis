@@ -7,10 +7,12 @@ interface ConfirmationDialogProps {
   onClose: () => void;
   onConfirm: () => void;
   title: string;
-  message: string;
+  message?: string;
+  content?: React.ReactNode;
   confirmText?: string;
   cancelText?: string;
   type?: 'danger' | 'warning' | 'info';
+  showUndoWarning?: boolean;
 }
 
 export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
@@ -19,9 +21,11 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   onConfirm,
   title,
   message,
+  content,
   confirmText = 'Confirm',
   cancelText = 'Cancel',
-  type = 'warning'
+  type = 'warning',
+  showUndoWarning = true
 }) => {
   const { modal } = App.useApp();
 
@@ -41,10 +45,31 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
       };
 
       console.log('[ConfirmationDialog] open', { title, message, type });
+      // Build content with optional undo warning
+      const finalContent = (() => {
+        if (content) return content;
+
+        const messageContent = message || '';
+        if (!showUndoWarning) return messageContent;
+
+        return (
+          <div>
+            <div style={{ marginBottom: showUndoWarning ? 12 : 0 }}>
+              {messageContent}
+            </div>
+            {showUndoWarning && (
+              <div style={{ fontSize: 12, color: '#faad14', fontStyle: 'italic' }}>
+                This action cannot be undone.
+              </div>
+            )}
+          </div>
+        );
+      })();
+
       modal.confirm({
         title,
         icon: getIcon(),
-        content: message,
+        content: finalContent,
         okText: confirmText,
         cancelText,
         okType: type === 'danger' ? 'danger' : 'primary',
