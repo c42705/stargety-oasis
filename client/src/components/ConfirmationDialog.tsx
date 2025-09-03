@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Modal, App } from 'antd';
+import { App } from 'antd';
 import { ExclamationCircleOutlined, WarningOutlined, InfoCircleOutlined } from '@ant-design/icons';
 
 interface ConfirmationDialogProps {

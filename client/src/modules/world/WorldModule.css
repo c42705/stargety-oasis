@@ -16,6 +16,20 @@
   flex: 1;
   background: #87CEEB;
   border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  max-width: 100%;
+  max-height: 100%;
+  position: relative;
+}
+
+.game-canvas canvas {
+  max-width: 100% !important;
+  max-height: 100% !important;
+  width: auto !important;
+  height: auto !important;
 }
 
 

@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import Phaser from 'phaser';
 import { useEventBus } from '../../shared/EventBusContext';
 import { PhaserMapRenderer } from './PhaserMapRenderer';
+import { AvatarGameRenderer } from '../../components/avatar/AvatarGameRenderer';
+import { useAuth } from '../../shared/AuthContext';
 import { InteractiveArea } from '../../shared/MapDataContext';
 import { SharedMapSystem } from '../../shared/SharedMapSystem';
 
@@ -24,6 +26,7 @@ class GameScene extends Phaser.Scene {
   private currentArea: string | null = null;
   private mapRenderer!: PhaserMapRenderer;
   private sharedMapSystem!: SharedMapSystem;
+  public avatarRenderer!: AvatarGameRenderer;
 
   // Interactive controls
   private spaceKey!: Phaser.Input.Keyboard.Key;
@@ -46,7 +49,7 @@ class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    // Create simple colored rectangles as sprites
+    // Create simple colored rectangles as sprites (fallback)
     this.add.graphics()
       .fillStyle(0x00ff00)
       .fillRect(0, 0, 32, 32)
@@ -89,9 +92,19 @@ class GameScene extends Phaser.Scene {
       this.onAreaClick(area.id);
     });
 
-    // Create player sprite
+    // Initialize avatar renderer
+    this.avatarRenderer = new AvatarGameRenderer(this);
+
+    // Set camera background color to match game config
+    this.cameras.main.setBackgroundColor('#020811');
+
+    // Create default player sprite immediately, then load avatar asynchronously
     this.player = this.add.sprite(400, 300, 'player');
-    this.player.setDepth(10); // Ensure player is above areas
+    this.player.setDepth(10);
+    this.originalY = this.player.y;
+
+    // Load avatar asynchronously and update sprite when ready
+    this.initializePlayer();
 
     // Create cursor keys
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -111,7 +124,7 @@ class GameScene extends Phaser.Scene {
         obj.getData && obj.getData('areaId')
       );
 
-      if (!clickedOnArea) {
+      if (!clickedOnArea && this.player) {
         this.player.x = pointer.x;
         this.player.y = pointer.y;
 
@@ -123,15 +136,52 @@ class GameScene extends Phaser.Scene {
       }
     });
 
-    // Store original Y position for jump animation
-    this.originalY = this.player.y;
+    // Player initialization will be handled in initializePlayer()
+  }
 
-    // Announce player joined
-    this.eventBus.publish('world:playerJoined', {
-      playerId: this.playerId,
-      x: this.player.x,
-      y: this.player.y,
-    });
+  async initializePlayer() {
+    console.log('Initializing player avatar for:', this.playerId);
+
+    try {
+      // Load player avatar
+      console.log('Loading player avatar...');
+      await this.avatarRenderer.loadPlayerAvatar(this.playerId);
+
+      // Create avatar sprite to replace the default one
+      console.log('Creating avatar sprite...');
+      const avatarSprite = this.avatarRenderer.createPlayerSprite(this.playerId, this.player.x, this.player.y);
+
+      if (avatarSprite) {
+        // Replace the default sprite with the avatar sprite
+        const oldX = this.player.x;
+        const oldY = this.player.y;
+        this.player.destroy();
+
+        this.player = avatarSprite;
+        this.player.setPosition(oldX, oldY);
+        this.player.setDepth(10);
+
+        console.log('Player avatar updated successfully');
+      } else {
+        console.log('Avatar sprite creation failed, keeping default sprite');
+      }
+
+      // Announce player joined
+      this.eventBus.publish('world:playerJoined', {
+        playerId: this.playerId,
+        x: this.player.x,
+        y: this.player.y,
+      });
+    } catch (error) {
+      console.error('Failed to load player avatar, keeping default sprite:', error);
+
+      // Still announce player joined with default sprite
+      this.eventBus.publish('world:playerJoined', {
+        playerId: this.playerId,
+        x: this.player.x,
+        y: this.player.y,
+      });
+    }
   }
 
   private setupKeyHandlers() {
@@ -309,8 +359,8 @@ class GameScene extends Phaser.Scene {
   }
 
   update() {
-    // Only allow movement if not jumping (to prevent interference with jump animation)
-    if (!this.isJumping) {
+    // Only allow movement if player exists and not jumping
+    if (!this.isJumping && this.player) {
       const speed = 200;
       let moved = false;
       let verticalMovement = false;
@@ -379,6 +429,11 @@ class GameScene extends Phaser.Scene {
   }
 
   private checkAreaCollisions() {
+    // Only check collisions if player exists
+    if (!this.player) {
+      return;
+    }
+
     // Get areas from SharedMapSystem (localStorage) instead of hardcoded data
     const mapData = this.sharedMapSystem.getMapData();
 
@@ -423,6 +478,7 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
 }) => {
   const gameRef = useRef<HTMLDivElement>(null);
   const phaserGameRef = useRef<Phaser.Game | null>(null);
+  const { user } = useAuth();
 
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [selectedArea, setSelectedArea] = useState<InteractiveArea | null>(null);
@@ -457,7 +513,15 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
   };
 
   useEffect(() => {
-    if (!gameRef.current || phaserGameRef.current) return;
+    if (!gameRef.current || phaserGameRef.current) {
+      console.log('Skipping game creation:', {
+        hasGameRef: !!gameRef.current,
+        hasExistingGame: !!phaserGameRef.current
+      });
+      return;
+    }
+
+    console.log('Creating Phaser game...');
 
     const config: Phaser.Types.Core.GameConfig = {
       type: Phaser.AUTO,
@@ -465,18 +529,34 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
       height: 600,
       parent: gameRef.current,
       backgroundColor: '#020811ff',
-      scene: new GameScene(eventBus, playerId, handleAreaClick),
+      scene: new GameScene(eventBus, user?.username || playerId, handleAreaClick),
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: '100%',
+        height: '100%',
+      },
     };
 
-    phaserGameRef.current = new Phaser.Game(config);
+    try {
+      phaserGameRef.current = new Phaser.Game(config);
+      console.log('Phaser game created successfully:', phaserGameRef.current);
+
+      // Store game instance globally for debugging
+      (window as any).phaserGame = phaserGameRef.current;
+    } catch (error) {
+      console.error('Failed to create Phaser game:', error);
+    }
 
     return () => {
+      console.log('Cleaning up Phaser game...');
       if (phaserGameRef.current) {
         phaserGameRef.current.destroy(true);
         phaserGameRef.current = null;
+        delete (window as any).phaserGame;
       }
     };
-  }, [eventBus, playerId]);
+  }, [eventBus, user?.username, playerId]);
 
 
 

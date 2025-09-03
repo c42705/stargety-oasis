@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Modal, Tabs, Image, Upload, Card, message, Row, Col, Typography, Space } from 'antd';
-import type { UploadProps } from 'antd';
-import { InboxOutlined } from '@ant-design/icons';
+import type { UploadProps, UploadFile, GetProp } from 'antd';
+import { PlusOutlined, CloseOutlined } from '@ant-design/icons';
+import ImgCrop from 'antd-img-crop';
 import AvatarPreview from './AvatarPreview';
-import { ASSET_DIMENSIONS, AvatarConfig, DEFAULT_AVATAR_CONFIG, LayerId, validatePngDimensions, fileToDataUrl } from './avatarTypes';
-
-const { Dragger } = Upload;
+import { ASSET_DIMENSIONS, AvatarConfig, DEFAULT_AVATAR_CONFIG, LayerId, fileToDataUrl } from './avatarTypes';
+type FileType = Parameters<GetProp<UploadProps, 'beforeUpload'>>[0];
 
 interface AssetOption {
   key: string;
@@ -22,28 +22,31 @@ interface AvatarCustomizerModalProps {
 
 const placeholderAssets: Record<LayerId, AssetOption[]> = {
   base: [
-    { key: 'base-1', src: 'https://placehold.co/128x128/2b2e3b/ffffff.png?text=Base+1' },
-    { key: 'base-2', src: 'https://placehold.co/128x128/3b2e2e/ffffff.png?text=Base+2' },
+    { key: 'base-1', src: 'https://placehold.co/128x128/f4c2a1/ffffff.png?text=👤' },
+    { key: 'base-2', src: 'https://placehold.co/128x128/d4a574/ffffff.png?text=👤' },
+    { key: 'base-3', src: 'https://placehold.co/128x128/8b4513/ffffff.png?text=👤' },
   ],
   hair: [
-    { key: 'hair-1', src: 'https://placehold.co/128x128/000000/ffffff.png?text=Hair+1' },
-    { key: 'hair-2', src: 'https://placehold.co/128x128/222222/ffffff.png?text=Hair+2' },
+    { key: 'hair-1', src: 'https://placehold.co/128x128/8b4513/ffffff.png?text=💇' },
+    { key: 'hair-2', src: 'https://placehold.co/128x128/ffd700/000000.png?text=💇' },
+    { key: 'hair-3', src: 'https://placehold.co/128x128/000000/ffffff.png?text=💇' },
   ],
   accessories: [
-    { key: 'acc-1', src: 'https://placehold.co/128x128/ff69b4/ffffff.png?text=Glasses' },
-    { key: 'acc-2', src: 'https://placehold.co/128x128/ffd700/000000.png?text=Hat' },
+    { key: 'acc-1', src: 'https://placehold.co/128x128/ff69b4/ffffff.png?text=👓' },
+    { key: 'acc-2', src: 'https://placehold.co/128x128/ffd700/000000.png?text=👑' },
+    { key: 'acc-3', src: 'https://placehold.co/128x128/32cd32/ffffff.png?text=🎩' },
   ],
   clothes: [
-    { key: 'clo-1', src: 'https://placehold.co/128x128/1e90ff/ffffff.png?text=Jacket' },
-    { key: 'clo-2', src: 'https://placehold.co/128x128/32cd32/ffffff.png?text=Shirt' },
+    { key: 'clo-1', src: 'https://placehold.co/128x128/1e90ff/ffffff.png?text=👔' },
+    { key: 'clo-2', src: 'https://placehold.co/128x128/32cd32/ffffff.png?text=👕' },
+    { key: 'clo-3', src: 'https://placehold.co/128x128/ff4500/ffffff.png?text=🧥' },
   ],
 };
 
 const TabTitle: React.FC<{ title: string; dims: { width: number; height: number } }>=({title,dims})=> (
-  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-    <span>{title}</span>
-    <Typography.Text type="secondary" style={{ fontSize: 12 }}>{dims.width}x{dims.height}px PNG</Typography.Text>
-  </div>
+  
+    <span>{title}</span>    
+  
 );
 
 const gridCardStyle: React.CSSProperties = {
@@ -51,14 +54,43 @@ const gridCardStyle: React.CSSProperties = {
   height: 88,
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'center',
-  background: 'var(--color-bg-tertiary)',
-  borderColor: 'var(--color-border-light)'
+  justifyContent: 'center'
 };
 
-const AssetGrid: React.FC<{ options: AssetOption[]; onPick: (src: string) => void }>=({ options, onPick })=> {
+const AssetGrid: React.FC<{
+  options: AssetOption[];
+  onPick: (src: string) => void;
+  showNoneOption?: boolean;
+  onPickNone?: () => void;
+}> = ({ options, onPick, showNoneOption = false, onPickNone }) => {
   return (
     <Row gutter={[8,8]}>
+      {showNoneOption && (
+        <Col key="none">
+          <Card
+            hoverable
+            size="small"
+            style={{
+              ...gridCardStyle,
+              borderColor: '#d9d9d9',
+              borderStyle: 'dashed'
+            }}
+            onClick={onPickNone}
+          >
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: 72,
+              color: '#ffffff4b'
+            }}>
+              <CloseOutlined style={{ fontSize: 24, marginBottom: 4 }} />
+              <Typography.Text type="secondary" style={{ fontSize: 11 }}>None</Typography.Text>
+            </div>
+          </Card>
+        </Col>
+      )}
       {options.map((opt) => (
         <Col key={opt.key}>
           <Card hoverable size="small" style={gridCardStyle} onClick={() => onPick(opt.src)}>
@@ -70,33 +102,86 @@ const AssetGrid: React.FC<{ options: AssetOption[]; onPick: (src: string) => voi
   );
 };
 
-const UploadDragger: React.FC<{ layer: LayerId; onPicked: (dataUrl: string) => void }>=({ layer, onPicked })=> {
+const getBase64 = (file: FileType): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });
+
+const CroppableUpload: React.FC<{ layer: LayerId; onPicked: (dataUrl: string) => void }> = ({ layer, onPicked }) => {
   const dims = ASSET_DIMENSIONS[layer];
-  const props: UploadProps = {
-    multiple: false,
-    accept: 'image/png',
-    beforeUpload: async (file) => {
-      try {
-        await validatePngDimensions(file, dims);
-        const dataUrl = await fileToDataUrl(file);
-        onPicked(dataUrl);
-        message.success('Image validated and loaded');
-      } catch (err: any) {
-        message.error(err.message || 'Validation failed');
-      }
-      return Upload.LIST_IGNORE; // prevent automatic upload
-    },
-    itemRender: () => null,
-    showUploadList: false,
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState('');
+
+  const handlePreview = async (file: UploadFile) => {
+    if (!file.url && !file.preview) {
+      file.preview = await getBase64(file.originFileObj as FileType);
+    }
+    setPreviewImage(file.url || (file.preview as string));
+    setPreviewOpen(true);
   };
+
+  const handleChange: UploadProps['onChange'] = ({ fileList: newFileList }) => {
+    setFileList(newFileList);
+  };
+
+  const beforeUpload = async (file: FileType) => {
+    try {
+      // Convert cropped file to data URL and validate
+      const dataUrl = await fileToDataUrl(file);
+      onPicked(dataUrl);
+      message.success('Image cropped and loaded successfully');
+    } catch (err: any) {
+      message.error(err.message || 'Upload failed');
+    }
+    return false; // Prevent automatic upload
+  };
+
+  const uploadButton = (
+    <button style={{ border: 0, background: 'none' }} type="button">
+      <PlusOutlined />
+      <div style={{ marginTop: 8 }}>Upload</div>
+    </button>
+  );
+
   return (
     <div style={{ marginTop: 8 }}>
-      <Typography.Text>Upload Custom ({dims.width}x{dims.height}px PNG)</Typography.Text>
-      <Dragger {...props} style={{ background: 'var(--color-bg-tertiary)' }}>
-        <p className="ant-upload-drag-icon"><InboxOutlined /></p>
-        <p className="ant-upload-text">Click or drag PNG to this area</p>
-        <p className="ant-upload-hint">We will validate dimensions and preview it instantly</p>
-      </Dragger>
+      <Typography.Text style={{ display: 'block', marginBottom: 8 }}>
+        Upload Custom ({dims.width}x{dims.height}px)
+      </Typography.Text>
+      <ImgCrop
+        rotationSlider
+        aspect={dims.width / dims.height}
+        quality={1}
+        modalTitle="Crop Avatar Image"
+        modalOk="Apply Crop"
+      >
+        <Upload
+          listType="picture-card"
+          fileList={fileList}
+          onPreview={handlePreview}
+          onChange={handleChange}
+          beforeUpload={beforeUpload}
+          accept="image/*"
+        >
+          {fileList.length >= 8 ? null : uploadButton}
+        </Upload>
+      </ImgCrop>
+
+      {previewImage && (
+        <Image
+          wrapperStyle={{ display: 'none' }}
+          preview={{
+            visible: previewOpen,
+            onVisibleChange: (visible) => setPreviewOpen(visible),
+            afterOpenChange: (visible) => !visible && setPreviewImage(''),
+          }}
+          src={previewImage}
+        />
+      )}
     </div>
   );
 };
@@ -122,6 +207,7 @@ export const AvatarCustomizerModal: React.FC<AvatarCustomizerModalProps> = ({ op
 
   const pick = (layer: LayerId, src: string) => setConfig((c) => updateLayer(c, layer, src, true));
   const pickUpload = (layer: LayerId) => (dataUrl: string) => setConfig((c) => updateLayer(c, layer, dataUrl, true));
+  const pickNone = (layer: LayerId) => () => setConfig((c) => updateLayer(c, layer, null, false));
 
   const tabs = (
     <Tabs
@@ -130,16 +216,21 @@ export const AvatarCustomizerModal: React.FC<AvatarCustomizerModalProps> = ({ op
         [
           { key: 'base', title: 'Base Character' as const },
           { key: 'hair', title: 'Hair Styles' as const },
-          { key: 'accessories', title: 'Accessories' as const },
           { key: 'clothes', title: 'Clothes' as const },
+          { key: 'accessories', title: 'Accessories' as const },          
         ] as { key: LayerId; title: string }[]
       ).map(({ key, title }) => ({
         key,
         label: <TabTitle title={title} dims={ASSET_DIMENSIONS[key]} />,
         children: (
           <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-            <AssetGrid options={placeholderAssets[key]} onPick={(src)=>pick(key, src)} />
-            <UploadDragger layer={key} onPicked={pickUpload(key)} />
+            <AssetGrid
+              options={placeholderAssets[key]}
+              onPick={(src)=>pick(key, src)}
+              showNoneOption={key !== 'base'} // Show "None" for all layers except base
+              onPickNone={pickNone(key)}
+            />
+            <CroppableUpload layer={key} onPicked={pickUpload(key)} />
           </Space>
         )
       }))}
@@ -152,17 +243,16 @@ export const AvatarCustomizerModal: React.FC<AvatarCustomizerModalProps> = ({ op
       open={open}
       onOk={() => onOk({ ...config, updatedAt: new Date().toISOString() })}
       onCancel={onCancel}
-      width={900}
+      width={600}
       okText="Save Changes"
       cancelText="Cancel"
-      styles={{ body: { background: 'var(--color-bg-secondary)' } }}
+      
     >
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) 2fr', gap: 16 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <AvatarPreview
           config={config}
-          onToggleLayer={(layer, enabled)=> setConfig((c)=> ({...c, [layer]: { ...((c as any)[layer]||{}), enabled }} as AvatarConfig))}
         />
-        <Card size="small" bordered style={{ background: 'var(--color-bg-secondary)' }}>
+        <Card size="small" >
           {tabs}
         </Card>
       </div>

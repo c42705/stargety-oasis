@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Form, Input, Switch, Select, Button, Space, Typography, Badge, Avatar, message } from 'antd';
-import { SaveOutlined, EditOutlined, UserOutlined, LogoutOutlined } from '@ant-design/icons';
+import { SaveOutlined, EditOutlined, UserOutlined, LogoutOutlined, EditFilled } from '@ant-design/icons';
 import { Lock, Mail } from 'lucide-react';
 import { useAuth } from '../../shared/AuthContext';
 import { useSettings } from '../../shared/SettingsContext';
@@ -106,6 +106,13 @@ export const MyProfileTab: React.FC = () => {
     }
     setCustomizerOpen(false);
     message.success('Character updated');
+
+    // Trigger avatar update event for game canvas
+    if (user) {
+      window.dispatchEvent(new CustomEvent('avatarConfigUpdated', {
+        detail: { username: user.username, config }
+      }));
+    }
   };
   const handleCustomizerCancel = () => setCustomizerOpen(false);
 
@@ -157,6 +164,21 @@ export const MyProfileTab: React.FC = () => {
               <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
                 Room: {user.roomId}
               </Typography.Text>
+
+              {/* Customize Character Button */}
+              <Button
+                size="small"
+                icon={<EditFilled />}
+                onClick={() => setCustomizerOpen(true)}
+                style={{
+                  backgroundColor: 'var(--color-accent)',
+                  borderColor: 'var(--color-accent)',
+                  color: 'white',
+                  marginTop: '8px'
+                }}
+              >
+                Customize Character
+              </Button>
             </Space>
           </Space>
         </Card>

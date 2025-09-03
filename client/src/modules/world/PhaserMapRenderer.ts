@@ -61,14 +61,20 @@ export class PhaserMapRenderer {
    * Initialize Phaser groups for organizing map elements
    */
   private initializeGroups(): void {
-    this.backgroundGroup = this.scene.add.group();
-    this.interactiveAreasGroup = this.scene.add.group();
-    this.collisionAreasGroup = this.scene.add.group();
-    
-    // Set depth for proper layering
-    this.backgroundGroup.setDepth(0);
-    this.interactiveAreasGroup.setDepth(10);
-    this.collisionAreasGroup.setDepth(5);
+    try {
+      this.backgroundGroup = this.scene.add.group();
+      this.interactiveAreasGroup = this.scene.add.group();
+      this.collisionAreasGroup = this.scene.add.group();
+
+      // Set depth for proper layering
+      this.backgroundGroup.setDepth(0);
+      this.interactiveAreasGroup.setDepth(10);
+      this.collisionAreasGroup.setDepth(5);
+
+      console.log('PhaserMapRenderer groups initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize PhaserMapRenderer groups:', error);
+    }
   }
 
   /**
@@ -161,10 +167,17 @@ export class PhaserMapRenderer {
    * Clear all map elements
    */
   private clearMap(): void {
-    this.backgroundGroup.clear(true, true);
-    this.interactiveAreasGroup.clear(true, true);
-    this.collisionAreasGroup.clear(true, true);
-    
+    // Safety checks to prevent errors if groups are not initialized
+    if (this.backgroundGroup) {
+      this.backgroundGroup.clear(true, true);
+    }
+    if (this.interactiveAreasGroup) {
+      this.interactiveAreasGroup.clear(true, true);
+    }
+    if (this.collisionAreasGroup) {
+      this.collisionAreasGroup.clear(true, true);
+    }
+
     this.interactiveAreaObjects.clear();
     this.collisionAreaObjects.clear();
   }
