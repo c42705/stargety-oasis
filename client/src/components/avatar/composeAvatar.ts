@@ -33,3 +33,62 @@ export const composeAvatarDataUrl = async (config: AvatarConfig): Promise<string
   }
 };
 
+/**
+ * Compose avatar into a 3x3 sprite sheet for animations
+ * Layout: Row 1 (walk down), Row 2 (walk left), Row 3 (walk up)
+ */
+export const composeAvatarSpriteSheet = async (config: AvatarConfig): Promise<string | null> => {
+  try {
+    const { width: frameWidth, height: frameHeight } = ASSET_DIMENSIONS.base;
+    const canvas = document.createElement('canvas');
+    canvas.width = frameWidth * 3;  // 3 columns
+    canvas.height = frameHeight * 3; // 3 rows
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    // Load all layer images first
+    const layerImages: { [key: string]: HTMLImageElement } = {};
+    for (const layer of LAYER_ORDER) {
+      const state = (config as any)[layer];
+      if (!state?.enabled || !state?.src) continue;
+      layerImages[layer] = await loadImage(state.src);
+    }
+
+    // Create 9 frames (3x3 grid)
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 3; col++) {
+        const x = col * frameWidth;
+        const y = row * frameHeight;
+
+        // Draw all layers for this frame
+        for (const layer of LAYER_ORDER) {
+          const img = layerImages[layer];
+          if (!img) continue;
+          ctx.drawImage(img, x, y, frameWidth, frameHeight);
+        }
+      }
+    }
+
+    return canvas.toDataURL('image/png');
+  } catch (e) {
+    console.warn('composeAvatarSpriteSheet failed', e);
+    return null;
+  }
+};
+
+/**
+ * Detect frame dimensions from a sprite sheet image
+ */
+export const detectFrameSize = (imageUrl: string): Promise<{width: number, height: number}> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const frameWidth = Math.floor(img.width / 3);  // 3 columns
+      const frameHeight = Math.floor(img.height / 3); // 3 rows
+      resolve({ width: frameWidth, height: frameHeight });
+    };
+    img.onerror = () => reject(new Error('Failed to load image for frame detection'));
+    img.src = imageUrl;
+  });
+};
+

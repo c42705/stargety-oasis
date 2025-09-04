@@ -49,11 +49,14 @@ class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    // Create simple colored rectangles as sprites (fallback)
+    // Load Terra Branford sprite as default player sprite from public folder
+    this.load.image('terra-branford', 'terra-branford.gif');
+
+    // Create simple colored rectangle as ultimate fallback
     this.add.graphics()
       .fillStyle(0x00ff00)
       .fillRect(0, 0, 32, 32)
-      .generateTexture('player', 32, 32);
+      .generateTexture('player-fallback', 32, 32);
   }
 
 
@@ -98,8 +101,10 @@ class GameScene extends Phaser.Scene {
     // Set camera background color to match game config
     this.cameras.main.setBackgroundColor('#020811');
 
-    // Create default player sprite immediately, then load avatar asynchronously
-    this.player = this.add.sprite(400, 300, 'player');
+    // Create default player sprite immediately using Terra Branford, then load avatar asynchronously
+    const defaultTexture = this.textures.exists('terra-branford') ? 'terra-branford' : 'player-fallback';
+    this.player = this.add.sprite(400, 300, defaultTexture);
+    this.player.setDisplaySize(64, 64); // Larger size for better visibility
     this.player.setDepth(10);
     this.originalY = this.player.y;
 
@@ -143,27 +148,60 @@ class GameScene extends Phaser.Scene {
     console.log('Initializing player avatar for:', this.playerId);
 
     try {
-      // Load player avatar
-      console.log('Loading player avatar...');
-      await this.avatarRenderer.loadPlayerAvatar(this.playerId);
+      // Try to load player avatar sprite sheet for animations
+      console.log('Loading player avatar sprite sheet...');
+      let spriteSheetKey = null;
 
-      // Create avatar sprite to replace the default one
-      console.log('Creating avatar sprite...');
-      const avatarSprite = this.avatarRenderer.createPlayerSprite(this.playerId, this.player.x, this.player.y);
+      try {
+        spriteSheetKey = await this.avatarRenderer.loadPlayerAvatarSpriteSheet(this.playerId);
+      } catch (error) {
+        console.warn('Sprite sheet loading failed:', error);
+        spriteSheetKey = null;
+      }
 
-      if (avatarSprite) {
-        // Replace the default sprite with the avatar sprite
-        const oldX = this.player.x;
-        const oldY = this.player.y;
-        this.player.destroy();
+      if (spriteSheetKey) {
+        // Create animated avatar sprite to replace the default one
+        console.log('Creating animated avatar sprite...');
+        const avatarSprite = this.avatarRenderer.createAnimatedPlayerSprite(this.playerId, this.player.x, this.player.y);
 
-        this.player = avatarSprite;
-        this.player.setPosition(oldX, oldY);
-        this.player.setDepth(10);
+        if (avatarSprite) {
+          // Replace the default sprite with the animated avatar sprite
+          const oldX = this.player.x;
+          const oldY = this.player.y;
+          this.player.destroy();
 
-        console.log('Player avatar updated successfully');
+          this.player = avatarSprite;
+          this.player.setPosition(oldX, oldY);
+          this.player.setDepth(10);
+
+          console.log('Player animated avatar updated successfully');
+        } else {
+          console.log('Animated avatar sprite creation failed, keeping default sprite');
+        }
       } else {
-        console.log('Avatar sprite creation failed, keeping default sprite');
+        // Fallback to single frame avatar
+        console.log('Sprite sheet failed, trying single frame avatar...');
+        try {
+          await this.avatarRenderer.loadPlayerAvatar(this.playerId);
+          const avatarSprite = this.avatarRenderer.createPlayerSprite(this.playerId, this.player.x, this.player.y);
+
+          if (avatarSprite) {
+            const oldX = this.player.x;
+            const oldY = this.player.y;
+            this.player.destroy();
+
+            this.player = avatarSprite;
+            this.player.setPosition(oldX, oldY);
+            this.player.setDepth(10);
+
+            console.log('Player single frame avatar updated successfully');
+          } else {
+            console.log('Single frame avatar also failed, keeping default sprite');
+          }
+        } catch (error) {
+          console.warn('Single frame avatar loading failed:', error);
+          console.log('Keeping default sprite');
+        }
       }
 
       // Announce player joined
@@ -364,23 +402,26 @@ class GameScene extends Phaser.Scene {
       const speed = 200;
       let moved = false;
       let verticalMovement = false;
+      let direction: 'up' | 'down' | 'left' | 'right' | 'idle' = 'idle';
 
       if (this.cursors.left.isDown) {
         this.player.x -= speed * this.game.loop.delta / 1000;
-        this.player.setFlipX(true); // Face left
+        direction = 'left';
         moved = true;
       } else if (this.cursors.right.isDown) {
         this.player.x += speed * this.game.loop.delta / 1000;
-        this.player.setFlipX(false); // Face right
+        direction = 'right';
         moved = true;
       }
 
       if (this.cursors.up.isDown) {
         this.player.y -= speed * this.game.loop.delta / 1000;
+        direction = 'up';
         moved = true;
         verticalMovement = true;
       } else if (this.cursors.down.isDown) {
         this.player.y += speed * this.game.loop.delta / 1000;
+        direction = 'down';
         moved = true;
         verticalMovement = true;
       }
@@ -392,6 +433,40 @@ class GameScene extends Phaser.Scene {
       // Update original Y position when moving vertically (but not during jump)
       if (verticalMovement) {
         this.originalY = this.player.y;
+      }
+
+      // Play appropriate animation if avatar renderer supports it
+      if (this.avatarRenderer.hasAnimatedSprite(this.playerId)) {
+        if (moved) {
+          // Play walking animation based on direction (only if not already playing the correct animation)
+          const currentAnim = this.player.anims.currentAnim;
+          const targetAnimKey = direction === 'right' ? `${this.playerId}_left` : `${this.playerId}_${direction}`;
+          const isPlayingCorrectAnim = currentAnim && currentAnim.key === targetAnimKey;
+
+          if (!isPlayingCorrectAnim) {
+            if (direction === 'right') {
+              // Use left animation flipped for right movement
+              this.avatarRenderer.playPlayerAnimation(this.playerId, 'left', true);
+            } else {
+              this.avatarRenderer.playPlayerAnimation(this.playerId, direction, false);
+            }
+          }
+        } else {
+          // Play idle animation when not moving (only if not already playing idle)
+          const currentAnim = this.player.anims.currentAnim;
+          const isPlayingIdle = currentAnim && currentAnim.key === `${this.playerId}_idle`;
+          if (!isPlayingIdle) {
+            console.log(`Starting idle animation for ${this.playerId}`);
+            this.avatarRenderer.playPlayerAnimation(this.playerId, 'idle', false);
+          }
+        }
+      } else {
+        // Fallback to simple sprite flipping for non-animated sprites
+        if (direction === 'left') {
+          this.player.setFlipX(true);
+        } else if (direction === 'right') {
+          this.player.setFlipX(false);
+        }
       }
 
       if (moved) {
@@ -408,6 +483,11 @@ class GameScene extends Phaser.Scene {
   }
 
   shutdown() {
+    // Clean up avatar renderer
+    if (this.avatarRenderer) {
+      this.avatarRenderer.cleanup();
+    }
+
     // Clean up map renderer
     if (this.mapRenderer) {
       this.mapRenderer.destroy();

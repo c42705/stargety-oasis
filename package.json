@@ -23,7 +23,16 @@
     "docker:logs": "docker-compose logs -f",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["virtual-world", "chat", "video-call", "phaser", "react", "nodejs", "socket.io", "jitsi"],
+  "keywords": [
+    "virtual-world",
+    "chat",
+    "video-call",
+    "phaser",
+    "react",
+    "nodejs",
+    "socket.io",
+    "jitsi"
+  ],
   "author": "Stargety Oasis Team",
   "license": "MIT",
   "devDependencies": {

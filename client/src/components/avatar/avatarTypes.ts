@@ -17,7 +17,7 @@ export interface AvatarConfig {
 }
 
 export const DEFAULT_AVATAR_CONFIG: AvatarConfig = {
-  base: { enabled: true, src: null },
+  base: { enabled: true, src: '/terra-branford.gif' },
   hair: { enabled: false, src: null },
   accessories: { enabled: false, src: null },
   clothes: { enabled: false, src: null },

@@ -22,6 +22,7 @@ interface AvatarCustomizerModalProps {
 
 const placeholderAssets: Record<LayerId, AssetOption[]> = {
   base: [
+    { key: 'terra-branford', src: '/terra-branford.gif', label: 'Terra Branford' },
     { key: 'base-1', src: 'https://placehold.co/128x128/f4c2a1/ffffff.png?text=👤' },
     { key: 'base-2', src: 'https://placehold.co/128x128/d4a574/ffffff.png?text=👤' },
     { key: 'base-3', src: 'https://placehold.co/128x128/8b4513/ffffff.png?text=👤' },
@@ -94,7 +95,14 @@ const AssetGrid: React.FC<{
       {options.map((opt) => (
         <Col key={opt.key}>
           <Card hoverable size="small" style={gridCardStyle} onClick={() => onPick(opt.src)}>
-            <Image src={opt.src} preview={false} width={72} height={72} style={{ imageRendering: 'pixelated' }}/>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+              <Image src={opt.src} preview={false} width={72} height={72} style={{ imageRendering: 'pixelated' }}/>
+              {opt.label && (
+                <Typography.Text style={{ fontSize: 10, textAlign: 'center', lineHeight: 1.2 }}>
+                  {opt.label}
+                </Typography.Text>
+              )}
+            </div>
           </Card>
         </Col>
       ))}
