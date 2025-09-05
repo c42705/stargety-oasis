@@ -101,34 +101,35 @@ Focus on FrameTextureCreation phase to debug sprite sheet frame division.
    * Simplified approach focusing on reliability and maintainability
    */
   public async loadPlayerAvatarSpriteSheet(username: string): Promise<string | null> {
-    this.log('SpriteSheetLoading', username, 'Starting sprite sheet loading process');
+    this.log('SpriteLoadingPhase', username, 'Sprite sheet texture loading begins');
 
     try {
-      this.log('SpriteSheetLoading', username, 'Loading avatar configuration');
+      this.log('SpriteLoadingPhase', username, 'Loading avatar configuration');
 
       // Load saved avatar config for this user
       const config = loadAvatarConfig(username);
       if (!config) {
-        this.log('SpriteSheetLoading', username, 'No avatar config found, using default sprite sheet');
+        this.log('SpriteLoadingPhase', username, 'No config found, using default texture', {
+          fallbackTexture: 'terra-branford'
+        });
         return this.createDefaultSpriteSheet(username);
       }
 
-      this.log('SpriteSheetLoading', username, 'Avatar config loaded successfully', {
-        configKeys: Object.keys(config)
+      this.log('SpriteLoadingPhase', username, 'Avatar config loaded successfully', {
+        configKeys: Object.keys(config), configValid: true
       });
 
       // Compose the avatar into a sprite sheet
-      this.log('SpriteSheetLoading', username, 'Composing avatar sprite sheet from config');
+      this.log('SpriteLoadingPhase', username, 'Composing avatar sprite sheet from config');
       const avatarSpriteSheetUrl = await composeAvatarSpriteSheet(config);
 
       if (!avatarSpriteSheetUrl) {
-        this.logError('SpriteSheetLoading', username, 'Failed to compose avatar sprite sheet, using default');
+        this.logError('SpriteLoadingPhase', username, 'Composition failed, using default texture');
         return this.createDefaultSpriteSheet(username);
       }
 
-      this.log('SpriteSheetLoading', username, 'Avatar sprite sheet composed successfully', {
-        urlLength: avatarSpriteSheetUrl.length,
-        urlPrefix: avatarSpriteSheetUrl.substring(0, 50) + '...'
+      this.log('SpriteLoadingPhase', username, 'Avatar sprite sheet composed successfully', {
+        urlLength: avatarSpriteSheetUrl.length, dataType: 'base64', compositionSuccess: true
       });
 
       return this.createSpriteSheetFromUrl(username, avatarSpriteSheetUrl);
@@ -161,11 +162,18 @@ Focus on FrameTextureCreation phase to debug sprite sheet frame division.
       const img = new Image();
       img.onload = () => {
         try {
-          this.log('SpriteSheetLoading', username, 'Image loaded successfully', {
-            width: img.width,
-            height: img.height,
-            naturalWidth: img.naturalWidth,
-            naturalHeight: img.naturalHeight
+          // Log texture dimensions and validation
+          const dimensions = {
+            width: img.width, height: img.height,
+            naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight
+          };
+          this.log('SpriteLoadingPhase', username, 'Texture dimensions loaded', dimensions);
+
+          // Validate texture dimensions
+          const validDimensions = img.width > 0 && img.height > 0 && img.width === img.height;
+          const expectedSize = img.width >= 192; // Minimum for 3x3 grid with 64px frames
+          this.log('SpriteLoadingPhase', username, 'Texture validation status', {
+            validDimensions, expectedSize, isSquare: img.width === img.height
           });
 
           // Calculate frame dimensions for 3x3 grid
@@ -185,7 +193,9 @@ Focus on FrameTextureCreation phase to debug sprite sheet frame division.
           }
 
           // PHASER BEST PRACTICE: Use built-in addSpriteSheet method
-          this.log('SpriteSheetLoading', username, 'Creating sprite sheet using Phaser addSpriteSheet method');
+          this.log('PhaserTextureProcessing', username, 'Calling addSpriteSheet() with frame params', {
+            frameWidth, frameHeight, startFrame: 0, endFrame: 8
+          });
 
           try {
             // Create sprite sheet using Phaser's built-in method
@@ -196,16 +206,40 @@ Focus on FrameTextureCreation phase to debug sprite sheet frame division.
               endFrame: 8 // 9 frames total (0-8)
             });
 
-            this.log('SpriteSheetLoading', username, 'Sprite sheet created successfully with Phaser built-in method', {
-              textureKey,
-              frameWidth,
-              frameHeight,
-              totalFrames: 9
+            // Validate sprite sheet registration
+            const texture = this.scene.textures.get(textureKey);
+            const frameCount = texture ? Object.keys(texture.frames).length - 1 : 0; // -1 for __BASE frame
+
+            this.log('PhaserTextureProcessing', username, 'Sprite sheet registered in Phaser texture manager', {
+              textureKey, frameCount, registrationSuccess: frameCount === 9
+            });
+
+            // Validate individual frames exist
+            let validFrameCount = 0;
+            for (let i = 0; i < 9; i++) {
+              try {
+                const frameKey = i.toString();
+                const frameExists = texture && texture.frames && (frameKey in texture.frames);
+                if (frameExists) {
+                  validFrameCount++;
+                } else {
+                  this.logError('PhaserTextureProcessing', username, `Frame ${i} validation failed`);
+                }
+              } catch (frameError) {
+                this.logError('PhaserTextureProcessing', username, `Frame ${i} check error`, frameError);
+              }
+            }
+
+            this.log('PhaserTextureProcessing', username, 'Frame validation completed', {
+              totalFrames: 9, validFrames: validFrameCount, allFramesValid: validFrameCount === 9
             });
 
             // Create animations using Phaser sprite sheet frames
             this.createMovementAnimationsFromSpriteSheet(username, textureKey);
-            this.log('SpriteSheetLoading', username, 'Avatar sprite sheet loading completed successfully');
+
+            this.log('SpriteLoadingPhase', username, 'Sprite sheet texture loading completes', {
+              textureKey, loadingSuccess: true, readyForSprites: true
+            });
 
             // Return the sprite sheet texture key (Phaser will handle frame selection)
             resolve(textureKey);
@@ -268,9 +302,8 @@ Focus on FrameTextureCreation phase to debug sprite sheet frame division.
    * This method follows Phaser.js official documentation for sprite sheet animations
    */
   private createMovementAnimationsFromSpriteSheet(username: string, spriteSheetKey: string): void {
-    this.log('AnimationCreation', username, 'Creating animations using Phaser sprite sheet frames', {
-      spriteSheetKey,
-      method: 'Phaser built-in sprite sheet system'
+    this.log('AnimationSystemSetup', username, 'Starting animation system setup', {
+      spriteSheetKey, totalAnimations: 5
     });
 
     const animPrefix = `${username}_`;
@@ -298,20 +331,27 @@ Focus on FrameTextureCreation phase to debug sprite sheet frame division.
       // Walking down animation (frames 0, 1, 2)
       const walkDownKey = `${animPrefix}walk_down`;
       if (!this.scene.anims.exists(walkDownKey)) {
-        this.log('AnimationCreation', username, 'Creating walk_down animation with sprite sheet frames', {
-          animationKey: walkDownKey,
-          frames: [0, 1, 2],
-          spriteSheetKey
+        this.log('AnimationSystemSetup', username, 'Creating walk_down animation', {
+          key: walkDownKey, frames: [0, 1, 2], frameRate: 8
         });
 
-        this.scene.anims.create({
-          key: walkDownKey,
-          frames: this.scene.anims.generateFrameNumbers(spriteSheetKey, { start: 0, end: 2 }),
-          frameRate: 8,
-          repeat: -1
-        });
+        try {
+          this.scene.anims.create({
+            key: walkDownKey,
+            frames: this.scene.anims.generateFrameNumbers(spriteSheetKey, { start: 0, end: 2 }),
+            frameRate: 8,
+            repeat: -1
+          });
+
+          const registered = this.scene.anims.exists(walkDownKey);
+          this.log('AnimationSystemSetup', username, 'walk_down registration result', {
+            success: registered, key: walkDownKey
+          });
+        } catch (animError) {
+          this.logError('AnimationSystemSetup', username, 'walk_down creation failed', animError);
+        }
       } else {
-        this.log('AnimationCreation', username, 'walk_down animation already exists, skipping', { walkDownKey });
+        this.log('AnimationSystemSetup', username, 'walk_down already exists, skipping');
       }
 
       // Walking left animation (frames 3, 4, 5)
@@ -832,10 +872,20 @@ Focus on FrameTextureCreation phase to debug sprite sheet frame division.
 
             if (this.scene.anims.exists(idleAnimKey)) {
               existingSprite.play(idleAnimKey);
-              this.log('SpriteDisplay', username, 'Sprite sheet idle animation started successfully');
+              this.log('SceneIntegration', username, 'Initial animation playback setup completed', {
+                animationKey: idleAnimKey, isPlaying: existingSprite.anims.isPlaying
+              });
             } else {
-              this.logError('SpriteDisplay', username, 'Sprite sheet idle animation does not exist', { animationKey: idleAnimKey });
+              this.logError('SceneIntegration', username, 'Initial animation setup failed', { animationKey: idleAnimKey });
             }
+
+            // Log sprite readiness for user input
+            this.log('SceneIntegration', username, 'Sprite visible and active in scene', {
+              visible: existingSprite.visible, active: existingSprite.active, depth: existingSprite.depth
+            });
+
+            // Final validation and movement readiness
+            this.validateSpriteReadiness(username, existingSprite);
 
             this.log('SpriteDisplay', username, 'Avatar sprite updated successfully with sprite sheet system');
           } else {
@@ -875,14 +925,89 @@ Focus on FrameTextureCreation phase to debug sprite sheet frame division.
   }
 
   /**
+   * Validate sprite readiness for movement and user input
+   */
+  private validateSpriteReadiness(username: string, sprite: Phaser.GameObjects.Sprite): void {
+    this.log('MovementReadiness', username, 'Starting sprite readiness validation');
+
+    // Check sprite state
+    const spriteReady = sprite && sprite.active && sprite.visible;
+    this.log('MovementReadiness', username, 'Sprite state validation', {
+      exists: !!sprite, active: sprite?.active, visible: sprite?.visible, ready: spriteReady
+    });
+
+    // Check texture state
+    const textureValid = sprite?.texture && sprite.texture.key !== '__MISSING';
+    this.log('MovementReadiness', username, 'Texture state validation', {
+      hasTexture: !!sprite?.texture, textureKey: sprite?.texture?.key, valid: textureValid
+    });
+
+    // Check animation availability
+    const animationsReady = ['idle', 'walk_down', 'walk_left', 'walk_up', 'walk_right']
+      .every(anim => this.scene.anims.exists(`${username}_${anim}`));
+    this.log('MovementReadiness', username, 'Animation availability check', {
+      allAnimationsExist: animationsReady, totalAnimations: 5
+    });
+
+    // Check scene integration
+    const inScene = this.avatarSprites.has(username) && this.avatarSprites.get(username) === sprite;
+    this.log('MovementReadiness', username, 'Scene integration validation', {
+      registeredInMap: inScene, spriteMapSize: this.avatarSprites.size
+    });
+
+    // Final readiness determination
+    const fullyReady = spriteReady && textureValid && animationsReady && inScene;
+    this.log('MovementReadiness', username, 'Final readiness status', {
+      ready: fullyReady, canAcceptMovement: fullyReady, enableUserControls: fullyReady
+    });
+
+    if (fullyReady) {
+      this.log('MovementReadiness', username, 'Sprite fully initialized and ready for movement commands');
+    } else {
+      this.logError('MovementReadiness', username, 'Sprite not ready for movement', {
+        spriteReady, textureValid, animationsReady, inScene
+      });
+    }
+  }
+
+  /**
    * Create default sprite using Terra Branford texture
    */
   private createDefaultSprite(username: string, x: number, y: number): Phaser.GameObjects.Sprite | null {
-    const defaultTexture = this.scene.textures.exists('terra-branford') ? 'terra-branford' : 'player-fallback';
-    const sprite = this.scene.add.sprite(x, y, defaultTexture);
-    sprite.setDisplaySize(64, 64);
-    this.avatarSprites.set(username, sprite);
-    return sprite;
+    this.log('SpriteObjectCreation', username, 'Starting Phaser sprite object instantiation', {
+      position: { x, y }
+    });
+
+    try {
+      // Determine texture to use
+      const defaultTexture = this.scene.textures.exists('terra-branford') ? 'terra-branford' : 'player-fallback';
+      this.log('SpriteObjectCreation', username, 'Selected texture for sprite creation', {
+        textureKey: defaultTexture, textureExists: this.scene.textures.exists(defaultTexture)
+      });
+
+      // Instantiate Phaser sprite object
+      const sprite = this.scene.add.sprite(x, y, defaultTexture);
+      this.log('SpriteObjectCreation', username, 'Phaser sprite object instantiated', {
+        spriteId: sprite.name || 'unnamed', textureKey: sprite.texture.key
+      });
+
+      // Set initial texture assignment and position
+      sprite.setDisplaySize(64, 64);
+      this.log('SpriteObjectCreation', username, 'Initial texture assignment completed', {
+        displaySize: { width: 64, height: 64 }, position: { x: sprite.x, y: sprite.y }
+      });
+
+      // Add sprite to scene and layer assignment
+      this.avatarSprites.set(username, sprite);
+      this.log('SceneIntegration', username, 'Sprite added to scene and registered', {
+        spriteCount: this.avatarSprites.size, visible: sprite.visible, active: sprite.active
+      });
+
+      return sprite;
+    } catch (error) {
+      this.logError('SpriteObjectCreation', username, 'Failed to create default sprite', error);
+      return null;
+    }
   }
 
   /**
