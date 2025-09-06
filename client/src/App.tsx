@@ -1,45 +1,48 @@
 import React, { useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { ConfigProvider, Layout, Space, Button, Badge, Typography, App as AntdApp } from 'antd';
-import { LogoutOutlined } from '@ant-design/icons';
-import { MessageCircle, Users, User, Star, MapPin, Settings } from 'lucide-react';
+import { ConfigProvider, Layout, Space, Button, Badge, Typography, Modal, Dropdown, Avatar, App as AntdApp } from 'antd';
+import { LogoutOutlined, UserOutlined, TeamOutlined, DownOutlined, SettingOutlined } from '@ant-design/icons';
+import { Star, MapPin } from 'lucide-react';
 import { EventBusProvider } from './shared/EventBusContext';
 import { SettingsProvider } from './shared/SettingsContext';
 import { AuthProvider, useAuth } from './shared/AuthContext';
 import { MapDataProvider } from './shared/MapDataContext';
 import { ThemeProvider, useTheme } from './shared/ThemeContext';
 import { MapSynchronizer } from './shared/MapSynchronizer';
-import { ChatModule } from './modules/chat/ChatModule';
+import { ModalStateProvider } from './shared/ModalStateManager';
 import { WorldModule } from './modules/world/WorldModule';
-import { SettingsModule } from './modules/settings/SettingsModule';
 import { LoginModule } from './modules/login/LoginModule';
-import { SlidingPanel, PanelToggle, PanelTab } from './components/SlidingPanel';
+import { SplitLayoutComponent } from './components/SplitLayoutComponent';
+import { VideoCommunicationPanel } from './components/VideoCommunicationPanel';
+import { PersistentChatPanel } from './components/PersistentChatPanel';
+import { QuickAvatarBuilder } from './components/avatar/AvatarBuilderLauncher';
+
 import { PeopleTab } from './components/panel-tabs/PeopleTab';
 import { MyProfileTab } from './components/panel-tabs/MyProfileTab';
+
+import { MapSyncStatus } from './components/MapSyncStatus';
 import { MapEditorPage } from './pages/MapEditorPage';
+import ConsolidatedSettings from './components/settings/ConsolidatedSettings';
 
 import './App.css';
 
 // Inner App component that uses both auth and settings context
 const AppContent: React.FC = () => {
   const { user, logout } = useAuth();
-  const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [currentVideoRoom, setCurrentVideoRoom] = useState<string>('general');
+  const [currentChatRoom, setCurrentChatRoom] = useState<string>('general');
+  const [showProfile, setShowProfile] = useState(false);
+  const [showPeople, setShowPeople] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   // If no user is authenticated, this shouldn't render
   if (!user) {
     return null;
   }
 
-
-
   // Handle logout
   const handleLogout = () => {
     logout();
-  };
-
-  // Handle panel toggle
-  const handlePanelToggle = () => {
-    setIsPanelOpen(!isPanelOpen);
   };
 
   // Handle map editor navigation
@@ -48,64 +51,47 @@ const AppContent: React.FC = () => {
     window.open('/map-editor', '_blank');
   };
 
-  // Create panel tabs (Chat is now the primary interface through the side panel)
-  const panelTabs: PanelTab[] = [
-    {
-      id: 'chat',
-      label: 'Chat',
-      icon: <MessageCircle size={16} />,
-      component: (
-        <ChatModule
-          currentUser={user.username}
-          roomId={user.roomId}
-          className="panel-chat-module"
-        />
-      )
-    },
-    {
-      id: 'people',
-      label: 'People',
-      icon: <Users size={16} />,
-      component: <PeopleTab />
-    },
-    {
-      id: 'profile',
-      label: 'My Profile',
-      icon: <User size={16} />,
-      component: <MyProfileTab />
-    }
-  ];
+  // Handle video room change
+  const handleVideoRoomChange = (roomId: string) => {
+    setCurrentVideoRoom(roomId);
+  };
 
-  // Add settings tab for admin users
-  if (user.isAdmin) {
-    panelTabs.push({
-      id: 'settings',
-      label: 'Settings',
-      icon: <Settings size={16} />,
-      component: (
-        <SettingsModule
-          className="panel-settings-module"
-        />
-      )
-    });
-  }
+  // Handle chat room change
+  const handleChatRoomChange = (roomId: string) => {
+    setCurrentChatRoom(roomId);
+  };
+
+  // Handle settings
+  const handleSettingsClick = () => {
+    setShowSettings(true);
+  };
+
+  const handleSettingsClose = () => {
+    setShowSettings(false);
+  };
+
+  // Handle profile modal
+  const handleProfileClick = () => {
+    setShowProfile(true);
+  };
+
+  const handleProfileClose = () => {
+    setShowProfile(false);
+  };
+
+  // Handle people modal
+  const handlePeopleClick = () => {
+    setShowPeople(true);
+  };
+
+  const handlePeopleClose = () => {
+    setShowPeople(false);
+  };
 
   return (
     <EventBusProvider>
-      <div className="App">
-        {/* Panel Toggle Button */}
-        <PanelToggle
-          isOpen={isPanelOpen}
-          onToggle={handlePanelToggle}
-        />
-
-        {/* Sliding Panel */}
-        <SlidingPanel
-          isOpen={isPanelOpen}
-          onToggle={handlePanelToggle}
-          tabs={panelTabs}
-        />
-
+      <div className="App" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        {/* Header */}
         <Layout.Header style={{
           background: 'var(--color-bg-secondary)',
           padding: '0 16px',
@@ -113,7 +99,8 @@ const AppContent: React.FC = () => {
           height: 'var(--header-height)',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          flexShrink: 0
         }}>
           <Typography.Title level={4} style={{
             margin: 0,
@@ -125,16 +112,67 @@ const AppContent: React.FC = () => {
             <Star size={24} style={{ color: 'var(--color-accent)' }} />
             Stargety Oasis
           </Typography.Title>
-
+          <span>Room: {user.roomId}</span>
           <Space size="middle" style={{ color: 'var(--color-text-secondary)' }}>
-            <span>Welcome, {user.displayName}</span>
-            <span>Room: {user.roomId}</span>
+            {/* Map Sync Status */}
+            <MapSyncStatus showText={false} />
+            {/* User Menu Dropdown */}
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: 'profile',
+                    label: 'My Profile',
+                    icon: <UserOutlined />,
+                    onClick: handleProfileClick
+                  },
+                  {
+                    key: 'people',
+                    label: 'People & Teams',
+                    icon: <TeamOutlined />,
+                    onClick: handlePeopleClick
+                  },
+                  {
+                    key: 'settings',
+                    label: 'Settings',
+                    icon: <SettingOutlined />,
+                    onClick: handleSettingsClick
+                  },
+                  { type: 'divider' },
+                  {
+                    key: 'logout',
+                    label: 'Logout',
+                    icon: <LogoutOutlined />,
+                    onClick: handleLogout
+                  }
+                ]
+              }}
+              trigger={['click']}
+            >
+              <Button
+                type="text"
+                style={{
+                  color: 'var(--color-text-secondary)',
+                  border: 'none',
+                  padding: '4px 8px'
+                }}
+              >
+                <Space>
+                  <Avatar size="small" icon={<UserOutlined />} />
+                  <span>Welcome, {user.displayName}</span>
+                  <DownOutlined style={{ fontSize: '10px' }} />
+                </Space>
+              </Button>
+            </Dropdown>
+
+            
             {user.isAdmin && (
               <Badge count="Admin" style={{
                 backgroundColor: 'var(--color-accent)',
                 color: 'var(--color-text-primary)'
               }} />
-            )}
+            )}            
+
             {user.isAdmin && (
               <Button
                 type="primary"
@@ -148,26 +186,65 @@ const AppContent: React.FC = () => {
                 Map Editor
               </Button>
             )}
-            <Button
-              icon={<LogoutOutlined />}
-              onClick={handleLogout}
-              style={{
-                backgroundColor: 'var(--color-bg-tertiary)',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-text-primary)'
-              }}
-            >
-              Logout
-            </Button>
           </Space>
         </Layout.Header>
 
-        <main className={`main-content ${isPanelOpen ? 'panel-open' : ''}`}>
-          <WorldModule
-            playerId={user.username}
-            className="module-content"
+        {/* Main Content Area with Split Layout */}
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <SplitLayoutComponent
+            leftPanel={
+              <WorldModule
+                playerId={user.username}
+                className="world-module-panel"
+              />
+            }
+            rightTopPanel={
+              <VideoCommunicationPanel
+                currentRoom={currentVideoRoom}
+                onRoomChange={handleVideoRoomChange}
+                className="video-panel"
+              />
+            }
+            rightBottomPanel={
+              <PersistentChatPanel
+                roomId={currentChatRoom}
+                onRoomChange={handleChatRoomChange}
+                className="chat-panel"
+              />
+            }
+            className="main-split-layout"
           />
-        </main>
+        </div>
+
+        {/* Consolidated Settings Modal */}
+        <ConsolidatedSettings
+          open={showSettings}
+          onClose={handleSettingsClose}
+        />
+
+        {/* Profile Modal */}
+        <Modal
+          title="My Profile"
+          open={showProfile}
+          onCancel={handleProfileClose}
+          footer={null}
+          width={900}
+          style={{ top: 20 }}
+        >
+          <MyProfileTab />
+        </Modal>
+
+        {/* People & Teams Modal */}
+        <Modal
+          title="People & Teams"
+          open={showPeople}
+          onCancel={handlePeopleClose}
+          footer={null}
+          width={1000}
+          style={{ top: 20 }}
+        >
+          <PeopleTab />
+        </Modal>
       </div>
     </EventBusProvider>
   );
@@ -190,9 +267,11 @@ const AuthenticatedApp: React.FC = () => {
             syncDebounceMs={100}
             onSyncError={(error) => {
               console.error('Map synchronization error:', error);
+              // TODO: Add user-visible error notification
             }}
             onSyncSuccess={() => {
               console.log('Map synchronized successfully');
+              // TODO: Add user-visible success notification
             }}
           >
             <AppContent />
@@ -211,9 +290,7 @@ const App: React.FC = () => {
   if (isLoading) {
     return (
       <div className="app-loading">
-        <div className="loading-spinner">
-          <div className="spinner"></div>
-          <p>Loading Stargety Oasis...</p>
+        <div className="loading-spinner">          
         </div>
       </div>
     );
@@ -268,7 +345,9 @@ const ThemedApp: React.FC = () => {
 const AppWithProviders: React.FC = () => {
   return (
     <ThemeProvider>
-      <ThemedApp />
+      <ModalStateProvider>
+        <ThemedApp />
+      </ModalStateProvider>
     </ThemeProvider>
   );
 };

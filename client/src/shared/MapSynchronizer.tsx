@@ -15,6 +15,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { SharedMapSystem, MapEventType } from './SharedMapSystem';
+import MapSyncStatus from '../components/MapSyncStatus';
 
 interface MapSynchronizerProps {
   children: React.ReactNode;
@@ -227,7 +228,7 @@ export const MapSynchronizer: React.FC<MapSynchronizerProps> = ({
           style={{
             position: 'fixed',
             bottom: '10px',
-            right: '10px',
+            left: '10px',
             background: 'rgba(0,0,0,0.8)',
             color: 'white',
             padding: '4px 8px',
@@ -237,7 +238,9 @@ export const MapSynchronizer: React.FC<MapSynchronizerProps> = ({
             pointerEvents: 'none'
           }}
         >
-          Map Sync Active
+          Map Sync
+          {/* Map Sync Status */}
+            <MapSyncStatus />
         </div>
       )}
     </>

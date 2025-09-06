@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
 import { useEventBus } from '../../shared/EventBusContext';
 import { PhaserMapRenderer } from './PhaserMapRenderer';
@@ -7,7 +7,8 @@ import { useAuth } from '../../shared/AuthContext';
 import { InteractiveArea } from '../../shared/MapDataContext';
 import { SharedMapSystem } from '../../shared/SharedMapSystem';
 
-import { VideoServiceModal } from '../../components/VideoServiceModal';
+
+import { shouldBlockBackgroundInteractions } from '../../shared/ModalStateManager';
 import './WorldModule.css';
 
 interface WorldModuleProps {
@@ -122,8 +123,13 @@ class GameScene extends Phaser.Scene {
     // Set up key event handlers
     this.setupKeyHandlers();
 
-    // Handle click movement (but not on interactive areas)
+    // Handle click movement (but not on interactive areas or when modals are open)
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer, currentlyOver: Phaser.GameObjects.GameObject[]) => {
+      // Check if background interactions should be blocked (modals open)
+      if (shouldBlockBackgroundInteractions()) {
+        return; // Don't process click if modals are blocking background
+      }
+
       // Check if clicking on an interactive area by checking if any object has areaId data
       const clickedOnArea = currentlyOver.some(obj =>
         obj.getData && obj.getData('areaId')
@@ -530,8 +536,8 @@ class GameScene extends Phaser.Scene {
           this.player.y >= area.y &&
           this.player.y <= area.y + area.height) {
 
-        // Trigger area entry if not already triggered
-        if (!this.currentArea || this.currentArea !== area.id) {
+        // Trigger area entry if not already triggered and no modals are blocking
+        if ((!this.currentArea || this.currentArea !== area.id) && !shouldBlockBackgroundInteractions()) {
           this.currentArea = area.id;
           this.onAreaClick(area.id);
         }
@@ -560,9 +566,7 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
   const phaserGameRef = useRef<Phaser.Game | null>(null);
   const { user } = useAuth();
 
-  const [showVideoModal, setShowVideoModal] = useState(false);
-  const [selectedArea, setSelectedArea] = useState<InteractiveArea | null>(null);
-  const [isLoadingVideo, setIsLoadingVideo] = useState(false);
+  // Note: Video functionality is now handled by the persistent video panel
   const eventBus = useEventBus();
 
 
@@ -574,22 +578,17 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
     if (mapData) {
       const area = mapData.interactiveAreas.find(a => a.id === areaId);
       if (area) {
-        setSelectedArea(area);
-        setIsLoadingVideo(true);
-        setShowVideoModal(true);
+        // Emit event to notify the video panel to connect to this area
+        eventBus.publish('area-selected', {
+          areaId: area.id,
+          areaName: area.name,
+          roomId: area.id
+        });
 
-        // Simulate loading time for video service connection
-        setTimeout(() => {
-          setIsLoadingVideo(false);
-        }, 2500); // Longer loading time for more realistic experience
+        console.log(`Area clicked: ${area.name} (${area.id})`);
+        // The video panel will handle the connection automatically
       }
     }
-  };
-
-  const handleCloseVideoModal = () => {
-    setShowVideoModal(false);
-    setSelectedArea(null);
-    setIsLoadingVideo(false);
   };
 
   useEffect(() => {
@@ -643,21 +642,10 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
 
 
   return (
-    <div className={`world-module ${className}`}>
-      <div className="world-container">
-        <div ref={gameRef} className="game-canvas" />
+    <div className={`world-module ${className}`} style={{ height: '100%', width: '100%' }}>
+      <div className="world-container" style={{ height: '100%', width: '100%' }}>
+        <div ref={gameRef} className="game-canvas" style={{ height: '100%', width: '100%' }} />
       </div>
-
-      {/* Video Service Modal */}
-      {selectedArea && (
-        <VideoServiceModal
-          isOpen={showVideoModal}
-          onClose={handleCloseVideoModal}
-          areaName={selectedArea.name}
-          roomId={selectedArea.id}
-          isLoading={isLoadingVideo}
-        />
-      )}
     </div>
   );
 };

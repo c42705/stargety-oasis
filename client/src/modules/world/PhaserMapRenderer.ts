@@ -15,6 +15,7 @@
 import Phaser from 'phaser';
 import { SharedMapSystem, SharedMapData } from '../../shared/SharedMapSystem';
 import { InteractiveArea, ImpassableArea } from '../../shared/MapDataContext';
+import { shouldBlockBackgroundInteractions } from '../../shared/ModalStateManager';
 
 export interface PhaserMapRendererConfig {
   scene: Phaser.Scene;
@@ -269,7 +270,10 @@ export class PhaserMapRenderer {
     if (this.enableInteractions) {
       rect.setInteractive();
       rect.on('pointerdown', () => {
-        this.handleInteractiveAreaClick(area);
+        // Don't handle area clicks if modals are blocking background interactions
+        if (!shouldBlockBackgroundInteractions()) {
+          this.handleInteractiveAreaClick(area);
+        }
       });
       
       rect.on('pointerover', () => {

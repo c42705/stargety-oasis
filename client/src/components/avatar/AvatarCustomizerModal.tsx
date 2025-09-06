@@ -11,6 +11,7 @@ import { SpriteSheetProcessor } from './SpriteSheetProcessor';
 import { FrameDetectionAlgorithms } from './FrameDetectionAlgorithms';
 import { AvatarBuilderStorage } from './AvatarBuilderStorage';
 import { UserGuidanceSystem } from './UserGuidanceSystem';
+import { useModalRegistration } from '../../shared/ModalStateManager';
 import {
   SpriteSheetDefinition,
   FrameDefinition,
@@ -230,6 +231,13 @@ interface BuilderState {
 
 export const AvatarCustomizerModal: React.FC<AvatarCustomizerModalProps> = ({ open, initialConfig, onOk, onCancel }) => {
   const [config, setConfig] = useState<AvatarConfig>(normalizeConfig(initialConfig));
+
+  // Register this modal with the global modal state system
+  useModalRegistration('avatar-customizer-modal', open, {
+    type: 'modal',
+    priority: 100,
+    blockBackground: true
+  });
 
   // Avatar Builder state
   const [builderState, setBuilderState] = useState<BuilderState>({

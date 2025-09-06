@@ -3,6 +3,7 @@ import { useSettings } from '../shared/SettingsContext';
 import { useAuth } from '../shared/AuthContext';
 import { VideoCallModule } from '../modules/video-call/VideoCallModule';
 import { RingCentralModule } from '../modules/ringcentral/RingCentralModule';
+import { useModalRegistration } from '../shared/ModalStateManager';
 import './VideoServiceModal.css';
 
 interface VideoServiceModalProps {
@@ -24,6 +25,13 @@ export const VideoServiceModal: React.FC<VideoServiceModalProps> = ({
   const [loadingProgress, setLoadingProgress] = useState(0);
   const { settings } = useSettings();
   const { user } = useAuth();
+
+  // Register this modal with the global modal state system
+  useModalRegistration('video-service-modal', isOpen, {
+    type: 'modal',
+    priority: 110, // Higher priority than avatar customizer
+    blockBackground: true
+  });
 
   // Simulate loading progress
   useEffect(() => {

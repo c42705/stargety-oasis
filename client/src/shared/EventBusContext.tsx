@@ -13,6 +13,7 @@ export interface EventMap {
   'world:playerJoined': { playerId: string; x: number; y: number };
   'world:playerLeft': { playerId: string };
   'world:objectInteraction': { playerId: string; objectId: string };
+  'area-selected': { areaId: string; areaName: string; roomId: string };
   'app:moduleLoaded': { module: string };
   'app:error': { error: string; module?: string };
   // RingCentral events

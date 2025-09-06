@@ -23,7 +23,7 @@ export const AvatarBuilderLauncher: React.FC<AvatarBuilderLauncherProps> = ({
   username = 'player',
   onAvatarCreated,
   style,
-  size = 'middle',
+  size = 'large',
   type = 'button'
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
