@@ -3,10 +3,6 @@ import { EditorState, EditorTool } from '../types/editor.types';
 import { DEFAULT_EDITOR_STATE } from '../constants/editorConstants';
 import {
   handleToolChange,
-  handleZoomIn,
-  handleZoomOut,
-  handleFitToScreen,
-  handleMouseMove,
   handleUndo,
   handleRedo
 } from '../utils/editorHandlers';
@@ -14,24 +10,18 @@ import {
 export const useEditorState = () => {
   const [editorState, setEditorState] = useState<EditorState>(DEFAULT_EDITOR_STATE);
 
+
+
   const onToolChange = useCallback((tool: EditorTool) => {
     handleToolChange(tool, setEditorState);
   }, []);
 
-  const onZoomIn = useCallback(() => {
-    handleZoomIn(setEditorState);
-  }, []);
-
-  const onZoomOut = useCallback(() => {
-    handleZoomOut(setEditorState);
-  }, []);
-
-  const onFitToScreen = useCallback(() => {
-    handleFitToScreen(setEditorState);
-  }, []);
-
   const onMouseMove = useCallback((e: React.MouseEvent) => {
-    handleMouseMove(e, setEditorState);
+    // TODO: Update mouse position in world coordinates when camera controls are implemented
+    setEditorState(prev => ({
+      ...prev,
+      mousePosition: { x: e.clientX, y: e.clientY }
+    }));
   }, []);
 
   const onUndo = useCallback(() => {
@@ -40,6 +30,19 @@ export const useEditorState = () => {
 
   const onRedo = useCallback(() => {
     handleRedo();
+  }, []);
+
+  // TODO: Implement camera control methods
+  const onZoomIn = useCallback(() => {
+    // TODO: Implement zoom in
+  }, []);
+
+  const onZoomOut = useCallback(() => {
+    // TODO: Implement zoom out
+  }, []);
+
+  const onFitToScreen = useCallback(() => {
+    // TODO: Implement fit to screen
   }, []);
 
   return {

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Map, Eye, Square } from 'lucide-react';
+import { Map, Eye, Square, Shield } from 'lucide-react';
 import { useMapData } from '../../shared/MapDataContext';
 import { useSharedMap } from '../../shared/useSharedMap';
 import { FabricMapCanvas } from './FabricMapCanvas';
 import { AreaFormModal } from '../../components/AreaFormModal';
+import { CollisionAreaFormModal } from '../../components/CollisionAreaFormModal';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 
 // Import extracted components
@@ -20,6 +21,8 @@ import { useEditorState } from './hooks/useEditorState';
 import { useGridConfig } from './hooks/useGridConfig';
 import { useModalState } from './hooks/useModalState';
 import { useDrawingMode } from './hooks/useDrawingMode';
+import { useCollisionModalState } from './hooks/useCollisionModalState';
+import { useCollisionDrawingMode } from './hooks/useCollisionDrawingMode';
 
 // Import types and constants
 import { MapEditorModuleProps, TabId, GridConfig } from './types/editor.types';
@@ -27,7 +30,10 @@ import { EDITOR_TABS, KEYBOARD_SHORTCUTS } from './constants/editorConstants';
 import {
   createAreaSaveHandler,
   createAreaDeleteHandler,
-  createAreaDrawnHandler
+  createAreaDrawnHandler,
+  createCollisionAreaSaveHandler,
+  createCollisionAreaDeleteHandler,
+  createCollisionAreaDrawnHandler
 } from './utils/editorHandlers';
 
 import './MapEditorModule.css';
@@ -40,14 +46,16 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   const [activeTab, setActiveTab] = useState<TabId>('areas');
   const [previewMode, setPreviewMode] = useState(false);
 
+  // Use shared map data
+  const { interactiveAreas: areas, impassableAreas } = mapData;
+
   // Use extracted hooks
   const editorState = useEditorState();
   const gridConfig = useGridConfig();
   const modalState = useModalState();
   const drawingMode = useDrawingMode();
-
-  // Use shared map data
-  const { interactiveAreas: areas, impassableAreas } = mapData;
+  const collisionModalState = useCollisionModalState();
+  const collisionDrawingMode = useCollisionDrawingMode();
 
   // Create handlers using extracted utilities
   const handleSaveArea = useCallback(
@@ -85,15 +93,55 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
     [drawingMode.pendingAreaData, sharedMap, drawingMode]
   );
 
+  // Collision area handlers
+  const handleSaveCollisionArea = useCallback(
+    createCollisionAreaSaveHandler(
+      collisionModalState.editingCollisionArea,
+      sharedMap,
+      collisionModalState.setShowCollisionAreaModal,
+      collisionModalState.setEditingCollisionArea,
+      collisionDrawingMode.setPendingCollisionAreaData,
+      collisionDrawingMode.setCollisionDrawingMode
+    ),
+    [collisionModalState.editingCollisionArea, sharedMap, collisionModalState, collisionDrawingMode]
+  );
+
+  const handleConfirmDeleteCollisionArea = useCallback(
+    createCollisionAreaDeleteHandler(
+      collisionModalState.collisionAreaToDelete,
+      sharedMap,
+      collisionModalState.setCollisionAreaToDelete
+    ),
+    [collisionModalState.collisionAreaToDelete, sharedMap, collisionModalState]
+  );
+
+  const handleCollisionAreaDrawn = useCallback(
+    createCollisionAreaDrawnHandler(
+      collisionDrawingMode.pendingCollisionAreaData,
+      sharedMap,
+      collisionDrawingMode.setCollisionDrawingMode,
+      collisionDrawingMode.setPendingCollisionAreaData,
+      () => {
+        // Force immediate re-render by triggering a state update
+        console.log('Collision area created, triggering immediate re-render');
+      }
+    ),
+    [collisionDrawingMode.pendingCollisionAreaData, sharedMap, collisionDrawingMode]
+  );
+
   // Modal close handler that combines drawing mode exit
   const handleCloseModals = useCallback(() => {
     modalState.handleCloseModals();
+    collisionModalState.handleCloseModals();
 
     // Exit drawing mode if active
     if (drawingMode.drawingMode) {
       drawingMode.exitDrawingMode();
     }
-  }, [modalState, drawingMode]);
+    if (collisionDrawingMode.collisionDrawingMode) {
+      collisionDrawingMode.exitCollisionDrawingMode();
+    }
+  }, [modalState, drawingMode, collisionModalState, collisionDrawingMode]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -130,7 +178,14 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
       case 'assets':
         return <AssetsTab />;
       case 'collision':
-        return <CollisionTab impassableAreas={impassableAreas} />;
+        return (
+          <CollisionTab
+            impassableAreas={impassableAreas}
+            onCreateNewCollisionArea={collisionModalState.handleCreateNewCollisionArea}
+            onEditCollisionArea={collisionModalState.handleEditCollisionArea}
+            onDeleteCollisionArea={collisionModalState.handleDeleteCollisionArea}
+          />
+        );
       case 'settings':
         return (
           <SettingsTab
@@ -184,7 +239,9 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
             gridColor={gridConfig.gridConfig.color}
             gridOpacity={gridConfig.gridConfig.opacity}
             drawingMode={drawingMode.drawingMode}
+            collisionDrawingMode={collisionDrawingMode.collisionDrawingMode}
             drawingAreaData={drawingMode.pendingAreaData || undefined}
+            drawingCollisionAreaData={collisionDrawingMode.pendingCollisionAreaData || undefined}
             onSelectionChanged={(objects) => {
               console.log('Selection changed:', objects);
             }}
@@ -192,6 +249,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
               console.log('Object modified:', object);
             }}
             onAreaDrawn={handleAreaDrawn}
+            onCollisionAreaDrawn={handleCollisionAreaDrawn}
             className="map-editor-canvas"
           />
         </main>
@@ -249,6 +307,21 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         </div>
       )}
 
+      {collisionDrawingMode.collisionDrawingMode && (
+        <div className="drawing-overlay">
+          <div className="drawing-notice">
+            <Shield size={20} />
+            <span>Collision Drawing Mode: Click and drag to create collision area</span>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={collisionDrawingMode.cancelCollisionDrawingMode}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       <AreaFormModal
         isOpen={modalState.showAreaModal}
         onClose={handleCloseModals}
@@ -262,6 +335,24 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         onConfirm={() => { console.log('[MapEditorModule] Confirm delete'); handleConfirmDelete(); }}
         title="Delete Interactive Area"
         message={`Are you sure you want to delete "${modalState.areaToDelete?.name}"?`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+      />
+
+      <CollisionAreaFormModal
+        isOpen={collisionModalState.showCollisionAreaModal}
+        onClose={handleCloseModals}
+        onSave={handleSaveCollisionArea}
+        editingArea={collisionModalState.editingCollisionArea}
+      />
+
+      <ConfirmationDialog
+        isOpen={collisionModalState.showDeleteConfirm}
+        onClose={handleCloseModals}
+        onConfirm={() => { console.log('[MapEditorModule] Confirm delete collision area'); handleConfirmDeleteCollisionArea(); }}
+        title="Delete Collision Area"
+        message={`Are you sure you want to delete "${collisionModalState.collisionAreaToDelete?.name || 'Collision Area'}"?`}
         confirmText="Delete"
         cancelText="Cancel"
         type="danger"

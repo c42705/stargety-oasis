@@ -44,6 +44,8 @@ export interface UseSharedMapReturn {
   loadMap: () => Promise<void>;
   exportMap: () => string;
   importMap: (jsonData: string) => Promise<void>;
+  updateWorldDimensions: (dimensions: { width: number; height: number }) => Promise<void>;
+  updateMapData: (updates: any) => Promise<void>;
   
   // Utilities
   getMapStatistics: () => any;
@@ -323,6 +325,37 @@ export const useSharedMap = (options: UseSharedMapOptions = {}): UseSharedMapRet
     await loadMap();
   }, [loadMap]);
 
+  const updateWorldDimensions = useCallback(async (dimensions: { width: number; height: number }) => {
+    if (!mapSystemRef.current) {
+      throw new Error('Map system not initialized');
+    }
+
+    try {
+      await mapSystemRef.current.updateWorldDimensions(dimensions, source);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update world dimensions';
+      setError(errorMessage);
+      throw err;
+    }
+  }, [source]);
+
+  const updateMapData = useCallback(async (updates: any) => {
+    if (!mapSystemRef.current) {
+      throw new Error('Map system not initialized');
+    }
+
+    try {
+      console.log('🔄 UPDATE MAP DATA CALLED:', updates);
+      await mapSystemRef.current.updateMapData(updates, source);
+      console.log('✅ MAP DATA UPDATED SUCCESSFULLY');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update map data';
+      console.error('❌ UPDATE MAP DATA ERROR:', err);
+      setError(errorMessage);
+      throw err;
+    }
+  }, [source]);
+
   // Cleanup
   useEffect(() => {
     return () => {
@@ -355,7 +388,9 @@ export const useSharedMap = (options: UseSharedMapOptions = {}): UseSharedMapRet
     loadMap,
     exportMap,
     importMap,
-    
+    updateWorldDimensions,
+    updateMapData,
+
     // Utilities
     getMapStatistics,
     clearError,

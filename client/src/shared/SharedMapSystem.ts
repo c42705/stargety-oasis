@@ -88,7 +88,8 @@ export type MapEventType =
   | 'map:layer:removed'
   | 'map:sync:started'
   | 'map:sync:completed'
-  | 'map:sync:error';
+  | 'map:sync:error'
+  | 'map:dimensionsChanged';
 
 export interface MapEvent {
   type: MapEventType;
@@ -101,7 +102,7 @@ export interface MapEvent {
 export interface MapChange {
   id: string;
   type: 'add' | 'update' | 'remove';
-  elementType: 'area' | 'collision' | 'layer' | 'asset';
+  elementType: 'area' | 'collision' | 'layer' | 'asset' | 'worldDimensions';
   before: any;
   after: any;
   timestamp: Date;
@@ -117,6 +118,14 @@ export class SharedMapSystem {
   private eventListeners: Map<MapEventType, Function[]> = new Map();
   private changeHistory: MapChange[] = [];
   private maxHistorySize = 50;
+
+  // Constants for default map creation
+  private static readonly DEFAULT_WORLD_WIDTH = 800;
+  private static readonly DEFAULT_WORLD_HEIGHT = 600;
+
+  // Maximum world dimensions for performance
+  private static readonly MAX_WORLD_WIDTH = 8000;
+  private static readonly MAX_WORLD_HEIGHT = 4000;
 
   // Save state tracking
   private isSaving = false;
@@ -159,15 +168,30 @@ export class SharedMapSystem {
       const storedData = localStorage.getItem(STORAGE_KEYS.MAP_DATA);
       if (storedData) {
         const parsedData = JSON.parse(storedData);
+        console.log('📁 LOADED EXISTING MAP DATA FROM LOCALSTORAGE:', {
+          hasBackgroundImage: !!parsedData.backgroundImage,
+          worldDimensions: parsedData.worldDimensions,
+          dataSize: storedData.length,
+          metadata: parsedData.metadata
+        });
+
+        // Check if this is an old map without background image
+        if (!parsedData.backgroundImage) {
+          console.log('🔄 EXISTING MAP HAS NO BACKGROUND IMAGE, CREATING NEW DEFAULT MAP WITH ZEP BACKGROUND');
+          return await this.createDefaultMap();
+        }
+
         // Convert date strings back to Date objects
         parsedData.lastModified = new Date(parsedData.lastModified);
         this.mapData = parsedData;
+        console.log('✅ USING EXISTING MAP WITH BACKGROUND IMAGE');
         return parsedData;
       } else {
+        console.log('🆕 NO EXISTING MAP DATA, CREATING NEW DEFAULT MAP');
         return await this.createDefaultMap();
       }
     } catch (error) {
-      console.error('Failed to load map data:', error);
+      console.error('❌ FAILED TO LOAD MAP DATA, CREATING DEFAULT:', error);
       return await this.createDefaultMap();
     }
   }
@@ -202,14 +226,24 @@ export class SharedMapSystem {
       dataToSave.lastModified = new Date();
       dataToSave.version += 1;
 
-      // Save to localStorage with error handling
+      // Save to localStorage with error handling and cleanup
       try {
         localStorage.setItem(STORAGE_KEYS.MAP_DATA, JSON.stringify(dataToSave));
       } catch (storageError) {
         if (storageError instanceof Error && storageError.name === 'QuotaExceededError') {
-          throw new Error('Storage quota exceeded - unable to save map data');
+          console.warn('⚠️ STORAGE QUOTA EXCEEDED DURING MAP SAVE, ATTEMPTING CLEANUP');
+          this.cleanupStorage();
+
+          // Try saving again after cleanup
+          try {
+            localStorage.setItem(STORAGE_KEYS.MAP_DATA, JSON.stringify(dataToSave));
+            console.log('✅ MAP DATA SAVED AFTER CLEANUP');
+          } catch (retryError) {
+            throw new Error('Storage quota exceeded - unable to save map data even after cleanup. Please use smaller background images or clear browser data.');
+          }
+        } else {
+          throw storageError;
         }
-        throw storageError;
       }
 
       // Create backup
@@ -337,6 +371,64 @@ export class SharedMapSystem {
     // Mark as changed and schedule auto-save
     this.markAsChanged();
     this.emit('map:changed', { mapData: this.mapData, source });
+  }
+
+  /**
+   * Update world dimensions and trigger synchronization
+   */
+  public async updateWorldDimensions(dimensions: { width: number; height: number }, source: 'world' | 'editor' = 'editor'): Promise<void> {
+    if (!this.mapData) {
+      throw new Error('Map data not initialized');
+    }
+
+    // Validate dimensions
+    if (dimensions.width <= 0 || dimensions.height <= 0) {
+      throw new Error('World dimensions must be positive numbers');
+    }
+
+    if (dimensions.width > 4000 || dimensions.height > 3000) {
+      throw new Error('World dimensions exceed maximum allowed size (4000×3000)');
+    }
+
+    if (dimensions.width < 400 || dimensions.height < 300) {
+      throw new Error('World dimensions are below minimum required size (400×300)');
+    }
+
+    const previousDimensions = { ...this.mapData.worldDimensions };
+
+    // Update world dimensions
+    this.mapData.worldDimensions = dimensions;
+
+    // Record change for history
+    this.recordChange({
+      id: `change_${Date.now()}`,
+      type: 'update',
+      elementType: 'worldDimensions',
+      before: { worldDimensions: previousDimensions },
+      after: { worldDimensions: dimensions },
+      timestamp: new Date(),
+      userId: 'current_user' // TODO: Get from auth context
+    });
+
+    // Mark as changed and schedule auto-save
+    this.markAsChanged();
+
+    // Emit specific event for world dimensions change
+    this.emit('map:dimensionsChanged', {
+      dimensions,
+      previousDimensions,
+      mapData: this.mapData,
+      source
+    });
+
+    // Also emit general map changed event
+    this.emit('map:changed', { mapData: this.mapData, source });
+
+    console.log('World dimensions updated:', {
+      from: previousDimensions,
+      to: dimensions,
+      source
+    });
   }
 
   /**
@@ -519,6 +611,23 @@ export class SharedMapSystem {
   }
 
   /**
+   * Validate and scale background image dimensions for user uploads
+   */
+  public validateBackgroundImageDimensions(width: number, height: number): { width: number; height: number; scaled: boolean } {
+    return this.validateAndScaleImageDimensions(width, height);
+  }
+
+  /**
+   * Get maximum allowed world dimensions
+   */
+  public static getMaxWorldDimensions(): { width: number; height: number } {
+    return {
+      width: SharedMapSystem.MAX_WORLD_WIDTH,
+      height: SharedMapSystem.MAX_WORLD_HEIGHT
+    };
+  }
+
+  /**
    * Event system for map synchronization
    */
   public on(eventType: MapEventType, callback: Function): void {
@@ -622,6 +731,32 @@ export class SharedMapSystem {
   }
 
   /**
+   * Clean up localStorage when quota is exceeded
+   */
+  private cleanupStorage(): void {
+    try {
+      console.log('🧹 CLEANING UP STORAGE DUE TO QUOTA EXCEEDED');
+
+      // Clear old history entries more aggressively
+      this.changeHistory = this.changeHistory.slice(-5); // Keep only last 5 changes
+
+      // Clear other potential large items
+      const keysToCheck = [STORAGE_KEYS.MAP_DATA, STORAGE_KEYS.MAP_BACKUP];
+      keysToCheck.forEach(key => {
+        const item = localStorage.getItem(key);
+        if (item && item.length > 1000000) { // If item is larger than 1MB
+          console.log(`🧹 REMOVING LARGE STORAGE ITEM: ${key} (${(item.length / 1024 / 1024).toFixed(1)}MB)`);
+          localStorage.removeItem(key);
+        }
+      });
+
+      console.log('🧹 STORAGE CLEANUP COMPLETED');
+    } catch (error) {
+      console.error('❌ FAILED TO CLEANUP STORAGE:', error);
+    }
+  }
+
+  /**
    * Record change for undo/redo functionality
    */
   private recordChange(change: MapChange): void {
@@ -632,8 +767,28 @@ export class SharedMapSystem {
       this.changeHistory.shift();
     }
 
-    // TODO: Persist change history to database for multi-session undo/redo
-    localStorage.setItem(STORAGE_KEYS.MAP_HISTORY, JSON.stringify(this.changeHistory));
+    // Save to localStorage with quota handling
+    try {
+      localStorage.setItem(STORAGE_KEYS.MAP_HISTORY, JSON.stringify(this.changeHistory));
+    } catch (error) {
+      if (error instanceof Error && error.name === 'QuotaExceededError') {
+        console.warn('⚠️ STORAGE QUOTA EXCEEDED, ATTEMPTING CLEANUP');
+        this.cleanupStorage();
+
+        // Try saving again after cleanup
+        try {
+          localStorage.setItem(STORAGE_KEYS.MAP_HISTORY, JSON.stringify(this.changeHistory));
+          console.log('✅ HISTORY SAVED AFTER CLEANUP');
+        } catch (retryError) {
+          console.error('❌ FAILED TO SAVE HISTORY EVEN AFTER CLEANUP:', retryError);
+          // Clear history entirely as last resort
+          this.changeHistory = [];
+          localStorage.removeItem(STORAGE_KEYS.MAP_HISTORY);
+        }
+      } else {
+        console.error('❌ FAILED TO SAVE MAP HISTORY:', error);
+      }
+    }
   }
 
   /**
@@ -668,17 +823,117 @@ export class SharedMapSystem {
   }
 
   /**
+   * Validate and scale image dimensions to fit within maximum limits
+   */
+  private validateAndScaleImageDimensions(width: number, height: number): { width: number; height: number; scaled: boolean } {
+    const maxWidth = SharedMapSystem.MAX_WORLD_WIDTH;
+    const maxHeight = SharedMapSystem.MAX_WORLD_HEIGHT;
+
+    // Check if dimensions exceed limits
+    if (width <= maxWidth && height <= maxHeight) {
+      return { width, height, scaled: false };
+    }
+
+    console.log('🔧 IMAGE DIMENSIONS EXCEED LIMITS, SCALING DOWN:', {
+      original: { width, height },
+      limits: { maxWidth, maxHeight }
+    });
+
+    // Calculate scale factor to fit within limits while maintaining aspect ratio
+    const scaleX = maxWidth / width;
+    const scaleY = maxHeight / height;
+    const scale = Math.min(scaleX, scaleY);
+
+    const scaledWidth = Math.floor(width * scale);
+    const scaledHeight = Math.floor(height * scale);
+
+    console.log('🔧 SCALED DIMENSIONS:', {
+      scale,
+      scaled: { width: scaledWidth, height: scaledHeight }
+    });
+
+    return { width: scaledWidth, height: scaledHeight, scaled: true };
+  }
+
+  /**
+   * Load default background image and get its dimensions
+   */
+  private async loadDefaultBackgroundImage(): Promise<{ imageUrl: string; width: number; height: number }> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        console.log('🖼️ DEFAULT BACKGROUND IMAGE LOADED:', {
+          width: img.width,
+          height: img.height,
+          staticUrl: '/default-background.jpg'
+        });
+
+        // Validate and scale dimensions if necessary
+        const validatedDimensions = this.validateAndScaleImageDimensions(img.width, img.height);
+
+        if (validatedDimensions.scaled) {
+          console.log('🖼️ DEFAULT BACKGROUND SCALED TO FIT LIMITS:', validatedDimensions);
+        }
+
+        resolve({
+          imageUrl: '/default-background.jpg', // Use static resource URL instead of data URL
+          width: validatedDimensions.width,
+          height: validatedDimensions.height
+        });
+      };
+
+      img.onerror = () => {
+        console.error('❌ FAILED TO LOAD DEFAULT BACKGROUND IMAGE');
+        reject(new Error('Failed to load default background image'));
+      };
+
+      // Use the static resource URL for loading
+      img.src = '/default-background.jpg';
+    });
+  }
+
+  /**
    * Create default map data
    */
   private async createDefaultMap(): Promise<SharedMapData> {
+    console.log('🗺️ CREATING DEFAULT MAP WITH BACKGROUND IMAGE');
+
+    // Load default background image
+    let backgroundImage: string | undefined;
+    let backgroundImageDimensions: { width: number; height: number } | undefined;
+    let worldWidth = 800;
+    let worldHeight = 600;
+
+    try {
+      const imageData = await this.loadDefaultBackgroundImage();
+      backgroundImage = imageData.imageUrl; // Use static URL instead of data URL
+      backgroundImageDimensions = {
+        width: imageData.width,
+        height: imageData.height
+      };
+
+      // Use image dimensions as world dimensions
+      worldWidth = imageData.width;
+      worldHeight = imageData.height;
+
+      console.log('🖼️ DEFAULT BACKGROUND SET:', {
+        worldDimensions: { width: worldWidth, height: worldHeight },
+        imageDimensions: backgroundImageDimensions,
+        staticUrl: backgroundImage
+      });
+    } catch (error) {
+      console.warn('⚠️ FAILED TO LOAD DEFAULT BACKGROUND, USING FALLBACK:', error);
+      // Continue without background image
+    }
+
     const defaultMap: SharedMapData = {
       interactiveAreas: [
         {
           id: 'meeting-room-default',
           name: 'Meeting Room',
           type: 'meeting-room',
-          x: 150,
-          y: 150,
+          x: Math.floor(worldWidth * 0.2), // 20% from left
+          y: Math.floor(worldHeight * 0.25), // 25% from top
           width: 120,
           height: 80,
           color: '#4A90E2',
@@ -688,8 +943,8 @@ export class SharedMapSystem {
           id: 'coffee-corner-default',
           name: 'Coffee Corner',
           type: 'coffee-corner',
-          x: 300,
-          y: 350,
+          x: Math.floor(worldWidth * 0.6), // 60% from left
+          y: Math.floor(worldHeight * 0.7), // 70% from top
           width: 100,
           height: 80,
           color: '#D2691E',
@@ -699,24 +954,26 @@ export class SharedMapSystem {
       impassableAreas: [
         {
           id: 'wall-default',
-          x: 200,
-          y: 100,
+          x: Math.floor(worldWidth * 0.3), // 30% from left
+          y: Math.floor(worldHeight * 0.15), // 15% from top
           width: 80,
           height: 20,
           name: 'Wall Section'
         }
       ],
       worldDimensions: {
-        width: 800,
-        height: 600
+        width: worldWidth,
+        height: worldHeight
       },
+      backgroundImage: backgroundImage,
+      backgroundImageDimensions: backgroundImageDimensions,
       version: 1,
       lastModified: new Date(),
       createdBy: 'system',
       metadata: {
-        name: 'Default Map',
-        description: 'Default virtual world map',
-        tags: ['default', 'starter'],
+        name: 'Default Map - Zep Style',
+        description: 'Default virtual world map with Zep-style background',
+        tags: ['default', 'starter', 'zep'],
         isPublic: true
       },
       layers: [
@@ -755,6 +1012,7 @@ export class SharedMapSystem {
     };
 
     await this.saveMapData(defaultMap);
+    console.log('✅ DEFAULT MAP CREATED WITH BACKGROUND IMAGE');
     return defaultMap;
   }
 

@@ -1,28 +1,24 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Button, List, Typography, Flex, Card, Avatar, Tag, Space } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Shield } from 'lucide-react';
-import { useSharedMap } from '../../../../shared/useSharedMap';
-import { ConfirmationDialog } from '../../../../components/ConfirmationDialog';
+import { ImpassableArea } from '../../../../shared/MapDataContext';
 
 const { Title, Text } = Typography;
 
 interface CollisionTabProps {
-  impassableAreas: any[];
+  impassableAreas: ImpassableArea[];
+  onCreateNewCollisionArea: () => void;
+  onEditCollisionArea: (area: ImpassableArea) => void;
+  onDeleteCollisionArea: (area: ImpassableArea) => void;
 }
 
 export const CollisionTab: React.FC<CollisionTabProps> = ({
-  impassableAreas
+  impassableAreas,
+  onCreateNewCollisionArea,
+  onEditCollisionArea,
+  onDeleteCollisionArea
 }) => {
-  const sharedMap = useSharedMap({ source: 'editor', autoSave: true });
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [pendingArea, setPendingArea] = useState<any | null>(null);
-
-  const handleDelete = (area: any) => {
-    console.log('[CollisionTab] Delete clicked', area);
-    setPendingArea(area);
-    setConfirmOpen(true);
-  };
 
   return (
     <>
@@ -32,7 +28,12 @@ export const CollisionTab: React.FC<CollisionTabProps> = ({
             <Title level={5} style={{ margin: 0 }}>
               Collision Areas
             </Title>
-            <Button type="primary" size="small" icon={<PlusOutlined />}>
+            <Button
+              type="primary"
+              size="small"
+              icon={<PlusOutlined />}
+              onClick={onCreateNewCollisionArea}
+            >
               Add Area
             </Button>
           </Flex>
@@ -58,8 +59,21 @@ export const CollisionTab: React.FC<CollisionTabProps> = ({
                     </Space>
                   </div>
                   <Space size={4}>
-                    <Button type="default" icon={<EditOutlined />} size="small" style={{ padding: 4, minWidth: 'auto' }} />
-                    <Button type="default" danger icon={<DeleteOutlined />} size="small" style={{ padding: 4, minWidth: 'auto' }} onClick={() => handleDelete(area)} />
+                    <Button
+                      type="default"
+                      icon={<EditOutlined />}
+                      onClick={() => onEditCollisionArea(area)}
+                      size="small"
+                      style={{ padding: 4, minWidth: 'auto' }}
+                    />
+                    <Button
+                      type="default"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => onDeleteCollisionArea(area)}
+                      size="small"
+                      style={{ padding: 4, minWidth: 'auto' }}
+                    />
                   </Space>
                 </Flex>
 
@@ -76,23 +90,6 @@ export const CollisionTab: React.FC<CollisionTabProps> = ({
           )}
         />
       </Card>
-
-      <ConfirmationDialog
-        isOpen={confirmOpen}
-        onClose={() => { setConfirmOpen(false); setPendingArea(null); }}
-        onConfirm={async () => {
-          if (pendingArea) {
-            console.log('[CollisionTab] Confirm delete', pendingArea.id);
-            try { await sharedMap.removeCollisionArea(pendingArea.id); } catch (e) { console.error(e); }
-          }
-          setPendingArea(null);
-        }}
-        title="Delete Collision Area"
-        message={`Are you sure you want to delete "${pendingArea?.name || 'Collision Area'}"?`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        type="danger"
-      />
     </>
   );
 };

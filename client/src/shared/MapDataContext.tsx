@@ -30,6 +30,11 @@ export interface MapData {
     width: number;
     height: number;
   };
+  backgroundImage?: string;
+  backgroundImageDimensions?: {
+    width: number;
+    height: number;
+  };
 }
 
 interface MapDataContextType {
@@ -115,7 +120,9 @@ const defaultMapData: MapData = {
   worldDimensions: {
     width: 800,
     height: 600
-  }
+  },
+  backgroundImage: undefined,
+  backgroundImageDimensions: undefined
 };
 
 export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {

@@ -164,7 +164,7 @@ const AppContent: React.FC = () => {
                 </Space>
               </Button>
             </Dropdown>
-
+            <QuickAvatarBuilder />
             
             {user.isAdmin && (
               <Badge count="Admin" style={{
