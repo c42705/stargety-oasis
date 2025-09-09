@@ -13,7 +13,9 @@ import {
   Shield,
   Eraser,
   Trash2,
-  Eye
+  Eye,
+  Hand,
+  RotateCcw
 } from 'lucide-react';
 import { EditorState, GridConfig } from '../types/editor.types';
 import { SaveStatusIndicator } from '../../../components/SaveStatusIndicator';
@@ -28,6 +30,7 @@ interface EditorToolbarProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onFitToScreen: () => void;
+  onResetZoom: () => void;
   onToggleGrid: () => void;
   onUndo: () => void;
   onRedo: () => void;
@@ -42,6 +45,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onZoomIn,
   onZoomOut,
   onFitToScreen,
+  onResetZoom,
   onToggleGrid,
   onUndo,
   onRedo,
@@ -51,6 +55,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     {
       label: <Tooltip title="Select Tool (S)"><MousePointer size={16} /></Tooltip>,
       value: 'select'
+    },
+    {
+      label: <Tooltip title="Pan Tool (P)"><Hand size={16} /></Tooltip>,
+      value: 'pan'
     },
     {
       label: <Tooltip title="Move Tool (M)"><Move size={16} /></Tooltip>,
@@ -121,6 +129,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             </Tooltip>
             <Tooltip title="Zoom In (+)">
               <Button icon={<ZoomIn size={16} />} onClick={onZoomIn} />
+            </Tooltip>
+            <Tooltip title="Reset Zoom (100%)">
+              <Button icon={<RotateCcw size={16} />} onClick={onResetZoom} />
             </Tooltip>
             <Tooltip title="Fit to Screen (0)">
               <Button icon={<Maximize size={16} />} onClick={onFitToScreen} />

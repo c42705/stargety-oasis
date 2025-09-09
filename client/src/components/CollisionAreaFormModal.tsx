@@ -73,7 +73,7 @@ export const CollisionAreaFormModal: React.FC<CollisionAreaFormModalProps> = ({
       onCancel={handleCancel}
       width={500}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
     >
       <div style={{ marginBottom: 16 }}>
         <Text type="secondary">

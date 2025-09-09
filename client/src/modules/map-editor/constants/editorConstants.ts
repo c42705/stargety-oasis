@@ -30,13 +30,14 @@ export const DEFAULT_EDITOR_STATE: EditorState = {
   mousePosition: { x: 0, y: 0 },
   saveStatus: 'saved',
   canUndo: false,
-  canRedo: false
+  canRedo: false,
+  isPanning: false
 };
 
 export const ZOOM_LIMITS = {
-  MIN: 25,
-  MAX: 400,
-  STEP: 25
+  MIN: 10,
+  MAX: 500,
+  STEP: 20
 } as const;
 
 export const KEYBOARD_SHORTCUTS = {
@@ -46,5 +47,7 @@ export const KEYBOARD_SHORTCUTS = {
   SELECT_TOOL: ['s', 'S'] as readonly string[],
   MOVE_TOOL: ['m', 'M'] as readonly string[],
   RESIZE_TOOL: ['r', 'R'] as readonly string[],
-  DELETE_TOOL: ['d', 'D'] as readonly string[]
+  DELETE_TOOL: ['d', 'D'] as readonly string[],
+  PAN_TOOL: ['p', 'P'] as readonly string[],
+  RESET_ZOOM: ['0'] as readonly string[]
 } as const;

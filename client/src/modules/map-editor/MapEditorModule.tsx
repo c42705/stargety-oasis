@@ -217,6 +217,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
           onToolChange={editorState.onToolChange}
           onZoomIn={editorState.onZoomIn}
           onZoomOut={editorState.onZoomOut}
+          onResetZoom={editorState.onResetZoom}
           onFitToScreen={editorState.onFitToScreen}
           onToggleGrid={gridConfig.toggleGrid}
           onUndo={editorState.onUndo}
@@ -242,6 +243,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
             collisionDrawingMode={collisionDrawingMode.collisionDrawingMode}
             drawingAreaData={drawingMode.pendingAreaData || undefined}
             drawingCollisionAreaData={collisionDrawingMode.pendingCollisionAreaData || undefined}
+            currentTool={editorState.editorState.tool}
             onSelectionChanged={(objects) => {
               console.log('Selection changed:', objects);
             }}
@@ -251,6 +253,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
             onAreaDrawn={handleAreaDrawn}
             onCollisionAreaDrawn={handleCollisionAreaDrawn}
             className="map-editor-canvas"
+            onCanvasReady={editorState.setFabricCanvas}
           />
         </main>
 

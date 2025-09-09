@@ -26,6 +26,7 @@ export const EditorStatusBar: React.FC<EditorStatusBarProps> = ({
   const getToolColor = (tool: string) => {
     switch (tool) {
       case 'select': return 'blue';
+      case 'pan': return 'cyan';
       case 'move': return 'green';
       case 'resize': return 'orange';
       case 'delete': return 'red';

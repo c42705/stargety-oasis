@@ -513,7 +513,7 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
       onCancel={onClose}
       width={1200}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
     >
       <Steps current={builderState.currentStep} style={{ marginBottom: 24 }}>
         {steps.map(item => (

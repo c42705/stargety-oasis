@@ -38,6 +38,8 @@ interface FabricMapCanvasProps {
   drawingCollisionAreaData?: Partial<ImpassableArea>;
   className?: string;
   cameraControls?: MapEditorCameraControls;
+  onCanvasReady?: (canvas: fabric.Canvas) => void;
+  currentTool?: 'select' | 'move' | 'resize' | 'delete' | 'pan' | 'draw-collision' | 'erase-collision';
 }
 
 interface CanvasObject extends fabric.Object {
@@ -73,7 +75,9 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   drawingAreaData,
   drawingCollisionAreaData,
   className = '',
-  cameraControls
+  cameraControls,
+  onCanvasReady,
+  currentTool = 'select'
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
@@ -86,6 +90,8 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [areasToDelete, setAreasToDelete] = useState<{ id: string; name: string }[]>([]);
   const [forceRender, setForceRender] = useState(0);
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Constants
@@ -428,22 +434,35 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       fabricCanvasRef.current = canvas;
       setIsInitialized(true);
 
-      // Configure canvas for drawing mode
-      const updateCanvasForDrawingMode = () => {
-        if (drawingMode) {
+      // Notify parent component that canvas is ready
+      if (onCanvasReady) {
+        onCanvasReady(canvas);
+      }
+
+      // Configure canvas for current tool
+      const updateCanvasForCurrentTool = () => {
+        const isInDrawingMode = drawingMode || collisionDrawingMode;
+        const isPanTool = currentTool === 'pan';
+
+        if (isInDrawingMode) {
           canvas.selection = false; // Disable selection during drawing
           canvas.defaultCursor = 'crosshair';
           canvas.hoverCursor = 'crosshair';
           canvas.moveCursor = 'crosshair';
+        } else if (isPanTool) {
+          canvas.selection = false; // Disable selection in pan mode
+          canvas.defaultCursor = 'grab';
+          canvas.hoverCursor = 'grab';
+          canvas.moveCursor = 'grab';
         } else {
-          canvas.selection = true; // Enable selection when not drawing
+          canvas.selection = true; // Enable selection for other tools
           canvas.defaultCursor = 'default';
           canvas.hoverCursor = 'move';
           canvas.moveCursor = 'move';
         }
       };
 
-      updateCanvasForDrawingMode();
+      updateCanvasForCurrentTool();
 
       // Set up event listeners
       setupCanvasEventListeners(canvas);
@@ -498,35 +517,74 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       }
     });
 
-    // Pan functionality using camera controls
-    if (cameraControls) {
-      let isPanning = false;
+    // Pan functionality - both with camera controls and manual pan tool
+    let isPanningWithCamera = false;
 
-      canvas.on('mouse:down', (e) => {
-        // Check if spacebar is held for panning or if no object is selected
-        if (e.e.ctrlKey || e.e.metaKey || !e.target) {
-          isPanning = true;
-          const pointer = canvas.getPointer(e.e);
-          cameraControls.startPan(pointer.x, pointer.y);
-          canvas.defaultCursor = 'grabbing';
-        }
-      });
+    canvas.on('mouse:down', (e) => {
+      const pointer = canvas.getPointer(e.e);
 
-      canvas.on('mouse:move', (e) => {
-        if (isPanning) {
-          const pointer = canvas.getPointer(e.e);
-          cameraControls.updatePan(pointer.x, pointer.y);
-        }
-      });
+      // Pan tool functionality
+      if (currentTool === 'pan') {
+        setIsPanning(true);
+        setPanStart({ x: pointer.x, y: pointer.y });
+        canvas.defaultCursor = 'grabbing';
+        canvas.hoverCursor = 'grabbing';
+        e.e?.preventDefault();
+        return;
+      }
 
-      canvas.on('mouse:up', () => {
-        if (isPanning) {
-          isPanning = false;
-          cameraControls.endPan();
-          canvas.defaultCursor = drawingMode ? 'crosshair' : 'default';
+      // Camera controls pan (Ctrl/Cmd + click or no target)
+      if (cameraControls && (e.e.ctrlKey || e.e.metaKey || !e.target)) {
+        isPanningWithCamera = true;
+        cameraControls.startPan(pointer.x, pointer.y);
+        canvas.defaultCursor = 'grabbing';
+      }
+    });
+
+    canvas.on('mouse:move', (e) => {
+      const pointer = canvas.getPointer(e.e);
+
+      // Pan tool functionality
+      if (currentTool === 'pan' && isPanning && panStart) {
+        const deltaX = pointer.x - panStart.x;
+        const deltaY = pointer.y - panStart.y;
+
+        // Apply pan transformation to canvas viewport
+        const vpt = canvas.viewportTransform;
+        if (vpt) {
+          vpt[4] += deltaX;
+          vpt[5] += deltaY;
+          canvas.setViewportTransform(vpt);
+          canvas.renderAll();
         }
-      });
-    }
+
+        setPanStart({ x: pointer.x, y: pointer.y });
+        return;
+      }
+
+      // Camera controls pan
+      if (cameraControls && isPanningWithCamera) {
+        cameraControls.updatePan(pointer.x, pointer.y);
+      }
+    });
+
+    canvas.on('mouse:up', () => {
+      // Pan tool functionality
+      if (currentTool === 'pan' && isPanning) {
+        setIsPanning(false);
+        setPanStart(null);
+        canvas.defaultCursor = 'grab';
+        canvas.hoverCursor = 'grab';
+        return;
+      }
+
+      // Camera controls pan
+      if (cameraControls && isPanningWithCamera) {
+        isPanningWithCamera = false;
+        cameraControls.endPan();
+        canvas.defaultCursor = drawingMode ? 'crosshair' : 'default';
+      }
+    });
 
     // Keyboard event handling for deletion
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -546,7 +604,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [gridVisible, gridSpacing, onSelectionChanged, onObjectModified, drawingMode, isDrawing, startPoint, drawingRect, onAreaDrawn, drawingAreaData, cameraControls]);
+  }, [gridVisible, gridSpacing, onSelectionChanged, onObjectModified, drawingMode, isDrawing, startPoint, drawingRect, onAreaDrawn, drawingAreaData, cameraControls, currentTool, isPanning, panStart]);
 
 
 
@@ -558,25 +616,36 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     }
   }, [width, height]);
 
-  // Update canvas selection behavior based on drawing mode
+  // Update canvas selection behavior based on current tool
   useEffect(() => {
     if (fabricCanvasRef.current) {
       const canvas = fabricCanvasRef.current;
       const isInDrawingMode = drawingMode || collisionDrawingMode;
+      const isPanTool = currentTool === 'pan';
+      const shouldDisableSelection = isInDrawingMode || isPanTool;
 
-      canvas.selection = !isInDrawingMode;
-      canvas.defaultCursor = isInDrawingMode ? 'crosshair' : 'default';
-      canvas.hoverCursor = isInDrawingMode ? 'crosshair' : 'move';
+      canvas.selection = !shouldDisableSelection;
 
-      // Disable object selection in drawing mode
+      if (isInDrawingMode) {
+        canvas.defaultCursor = 'crosshair';
+        canvas.hoverCursor = 'crosshair';
+      } else if (isPanTool) {
+        canvas.defaultCursor = 'grab';
+        canvas.hoverCursor = 'grab';
+      } else {
+        canvas.defaultCursor = 'default';
+        canvas.hoverCursor = 'move';
+      }
+
+      // Disable object selection in drawing mode or pan mode
       canvas.forEachObject((obj) => {
-        obj.selectable = !isInDrawingMode;
-        obj.evented = !isInDrawingMode;
+        obj.selectable = !shouldDisableSelection;
+        obj.evented = !shouldDisableSelection;
       });
 
       canvas.renderAll();
     }
-  }, [drawingMode, collisionDrawingMode]);
+  }, [drawingMode, collisionDrawingMode, currentTool]);
 
   // Handle background image changes
   useEffect(() => {

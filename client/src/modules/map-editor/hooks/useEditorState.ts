@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { EditorState, EditorTool } from '../types/editor.types';
 import { DEFAULT_EDITOR_STATE } from '../constants/editorConstants';
 import {
@@ -9,6 +9,9 @@ import {
 
 export const useEditorState = () => {
   const [editorState, setEditorState] = useState<EditorState>(DEFAULT_EDITOR_STATE);
+
+  // Store reference to Fabric.js canvas for zoom operations
+  const fabricCanvasRef = useRef<any>(null);
 
 
 
@@ -32,25 +35,103 @@ export const useEditorState = () => {
     handleRedo();
   }, []);
 
-  // TODO: Implement camera control methods
+  // Set fabric canvas reference for zoom operations
+  const setFabricCanvas = useCallback((canvas: any) => {
+    fabricCanvasRef.current = canvas;
+  }, []);
+
+  // Zoom in functionality
   const onZoomIn = useCallback(() => {
-    // TODO: Implement zoom in
+    const canvas = fabricCanvasRef.current;
+    if (canvas) {
+      const currentZoom = canvas.getZoom();
+      const newZoom = Math.min(currentZoom * 1.2, 5.0); // Max zoom 5x
+      canvas.setZoom(newZoom);
+      canvas.renderAll();
+
+      setEditorState(prev => ({
+        ...prev,
+        zoom: Math.round(newZoom * 100)
+      }));
+
+      console.log('🔍 ZOOM IN:', { from: currentZoom, to: newZoom });
+    }
   }, []);
 
+  // Zoom out functionality
   const onZoomOut = useCallback(() => {
-    // TODO: Implement zoom out
+    const canvas = fabricCanvasRef.current;
+    if (canvas) {
+      const currentZoom = canvas.getZoom();
+      const newZoom = Math.max(currentZoom / 1.2, 0.1); // Min zoom 0.1x
+      canvas.setZoom(newZoom);
+      canvas.renderAll();
+
+      setEditorState(prev => ({
+        ...prev,
+        zoom: Math.round(newZoom * 100)
+      }));
+
+      console.log('🔍 ZOOM OUT:', { from: currentZoom, to: newZoom });
+    }
   }, []);
 
+  // Reset zoom to 100%
+  const onResetZoom = useCallback(() => {
+    const canvas = fabricCanvasRef.current;
+    if (canvas) {
+      const currentZoom = canvas.getZoom();
+      canvas.setZoom(1.0);
+      canvas.renderAll();
+
+      setEditorState(prev => ({
+        ...prev,
+        zoom: 100
+      }));
+
+      console.log('🔍 RESET ZOOM:', { from: currentZoom, to: 1.0 });
+    }
+  }, []);
+
+  // Fit to screen functionality
   const onFitToScreen = useCallback(() => {
-    // TODO: Implement fit to screen
+    const canvas = fabricCanvasRef.current;
+    if (canvas) {
+      // Get canvas container dimensions
+      const container = canvas.getElement().parentElement;
+      if (container) {
+        const containerWidth = container.clientWidth;
+        const containerHeight = container.clientHeight;
+
+        // Calculate zoom to fit the world in the viewport
+        const worldWidth = 7603; // Current world width
+        const worldHeight = 3679; // Current world height
+
+        const zoomX = containerWidth / worldWidth;
+        const zoomY = containerHeight / worldHeight;
+        const fitZoom = Math.min(zoomX, zoomY, 1.0); // Don't zoom in beyond 100%
+
+        canvas.setZoom(fitZoom);
+        canvas.renderAll();
+
+        setEditorState(prev => ({
+          ...prev,
+          zoom: Math.round(fitZoom * 100)
+        }));
+
+        console.log('🔍 FIT TO SCREEN:', { fitZoom, containerWidth, containerHeight });
+      }
+    }
   }, []);
 
   return {
     editorState,
     setEditorState,
+    setFabricCanvas,
     onToolChange,
     onZoomIn,
     onZoomOut,
+    onResetZoom,
     onFitToScreen,
     onMouseMove,
     onUndo,

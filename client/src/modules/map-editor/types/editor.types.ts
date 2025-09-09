@@ -11,12 +11,13 @@ export interface GridConfig {
 }
 
 export interface EditorState {
-  tool: 'select' | 'move' | 'resize' | 'delete' | 'draw-collision' | 'erase-collision';
+  tool: 'select' | 'move' | 'resize' | 'delete' | 'pan' | 'draw-collision' | 'erase-collision';
   zoom: number;
   mousePosition: { x: number; y: number };
   saveStatus: 'saved' | 'unsaved' | 'saving';
   canUndo: boolean;
   canRedo: boolean;
+  isPanning: boolean;
 }
 
 export type EditorTool = EditorState['tool'];
