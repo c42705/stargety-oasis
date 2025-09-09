@@ -18,6 +18,8 @@
   padding: var(--spacing-xs);
   background: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border-light);
+  max-height: 120px; /* Limit header height to prevent layout collapse */
+  overflow: hidden; /* Hide overflow if toolbar wraps */
 }
 
 .editor-title {

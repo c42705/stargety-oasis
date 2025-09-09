@@ -307,36 +307,39 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
   // Handle reset to default map
   const handleResetToDefault = useCallback(async () => {
-    Modal.confirm({
-      title: 'Reset to Default Map',
-      content: (
-        <div>
-          <p>This will reset the entire map to the default Zep-style layout with background image.</p>
-          <p><strong>Warning:</strong> All current map data, areas, and customizations will be lost.</p>
-          <p>Are you sure you want to continue?</p>
-        </div>
-      ),
-      okText: 'Yes, Reset Map',
-      cancelText: 'Cancel',
-      okType: 'danger',
-      onOk: async () => {
-        try {
-          console.log('🔄 RESETTING TO DEFAULT MAP');
+    // Use a direct confirmation instead of Modal.confirm to avoid context issues
+    const confirmed = window.confirm(
+      'Reset to Default Map\n\n' +
+      'This will reset the entire map to the default Zep-style layout with background image.\n\n' +
+      'WARNING: All current map data, areas, and customizations will be lost.\n\n' +
+      'Are you sure you want to continue?'
+    );
 
-          // Clear localStorage to force recreation of default map
-          localStorage.removeItem('stargety_map_data');
-          localStorage.removeItem('stargety_map_history');
-          localStorage.removeItem('stargety_map_backup');
+    if (confirmed) {
+      try {
+        console.log('🔄 RESETTING TO DEFAULT MAP - CLEARING ALL STORAGE');
 
-          // Reload the page to reinitialize with default map
+        // Clear all map-related localStorage using correct keys
+        localStorage.removeItem('stargety_shared_map_data');
+        localStorage.removeItem('stargety_map_backup');
+        localStorage.removeItem('stargety_map_settings');
+        localStorage.removeItem('stargety_map_history');
+
+        console.log('🔄 STORAGE CLEARED, RELOADING PAGE TO RECREATE DEFAULT MAP');
+
+        // Show success message before reload
+        message.success('Map reset initiated. Reloading page...');
+
+        // Small delay to show message, then reload
+        setTimeout(() => {
           window.location.reload();
+        }, 1000);
 
-        } catch (error) {
-          console.error('❌ FAILED TO RESET TO DEFAULT MAP:', error);
-          message.error('Failed to reset map. Please try again.');
-        }
+      } catch (error) {
+        console.error('❌ FAILED TO RESET TO DEFAULT MAP:', error);
+        message.error('Failed to reset map. Please try again.');
       }
-    });
+    }
   }, []);
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>

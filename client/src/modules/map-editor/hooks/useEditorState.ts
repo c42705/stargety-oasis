@@ -97,11 +97,11 @@ export const useEditorState = () => {
   const onFitToScreen = useCallback(() => {
     const canvas = fabricCanvasRef.current;
     if (canvas) {
-      // Get canvas container dimensions
-      const container = canvas.getElement().parentElement;
-      if (container) {
-        const containerWidth = container.clientWidth;
-        const containerHeight = container.clientHeight;
+      // Get the actual viewport container (main element)
+      const mainContainer = document.querySelector('.editor-main');
+      if (mainContainer) {
+        const containerWidth = mainContainer.clientWidth;
+        const containerHeight = mainContainer.clientHeight;
 
         // Calculate zoom to fit the world in the viewport
         const worldWidth = 7603; // Current world width
@@ -109,7 +109,7 @@ export const useEditorState = () => {
 
         const zoomX = containerWidth / worldWidth;
         const zoomY = containerHeight / worldHeight;
-        const fitZoom = Math.min(zoomX, zoomY, 1.0); // Don't zoom in beyond 100%
+        const fitZoom = Math.min(zoomX, zoomY); // Allow zooming out as much as needed
 
         canvas.setZoom(fitZoom);
         canvas.renderAll();
@@ -119,7 +119,7 @@ export const useEditorState = () => {
           zoom: Math.round(fitZoom * 100)
         }));
 
-        console.log('🔍 FIT TO SCREEN:', { fitZoom, containerWidth, containerHeight });
+        console.log('🔍 FIT TO SCREEN:', { fitZoom, containerWidth, containerHeight, worldWidth, worldHeight });
       }
     }
   }, []);

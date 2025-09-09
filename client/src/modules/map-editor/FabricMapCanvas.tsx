@@ -13,7 +13,7 @@
  * - Add collaborative cursor tracking for multi-user editing
  */
 
-import React, { useRef, useEffect, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import * as fabric from 'fabric';
 import { useSharedMap } from '../../shared/useSharedMap';
 import { InteractiveArea, ImpassableArea } from '../../shared/MapDataContext';
@@ -647,12 +647,16 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     }
   }, [drawingMode, collisionDrawingMode, currentTool]);
 
-  // Handle background image changes
+  // Handle background image changes - use a stable reference to prevent constant re-renders
+  const backgroundImageUrl = useMemo(() => {
+    return sharedMap.mapData?.backgroundImage;
+  }, [sharedMap.mapData?.backgroundImage]);
+
   useEffect(() => {
-    if (fabricCanvasRef.current && sharedMap.mapData) {
+    if (fabricCanvasRef.current && backgroundImageUrl !== undefined) {
       updateBackgroundImage();
     }
-  }, [sharedMap.mapData?.backgroundImage]);
+  }, [backgroundImageUrl]);
 
   // Update background image with cover mode scaling (same as game world)
   const updateBackgroundImage = useCallback(() => {
@@ -673,10 +677,13 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     }
 
     // Add new background image if available
-    if (sharedMap.mapData.backgroundImage) {
-      console.log('🖼️ ADDING BACKGROUND IMAGE TO FABRIC CANVAS');
+    if (backgroundImageUrl) {
+      console.log('🖼️ ADDING BACKGROUND IMAGE TO FABRIC CANVAS:', {
+        backgroundImageUrl,
+        canvasSize: { width: canvas.width, height: canvas.height }
+      });
 
-      fabric.Image.fromURL(sharedMap.mapData.backgroundImage, {
+      fabric.Image.fromURL(backgroundImageUrl, {
         crossOrigin: 'anonymous'
       }).then((img: fabric.Image) => {
         if (!canvas || !img) {
@@ -690,27 +697,19 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         const imageWidth = img.width!;
         const imageHeight = img.height!;
 
-        // Calculate scale factors for both dimensions
-        const scaleX = canvasWidth / imageWidth;
-        const scaleY = canvasHeight / imageHeight;
+        console.log('🖼️ BACKGROUND IMAGE DIMENSIONS:', {
+          canvas: { width: canvasWidth, height: canvasHeight },
+          image: { width: imageWidth, height: imageHeight }
+        });
 
-        // Use the larger scale to ensure the image covers the entire area (cover mode)
-        // This may crop parts of the image but ensures no empty areas
-        const coverScale = Math.max(scaleX, scaleY);
-
-        // Calculate final scaled dimensions
-        const scaledWidth = imageWidth * coverScale;
-        const scaledHeight = imageHeight * coverScale;
-
-        // Center the image on the canvas
-        const left = (canvasWidth - scaledWidth) / 2;
-        const top = (canvasHeight - scaledHeight) / 2;
-
+        // For the Map Editor, we want to show the image at its actual size
+        // without scaling, so users can see the full detail
+        // The canvas should match the image dimensions
         img.set({
-          left: left,
-          top: top,
-          scaleX: coverScale,
-          scaleY: coverScale,
+          left: 0,
+          top: 0,
+          scaleX: 1,
+          scaleY: 1,
           selectable: false,
           evented: false,
           excludeFromExport: false,
@@ -720,34 +719,63 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
         // Mark as background image for identification
         (img as any).isBackgroundImage = true;
+        (img as any).selectable = false;
+        (img as any).evented = false;
+        (img as any).excludeFromExport = false;
+
+        console.log('🖼️ BACKGROUND IMAGE CONFIGURED:', {
+          position: { left: 0, top: 0 },
+          scale: { x: 1, y: 1 },
+          size: { width: imageWidth, height: imageHeight }
+        });
 
         // Add to canvas and send to back (behind grid and other elements)
         canvas.add(img);
         canvas.sendObjectToBack(img);
 
-        // Ensure grid and other elements are properly layered
-        updateLayerOrder();
-
         canvas.renderAll();
 
-        console.log('🖼️ COVER MODE BACKGROUND ADDED TO FABRIC CANVAS:', {
-          originalSize: { width: imageWidth, height: imageHeight },
-          canvas: { width: canvasWidth, height: canvasHeight },
-          scale: { x: scaleX, y: scaleY, cover: coverScale },
-          finalSize: { width: scaledWidth, height: scaledHeight },
-          position: { left, top },
-          cropped: {
-            width: scaledWidth > canvasWidth,
-            height: scaledHeight > canvasHeight
+        console.log('🖼️ BACKGROUND IMAGE ADDED TO FABRIC CANVAS');
+
+        // Store background image reference for persistent layer management
+        (canvas as any)._backgroundImageRef = img;
+
+        // Force layer order update after a brief delay to ensure background is maintained
+        setTimeout(() => {
+          const bgImg = canvas.getObjects().find(obj => (obj as any).isBackgroundImage);
+          if (bgImg) {
+            canvas.sendObjectToBack(bgImg);
+            canvas.renderAll();
+            console.log('🖼️ BACKGROUND IMAGE LAYER ORDER ENFORCED');
+
+            // Log final state
+            const allObjects = canvas.getObjects();
+            const bgImages = allObjects.filter(obj => (obj as any).isBackgroundImage);
+            console.log('🖼️ FINAL BACKGROUND STATE:', {
+              totalObjects: allObjects.length,
+              backgroundImages: bgImages.length,
+              backgroundImageVisible: bgImages.length > 0,
+              backgroundImagePosition: bgImages[0] ? {
+                left: bgImages[0].left,
+                top: bgImages[0].top,
+                width: bgImages[0].width,
+                height: bgImages[0].height,
+                scaleX: bgImages[0].scaleX,
+                scaleY: bgImages[0].scaleY
+              } : null
+            });
+          } else {
+            console.warn('⚠️ BACKGROUND IMAGE NOT FOUND DURING LAYER ORDER ENFORCEMENT');
           }
-        });
+        }, 100);
+
       }).catch((error: any) => {
         console.error('❌ FAILED TO LOAD BACKGROUND IMAGE:', error);
       });
     } else {
       console.log('🖼️ NO BACKGROUND IMAGE, USING TRANSPARENT BACKGROUND');
     }
-  }, [sharedMap.mapData]);
+  }, [backgroundImageUrl]);
 
   // Update layer order to ensure proper stacking: background → grid → interactive elements
   const updateLayerOrder = useCallback(() => {
@@ -760,6 +788,17 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     const interactiveElements = canvas.getObjects().filter(obj =>
       !((obj as any).isBackgroundImage) && !((obj as any).isGridLine)
     );
+
+    // Check if background image was lost and restore it
+    if (backgroundImages.length === 0 && (canvas as any)._backgroundImageRef) {
+      const bgRef = (canvas as any)._backgroundImageRef;
+      if (!canvas.getObjects().includes(bgRef)) {
+        console.log('🔧 RESTORING LOST BACKGROUND IMAGE');
+        canvas.add(bgRef);
+        canvas.sendObjectToBack(bgRef);
+        backgroundImages.push(bgRef);
+      }
+    }
 
     // Send background images to the very back
     backgroundImages.forEach(obj => canvas.sendObjectToBack(obj));
