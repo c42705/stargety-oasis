@@ -15,7 +15,8 @@
 
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import * as fabric from 'fabric';
-import { useSharedMap } from '../../shared/useSharedMap';
+// import { useSharedMap } from '../../shared/useSharedMap';
+import { useSharedMapCompat as useSharedMap } from '../../stores/useSharedMapCompat';
 import { InteractiveArea, ImpassableArea } from '../../shared/MapDataContext';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 import { MapEditorCameraControls } from './hooks/useMapEditorCamera';
@@ -82,6 +83,8 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isBackgroundReady, setIsBackgroundReady] = useState(false);
+  const [isElementsReady, setIsElementsReady] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawingRect, setDrawingRect] = useState<fabric.Rect | null>(null);
   const [drawingText, setDrawingText] = useState<fabric.Text | null>(null);
@@ -93,6 +96,16 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Log initialization state changes for debugging
+  useEffect(() => {
+    console.log('🔄 CANVAS INITIALIZATION STATE:', {
+      isInitialized,
+      isBackgroundReady,
+      isElementsReady,
+      canvasExists: !!fabricCanvasRef.current
+    });
+  }, [isInitialized, isBackgroundReady, isElementsReady]);
 
   // Constants
   const MIN_AREA_SIZE = 90;
@@ -111,8 +124,11 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     return luminance > 0.5 ? '#000000' : '#ffffff';
   };
 
-  // Use shared map system
-  const sharedMap = useSharedMap({ source: 'editor', autoSave: true });
+  // Auto-save is now controlled entirely by the Zustand store
+  const sharedMap = useSharedMap({
+    source: 'editor'
+    // Note: autoSave parameter removed - controlled by store toggle only
+  });
 
   // Handle object modification and sync with shared map (with debouncing)
   const handleObjectModified = useCallback(async (object: CanvasObject) => {
@@ -432,6 +448,9 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       });
 
       fabricCanvasRef.current = canvas;
+      // Reset all initialization states when canvas is recreated
+      setIsBackgroundReady(false);
+      setIsElementsReady(false);
       setIsInitialized(true);
 
       // Notify parent component that canvas is ready
@@ -652,11 +671,13 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     return sharedMap.mapData?.backgroundImage;
   }, [sharedMap.mapData?.backgroundImage]);
 
+  // Priority background loading - triggers immediately when canvas is ready
   useEffect(() => {
-    if (fabricCanvasRef.current && backgroundImageUrl !== undefined) {
+    if (fabricCanvasRef.current && isInitialized && backgroundImageUrl !== undefined) {
+      console.log('🚀 PRIORITY BACKGROUND LOADING INITIATED');
       updateBackgroundImage();
     }
-  }, [backgroundImageUrl]);
+  }, [isInitialized, backgroundImageUrl]);
 
   // Update background image with cover mode scaling (same as game world)
   const updateBackgroundImage = useCallback(() => {
@@ -717,28 +738,44 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
           originY: 'top'
         });
 
-        // Mark as background image for identification
+        // Mark as background image for identification - SET IMMEDIATELY
         (img as any).isBackgroundImage = true;
         (img as any).selectable = false;
         (img as any).evented = false;
         (img as any).excludeFromExport = false;
 
+        // Store background image reference BEFORE adding to canvas
+        (canvas as any)._backgroundImageRef = img;
+
         console.log('🖼️ BACKGROUND IMAGE CONFIGURED:', {
           position: { left: 0, top: 0 },
           scale: { x: 1, y: 1 },
-          size: { width: imageWidth, height: imageHeight }
+          size: { width: imageWidth, height: imageHeight },
+          hasBackgroundProperty: (img as any).isBackgroundImage
         });
 
         // Add to canvas and send to back (behind grid and other elements)
         canvas.add(img);
         canvas.sendObjectToBack(img);
 
-        canvas.renderAll();
-
         console.log('🖼️ BACKGROUND IMAGE ADDED TO FABRIC CANVAS');
 
-        // Store background image reference for persistent layer management
-        (canvas as any)._backgroundImageRef = img;
+        // Verify the background image was added correctly
+        const addedObjects = canvas.getObjects();
+        const backgroundCount = addedObjects.filter(obj => (obj as any).isBackgroundImage).length;
+        console.log('🔍 IMMEDIATE BACKGROUND VERIFICATION:', {
+          totalObjects: addedObjects.length,
+          backgroundImages: backgroundCount,
+          backgroundImageVisible: backgroundCount > 0,
+          imageProperties: {
+            isBackgroundImage: (img as any).isBackgroundImage,
+            selectable: (img as any).selectable,
+            evented: (img as any).evented
+          }
+        });
+
+        // Immediate render to ensure visibility
+        canvas.renderAll();
 
         // Force layer order update after a brief delay to ensure background is maintained
         setTimeout(() => {
@@ -764,6 +801,13 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
                 scaleY: bgImages[0].scaleY
               } : null
             });
+
+            // Mark background as ready and trigger coordinated layer order update
+            setTimeout(() => {
+              console.log('✅ BACKGROUND IMAGE FULLY INTEGRATED - MARKING READY');
+              setIsBackgroundReady(true);
+              updateLayerOrder(true); // Skip background check since we just added it
+            }, 50);
           } else {
             console.warn('⚠️ BACKGROUND IMAGE NOT FOUND DURING LAYER ORDER ENFORCEMENT');
           }
@@ -774,46 +818,97 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       });
     } else {
       console.log('🖼️ NO BACKGROUND IMAGE, USING TRANSPARENT BACKGROUND');
+      // Mark background as ready even when no image (transparent background)
+      setIsBackgroundReady(true);
     }
   }, [backgroundImageUrl]);
 
   // Update layer order to ensure proper stacking: background → grid → interactive elements
-  const updateLayerOrder = useCallback(() => {
+  const updateLayerOrder = useCallback((skipBackgroundCheck = false) => {
     const canvas = fabricCanvasRef.current;
     if (!canvas) return;
 
-    // Get all objects by type
-    const backgroundImages = canvas.getObjects().filter(obj => (obj as any).isBackgroundImage);
-    const gridLines = canvas.getObjects().filter(obj => (obj as any).isGridLine);
-    const interactiveElements = canvas.getObjects().filter(obj =>
+    // Get all objects with multiple detection methods
+    const allObjects = canvas.getObjects();
+    let backgroundImages = allObjects.filter(obj => (obj as any).isBackgroundImage);
+
+    // Alternative detection: look for image objects that might be background
+    if (backgroundImages.length === 0 && (canvas as any)._backgroundImageRef) {
+      const bgRef = (canvas as any)._backgroundImageRef;
+      // Find the background image by reference or by being an image at position (0,0)
+      const possibleBg = allObjects.find(obj =>
+        obj === bgRef ||
+        (obj.type === 'image' && obj.left === 0 && obj.top === 0)
+      );
+
+      if (possibleBg) {
+        console.log('🔧 FOUND BACKGROUND IMAGE WITHOUT PROPERTY - FIXING');
+        (possibleBg as any).isBackgroundImage = true;
+        (possibleBg as any).selectable = false;
+        (possibleBg as any).evented = false;
+        backgroundImages.push(possibleBg);
+      }
+    }
+
+    const gridLines = allObjects.filter(obj => (obj as any).isGridLine);
+    const interactiveElements = allObjects.filter(obj =>
       !((obj as any).isBackgroundImage) && !((obj as any).isGridLine)
     );
 
-    // Check if background image was lost and restore it
-    if (backgroundImages.length === 0 && (canvas as any)._backgroundImageRef) {
+    // Enhanced background image restoration logic (only if not skipping)
+    if (!skipBackgroundCheck && backgroundImages.length === 0 && (canvas as any)._backgroundImageRef) {
       const bgRef = (canvas as any)._backgroundImageRef;
-      if (!canvas.getObjects().includes(bgRef)) {
-        console.log('🔧 RESTORING LOST BACKGROUND IMAGE');
+
+      // Check if the background image reference exists in canvas but lost its property
+      if (allObjects.includes(bgRef)) {
+        console.log('🔧 BACKGROUND IMAGE FOUND BUT MISSING PROPERTY - RESTORING');
+        (bgRef as any).isBackgroundImage = true;
+        (bgRef as any).selectable = false;
+        (bgRef as any).evented = false;
+        backgroundImages.push(bgRef);
+      } else {
+        console.log('🔧 RESTORING COMPLETELY LOST BACKGROUND IMAGE');
         canvas.add(bgRef);
-        canvas.sendObjectToBack(bgRef);
+        (bgRef as any).isBackgroundImage = true;
+        (bgRef as any).selectable = false;
+        (bgRef as any).evented = false;
         backgroundImages.push(bgRef);
       }
     }
 
-    // Send background images to the very back
-    backgroundImages.forEach(obj => canvas.sendObjectToBack(obj));
+    // Only reorder if we have objects to reorder
+    if (backgroundImages.length > 0 || gridLines.length > 0 || interactiveElements.length > 0) {
+      // Send background images to the very back
+      backgroundImages.forEach(obj => canvas.sendObjectToBack(obj));
 
-    // Bring grid lines above background but below interactive elements
-    gridLines.forEach(obj => canvas.bringObjectForward(obj));
+      // Bring grid lines above background but below interactive elements
+      gridLines.forEach(obj => canvas.bringObjectForward(obj));
 
-    // Bring interactive elements to the front
-    interactiveElements.forEach(obj => canvas.bringObjectToFront(obj));
+      // Bring interactive elements to the front
+      interactiveElements.forEach(obj => canvas.bringObjectToFront(obj));
+    }
 
     console.log('🔄 LAYER ORDER UPDATED:', {
       backgroundImages: backgroundImages.length,
       gridLines: gridLines.length,
-      interactiveElements: interactiveElements.length
+      interactiveElements: interactiveElements.length,
+      totalObjects: allObjects.length,
+      skippedBackgroundCheck: skipBackgroundCheck
     });
+
+    // Additional debugging for background image issues
+    if (!skipBackgroundCheck && backgroundImages.length === 0 && (canvas as any)._backgroundImageRef) {
+      console.warn('⚠️ BACKGROUND IMAGE REFERENCE EXISTS BUT NOT FOUND IN CANVAS:', {
+        hasReference: !!(canvas as any)._backgroundImageRef,
+        totalObjects: allObjects.length,
+        objectTypes: allObjects.map(obj => ({
+          type: obj.type,
+          isBackground: (obj as any).isBackgroundImage,
+          isGrid: (obj as any).isGridLine,
+          position: { left: obj.left, top: obj.top }
+        }))
+      });
+    }
   }, []);
 
   // Keyboard event handling for delete functionality
@@ -901,18 +996,17 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       canvas.add(line);
     }
 
-    // Ensure proper layer order after adding grid
-    updateLayerOrder();
-
+    // Note: Layer order will be coordinated after all elements are loaded
     canvas.renderAll();
   }, [width, height, gridVisible, gridSpacing, gridColor, gridOpacity, updateLayerOrder]);
 
-  // Update grid when properties change
+  // Update grid when properties change - wait for background to be ready
   useEffect(() => {
-    if (isInitialized) {
+    if (isInitialized && isBackgroundReady) {
+      console.log('🔲 RENDERING GRID AFTER BACKGROUND READY');
       renderGrid();
     }
-  }, [isInitialized, renderGrid]);
+  }, [isInitialized, isBackgroundReady, renderGrid]);
 
   // Render interactive areas
   const renderInteractiveAreas = useCallback(() => {
@@ -978,9 +1072,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       canvas.add(group);
     });
 
-    // Ensure proper layer order after adding interactive areas
-    updateLayerOrder();
-
+    // Note: Layer order will be coordinated after all elements are loaded
     canvas.renderAll();
   }, [sharedMap.interactiveAreas, updateLayerOrder]);
 
@@ -1019,19 +1111,28 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       canvas.add(rect);
     });
 
-    // Ensure proper layer order after adding collision areas
-    updateLayerOrder();
-
+    // Note: Layer order will be coordinated after all elements are loaded
     canvas.renderAll();
   }, [sharedMap.collisionAreas, updateLayerOrder]);
 
-  // Update canvas when map data changes
+  // Update canvas when map data changes - wait for background to be ready
   useEffect(() => {
-    if (isInitialized) {
+    if (isInitialized && isBackgroundReady) {
+      console.log('🎯 RENDERING AREAS AFTER BACKGROUND READY');
       renderInteractiveAreas();
       renderCollisionAreas();
+      // Mark all elements as ready after areas are rendered
+      setIsElementsReady(true);
     }
-  }, [isInitialized, renderInteractiveAreas, renderCollisionAreas, forceRender]);
+  }, [isInitialized, isBackgroundReady, renderInteractiveAreas, renderCollisionAreas, forceRender]);
+
+  // Coordinated layer order update after all elements are ready
+  useEffect(() => {
+    if (isElementsReady && fabricCanvasRef.current) {
+      console.log('🎯 FINAL COORDINATED LAYER ORDER UPDATE');
+      updateLayerOrder();
+    }
+  }, [isElementsReady, updateLayerOrder]);
 
   // Apply camera transformations to canvas
   useEffect(() => {

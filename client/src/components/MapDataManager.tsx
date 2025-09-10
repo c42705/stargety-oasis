@@ -16,7 +16,8 @@
 import React, { useState, useCallback } from 'react';
 import { App, Alert, Button, Card, Descriptions, Space, Typography, Upload } from 'antd';
 import { UploadOutlined, SaveOutlined, DownloadOutlined, InboxOutlined, CopyOutlined, UndoOutlined } from '@ant-design/icons';
-import { useSharedMap } from '../shared/useSharedMap';
+// import { useSharedMap } from '../shared/useSharedMap';
+import { useSharedMapCompat as useSharedMap } from '../stores/useSharedMapCompat';
 import { SharedMapSystem } from '../shared/SharedMapSystem';
 
 interface MapDataManagerProps {

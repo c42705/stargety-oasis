@@ -177,7 +177,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           <SaveStatusIndicator
             className="compact"
             showManualSave={true}
-            showAutoSaveToggle={false}
+            showAutoSaveToggle={true}
             onSaveSuccess={() => {
               console.log('Map saved successfully');
             }}

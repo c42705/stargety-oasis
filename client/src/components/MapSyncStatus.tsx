@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Badge, Tooltip, Typography } from 'antd';
 import { SyncOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import { SharedMapSystem } from '../shared/SharedMapSystem';
+// import { SharedMapSystem } from '../shared/SharedMapSystem';
+import { useMapStore } from '../stores/useMapStore';
 
 const { Text } = Typography;
 
@@ -24,60 +25,35 @@ export const MapSyncStatus: React.FC<MapSyncStatusProps> = ({
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
 
-  useEffect(() => {
-    const mapSystem = SharedMapSystem.getInstance();
+  const { isLoading, error, lastSaved } = useMapStore();
 
-    // Event handlers
-    const handleSyncStarted = () => {
+  useEffect(() => {
+    // Update sync status based on store state
+    if (isLoading) {
       setSyncStatus('syncing');
       setErrorMessage('');
-    };
-
-    const handleSyncCompleted = () => {
-      setSyncStatus('success');
-      setLastSyncTime(new Date());
-      
-      // Reset to idle after 2 seconds
-      setTimeout(() => {
-        setSyncStatus('idle');
-      }, 2000);
-    };
-
-    const handleSyncError = (data: any) => {
+    } else if (error) {
       setSyncStatus('error');
-      setErrorMessage(data.error || 'Synchronization failed');
-      
+      setErrorMessage(error);
+
       // Reset to idle after 5 seconds
       setTimeout(() => {
         setSyncStatus('idle');
         setErrorMessage('');
       }, 5000);
-    };
-
-    const handleMapSaved = () => {
+    } else if (lastSaved) {
       setSyncStatus('success');
-      setLastSyncTime(new Date());
-      
+      setLastSyncTime(lastSaved);
+
       // Reset to idle after 2 seconds
       setTimeout(() => {
         setSyncStatus('idle');
       }, 2000);
-    };
+    } else {
+      setSyncStatus('idle');
+    }
 
-    // Subscribe to events
-    mapSystem.on('map:sync:started', handleSyncStarted);
-    mapSystem.on('map:sync:completed', handleSyncCompleted);
-    mapSystem.on('map:sync:error', handleSyncError);
-    mapSystem.on('map:saved', handleMapSaved);
-
-    // Cleanup
-    return () => {
-      mapSystem.off('map:sync:started', handleSyncStarted);
-      mapSystem.off('map:sync:completed', handleSyncCompleted);
-      mapSystem.off('map:sync:error', handleSyncError);
-      mapSystem.off('map:saved', handleMapSaved);
-    };
-  }, []);
+  }, [isLoading, error, lastSaved]);
 
   const getStatusIcon = () => {
     switch (syncStatus) {
@@ -175,30 +151,7 @@ export const useMapSyncStatus = () => {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
-  useEffect(() => {
-    const mapSystem = SharedMapSystem.getInstance();
 
-    const handleSyncStarted = () => setSyncStatus('syncing');
-    const handleSyncCompleted = () => {
-      setSyncStatus('success');
-      setLastSyncTime(new Date());
-      setTimeout(() => setSyncStatus('idle'), 2000);
-    };
-    const handleSyncError = () => {
-      setSyncStatus('error');
-      setTimeout(() => setSyncStatus('idle'), 5000);
-    };
-
-    mapSystem.on('map:sync:started', handleSyncStarted);
-    mapSystem.on('map:sync:completed', handleSyncCompleted);
-    mapSystem.on('map:sync:error', handleSyncError);
-
-    return () => {
-      mapSystem.off('map:sync:started', handleSyncStarted);
-      mapSystem.off('map:sync:completed', handleSyncCompleted);
-      mapSystem.off('map:sync:error', handleSyncError);
-    };
-  }, []);
 
   return {
     syncStatus,

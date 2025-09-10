@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { useSharedMap } from './useSharedMap';
+// import { useSharedMap } from './useSharedMap';
+import { useSharedMapCompat as useSharedMap } from '../stores/useSharedMapCompat';
 
 // Shared interfaces for map data
 export interface InteractiveArea {

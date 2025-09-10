@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Map, Eye, Square, Shield } from 'lucide-react';
 import { useMapData } from '../../shared/MapDataContext';
-import { useSharedMap } from '../../shared/useSharedMap';
+// import { useSharedMap } from '../../shared/useSharedMap';
+import { useSharedMapCompat as useSharedMap } from '../../stores/useSharedMapCompat';
 import { FabricMapCanvas } from './FabricMapCanvas';
 import { AreaFormModal } from '../../components/AreaFormModal';
 import { CollisionAreaFormModal } from '../../components/CollisionAreaFormModal';
@@ -36,13 +37,20 @@ import {
   createCollisionAreaDrawnHandler
 } from './utils/editorHandlers';
 
+// Temporary import for testing new store
+import { MapStoreTest } from '../../stores/MapStoreTest';
+
 import './MapEditorModule.css';
 
 export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   className = ''
 }) => {
   const { mapData } = useMapData();
-  const sharedMap = useSharedMap({ source: 'editor', autoSave: true });
+  // Auto-save is now controlled entirely by the Zustand store
+  const sharedMap = useSharedMap({
+    source: 'editor'
+    // Note: autoSave parameter removed - controlled by store toggle only
+  });
   const [activeTab, setActiveTab] = useState<TabId>('areas');
   const [previewMode, setPreviewMode] = useState(false);
 

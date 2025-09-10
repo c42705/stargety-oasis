@@ -8,7 +8,6 @@ import {
   StopOutlined
 } from '@ant-design/icons';
 import { EditorState } from '../types/editor.types';
-import { SaveStatusIndicator } from '../../../components/SaveStatusIndicator';
 
 const { Text } = Typography;
 
@@ -84,11 +83,6 @@ export const EditorStatusBar: React.FC<EditorStatusBarProps> = ({
           <Text strong>{collisionAreasCount}</Text>
         </Space>
 
-        <SaveStatusIndicator
-          className="compact"
-          showManualSave={false}
-          showAutoSaveToggle={true}
-        />
       </Space>
     </Flex>
   );

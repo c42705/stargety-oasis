@@ -16,7 +16,8 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Space, Typography, Badge, Spin, Switch, Popover, Alert } from 'antd';
 import { SaveOutlined, CheckCircleOutlined, ExclamationCircleOutlined, SettingOutlined } from '@ant-design/icons';
 import { Clock } from 'lucide-react';
-import { SharedMapSystem } from '../shared/SharedMapSystem';
+// import { SharedMapSystem } from '../shared/SharedMapSystem';
+import { useMapStore } from '../stores/useMapStore';
 
 interface SaveStatusIndicatorProps {
   className?: string;
@@ -43,52 +44,35 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
 
   const [isManualSaving, setIsManualSaving] = useState(false);
 
-  // Get SharedMapSystem instance
-  const mapSystem = SharedMapSystem.getInstance();
+  // Get state from Zustand store
+  const {
+    isLoading,
+    isDirty,
+    lastSaved,
+    error,
+    saveMap,
+    autoSaveEnabled,
+    setAutoSaveEnabled
+  } = useMapStore();
 
-  // Update save state from SharedMapSystem
-  const updateSaveState = () => {
-    const currentState = mapSystem.getSaveState();
-    setSaveState(currentState);
-  };
-
-  // Set up event listeners
+  // Update save state based on store state
   useEffect(() => {
-    // Initial state
-    updateSaveState();
+    setSaveState({
+      isSaving: isLoading,
+      hasUnsavedChanges: isDirty,
+      lastSaveTime: lastSaved,
+      saveError: error,
+      autoSaveEnabled: autoSaveEnabled
+    });
 
-    const handleSaving = () => {
-      updateSaveState();
-    };
-
-    const handleSaved = () => {
-      updateSaveState();
+    // Trigger callbacks
+    if (lastSaved && !isLoading && !error) {
       onSaveSuccess?.();
-    };
-
-    const handleSaveError = (data: any) => {
-      updateSaveState();
-      onSaveError?.(data.error);
-    };
-
-    const handleMapChanged = () => {
-      updateSaveState();
-    };
-
-    // Subscribe to events
-    mapSystem.on('map:saving', handleSaving);
-    mapSystem.on('map:saved', handleSaved);
-    mapSystem.on('map:save:error', handleSaveError);
-    mapSystem.on('map:changed', handleMapChanged);
-
-    // Cleanup
-    return () => {
-      mapSystem.off('map:saving', handleSaving);
-      mapSystem.off('map:saved', handleSaved);
-      mapSystem.off('map:save:error', handleSaveError);
-      mapSystem.off('map:changed', handleMapChanged);
-    };
-  }, [mapSystem, onSaveSuccess, onSaveError]);
+    }
+    if (error) {
+      onSaveError?.(error);
+    }
+  }, [isLoading, isDirty, lastSaved, error, autoSaveEnabled, onSaveSuccess, onSaveError]);
 
   // Manual save handler
   const handleManualSave = async () => {
@@ -96,7 +80,7 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
 
     try {
       setIsManualSaving(true);
-      await mapSystem.saveMapData(undefined, true); // Force save
+      await saveMap(); // Use Zustand store save
     } catch (error) {
       console.error('Manual save failed:', error);
     } finally {
@@ -106,9 +90,9 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
 
   // Auto-save toggle handler
   const handleAutoSaveToggle = () => {
-    const newEnabled = !saveState.autoSaveEnabled;
-    mapSystem.configureAutoSave(newEnabled);
-    updateSaveState();
+    const newEnabled = !autoSaveEnabled;
+    setAutoSaveEnabled(newEnabled);
+    console.log(`Auto-save ${newEnabled ? 'enabled' : 'disabled'}`);
   };
 
   // Get status display info
@@ -175,7 +159,7 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
       <Space direction="horizontal" style={{ width: '100%' }}>
         <Space>
           <Switch
-            checked={saveState.autoSaveEnabled}
+            checked={autoSaveEnabled}
             onChange={handleAutoSaveToggle}
             size="small"
           />
@@ -191,14 +175,10 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
   );
 
   return (
-    <Card
+    <Space
       size="small"
       className={className}
-      style={{
-        minWidth: 200,
-        backgroundColor: 'var(--color-bg-secondary)',
-        borderColor: 'var(--color-border-light)'
-      }}
+     
     >
       <Space direction="horizontal" size="small" style={{ width: '100%' }}>
         {/* Main Status Display */}
@@ -274,12 +254,12 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
             <Typography.Text type="secondary" style={{ fontSize: '11px' }}>
               Last saved: {saveState.lastSaveTime.toLocaleString()}
             </Typography.Text>
-            {saveState.autoSaveEnabled && (
+            {autoSaveEnabled && (
               <Badge status="success" text="Auto-save enabled" style={{ fontSize: '11px' }} />
             )}
           </Space>
         )}
       </Space>
-    </Card>
+    </Space>
   );
 };
