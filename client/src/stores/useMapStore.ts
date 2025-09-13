@@ -114,7 +114,10 @@ export const useMapStore = create<MapStore>()(
           state.isInitializing = false; // Mark initialization as complete
         });
 
-        console.log('✅ MAP DATA LOADED SUCCESSFULLY');
+        // Map data loaded successfully (development only)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ MAP DATA LOADED SUCCESSFULLY');
+        }
 
       } catch (error) {
         console.error('❌ FAILED TO LOAD MAP:', error);

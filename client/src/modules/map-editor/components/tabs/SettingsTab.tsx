@@ -5,7 +5,6 @@ import {
   Space,
   Switch,
   Slider,
-  Input,
   Form,
   InputNumber,
   Select,
@@ -15,10 +14,12 @@ import {
   Tooltip,
   message,
   Upload,
-  Modal
+  Modal,
+  Radio
 } from 'antd';
 import { UploadOutlined, InfoCircleOutlined, ExpandOutlined } from '@ant-design/icons';
 import { GridConfig } from '../../types/editor.types';
+import { GRID_PATTERNS } from '../../constants/editorConstants';
 import { MapDataManager } from '../../../../components/MapDataManager';
 import { useMapData } from '../../../../shared/MapDataContext';
 import { useSharedMap } from '../../../../shared/useSharedMap';
@@ -179,7 +180,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         return false;
       }
 
-      const img = new Image();
+      const img = new window.Image();
       img.onload = async () => {
         console.log('🖼️ IMAGE LOADED:', {
           width: img.width,
@@ -499,20 +500,26 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             />
           </Form.Item>
 
-          <Form.Item label={`Grid Spacing: ${gridConfig.spacing}px`}>
-            <Slider
-              min={10}
-              max={100}
+          <Form.Item label="Grid Size">
+            <Select
               value={gridConfig.spacing}
-              onChange={(value) => onGridConfigChange({ spacing: value })}
-              marks={{
-                10: '10px',
-                25: '25px',
-                50: '50px',
-                75: '75px',
-                100: '100px'
+              onChange={(value) => {
+                const pattern = GRID_PATTERNS.find(p => p.size === value);
+                if (pattern) {
+                  onGridConfigChange({
+                    spacing: value,
+                    pattern: pattern.id as GridConfig['pattern']
+                  });
+                }
               }}
-            />
+              style={{ width: '100%' }}
+            >
+              {GRID_PATTERNS.map((pattern) => (
+                <Select.Option key={pattern.id} value={pattern.size}>
+                  {pattern.name}
+                </Select.Option>
+              ))}
+            </Select>
           </Form.Item>
 
           <Form.Item label={`Grid Opacity: ${gridConfig.opacity}%`}>
@@ -531,13 +538,34 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             />
           </Form.Item>
 
-          <Form.Item label="Grid Color">
-            <Input
-              type="color"
-              value={gridConfig.color}
-              onChange={(e) => onGridConfigChange({ color: e.target.value })}
-              style={{ width: '100px' }}
-            />
+          <Form.Item label="Grid Pattern">
+            <Radio.Group
+              value={gridConfig.pattern}
+              onChange={(e) => onGridConfigChange({ pattern: e.target.value })}
+              style={{ width: '100%' }}
+            >
+              <Space direction="vertical" style={{ width: '100%' }}>
+                {GRID_PATTERNS.map((pattern) => (
+                  <Radio key={pattern.id} value={pattern.id} style={{ width: '100%' }}>
+                    <Space align="center">
+                      <div
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          border: '1px solid #d9d9d9',
+                          borderRadius: '4px',
+                          backgroundImage: `url(${pattern.thumbnail})`,
+                          backgroundSize: 'cover',
+                          backgroundRepeat: 'repeat',
+                          imageRendering: 'pixelated'
+                        }}
+                      />
+                      <span>{pattern.name}</span>
+                    </Space>
+                  </Radio>
+                ))}
+              </Space>
+            </Radio.Group>
           </Form.Item>
         </Form>
       </Card>

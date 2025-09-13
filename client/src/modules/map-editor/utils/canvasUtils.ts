@@ -35,7 +35,7 @@ export const addGridToCanvas = (
   // Create vertical lines
   for (let x = 0; x <= width; x += spacing) {
     const line = new fabric.Line([x, 0, x, height], {
-      stroke: gridConfig.color,
+      stroke: '#4a5568', // Default grid color
       strokeWidth: 1,
       opacity: gridConfig.opacity / 100,
       selectable: false,
@@ -47,7 +47,7 @@ export const addGridToCanvas = (
   // Create horizontal lines
   for (let y = 0; y <= height; y += spacing) {
     const line = new fabric.Line([0, y, width, y], {
-      stroke: gridConfig.color,
+      stroke: '#4a5568', // Default grid color
       strokeWidth: 1,
       opacity: gridConfig.opacity / 100,
       selectable: false,

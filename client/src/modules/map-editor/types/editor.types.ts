@@ -5,9 +5,17 @@ export interface MapEditorModuleProps {
 export interface GridConfig {
   spacing: number;
   opacity: number;
-  color: string;
+  pattern: 'pattern-8px' | 'pattern-16px' | 'pattern-32px' | 'pattern-64px' | 'pattern-128px';
   visible: boolean;
   snapToGrid: boolean;
+}
+
+export interface GridPattern {
+  id: string;
+  name: string;
+  size: number;
+  imagePath: string;
+  thumbnail: string;
 }
 
 export interface EditorState {

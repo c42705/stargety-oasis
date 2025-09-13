@@ -7,7 +7,7 @@ import {
   Shield,
   TreePine
 } from 'lucide-react';
-import { EditorTab, GridConfig, EditorState } from '../types/editor.types';
+import { EditorTab, GridConfig, EditorState, GridPattern } from '../types/editor.types';
 
 export const EDITOR_TABS: EditorTab[] = [
   { id: 'areas', label: 'Interactive Areas', icon: React.createElement(Grid, { size: 16 }) },
@@ -18,10 +18,48 @@ export const EDITOR_TABS: EditorTab[] = [
   { id: 'settings', label: 'Settings', icon: React.createElement(Settings, { size: 16 }) }
 ];
 
+export const GRID_PATTERNS: GridPattern[] = [
+  {
+    id: 'pattern-8px',
+    name: '8px Grid',
+    size: 8,
+    imagePath: '/assets/grid-patterns/grid-pattern-8px.svg',
+    thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOCIgaGVpZ2h0PSI4IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0gOCAwIEwgMCAwIDAgOCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNGE1NTY4IiBzdHJva2Utd2lkdGg9IjEiIG9wYWNpdHk9IjAuMyIvPjwvc3ZnPg=='
+  },
+  {
+    id: 'pattern-16px',
+    name: '16px Grid',
+    size: 16,
+    imagePath: '/assets/grid-patterns/grid-pattern-16px.svg',
+    thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTSAxNiAwIEwgMCAwIDAgMTYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzRhNTU2OCIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjMiLz48L3N2Zz4='
+  },
+  {
+    id: 'pattern-32px',
+    name: '32px Grid',
+    size: 32,
+    imagePath: '/assets/grid-patterns/grid-pattern-32px.svg',
+    thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTSAzMiAwIEwgMCAwIDAgMzIiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzRhNTU2OCIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjMiLz48L3N2Zz4='
+  },
+  {
+    id: 'pattern-64px',
+    name: '64px Grid',
+    size: 64,
+    imagePath: '/assets/grid-patterns/grid-pattern-64px.svg',
+    thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTSA2NCAwIEwgMCAwIDAgNjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzRhNTU2OCIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjMiLz48L3N2Zz4='
+  },
+  {
+    id: 'pattern-128px',
+    name: '128px Grid',
+    size: 128,
+    imagePath: '/assets/grid-patterns/grid-pattern-128px.svg',
+    thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNIDEyOCAwIEwgMCAwIDAgMTI4IiBmaWxsPSJub25lIiBzdHJva2U9IiM0YTU1NjgiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC4zIi8+PC9zdmc+'
+  }
+];
+
 export const DEFAULT_GRID_CONFIG: GridConfig = {
-  spacing: 20,
-  opacity: 25,
-  color: '#4a5568',
+  spacing: 32,
+  opacity: 30,
+  pattern: 'pattern-32px',
   visible: true,
   snapToGrid: false
 };

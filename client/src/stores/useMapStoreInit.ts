@@ -32,16 +32,22 @@ export const useMapStoreInit = (options: UseMapStoreInitOptions = {}) => {
 
     const initializeStore = async () => {
       try {
-        console.log(`🚀 INITIALIZING MAP STORE FOR: ${source}`);
+        // Initialize map store (development logging only)
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`🚀 INITIALIZING MAP STORE FOR: ${source}`);
+        }
         await loadMap();
-        console.log(`✅ MAP STORE INITIALIZED FOR: ${source}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`✅ MAP STORE INITIALIZED FOR: ${source}`);
+        }
       } catch (error) {
         console.error(`❌ FAILED TO INITIALIZE MAP STORE FOR: ${source}`, error);
       }
     };
 
     initializeStore();
-  }, [autoLoad, source, loadMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLoad, source]); // Removed loadMap from dependencies to prevent re-initialization
 
   return {
     mapData,

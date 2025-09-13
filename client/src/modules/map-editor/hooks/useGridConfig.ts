@@ -17,8 +17,8 @@ export const useGridConfig = () => {
     setGridConfig(prev => ({ ...prev, opacity }));
   }, []);
 
-  const updateGridColor = useCallback((color: string) => {
-    setGridConfig(prev => ({ ...prev, color }));
+  const updateGridPattern = useCallback((pattern: GridConfig['pattern']) => {
+    setGridConfig(prev => ({ ...prev, pattern }));
   }, []);
 
   const updateSnapToGrid = useCallback((snapToGrid: boolean) => {
@@ -31,7 +31,7 @@ export const useGridConfig = () => {
     toggleGrid,
     updateGridSpacing,
     updateGridOpacity,
-    updateGridColor,
+    updateGridPattern,
     updateSnapToGrid
   };
 };

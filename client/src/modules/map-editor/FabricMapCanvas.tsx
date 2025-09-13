@@ -22,6 +22,7 @@ import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 import { MapEditorCameraControls } from './hooks/useMapEditorCamera';
 import { usePanControls, PanMethod } from './hooks/usePanControls';
 import { BackgroundInfoPanel } from './components/BackgroundInfoPanel';
+import { GRID_PATTERNS } from './constants/editorConstants';
 import './FabricMapCanvas.css';
 
 interface FabricMapCanvasProps {
@@ -29,7 +30,7 @@ interface FabricMapCanvasProps {
   height: number;
   gridVisible: boolean;
   gridSpacing: number;
-  gridColor: string;
+  gridPattern: string;
   gridOpacity: number;
   onSelectionChanged?: (selectedObjects: fabric.Object[]) => void;
   onObjectModified?: (object: fabric.Object) => void;
@@ -70,7 +71,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   height,
   gridVisible,
   gridSpacing,
-  gridColor,
+  gridPattern,
   gridOpacity,
   onSelectionChanged,
   onObjectModified,
@@ -917,20 +918,23 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       }
     }
 
-    const gridLines = allObjects.filter(obj => (obj as any).isGridLine);
+    const gridObjects = allObjects.filter(obj =>
+      (obj as any).isGridLine || (obj as any).isGridPattern
+    );
     const interactiveElements = allObjects.filter(obj =>
       !((obj as any).isBackgroundImage) &&
       !((obj as any).isGridLine) &&
+      !((obj as any).isGridPattern) &&
       (obj as any).backgroundImageId !== 'map-background-image'
     );
 
     // Only reorder if we have objects to reorder
-    if (backgroundImages.length > 0 || gridLines.length > 0 || interactiveElements.length > 0) {
+    if (backgroundImages.length > 0 || gridObjects.length > 0 || interactiveElements.length > 0) {
       // Send background images to the very back
       backgroundImages.forEach(obj => canvas.sendObjectToBack(obj));
 
-      // Bring grid lines above background but below interactive elements
-      gridLines.forEach(obj => canvas.bringObjectForward(obj));
+      // Bring grid objects above background but below interactive elements
+      gridObjects.forEach(obj => canvas.bringObjectForward(obj));
 
       // Bring interactive elements to the front
       interactiveElements.forEach(obj => canvas.bringObjectToFront(obj));
@@ -938,7 +942,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
     console.log('🔄 LAYER ORDER UPDATED:', {
       backgroundImages: backgroundImages.length,
-      gridLines: gridLines.length,
+      gridObjects: gridObjects.length,
       interactiveElements: interactiveElements.length,
       totalObjects: allObjects.length,
       skippedBackgroundCheck: skipBackgroundCheck
@@ -954,7 +958,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
           type: obj.type,
           isBackground: (obj as any).isBackgroundImage,
           backgroundId: (obj as any).backgroundImageId,
-          isGrid: (obj as any).isGridLine,
+          isGrid: (obj as any).isGridLine || (obj as any).isGridPattern,
           position: { left: obj.left, top: obj.top },
           size: { width: obj.width, height: obj.height }
         }))
@@ -1017,57 +1021,112 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [drawingMode, sharedMap]);
 
-  // Render grid
+  // Render grid using direct SVG file approach
   const renderGrid = useCallback(() => {
-    if (!fabricCanvasRef.current || !gridVisible) return;
+    if (!fabricCanvasRef.current) return;
 
     const canvas = fabricCanvasRef.current;
-    
-    // Remove existing grid lines
-    const gridObjects = canvas.getObjects().filter(obj => (obj as any).isGridLine);
+
+    // Remove existing grid objects
+    const gridObjects = canvas.getObjects().filter(obj => (obj as any).isGridPattern);
     gridObjects.forEach(obj => canvas.remove(obj));
 
-    if (gridSpacing <= 0) return;
+    // If grid is not visible or spacing is invalid, just remove and return
+    if (!gridVisible || gridSpacing <= 0) {
+      canvas.renderAll();
+      return;
+    }
 
-    // Create vertical lines
-    for (let x = 0; x <= width; x += gridSpacing) {
-      const line = new fabric.Line([x, 0, x, height], {
-        stroke: gridColor,
-        strokeWidth: 1,
+    // Find the pattern configuration
+    const pattern = GRID_PATTERNS.find(p => p.id === gridPattern);
+    if (!pattern) {
+      console.warn('Grid pattern not found:', gridPattern);
+      return;
+    }
+
+    // Grid rendering debug info (only in development)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔲 RENDERING GRID:', {
+        gridVisible,
+        gridSpacing,
+        gridPattern,
+        gridOpacity
+      });
+    }
+
+    // Load the SVG file directly and create a tiled pattern
+    fabric.FabricImage.fromURL(pattern.imagePath, {
+      crossOrigin: 'anonymous'
+    }).then((img) => {
+      if (!img || !fabricCanvasRef.current) return;
+
+      // Scale the image to match the desired grid spacing
+      const scale = gridSpacing / pattern.size;
+      img.scale(scale);
+
+      // Create a pattern from the scaled image
+      const patternSourceCanvas = new fabric.StaticCanvas();
+      patternSourceCanvas.setDimensions({ width: gridSpacing, height: gridSpacing });
+      patternSourceCanvas.add(img);
+
+      const fabricPattern = new fabric.Pattern({
+        source: patternSourceCanvas.getElement(),
+        repeat: 'repeat'
+      });
+
+      // Create a rectangle covering the entire canvas with the pattern
+      const gridRect = new fabric.Rect({
+        left: 0,
+        top: 0,
+        width: width,
+        height: height,
+        fill: fabricPattern,
         opacity: gridOpacity / 100,
         selectable: false,
         evented: false,
         excludeFromExport: true
       });
-      (line as any).isGridLine = true;
-      canvas.add(line);
-    }
 
-    // Create horizontal lines
-    for (let y = 0; y <= height; y += gridSpacing) {
-      const line = new fabric.Line([0, y, width, y], {
-        stroke: gridColor,
-        strokeWidth: 1,
-        opacity: gridOpacity / 100,
-        selectable: false,
-        evented: false,
-        excludeFromExport: true
-      });
-      (line as any).isGridLine = true;
-      canvas.add(line);
-    }
+      (gridRect as any).isGridPattern = true;
+      (gridRect as any).mapElementType = 'grid';
 
-    // Note: Layer order will be coordinated after all elements are loaded
-    canvas.renderAll();
-  }, [width, height, gridVisible, gridSpacing, gridColor, gridOpacity, updateLayerOrder]);
+      // Add grid and ensure proper layer order
+      fabricCanvasRef.current.add(gridRect);
+
+      // Force layer order update to position grid correctly
+      setTimeout(() => {
+        if (fabricCanvasRef.current) {
+          updateLayerOrder();
+        }
+      }, 10);
+
+      console.log('✅ GRID RENDERED SUCCESSFULLY');
+    }).catch((error) => {
+      console.error('❌ FAILED TO LOAD GRID PATTERN:', error);
+    });
+  }, [width, height, gridVisible, gridSpacing, gridPattern, gridOpacity, updateLayerOrder]);
 
   // Update grid when properties change - wait for background to be ready
   useEffect(() => {
     if (isInitialized && isBackgroundReady) {
-      console.log('🔲 RENDERING GRID AFTER BACKGROUND READY');
+      // Grid rendering after background ready (development only)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔲 RENDERING GRID AFTER BACKGROUND READY');
+      }
       renderGrid();
     }
   }, [isInitialized, isBackgroundReady, renderGrid]);
+
+  // Re-render grid immediately when grid settings change (for real-time updates)
+  useEffect(() => {
+    if (isInitialized && fabricCanvasRef.current) {
+      // Grid settings changed (development only)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔲 GRID SETTINGS CHANGED - RE-RENDERING');
+      }
+      renderGrid();
+    }
+  }, [gridVisible, gridSpacing, gridPattern, gridOpacity, renderGrid, isInitialized]);
 
   // Render interactive areas
   const renderInteractiveAreas = useCallback(() => {

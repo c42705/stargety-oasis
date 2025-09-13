@@ -1,16 +1,18 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { Tree, Card, Typography, Space, Button, Tooltip, Badge, Avatar } from 'antd';
-import { 
-  EyeOutlined, 
+import { Tree, Card, Typography, Space, Button, Tooltip, Badge } from 'antd';
+import {
+  EyeOutlined,
   EyeInvisibleOutlined,
-  ExpandOutlined,
-  CompressOutlined
+  LockOutlined,
+  UnlockOutlined,
+  EditOutlined,
+  DeleteOutlined
 } from '@ant-design/icons';
-import { 
-  Image, 
-  Grid as GridIcon, 
-  Square, 
-  Shield, 
+import {
+  Image,
+  Grid as GridIcon,
+  Square,
+  Shield,
   TreePine,
   Layers as LayersIcon
 } from 'lucide-react';
@@ -23,6 +25,7 @@ interface LayerObject {
   name: string;
   type: 'background' | 'grid' | 'interactive' | 'collision' | 'terrain';
   visible: boolean;
+  locked: boolean;
   position?: { x: number; y: number };
   size?: { width: number; height: number };
   fabricObject?: fabric.Object;
@@ -34,6 +37,7 @@ interface LayerGroup {
   icon: React.ReactNode;
   objects: LayerObject[];
   visible: boolean;
+  locked: boolean;
 }
 
 interface LayersTabProps {
@@ -41,13 +45,19 @@ interface LayersTabProps {
   onObjectSelect?: (object: fabric.Object) => void;
   onToolChange?: (tool: 'resize') => void;
   onZoomToObject?: (object: fabric.Object) => void;
+  onEditInteractiveArea?: (areaId: string) => void;
+  onEditCollisionArea?: (areaId: string) => void;
+  onDeleteObject?: (object: fabric.Object) => void;
 }
 
 export const LayersTab: React.FC<LayersTabProps> = ({
   fabricCanvas,
   onObjectSelect,
   onToolChange,
-  onZoomToObject
+  onZoomToObject,
+  onEditInteractiveArea,
+  onEditCollisionArea,
+  onDeleteObject
 }) => {
   const [expandedKeys, setExpandedKeys] = useState<string[]>(['background', 'interactive', 'collision']);
 
@@ -78,17 +88,19 @@ export const LayersTab: React.FC<LayersTabProps> = ({
           name: 'Background Image',
           type: 'background',
           visible: obj.visible !== false,
+          locked: objAny.locked || false,
           position: { x: obj.left || 0, y: obj.top || 0 },
           size: { width: obj.width || 0, height: obj.height || 0 },
           fabricObject: obj
         };
         backgroundObjects.push(layerObj);
-      } else if (objAny.isGridLine) {
+      } else if (objAny.isGridLine || objAny.isGridPattern) {
         layerObj = {
           id: `grid-${index}`,
-          name: `Grid Line ${gridObjects.length + 1}`,
+          name: objAny.isGridPattern ? 'Grid Pattern' : `Grid Line ${gridObjects.length + 1}`,
           type: 'grid',
           visible: obj.visible !== false,
+          locked: objAny.locked || false,
           fabricObject: obj
         };
         gridObjects.push(layerObj);
@@ -99,7 +111,7 @@ export const LayersTab: React.FC<LayersTabProps> = ({
           name: areaData?.name || `Interactive Area ${interactiveObjects.length + 1}`,
           type: 'interactive',
           visible: obj.visible !== false,
-          position: { x: obj.left || 0, y: obj.top || 0 },
+          locked: objAny.locked || false,
           size: { width: obj.width || 0, height: obj.height || 0 },
           fabricObject: obj
         };
@@ -111,7 +123,7 @@ export const LayersTab: React.FC<LayersTabProps> = ({
           name: areaData?.name || `Collision Area ${collisionObjects.length + 1}`,
           type: 'collision',
           visible: obj.visible !== false,
-          position: { x: obj.left || 0, y: obj.top || 0 },
+          locked: objAny.locked || false,
           size: { width: obj.width || 0, height: obj.height || 0 },
           fabricObject: obj
         };
@@ -123,7 +135,7 @@ export const LayersTab: React.FC<LayersTabProps> = ({
           name: `Terrain Object ${terrainObjects.length + 1}`,
           type: 'terrain',
           visible: obj.visible !== false,
-          position: { x: obj.left || 0, y: obj.top || 0 },
+          locked: objAny.locked || false,
           size: { width: obj.width || 0, height: obj.height || 0 },
           fabricObject: obj
         };
@@ -137,35 +149,40 @@ export const LayersTab: React.FC<LayersTabProps> = ({
         title: 'Background',
         icon: <Image size={16} />,
         objects: backgroundObjects,
-        visible: backgroundObjects.some(obj => obj.visible)
+        visible: backgroundObjects.some(obj => obj.visible),
+        locked: backgroundObjects.every(obj => obj.locked)
       },
       {
         key: 'interactive',
         title: 'Interactive Areas',
         icon: <GridIcon size={16} />,
         objects: interactiveObjects,
-        visible: interactiveObjects.some(obj => obj.visible)
+        visible: interactiveObjects.some(obj => obj.visible),
+        locked: interactiveObjects.every(obj => obj.locked)
       },
       {
         key: 'collision',
         title: 'Collision Areas',
         icon: <Shield size={16} />,
         objects: collisionObjects,
-        visible: collisionObjects.some(obj => obj.visible)
+        visible: collisionObjects.some(obj => obj.visible),
+        locked: collisionObjects.every(obj => obj.locked)
       },
       {
         key: 'terrain',
         title: 'Terrain',
         icon: <TreePine size={16} />,
         objects: terrainObjects,
-        visible: terrainObjects.some(obj => obj.visible)
+        visible: terrainObjects.some(obj => obj.visible),
+        locked: terrainObjects.every(obj => obj.locked)
       },
       {
         key: 'grid',
         title: 'Grid',
         icon: <Square size={16} />,
         objects: gridObjects,
-        visible: gridObjects.some(obj => obj.visible)
+        visible: gridObjects.some(obj => obj.visible),
+        locked: gridObjects.every(obj => obj.locked)
       }
     ].filter(group => group.objects.length > 0); // Only show groups with objects
   }, [fabricCanvas]);
@@ -207,12 +224,62 @@ export const LayersTab: React.FC<LayersTabProps> = ({
   // Toggle object visibility
   const handleObjectVisibilityToggle = useCallback((layerObject: LayerObject, e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     if (!layerObject.fabricObject || !fabricCanvas) return;
 
     layerObject.fabricObject.visible = !layerObject.visible;
     fabricCanvas.renderAll();
   }, [fabricCanvas]);
+
+  // Toggle layer lock state
+  const handleLayerLockToggle = useCallback((layerGroup: LayerGroup) => {
+    if (!fabricCanvas) return;
+
+    const newLockState = !layerGroup.locked;
+    layerGroup.objects.forEach(obj => {
+      if (obj.fabricObject) {
+        (obj.fabricObject as any).locked = newLockState;
+        obj.fabricObject.selectable = !newLockState;
+        obj.fabricObject.evented = !newLockState;
+      }
+    });
+
+    fabricCanvas.renderAll();
+  }, [fabricCanvas]);
+
+  // Toggle object lock state
+  const handleObjectLockToggle = useCallback((layerObject: LayerObject, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (!layerObject.fabricObject || !fabricCanvas) return;
+
+    const newLockState = !layerObject.locked;
+    (layerObject.fabricObject as any).locked = newLockState;
+    layerObject.fabricObject.selectable = !newLockState;
+    layerObject.fabricObject.evented = !newLockState;
+
+    fabricCanvas.renderAll();
+  }, [fabricCanvas]);
+
+  // Handle edit object
+  const handleEditObject = useCallback((layerObject: LayerObject, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (layerObject.type === 'interactive' && onEditInteractiveArea) {
+      onEditInteractiveArea(layerObject.id);
+    } else if (layerObject.type === 'collision' && onEditCollisionArea) {
+      onEditCollisionArea(layerObject.id);
+    }
+  }, [onEditInteractiveArea, onEditCollisionArea]);
+
+  // Handle delete object
+  const handleDeleteObject = useCallback((layerObject: LayerObject, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (!layerObject.fabricObject || !onDeleteObject) return;
+
+    onDeleteObject(layerObject.fabricObject);
+  }, [onDeleteObject]);
 
   // Create tree data structure
   const treeData = useMemo(() => {
@@ -226,18 +293,32 @@ export const LayersTab: React.FC<LayersTabProps> = ({
             </Text>
             <Badge count={group.objects.length} size="small" />
           </Space>
-          <Tooltip title={group.visible ? 'Hide Layer' : 'Show Layer'}>
-            <Button
-              type="text"
-              size="small"
-              icon={group.visible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleLayerVisibilityToggle(group);
-              }}
-              style={{ padding: '2px 4px' }}
-            />
-          </Tooltip>
+          <Space size={0}>
+            <Tooltip title={group.locked ? 'Unlock Layer' : 'Lock Layer'}>
+              <Button
+                type="text"
+                size="small"
+                icon={group.locked ? <LockOutlined /> : <UnlockOutlined />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLayerLockToggle(group);
+                }}
+                style={{ padding: '2px 4px' }}
+              />
+            </Tooltip>
+            <Tooltip title={group.visible ? 'Hide Layer' : 'Show Layer'}>
+              <Button
+                type="text"
+                size="small"
+                icon={group.visible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLayerVisibilityToggle(group);
+                }}
+                style={{ padding: '2px 4px' }}
+              />
+            </Tooltip>
+          </Space>
         </Space>
       ),
       key: group.key,
@@ -245,35 +326,78 @@ export const LayersTab: React.FC<LayersTabProps> = ({
         title: (
           <Space size="small" style={{ width: '100%', justifyContent: 'space-between' }}>
             <Space size="small" style={{ flex: 1, minWidth: 0 }}>
-              <Text 
-                style={{ fontSize: '12px' }} 
+              <Text
+                style={{ fontSize: '12px', cursor: 'pointer' }}
                 ellipsis={{ tooltip: obj.name }}
                 onClick={() => handleObjectSelect(obj)}
               >
                 {obj.name}
               </Text>
-              {obj.position && obj.size && (
+              {obj.size && (
                 <Text type="secondary" style={{ fontSize: '10px' }}>
-                  ({Math.round(obj.position.x)}, {Math.round(obj.position.y)}) • {Math.round(obj.size.width)}×{Math.round(obj.size.height)}
+                  {Math.round(obj.size.width)}×{Math.round(obj.size.height)}
                 </Text>
               )}
             </Space>
-            <Tooltip title={obj.visible ? 'Hide Object' : 'Show Object'}>
-              <Button
-                type="text"
-                size="small"
-                icon={obj.visible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
-                onClick={(e) => handleObjectVisibilityToggle(obj, e)}
-                style={{ padding: '2px 4px' }}
-              />
-            </Tooltip>
+            <Space size={0}>
+              <Tooltip title={obj.locked ? 'Unlock Object' : 'Lock Object'}>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={obj.locked ? <LockOutlined /> : <UnlockOutlined />}
+                  onClick={(e) => handleObjectLockToggle(obj, e)}
+                  style={{ padding: '2px 4px' }}
+                />
+              </Tooltip>
+              {(obj.type === 'interactive' || obj.type === 'collision') && (
+                <Tooltip title="Edit Object">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<EditOutlined />}
+                    onClick={(e) => handleEditObject(obj, e)}
+                    style={{ padding: '2px 4px' }}
+                  />
+                </Tooltip>
+              )}
+              <Tooltip title={obj.visible ? 'Hide Object' : 'Show Object'}>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={obj.visible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
+                  onClick={(e) => handleObjectVisibilityToggle(obj, e)}
+                  style={{ padding: '2px 4px' }}
+                />
+              </Tooltip>
+              {obj.type !== 'background' && obj.type !== 'grid' && (
+                <Tooltip title="Delete Object">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    onClick={(e) => handleDeleteObject(obj, e)}
+                    style={{ padding: '2px 4px', color: '#ff4d4f' }}
+                    danger
+                  />
+                </Tooltip>
+              )}
+            </Space>
           </Space>
         ),
         key: obj.id,
         isLeaf: true
       }))
     }));
-  }, [layerGroups, handleObjectSelect, handleLayerVisibilityToggle, handleObjectVisibilityToggle]);
+  }, [
+    layerGroups,
+    handleObjectSelect,
+    handleLayerVisibilityToggle,
+    handleObjectVisibilityToggle,
+    handleLayerLockToggle,
+    handleObjectLockToggle,
+    handleEditObject,
+    handleDeleteObject
+  ]);
 
   return (
     <Card
