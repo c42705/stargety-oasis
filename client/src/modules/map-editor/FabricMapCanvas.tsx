@@ -20,6 +20,8 @@ import { useSharedMapCompat as useSharedMap } from '../../stores/useSharedMapCom
 import { InteractiveArea, ImpassableArea } from '../../shared/MapDataContext';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 import { MapEditorCameraControls } from './hooks/useMapEditorCamera';
+import { usePanControls, PanMethod } from './hooks/usePanControls';
+import { BackgroundInfoPanel } from './components/BackgroundInfoPanel';
 import './FabricMapCanvas.css';
 
 interface FabricMapCanvasProps {
@@ -41,6 +43,9 @@ interface FabricMapCanvasProps {
   cameraControls?: MapEditorCameraControls;
   onCanvasReady?: (canvas: fabric.Canvas) => void;
   currentTool?: 'select' | 'move' | 'resize' | 'delete' | 'pan' | 'draw-collision' | 'erase-collision';
+  // Background info panel props
+  backgroundInfoPanelVisible?: boolean;
+  onBackgroundInfoPanelClose?: () => void;
 }
 
 interface CanvasObject extends fabric.Object {
@@ -78,7 +83,9 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   className = '',
   cameraControls,
   onCanvasReady,
-  currentTool = 'select'
+  currentTool = 'select',
+  backgroundInfoPanelVisible = false,
+  onBackgroundInfoPanelClose
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
@@ -93,9 +100,19 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [areasToDelete, setAreasToDelete] = useState<{ id: string; name: string }[]>([]);
   const [forceRender, setForceRender] = useState(0);
-  const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Background info panel state managed by parent component
+
+  // Initialize pan controls hook
+  const panControls = usePanControls({
+    cameraControls,
+    canvasElement: canvasRef.current,
+    currentTool,
+    onPanStateChange: (isPanning: boolean, method: PanMethod) => {
+      console.log('🎮 Pan state changed:', { isPanning, method });
+    }
+  });
 
   // Log initialization state changes for debugging
   useEffect(() => {
@@ -160,25 +177,25 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     }, 300); // 300ms debounce
   }, [sharedMap]);
 
-  // Handle real-time object movement (immediate visual feedback)
+  // Handle real-time object movement (immediate visual feedback only)
   const handleObjectMoving = useCallback((object: CanvasObject) => {
     // Snap to grid if enabled
     if (gridVisible && gridSpacing > 0) {
       snapToGrid(object, gridSpacing);
     }
 
-    // Trigger immediate update for real-time feedback (without persistence)
-    onObjectModified?.(object);
-  }, [gridVisible, gridSpacing, onObjectModified]);
+    // Note: onObjectModified is NOT called here to prevent excessive callbacks during drag
+    // The callback will be triggered only when the transformation is complete (object:modified event)
+  }, [gridVisible, gridSpacing]);
 
-  // Handle real-time object scaling (immediate visual feedback)
+  // Handle real-time object scaling (immediate visual feedback only)
   const handleObjectScaling = useCallback((object: CanvasObject) => {
-    // Maintain aspect ratio for certain objects if needed
-    maintainAspectRatio(object);
+    // Note: Aspect ratio maintenance can be implemented here if needed
+    // For now, we just provide visual feedback without triggering callbacks
 
-    // Trigger immediate update for real-time feedback (without persistence)
-    onObjectModified?.(object);
-  }, [onObjectModified]);
+    // Note: onObjectModified is NOT called here to prevent excessive callbacks during scaling
+    // The callback will be triggered only when the transformation is complete (object:modified event)
+  }, []);
 
   // Snap object to grid
   const snapToGrid = useCallback((object: fabric.Object, spacing: number) => {
@@ -195,7 +212,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
   // Drawing mode handlers
   const handleDrawingStart = useCallback((pointer: fabric.Point) => {
-    if (!fabricCanvasRef.current || !drawingMode) return;
+    if (!fabricCanvasRef.current || (!drawingMode && !collisionDrawingMode)) return;
 
     const canvas = fabricCanvasRef.current;
     setIsDrawing(true);
@@ -453,6 +470,8 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       setIsElementsReady(false);
       setIsInitialized(true);
 
+      console.log('🚀 FABRIC CANVAS INITIALIZED:', { width, height });
+
       // Notify parent component that canvas is ready
       if (onCanvasReady) {
         onCanvasReady(canvas);
@@ -470,14 +489,12 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
           canvas.moveCursor = 'crosshair';
         } else if (isPanTool) {
           canvas.selection = false; // Disable selection in pan mode
-          canvas.defaultCursor = 'grab';
-          canvas.hoverCursor = 'grab';
-          canvas.moveCursor = 'grab';
+          // Let pan controls manage cursor for pan tool
+          panControls.actions.updateCursor();
         } else {
           canvas.selection = true; // Enable selection for other tools
-          canvas.defaultCursor = 'default';
-          canvas.hoverCursor = 'move';
-          canvas.moveCursor = 'move';
+          // Let pan controls manage cursor (handles Space key states)
+          panControls.actions.updateCursor();
         }
       };
 
@@ -492,7 +509,18 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         setIsInitialized(false);
       };
     }
-  }, [width, height]);
+  }, []); // Remove width/height dependencies to prevent canvas recreation
+
+  // Handle canvas resizing without recreation
+  useEffect(() => {
+    const canvas = fabricCanvasRef.current;
+    if (canvas && isInitialized) {
+      // Resize canvas while preserving all objects and references
+
+      canvas.setDimensions({ width, height });
+      canvas.renderAll();
+    }
+  }, [width, height, isInitialized]);
 
   // Set up canvas event listeners
   const setupCanvasEventListeners = useCallback((canvas: fabric.Canvas) => {
@@ -536,25 +564,26 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       }
     });
 
-    // Pan functionality - both with camera controls and manual pan tool
-    let isPanningWithCamera = false;
-
+    // Enhanced pan functionality - supports Space+drag, middle mouse, and pan tool
     canvas.on('mouse:down', (e) => {
       const pointer = canvas.getPointer(e.e);
+      const mouseEvent = e.e as MouseEvent;
 
-      // Pan tool functionality
-      if (currentTool === 'pan') {
-        setIsPanning(true);
-        setPanStart({ x: pointer.x, y: pointer.y });
-        canvas.defaultCursor = 'grabbing';
-        canvas.hoverCursor = 'grabbing';
+      // Check if we should start panning with any of the supported methods
+      const panMethod = panControls.actions.shouldStartPan(mouseEvent);
+
+      if (panMethod !== 'none') {
+        panControls.startPan(panMethod, pointer.x, pointer.y);
+        // Prevent default behavior and stop event propagation for pan operations
         e.e?.preventDefault();
+        e.e?.stopPropagation();
+        // Disable canvas selection during pan to prevent object interactions
+        canvas.selection = false;
         return;
       }
 
-      // Camera controls pan (Ctrl/Cmd + click or no target)
-      if (cameraControls && (e.e.ctrlKey || e.e.metaKey || !e.target)) {
-        isPanningWithCamera = true;
+      // Legacy camera controls pan (Ctrl/Cmd + click) - keeping for compatibility
+      if (cameraControls && (mouseEvent.ctrlKey || mouseEvent.metaKey) && !e.target) {
         cameraControls.startPan(pointer.x, pointer.y);
         canvas.defaultCursor = 'grabbing';
       }
@@ -562,46 +591,32 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
     canvas.on('mouse:move', (e) => {
       const pointer = canvas.getPointer(e.e);
+      const mouseEvent = e.e as MouseEvent;
 
-      // Pan tool functionality
-      if (currentTool === 'pan' && isPanning && panStart) {
-        const deltaX = pointer.x - panStart.x;
-        const deltaY = pointer.y - panStart.y;
-
-        // Apply pan transformation to canvas viewport
-        const vpt = canvas.viewportTransform;
-        if (vpt) {
-          vpt[4] += deltaX;
-          vpt[5] += deltaY;
-          canvas.setViewportTransform(vpt);
-          canvas.renderAll();
-        }
-
-        setPanStart({ x: pointer.x, y: pointer.y });
+      // Enhanced pan functionality
+      if (panControls.state.isPanning && panControls.actions.shouldContinuePan(mouseEvent)) {
+        panControls.updatePan(pointer.x, pointer.y);
+        // Prevent default behavior and stop event propagation during pan
+        e.e?.preventDefault();
+        e.e?.stopPropagation();
         return;
-      }
-
-      // Camera controls pan
-      if (cameraControls && isPanningWithCamera) {
-        cameraControls.updatePan(pointer.x, pointer.y);
       }
     });
 
-    canvas.on('mouse:up', () => {
-      // Pan tool functionality
-      if (currentTool === 'pan' && isPanning) {
-        setIsPanning(false);
-        setPanStart(null);
-        canvas.defaultCursor = 'grab';
-        canvas.hoverCursor = 'grab';
-        return;
-      }
+    canvas.on('mouse:up', (e) => {
+      const mouseEvent = e.e as MouseEvent;
 
-      // Camera controls pan
-      if (cameraControls && isPanningWithCamera) {
-        isPanningWithCamera = false;
-        cameraControls.endPan();
-        canvas.defaultCursor = drawingMode ? 'crosshair' : 'default';
+      // Enhanced pan functionality
+      if (panControls.state.isPanning && panControls.actions.shouldEndPan(mouseEvent)) {
+        panControls.endPan();
+        // Re-enable canvas selection after pan ends
+        const isInDrawingMode = drawingMode || collisionDrawingMode;
+        const isPanTool = currentTool === 'pan';
+        canvas.selection = !isInDrawingMode && !isPanTool;
+        // Prevent default behavior and stop event propagation
+        e.e?.preventDefault();
+        e.e?.stopPropagation();
+        return;
       }
     });
 
@@ -623,7 +638,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [gridVisible, gridSpacing, onSelectionChanged, onObjectModified, drawingMode, isDrawing, startPoint, drawingRect, onAreaDrawn, drawingAreaData, cameraControls, currentTool, isPanning, panStart]);
+  }, [gridVisible, gridSpacing, onSelectionChanged, onObjectModified, drawingMode, isDrawing, startPoint, drawingRect, onAreaDrawn, drawingAreaData, cameraControls, currentTool, panControls]);
 
 
 
@@ -648,12 +663,9 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       if (isInDrawingMode) {
         canvas.defaultCursor = 'crosshair';
         canvas.hoverCursor = 'crosshair';
-      } else if (isPanTool) {
-        canvas.defaultCursor = 'grab';
-        canvas.hoverCursor = 'grab';
       } else {
-        canvas.defaultCursor = 'default';
-        canvas.hoverCursor = 'move';
+        // Let pan controls manage cursor for all non-drawing modes
+        panControls.actions.updateCursor();
       }
 
       // Disable object selection in drawing mode or pan mode
@@ -689,12 +701,17 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       canvasSize: { width: canvas.width, height: canvas.height }
     });
 
+    // Background info panel status is managed by parent component
+
     // Remove existing background image
     const existingBackground = canvas.getObjects().find(obj =>
-      (obj as any).isBackgroundImage === true
+      (obj as any).isBackgroundImage === true || (obj as any).backgroundImageId === 'map-background-image'
     );
     if (existingBackground) {
+      console.log('🗑️ REMOVING EXISTING BACKGROUND IMAGE BEFORE ADDING NEW ONE');
       canvas.remove(existingBackground);
+      // Clear the reference since we're replacing it
+      (canvas as any)._backgroundImageRef = null;
     }
 
     // Add new background image if available
@@ -743,9 +760,18 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         (img as any).selectable = false;
         (img as any).evented = false;
         (img as any).excludeFromExport = false;
+        (img as any).backgroundImageId = 'map-background-image';
+        (img as any).mapElementType = 'background';
 
         // Store background image reference BEFORE adding to canvas
         (canvas as any)._backgroundImageRef = img;
+
+        // Add event listener to maintain properties if they get lost
+        img.on('added', () => {
+          (img as any).isBackgroundImage = true;
+          (img as any).backgroundImageId = 'map-background-image';
+          (img as any).mapElementType = 'background';
+        });
 
         console.log('🖼️ BACKGROUND IMAGE CONFIGURED:', {
           position: { left: 0, top: 0 },
@@ -807,6 +833,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
               console.log('✅ BACKGROUND IMAGE FULLY INTEGRATED - MARKING READY');
               setIsBackgroundReady(true);
               updateLayerOrder(true); // Skip background check since we just added it
+              // Background info panel success handled by parent
             }, 50);
           } else {
             console.warn('⚠️ BACKGROUND IMAGE NOT FOUND DURING LAYER ORDER ENFORCEMENT');
@@ -815,13 +842,14 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
       }).catch((error: any) => {
         console.error('❌ FAILED TO LOAD BACKGROUND IMAGE:', error);
+        // Background info panel error handled by parent
       });
     } else {
       console.log('🖼️ NO BACKGROUND IMAGE, USING TRANSPARENT BACKGROUND');
       // Mark background as ready even when no image (transparent background)
       setIsBackgroundReady(true);
     }
-  }, [backgroundImageUrl]);
+  }, [backgroundImageUrl, sharedMap.mapData]);
 
   // Update layer order to ensure proper stacking: background → grid → interactive elements
   const updateLayerOrder = useCallback((skipBackgroundCheck = false) => {
@@ -830,51 +858,71 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
     // Get all objects with multiple detection methods
     const allObjects = canvas.getObjects();
-    let backgroundImages = allObjects.filter(obj => (obj as any).isBackgroundImage);
 
-    // Alternative detection: look for image objects that might be background
+    // Enhanced object detection with detailed logging for background issues
+    if (allObjects.length === 0 && !skipBackgroundCheck) {
+      console.warn('⚠️ NO OBJECTS FOUND ON CANVAS - POSSIBLE INITIALIZATION ISSUE');
+    }
+
+    // Enhanced background image detection with multiple fallback methods
+    let backgroundImages = allObjects.filter(obj =>
+      (obj as any).isBackgroundImage ||
+      (obj as any).backgroundImageId === 'map-background-image' ||
+      (obj.type === 'image' && obj.left === 0 && obj.top === 0)
+    );
+
+    // Primary fallback: use stored reference
     if (backgroundImages.length === 0 && (canvas as any)._backgroundImageRef) {
       const bgRef = (canvas as any)._backgroundImageRef;
-      // Find the background image by reference or by being an image at position (0,0)
+
+      // Check if reference exists in canvas objects
+      const refInCanvas = allObjects.find(obj => obj === bgRef);
+      if (refInCanvas) {
+        console.log('🔧 BACKGROUND IMAGE FOUND BY REFERENCE - RESTORING PROPERTIES');
+        (refInCanvas as any).isBackgroundImage = true;
+        (refInCanvas as any).selectable = false;
+        (refInCanvas as any).evented = false;
+        (refInCanvas as any).backgroundImageId = 'map-background-image';
+        backgroundImages.push(refInCanvas);
+      } else if (!skipBackgroundCheck) {
+        // Reference exists but not in canvas - re-add it
+        console.log('🔧 RESTORING COMPLETELY LOST BACKGROUND IMAGE FROM REFERENCE');
+        canvas.add(bgRef);
+        (bgRef as any).isBackgroundImage = true;
+        (bgRef as any).selectable = false;
+        (bgRef as any).evented = false;
+        (bgRef as any).backgroundImageId = 'map-background-image';
+        backgroundImages.push(bgRef);
+        canvas.sendObjectToBack(bgRef);
+      }
+    }
+
+    // Secondary fallback: look for image objects that could be background
+    if (backgroundImages.length === 0 && !skipBackgroundCheck) {
       const possibleBg = allObjects.find(obj =>
-        obj === bgRef ||
-        (obj.type === 'image' && obj.left === 0 && obj.top === 0)
+        obj.type === 'image' &&
+        (obj.left === 0 || Math.abs(obj.left || 0) < 10) &&
+        (obj.top === 0 || Math.abs(obj.top || 0) < 10)
       );
 
       if (possibleBg) {
-        console.log('🔧 FOUND BACKGROUND IMAGE WITHOUT PROPERTY - FIXING');
+        console.log('🔧 FOUND POTENTIAL BACKGROUND IMAGE BY POSITION - MARKING AS BACKGROUND');
         (possibleBg as any).isBackgroundImage = true;
         (possibleBg as any).selectable = false;
         (possibleBg as any).evented = false;
+        (possibleBg as any).backgroundImageId = 'map-background-image';
+        // Update the reference
+        (canvas as any)._backgroundImageRef = possibleBg;
         backgroundImages.push(possibleBg);
       }
     }
 
     const gridLines = allObjects.filter(obj => (obj as any).isGridLine);
     const interactiveElements = allObjects.filter(obj =>
-      !((obj as any).isBackgroundImage) && !((obj as any).isGridLine)
+      !((obj as any).isBackgroundImage) &&
+      !((obj as any).isGridLine) &&
+      (obj as any).backgroundImageId !== 'map-background-image'
     );
-
-    // Enhanced background image restoration logic (only if not skipping)
-    if (!skipBackgroundCheck && backgroundImages.length === 0 && (canvas as any)._backgroundImageRef) {
-      const bgRef = (canvas as any)._backgroundImageRef;
-
-      // Check if the background image reference exists in canvas but lost its property
-      if (allObjects.includes(bgRef)) {
-        console.log('🔧 BACKGROUND IMAGE FOUND BUT MISSING PROPERTY - RESTORING');
-        (bgRef as any).isBackgroundImage = true;
-        (bgRef as any).selectable = false;
-        (bgRef as any).evented = false;
-        backgroundImages.push(bgRef);
-      } else {
-        console.log('🔧 RESTORING COMPLETELY LOST BACKGROUND IMAGE');
-        canvas.add(bgRef);
-        (bgRef as any).isBackgroundImage = true;
-        (bgRef as any).selectable = false;
-        (bgRef as any).evented = false;
-        backgroundImages.push(bgRef);
-      }
-    }
 
     // Only reorder if we have objects to reorder
     if (backgroundImages.length > 0 || gridLines.length > 0 || interactiveElements.length > 0) {
@@ -896,16 +944,29 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       skippedBackgroundCheck: skipBackgroundCheck
     });
 
-    // Additional debugging for background image issues
-    if (!skipBackgroundCheck && backgroundImages.length === 0 && (canvas as any)._backgroundImageRef) {
+    // Enhanced debugging for background image issues
+    if (backgroundImages.length === 0 && (canvas as any)._backgroundImageRef) {
       console.warn('⚠️ BACKGROUND IMAGE REFERENCE EXISTS BUT NOT FOUND IN CANVAS:', {
         hasReference: !!(canvas as any)._backgroundImageRef,
         totalObjects: allObjects.length,
+        skipCheck: skipBackgroundCheck,
         objectTypes: allObjects.map(obj => ({
           type: obj.type,
           isBackground: (obj as any).isBackgroundImage,
+          backgroundId: (obj as any).backgroundImageId,
           isGrid: (obj as any).isGridLine,
-          position: { left: obj.left, top: obj.top }
+          position: { left: obj.left, top: obj.top },
+          size: { width: obj.width, height: obj.height }
+        }))
+      });
+    } else if (backgroundImages.length > 0) {
+      console.log('✅ BACKGROUND IMAGE SUCCESSFULLY MAINTAINED:', {
+        count: backgroundImages.length,
+        properties: backgroundImages.map(bg => ({
+          isBackground: (bg as any).isBackgroundImage,
+          backgroundId: (bg as any).backgroundImageId,
+          position: { left: bg.left, top: bg.top },
+          size: { width: bg.width, height: bg.height }
         }))
       });
     }
@@ -1331,6 +1392,16 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
           }
         </div>
       )}
+
+      {/* Background Information Panel */}
+      <BackgroundInfoPanel
+        isVisible={backgroundInfoPanelVisible}
+        onClose={onBackgroundInfoPanelClose || (() => {})}
+        canvasWidth={width}
+        canvasHeight={height}
+        backgroundLoadingStatus="loaded"
+        backgroundVisible={true}
+      />
     </div>
   );
 };

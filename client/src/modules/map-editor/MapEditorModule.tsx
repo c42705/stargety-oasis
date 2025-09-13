@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Map, Eye, Square, Shield } from 'lucide-react';
 import { useMapData } from '../../shared/MapDataContext';
 // import { useSharedMap } from '../../shared/useSharedMap';
 import { useSharedMapCompat as useSharedMap } from '../../stores/useSharedMapCompat';
 import { FabricMapCanvas } from './FabricMapCanvas';
+import * as fabric from 'fabric';
 import { AreaFormModal } from '../../components/AreaFormModal';
 import { CollisionAreaFormModal } from '../../components/CollisionAreaFormModal';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
@@ -14,6 +15,7 @@ import { EditorStatusBar } from './components/EditorStatusBar';
 import { AreasTab } from './components/tabs/AreasTab';
 import { TerrainTab } from './components/tabs/TerrainTab';
 import { AssetsTab } from './components/tabs/AssetsTab';
+import { LayersTab } from './components/tabs/LayersTab';
 import { CollisionTab } from './components/tabs/CollisionTab';
 import { SettingsTab } from './components/tabs/SettingsTab';
 
@@ -24,6 +26,7 @@ import { useModalState } from './hooks/useModalState';
 import { useDrawingMode } from './hooks/useDrawingMode';
 import { useCollisionModalState } from './hooks/useCollisionModalState';
 import { useCollisionDrawingMode } from './hooks/useCollisionDrawingMode';
+import { useBackgroundInfoIntegration } from './hooks/useBackgroundInfoPanel';
 
 // Import types and constants
 import { MapEditorModuleProps, TabId, GridConfig } from './types/editor.types';
@@ -54,6 +57,9 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   const [activeTab, setActiveTab] = useState<TabId>('areas');
   const [previewMode, setPreviewMode] = useState(false);
 
+  // Fabric canvas reference for layers tab
+  const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
+
   // Use shared map data
   const { interactiveAreas: areas, impassableAreas } = mapData;
 
@@ -64,6 +70,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   const drawingMode = useDrawingMode();
   const collisionModalState = useCollisionModalState();
   const collisionDrawingMode = useCollisionDrawingMode();
+  const backgroundInfoPanel = useBackgroundInfoIntegration();
 
   // Create handlers using extracted utilities
   const handleSaveArea = useCallback(
@@ -185,6 +192,53 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         return <TerrainTab />;
       case 'assets':
         return <AssetsTab />;
+      case 'layers':
+        return (
+          <LayersTab
+            fabricCanvas={fabricCanvasRef.current}
+            onObjectSelect={(object) => {
+              // Handle object selection
+              console.log('Object selected from layers:', object);
+            }}
+            onToolChange={editorState.onToolChange}
+            onZoomToObject={(object) => {
+              // Zoom to fit the selected object
+              if (fabricCanvasRef.current && object) {
+                const canvas = fabricCanvasRef.current;
+                const objectBounds = object.getBoundingRect();
+
+                // Calculate zoom to fit object with some padding
+                const padding = 100;
+                const containerWidth = canvas.getWidth();
+                const containerHeight = canvas.getHeight();
+
+                const zoomX = (containerWidth - padding * 2) / objectBounds.width;
+                const zoomY = (containerHeight - padding * 2) / objectBounds.height;
+                const fitZoom = Math.min(zoomX, zoomY, 2.0); // Max zoom 2x for object focus
+
+                // Center the object in viewport
+                const centerX = objectBounds.left + objectBounds.width / 2;
+                const centerY = objectBounds.top + objectBounds.height / 2;
+
+                const viewportCenterX = containerWidth / 2;
+                const viewportCenterY = containerHeight / 2;
+
+                canvas.setZoom(fitZoom);
+                canvas.absolutePan(new fabric.Point(
+                  viewportCenterX - centerX * fitZoom,
+                  viewportCenterY - centerY * fitZoom
+                ));
+                canvas.renderAll();
+
+                // Update editor state zoom
+                editorState.setEditorState(prev => ({
+                  ...prev,
+                  zoom: Math.round(fitZoom * 100)
+                }));
+              }
+            }}
+          />
+        );
       case 'collision':
         return (
           <CollisionTab
@@ -231,6 +285,8 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
           onUndo={editorState.onUndo}
           onRedo={editorState.onRedo}
           onTogglePreview={() => setPreviewMode(!previewMode)}
+          onToggleBackgroundInfo={backgroundInfoPanel.togglePanel}
+          backgroundInfoVisible={backgroundInfoPanel.isPanelVisible}
         />
       </header>
 
@@ -261,7 +317,12 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
             onAreaDrawn={handleAreaDrawn}
             onCollisionAreaDrawn={handleCollisionAreaDrawn}
             className="map-editor-canvas"
-            onCanvasReady={editorState.setFabricCanvas}
+            onCanvasReady={(canvas) => {
+              editorState.setFabricCanvas(canvas);
+              fabricCanvasRef.current = canvas;
+            }}
+            backgroundInfoPanelVisible={backgroundInfoPanel.isPanelVisible}
+            onBackgroundInfoPanelClose={backgroundInfoPanel.hidePanel}
           />
         </main>
 

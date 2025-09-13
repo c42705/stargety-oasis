@@ -94,9 +94,10 @@ export const useSharedMapCompat = (options: UseSharedMapOptions = {}): UseShared
 
   // Auto-save functionality
   const scheduleAutoSave = useCallback(() => {
-    // Check if auto-save is enabled in store (ignore options parameter)
-    if (!autoSaveEnabled || !isDirty) {
-      console.log(`⏸️  Auto-save skipped: enabled=${autoSaveEnabled}, dirty=${isDirty}`);
+    // Check if auto-save is enabled in store and not during initialization
+    const { isInitializing } = useMapStore.getState();
+    if (!autoSaveEnabled || !isDirty || isInitializing) {
+      console.log(`⏸️  Auto-save skipped: enabled=${autoSaveEnabled}, dirty=${isDirty}, initializing=${isInitializing}`);
       return;
     }
 
@@ -239,7 +240,8 @@ export const useSharedMapCompat = (options: UseSharedMapOptions = {}): UseShared
  * Hook specifically for the Map Editor with enhanced functionality
  */
 export const useMapEditorStore = () => {
-  const compatHook = useSharedMapCompat({ source: 'editor', autoSave: true });
+  // Auto-save is now controlled by the Zustand store configuration
+  const compatHook = useSharedMapCompat({ source: 'editor' });
   const { isDirty, markDirty, markClean } = useMapStore();
 
   return {

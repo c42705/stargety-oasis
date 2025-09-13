@@ -21,10 +21,19 @@ export const useEditorState = () => {
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
     // TODO: Update mouse position in world coordinates when camera controls are implemented
-    setEditorState(prev => ({
-      ...prev,
-      mousePosition: { x: e.clientX, y: e.clientY }
-    }));
+    const newX = e.clientX;
+    const newY = e.clientY;
+
+    setEditorState(prev => {
+      // Only update if position actually changed to prevent unnecessary re-renders
+      if (prev.mousePosition.x === newX && prev.mousePosition.y === newY) {
+        return prev;
+      }
+      return {
+        ...prev,
+        mousePosition: { x: newX, y: newY }
+      };
+    });
   }, []);
 
   const onUndo = useCallback(() => {

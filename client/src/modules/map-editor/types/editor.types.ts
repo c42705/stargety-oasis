@@ -22,7 +22,7 @@ export interface EditorState {
 
 export type EditorTool = EditorState['tool'];
 
-export type TabId = 'areas' | 'terrain' | 'assets' | 'settings' | 'collision';
+export type TabId = 'areas' | 'terrain' | 'assets' | 'layers' | 'collision' | 'settings';
 
 export interface EditorTab {
   id: TabId;

@@ -26,7 +26,8 @@ interface MapStore {
   isLoading: boolean;
   error: string | null;
   lastSaved: Date | null;
-  isDirty: boolean; // Has unsaved changes
+  isDirty: boolean;
+  isInitializing: boolean; // Has unsaved changes
 
   // Auto-save configuration
   autoSaveEnabled: boolean;
@@ -82,6 +83,7 @@ export const useMapStore = create<MapStore>()(
     error: null,
     lastSaved: null,
     isDirty: false,
+    isInitializing: true, // Flag to prevent auto-save during initialization
 
     // Auto-save configuration - DISABLED by default
     autoSaveEnabled: false,
@@ -109,6 +111,7 @@ export const useMapStore = create<MapStore>()(
           state.lastSaved = mapData?.lastModified || new Date();
           state.isDirty = false;
           state.isLoading = false;
+          state.isInitializing = false; // Mark initialization as complete
         });
 
         console.log('✅ MAP DATA LOADED SUCCESSFULLY');
@@ -410,6 +413,12 @@ export const useMapStore = create<MapStore>()(
     },
 
     markDirty: () => {
+      const { isInitializing } = get();
+      // Don't mark as dirty during initialization to prevent auto-save
+      if (isInitializing) {
+        console.log('🚫 Skipping markDirty during initialization');
+        return;
+      }
       set((state) => {
         state.isDirty = true;
       });

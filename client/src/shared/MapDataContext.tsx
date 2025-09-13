@@ -128,7 +128,8 @@ const defaultMapData: MapData = {
 
 export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Use the shared map system instead of local state
-  const sharedMap = useSharedMap({ source: 'editor', autoSave: true });
+  // Auto-save is now controlled by the Zustand store configuration
+  const sharedMap = useSharedMap({ source: 'editor' });
   const [mapData, setMapData] = useState<MapData>(defaultMapData);
 
   // Sync with shared map system

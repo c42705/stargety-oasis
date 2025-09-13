@@ -55,7 +55,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   onPreviewModeChange
 }) => {
   const { mapData, updateInteractiveAreas, updateImpassableAreas } = useMapData();
-  const sharedMap = useSharedMap({ source: 'editor', autoSave: true });
+  // Auto-save is now controlled by the Zustand store configuration
+  const sharedMap = useSharedMap({ source: 'editor' });
   const [customMapSize, setCustomMapSize] = useState({
     width: mapData.worldDimensions.width,
     height: mapData.worldDimensions.height

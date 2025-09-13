@@ -4,14 +4,16 @@ import {
   Layers,
   Palette,
   Settings,
-  Shield
+  Shield,
+  TreePine
 } from 'lucide-react';
 import { EditorTab, GridConfig, EditorState } from '../types/editor.types';
 
 export const EDITOR_TABS: EditorTab[] = [
   { id: 'areas', label: 'Interactive Areas', icon: React.createElement(Grid, { size: 16 }) },
-  { id: 'terrain', label: 'Terrain', icon: React.createElement(Layers, { size: 16 }) },
+  { id: 'terrain', label: 'Terrain', icon: React.createElement(TreePine, { size: 16 }) },
   { id: 'assets', label: 'Assets', icon: React.createElement(Palette, { size: 16 }) },
+  { id: 'layers', label: 'Layers', icon: React.createElement(Layers, { size: 16 }) },
   { id: 'collision', label: 'Collision', icon: React.createElement(Shield, { size: 16 }) },
   { id: 'settings', label: 'Settings', icon: React.createElement(Settings, { size: 16 }) }
 ];

@@ -15,7 +15,8 @@ import {
   Trash2,
   Eye,
   Hand,
-  RotateCcw
+  RotateCcw,
+  Info
 } from 'lucide-react';
 import { EditorState, GridConfig } from '../types/editor.types';
 import { SaveStatusIndicator } from '../../../components/SaveStatusIndicator';
@@ -35,6 +36,8 @@ interface EditorToolbarProps {
   onUndo: () => void;
   onRedo: () => void;
   onTogglePreview: () => void;
+  onToggleBackgroundInfo?: () => void;
+  backgroundInfoVisible?: boolean;
 }
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({
@@ -49,7 +52,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onToggleGrid,
   onUndo,
   onRedo,
-  onTogglePreview
+  onTogglePreview,
+  onToggleBackgroundInfo,
+  backgroundInfoVisible = false
 }) => {
   const toolOptions = [
     {
@@ -178,9 +183,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             className="compact"
             showManualSave={true}
             showAutoSaveToggle={true}
-            onSaveSuccess={() => {
-              console.log('Map saved successfully');
-            }}
             onSaveError={(error) => {
               console.error('Save error:', error);
             }}
@@ -192,6 +194,15 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               onClick={onTogglePreview}
             />
           </Tooltip>
+          {onToggleBackgroundInfo && (
+            <Tooltip title="Background Info Panel">
+              <Button
+                type={backgroundInfoVisible ? 'primary' : 'default'}
+                icon={<Info size={16} />}
+                onClick={onToggleBackgroundInfo}
+              />
+            </Tooltip>
+          )}
         </Space>
       </Flex>
     </Flex>
