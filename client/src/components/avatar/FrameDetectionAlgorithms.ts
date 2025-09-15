@@ -52,7 +52,6 @@ export class FrameDetectionAlgorithms {
   static async detectFrames(img: HTMLImageElement): Promise<ProcessingResult<DetectionResult>> {
     try {
       const canvas = SpriteSheetProcessor.createCanvasFromImage(img);
-      const ctx = canvas.getContext('2d')!;
       
       // Perform various analyses
       const edgeAnalysis = this.analyzeEdges(canvas);

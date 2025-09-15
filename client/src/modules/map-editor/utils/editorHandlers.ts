@@ -1,4 +1,4 @@
-import { EditorState, EditorTool, AreaBounds, GridConfig } from '../types/editor.types';
+import { EditorState, EditorTool, AreaBounds } from '../types/editor.types';
 import { ZOOM_LIMITS } from '../constants/editorConstants';
 import { InteractiveArea, ImpassableArea } from '../../../shared/MapDataContext';
 

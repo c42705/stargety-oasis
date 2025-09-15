@@ -10,7 +10,7 @@ import {
   RedoOutlined
 } from '@ant-design/icons';
 import { Point, Dimensions, Rectangle, FrameDefinition } from './AvatarBuilderTypes';
-import { CanvasManipulationTools } from './CanvasManipulationTools';
+
 
 const { Text } = Typography;
 
@@ -83,13 +83,7 @@ export const FrameSelectionTools: React.FC<FrameSelectionToolsProps> = ({
     return coords;
   }, [scale, snapToPixels]);
 
-  // Convert image coordinates to canvas coordinates
-  const imageToCanvasCoords = useCallback((imagePoint: Point): Point => {
-    return {
-      x: imagePoint.x * scale,
-      y: imagePoint.y * scale
-    };
-  }, [scale]);
+
 
   // Find frame at given position
   const getFrameAtPosition = useCallback((imagePos: Point): string | null => {
@@ -438,15 +432,7 @@ export const FrameSelectionTools: React.FC<FrameSelectionToolsProps> = ({
     onSelectionChange([]);
   }, [selectedFrameIds, onFrameDelete, onSelectionChange]);
 
-  const handleCropSelected = useCallback(async () => {
-    if (selectedFrameIds.length !== 1) return;
-    
-    const frame = frames.find(f => f.id === selectedFrameIds[0]);
-    if (!frame) return;
 
-    // Implement crop operation using CanvasManipulationTools
-    // This would extract the frame region and update the frame
-  }, [selectedFrameIds, frames]);
 
   // Update canvas size and scale
   const updateCanvasSize = useCallback(() => {

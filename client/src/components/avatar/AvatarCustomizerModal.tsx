@@ -503,7 +503,7 @@ export const AvatarCustomizerModal: React.FC<AvatarCustomizerModalProps> = ({ op
     }));
 
     message.success(`Created ${animations.length} default animations`);
-  }, [builderState.spriteSheetDefinition.frames]);
+  }, [builderState.spriteSheetDefinition, setBuilderState]);
 
   // Handle Avatar Builder save
   const handleAvatarBuilderSave = useCallback(() => {

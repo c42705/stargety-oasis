@@ -1,13 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Modal, Steps, Button, message, Space, Typography, Card, Upload, Progress } from 'antd';
-import { 
-  UploadOutlined, 
-  SettingOutlined, 
-  PlayCircleOutlined, 
+import {
   SaveOutlined,
-  InboxOutlined 
+  InboxOutlined
 } from '@ant-design/icons';
-import type { UploadProps, UploadFile } from 'antd';
+import type { UploadProps } from 'antd';
 import { GridOverlayComponent } from './GridOverlayComponent';
 import { FrameSelectionTools } from './FrameSelectionTools';
 import { FramePreviewSystem } from './FramePreviewSystem';
@@ -348,7 +345,7 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
     }));
 
     message.success(`Created ${animations.length} default animations`);
-  }, [builderState.spriteSheetDefinition.frames]);
+  }, [builderState.spriteSheetDefinition, setBuilderState]);
 
   // Validate and save
   const handleSave = useCallback(() => {
@@ -393,7 +390,7 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
     onSave?.(completeDefinition);
     message.success('Avatar saved successfully!');
     onClose();
-  }, [builderState.spriteSheetDefinition, username, onSave, onClose]);
+  }, [builderState, username, onSave, onClose, setBuilderState]);
 
   // Upload props
   const uploadProps: UploadProps = {

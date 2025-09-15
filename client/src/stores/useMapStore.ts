@@ -97,12 +97,12 @@ export const useMapStore = create<MapStore>()(
           state.error = null;
         });
 
-        console.log('📂 LOADING MAP DATA FROM STORE');
+        // Loading map data from store
 
         let mapData = await MapDataService.loadMapData();
         
         if (!mapData) {
-          console.log('🆕 NO MAP DATA FOUND, CREATING DEFAULT');
+          // No map data found, creating default
           mapData = await MapDataService.createDefaultMap();
         }
 
@@ -114,10 +114,7 @@ export const useMapStore = create<MapStore>()(
           state.isInitializing = false; // Mark initialization as complete
         });
 
-        // Map data loaded successfully (development only)
-        if (process.env.NODE_ENV === 'development') {
-          console.log('✅ MAP DATA LOADED SUCCESSFULLY');
-        }
+        // Map data loaded successfully
 
       } catch (error) {
         console.error('❌ FAILED TO LOAD MAP:', error);

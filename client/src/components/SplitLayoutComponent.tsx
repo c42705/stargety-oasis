@@ -1,6 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Splitter, Button, Typography, Space } from 'antd';
-import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons';
+import { Splitter, Typography } from 'antd';
 import { useAuth } from '../shared/AuthContext';
 import './SplitLayoutComponent.css';
 
@@ -23,11 +22,7 @@ export const SplitLayoutComponent: React.FC<SplitLayoutComponentProps> = ({
 }) => {
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [rightTopPanelSize, setRightTopPanelSize] = useState(60); // Percentage
-  const { user } = useAuth();
 
-  const handleLeftPanelToggle = useCallback(() => {
-    setLeftPanelCollapsed(!leftPanelCollapsed);
-  }, [leftPanelCollapsed]);
 
   const handleRightPanelResize = useCallback((sizes: number[]) => {
     if (sizes.length >= 2) {

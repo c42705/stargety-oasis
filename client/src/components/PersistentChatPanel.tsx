@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { List, Input, Button, Space, Typography, Badge, Avatar, Popover, Card, Divider } from 'antd';
+import { List, Input, Button, Space, Typography, Badge, Avatar, Popover, Card } from 'antd';
 import { SendOutlined, SmileOutlined, UserOutlined, TeamOutlined, SettingOutlined } from '@ant-design/icons';
 import { Smile, Laugh, Heart, ThumbsUp, ThumbsDown, PartyPopper, Frown } from 'lucide-react';
 import { useAuth } from '../shared/AuthContext';
@@ -52,7 +52,7 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
     }
   ]);
   const [inputMessage, setInputMessage] = useState('');
-  const [isConnected, setIsConnected] = useState(true);
+  const [isConnected] = useState(true);
   const [activeRoom, setActiveRoom] = useState(roomId);
   const [chatRooms] = useState<ChatRoom[]>([
     { id: 'general', name: 'General', unreadCount: 0, lastMessage: 'Welcome to the chat!', lastActivity: new Date() },

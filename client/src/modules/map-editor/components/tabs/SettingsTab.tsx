@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
   Card,
-  Typography,
   Space,
   Switch,
   Slider,
@@ -24,7 +23,7 @@ import { MapDataManager } from '../../../../components/MapDataManager';
 import { useMapData } from '../../../../shared/MapDataContext';
 import { useSharedMap } from '../../../../shared/useSharedMap';
 
-const { Title } = Typography;
+
 const { Option } = Select;
 
 // Map size presets
@@ -55,7 +54,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   onGridConfigChange,
   onPreviewModeChange
 }) => {
-  const { mapData, updateInteractiveAreas, updateImpassableAreas } = useMapData();
+  const { mapData, updateInteractiveAreas } = useMapData();
   // Auto-save is now controlled by the Zustand store configuration
   const sharedMap = useSharedMap({ source: 'editor' });
   const [customMapSize, setCustomMapSize] = useState({
@@ -63,9 +62,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     height: mapData.worldDimensions.height
   });
   const [selectedPreset, setSelectedPreset] = useState<string>('custom');
-  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
-  const [showImageModal, setShowImageModal] = useState(false);
-  const [imageResizeOption, setImageResizeOption] = useState<'fit' | 'stretch' | 'custom'>('fit');
 
   // Determine current preset based on map dimensions
   React.useEffect(() => {
@@ -222,8 +218,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           return;
         }
 
-        // Set background image in local state
-        setBackgroundImage(imageDataUrl);
+        // Background image will be stored in shared map system
 
         // Save background image to SharedMapSystem
         try {

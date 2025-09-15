@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, Button, Descriptions, Badge, Typography, Space, Tooltip } from 'antd';
 import { 
   CloseOutlined, 
@@ -10,7 +10,7 @@ import {
 } from '@ant-design/icons';
 import { useSharedMap } from '../../../shared/useSharedMap';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 interface BackgroundInfoPanelProps {
   isVisible: boolean;

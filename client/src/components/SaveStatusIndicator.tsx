@@ -13,7 +13,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Space, Typography, Badge, Spin, Switch, Popover, Alert } from 'antd';
+import { Button, Space, Typography, Badge, Spin, Switch, Popover, Alert } from 'antd';
 import { SaveOutlined, CheckCircleOutlined, ExclamationCircleOutlined, SettingOutlined } from '@ant-design/icons';
 import { Clock } from 'lucide-react';
 // import { SharedMapSystem } from '../shared/SharedMapSystem';

@@ -289,8 +289,7 @@ export class AvatarBuilderStorage {
     // Estimate localStorage usage
     let storageUsed = 0;
     try {
-      const testKey = 'test_storage_size';
-      const testData = 'x'.repeat(1024); // 1KB test
+      // Storage size estimation
       let usedSpace = 0;
 
       // Estimate current usage

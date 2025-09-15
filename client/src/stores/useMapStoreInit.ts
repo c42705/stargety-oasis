@@ -14,6 +14,9 @@ interface UseMapStoreInitOptions {
   source?: 'editor' | 'world' | 'test';
 }
 
+// Global flag to prevent multiple initializations across all components
+let globalInitializationFlag = false;
+
 /**
  * Initialize the map store and load data
  */
@@ -23,23 +26,19 @@ export const useMapStoreInit = (options: UseMapStoreInitOptions = {}) => {
   const initializationRef = useRef(false);
 
   useEffect(() => {
-    // Prevent multiple initializations
-    if (initializationRef.current || !autoLoad) {
+    // Prevent multiple initializations globally
+    if (globalInitializationFlag || initializationRef.current || !autoLoad) {
       return;
     }
 
+    globalInitializationFlag = true;
     initializationRef.current = true;
 
     const initializeStore = async () => {
       try {
-        // Initialize map store (development logging only)
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`🚀 INITIALIZING MAP STORE FOR: ${source}`);
-        }
+        // Initialize map store
         await loadMap();
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`✅ MAP STORE INITIALIZED FOR: ${source}`);
-        }
+        // Map store initialized successfully
       } catch (error) {
         console.error(`❌ FAILED TO INITIALIZE MAP STORE FOR: ${source}`, error);
       }
@@ -68,7 +67,7 @@ export const useEnsureMapStoreInit = () => {
   useEffect(() => {
     if (!mapData && !isLoading && !hasTriedInit.current) {
       hasTriedInit.current = true;
-      console.log('🔄 ENSURING MAP STORE IS INITIALIZED');
+      // Ensuring map store is initialized
       loadMap();
     }
   }, [mapData, isLoading, loadMap]);

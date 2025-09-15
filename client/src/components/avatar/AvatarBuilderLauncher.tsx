@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Button, Card, Space, Typography, Tooltip } from 'antd';
-import { BuildOutlined, UserOutlined, ToolOutlined } from '@ant-design/icons';
+import { BuildOutlined, UserOutlined } from '@ant-design/icons';
 import { AvatarBuilderModal } from './AvatarBuilderModal';
 import { AvatarBuilderStorage } from './AvatarBuilderStorage';
 import { SpriteSheetDefinition } from './AvatarBuilderTypes';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 export interface AvatarBuilderLauncherProps {
   username?: string;

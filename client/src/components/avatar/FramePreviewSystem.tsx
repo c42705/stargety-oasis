@@ -10,9 +10,9 @@ import {
   WarningOutlined,
   CheckCircleOutlined
 } from '@ant-design/icons';
-import { FrameDefinition, AnimationMapping, AnimationCategory } from './AvatarBuilderTypes';
+import { FrameDefinition, AnimationMapping } from './AvatarBuilderTypes';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 const { Option } = Select;
 
 export interface FramePreviewSystemProps {
@@ -268,7 +268,7 @@ export const FramePreviewSystem: React.FC<FramePreviewSystemProps> = ({
     }
 
     animationRef.current = requestAnimationFrame(animate);
-  }, [previewState.isPlaying, previewState.frameRate, previewState.direction, previewState.loop, getCurrentFrameSequence]);
+  }, [previewState.isPlaying, previewState.frameRate, getCurrentFrameSequence]);
 
   // Control functions
   const play = useCallback(() => {

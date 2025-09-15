@@ -9,7 +9,7 @@ import {
   CheckCircleOutlined 
 } from '@ant-design/icons';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 export interface UserGuidanceSystemProps {
   currentStep: number;
@@ -38,7 +38,7 @@ export const UserGuidanceSystem: React.FC<UserGuidanceSystemProps> = ({
 }) => {
   const [tourOpen, setTourOpen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
+  const [completedSteps] = useState<Set<number>>(new Set());
 
   // Tour steps for each stage of the Avatar Builder
   const tourSteps: TourProps['steps'] = [
@@ -145,10 +145,7 @@ export const UserGuidanceSystem: React.FC<UserGuidanceSystemProps> = ({
     }
   }, [isFirstTime, currentStep]);
 
-  // Mark step as completed
-  const markStepCompleted = (step: number) => {
-    setCompletedSteps(prev => new Set(Array.from(prev).concat(step)));
-  };
+
 
   // Get current step guidance
   const currentGuidance = stepGuidance[currentStep];

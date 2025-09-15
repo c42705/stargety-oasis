@@ -148,8 +148,8 @@ export const MapSyncStatus: React.FC<MapSyncStatusProps> = ({
  * Hook for accessing map sync status
  */
 export const useMapSyncStatus = () => {
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
-  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const [syncStatus] = useState<SyncStatus>('idle');
+  const [lastSyncTime] = useState<Date | null>(null);
 
 
 

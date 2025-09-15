@@ -55,16 +55,7 @@ interface CanvasObject extends fabric.Object {
   mapElementData?: InteractiveArea | ImpassableArea;
 }
 
-export interface FabricMapCanvasRef {
-  getCanvas: () => fabric.Canvas | null;
-  clearSelection: () => void;
-  deleteSelected: () => Promise<void>;
-  renderGrid: () => void;
-  renderInteractiveAreas: () => void;
-  renderCollisionAreas: () => void;
-  enterDrawingMode: (areaData: Partial<InteractiveArea>) => void;
-  exitDrawingMode: () => void;
-}
+
 
 export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   width,
@@ -178,6 +169,13 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     }, 300); // 300ms debounce
   }, [sharedMap]);
 
+  // Snap object to grid
+  const snapToGrid = useCallback((object: fabric.Object, spacing: number) => {
+    const left = Math.round((object.left || 0) / spacing) * spacing;
+    const top = Math.round((object.top || 0) / spacing) * spacing;
+    object.set({ left, top });
+  }, []);
+
   // Handle real-time object movement (immediate visual feedback only)
   const handleObjectMoving = useCallback((object: CanvasObject) => {
     // Snap to grid if enabled
@@ -187,7 +185,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
     // Note: onObjectModified is NOT called here to prevent excessive callbacks during drag
     // The callback will be triggered only when the transformation is complete (object:modified event)
-  }, [gridVisible, gridSpacing]);
+  }, [gridVisible, gridSpacing, snapToGrid]);
 
   // Handle real-time object scaling (immediate visual feedback only)
   const handleObjectScaling = useCallback((object: CanvasObject) => {
@@ -198,18 +196,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     // The callback will be triggered only when the transformation is complete (object:modified event)
   }, []);
 
-  // Snap object to grid
-  const snapToGrid = useCallback((object: fabric.Object, spacing: number) => {
-    const left = Math.round((object.left || 0) / spacing) * spacing;
-    const top = Math.round((object.top || 0) / spacing) * spacing;
-    object.set({ left, top });
-  }, []);
 
-  // Maintain aspect ratio for specific objects
-  const maintainAspectRatio = useCallback((object: fabric.Object) => {
-    // Implementation for maintaining aspect ratio
-    // This can be customized based on object type
-  }, []);
 
   // Drawing mode handlers
   const handleDrawingStart = useCallback((pointer: fabric.Point) => {
@@ -639,7 +626,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [gridVisible, gridSpacing, onSelectionChanged, onObjectModified, drawingMode, isDrawing, startPoint, drawingRect, onAreaDrawn, drawingAreaData, cameraControls, currentTool, panControls]);
+  }, [gridVisible, gridSpacing, onSelectionChanged, onObjectModified, drawingMode, collisionDrawingMode, isDrawing, startPoint, drawingRect, onAreaDrawn, drawingAreaData, cameraControls, currentTool, panControls, handleObjectModified, handleObjectMoving, handleObjectScaling, handleDeleteSelectedAreas]);
 
 
 
@@ -677,20 +664,12 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
       canvas.renderAll();
     }
-  }, [drawingMode, collisionDrawingMode, currentTool]);
+  }, [drawingMode, collisionDrawingMode, currentTool, panControls.actions]);
 
   // Handle background image changes - use a stable reference to prevent constant re-renders
   const backgroundImageUrl = useMemo(() => {
     return sharedMap.mapData?.backgroundImage;
   }, [sharedMap.mapData?.backgroundImage]);
-
-  // Priority background loading - triggers immediately when canvas is ready
-  useEffect(() => {
-    if (fabricCanvasRef.current && isInitialized && backgroundImageUrl !== undefined) {
-      console.log('🚀 PRIORITY BACKGROUND LOADING INITIATED');
-      updateBackgroundImage();
-    }
-  }, [isInitialized, backgroundImageUrl]);
 
   // Update background image with cover mode scaling (same as game world)
   const updateBackgroundImage = useCallback(() => {
@@ -831,7 +810,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
             // Mark background as ready and trigger coordinated layer order update
             setTimeout(() => {
-              console.log('✅ BACKGROUND IMAGE FULLY INTEGRATED - MARKING READY');
+              // Background image fully integrated - marking ready
               setIsBackgroundReady(true);
               updateLayerOrder(true); // Skip background check since we just added it
               // Background info panel success handled by parent
@@ -851,6 +830,14 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       setIsBackgroundReady(true);
     }
   }, [backgroundImageUrl, sharedMap.mapData]);
+
+  // Priority background loading - triggers immediately when canvas is ready
+  useEffect(() => {
+    if (fabricCanvasRef.current && isInitialized && backgroundImageUrl !== undefined) {
+      console.log('🚀 PRIORITY BACKGROUND LOADING INITIATED');
+      updateBackgroundImage();
+    }
+  }, [isInitialized, backgroundImageUrl, updateBackgroundImage]);
 
   // Update layer order to ensure proper stacking: background → grid → interactive elements
   const updateLayerOrder = useCallback((skipBackgroundCheck = false) => {
@@ -964,15 +951,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         }))
       });
     } else if (backgroundImages.length > 0) {
-      console.log('✅ BACKGROUND IMAGE SUCCESSFULLY MAINTAINED:', {
-        count: backgroundImages.length,
-        properties: backgroundImages.map(bg => ({
-          isBackground: (bg as any).isBackgroundImage,
-          backgroundId: (bg as any).backgroundImageId,
-          position: { left: bg.left, top: bg.top },
-          size: { width: bg.width, height: bg.height }
-        }))
-      });
+      // Background image successfully maintained
     }
   }, []);
 
@@ -1045,14 +1024,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     }
 
     // Grid rendering debug info (only in development)
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔲 RENDERING GRID:', {
-        gridVisible,
-        gridSpacing,
-        gridPattern,
-        gridOpacity
-      });
-    }
+    // Removed excessive logging for performance
 
     // Load the SVG file directly and create a tiled pattern
     fabric.FabricImage.fromURL(pattern.imagePath, {
@@ -1100,7 +1072,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         }
       }, 10);
 
-      console.log('✅ GRID RENDERED SUCCESSFULLY');
+      // Grid rendered successfully
     }).catch((error) => {
       console.error('❌ FAILED TO LOAD GRID PATTERN:', error);
     });
@@ -1109,10 +1081,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   // Update grid when properties change - wait for background to be ready
   useEffect(() => {
     if (isInitialized && isBackgroundReady) {
-      // Grid rendering after background ready (development only)
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔲 RENDERING GRID AFTER BACKGROUND READY');
-      }
+      // Grid rendering after background ready
       renderGrid();
     }
   }, [isInitialized, isBackgroundReady, renderGrid]);
@@ -1120,10 +1089,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   // Re-render grid immediately when grid settings change (for real-time updates)
   useEffect(() => {
     if (isInitialized && fabricCanvasRef.current) {
-      // Grid settings changed (development only)
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔲 GRID SETTINGS CHANGED - RE-RENDERING');
-      }
+      // Grid settings changed - re-rendering
       renderGrid();
     }
   }, [gridVisible, gridSpacing, gridPattern, gridOpacity, renderGrid, isInitialized]);
@@ -1194,7 +1160,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
     // Note: Layer order will be coordinated after all elements are loaded
     canvas.renderAll();
-  }, [sharedMap.interactiveAreas, updateLayerOrder]);
+  }, [sharedMap.interactiveAreas]);
 
   // Render collision areas
   const renderCollisionAreas = useCallback(() => {
@@ -1233,12 +1199,12 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
     // Note: Layer order will be coordinated after all elements are loaded
     canvas.renderAll();
-  }, [sharedMap.collisionAreas, updateLayerOrder]);
+  }, [sharedMap.collisionAreas]);
 
   // Update canvas when map data changes - wait for background to be ready
   useEffect(() => {
     if (isInitialized && isBackgroundReady) {
-      console.log('🎯 RENDERING AREAS AFTER BACKGROUND READY');
+      // Rendering areas after background ready
       renderInteractiveAreas();
       renderCollisionAreas();
       // Mark all elements as ready after areas are rendered
@@ -1249,7 +1215,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   // Coordinated layer order update after all elements are ready
   useEffect(() => {
     if (isElementsReady && fabricCanvasRef.current) {
-      console.log('🎯 FINAL COORDINATED LAYER ORDER UPDATE');
+      // Final coordinated layer order update
       updateLayerOrder();
     }
   }, [isElementsReady, updateLayerOrder]);
@@ -1336,61 +1302,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     };
   }, [drawingMode, collisionDrawingMode, isDrawing, handleDrawingStart, handleDrawingMove, handleDrawingEnd]);
 
-  // Public methods for external control
-  const getCanvas = useCallback(() => fabricCanvasRef.current, []);
-  
-  const clearSelection = useCallback(() => {
-    if (fabricCanvasRef.current) {
-      fabricCanvasRef.current.discardActiveObject();
-      fabricCanvasRef.current.renderAll();
-    }
-  }, []);
 
-  const deleteSelected = useCallback(async () => {
-    if (!fabricCanvasRef.current) return;
-
-    const canvas = fabricCanvasRef.current;
-    const activeObjects = canvas.getActiveObjects();
-
-    for (const obj of activeObjects) {
-      const canvasObj = obj as CanvasObject;
-      if (canvasObj.mapElementId && canvasObj.mapElementType) {
-        try {
-          if (canvasObj.mapElementType === 'interactive') {
-            await sharedMap.removeInteractiveArea(canvasObj.mapElementId);
-          } else if (canvasObj.mapElementType === 'collision') {
-            await sharedMap.removeCollisionArea(canvasObj.mapElementId);
-          }
-        } catch (error) {
-          console.error('Failed to remove map element:', error);
-        }
-      }
-      canvas.remove(obj);
-    }
-
-    canvas.discardActiveObject();
-    canvas.renderAll();
-  }, [sharedMap]);
-
-  // Public methods for drawing mode
-  const enterDrawingMode = useCallback((areaData: Partial<InteractiveArea>) => {
-    // This will be handled by the parent component through props
-    console.log('Enter drawing mode with area data:', areaData);
-  }, []);
-
-  const exitDrawingMode = useCallback(() => {
-    // Clean up any drawing state
-    if (drawingRect && fabricCanvasRef.current) {
-      fabricCanvasRef.current.remove(drawingRect);
-      fabricCanvasRef.current.renderAll();
-    }
-    setIsDrawing(false);
-    setStartPoint(null);
-    setDrawingRect(null);
-  }, [drawingRect]);
-
-  // Public methods available via props callbacks
-  // TODO: Implement ref-based API when needed
 
   return (
     <div className={`fabric-map-canvas ${className}`}>

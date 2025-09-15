@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Map, Eye, Square, Shield } from 'lucide-react';
-import { useMapData } from '../../shared/MapDataContext';
+import { useMapData, InteractiveArea } from '../../shared/MapDataContext';
 // import { useSharedMap } from '../../shared/useSharedMap';
 import { useSharedMapCompat as useSharedMap } from '../../stores/useSharedMapCompat';
 import { FabricMapCanvas } from './FabricMapCanvas';
@@ -31,17 +31,9 @@ import { useBackgroundInfoIntegration } from './hooks/useBackgroundInfoPanel';
 // Import types and constants
 import { MapEditorModuleProps, TabId, GridConfig } from './types/editor.types';
 import { EDITOR_TABS, KEYBOARD_SHORTCUTS } from './constants/editorConstants';
-import {
-  createAreaSaveHandler,
-  createAreaDeleteHandler,
-  createAreaDrawnHandler,
-  createCollisionAreaSaveHandler,
-  createCollisionAreaDeleteHandler,
-  createCollisionAreaDrawnHandler
-} from './utils/editorHandlers';
 
-// Temporary import for testing new store
-import { MapStoreTest } from '../../stores/MapStoreTest';
+
+
 
 import './MapEditorModule.css';
 
@@ -73,76 +65,139 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   const backgroundInfoPanel = useBackgroundInfoIntegration();
 
   // Create handlers using extracted utilities
-  const handleSaveArea = useCallback(
-    createAreaSaveHandler(
-      modalState.editingArea,
-      sharedMap,
-      modalState.setShowAreaModal,
-      modalState.setEditingArea,
-      drawingMode.setPendingAreaData,
-      drawingMode.setDrawingMode
-    ),
-    [modalState.editingArea, sharedMap, modalState, drawingMode]
-  );
-
-  const handleConfirmDelete = useCallback(
-    createAreaDeleteHandler(
-      modalState.areaToDelete,
-      sharedMap,
-      modalState.setAreaToDelete
-    ),
-    [modalState.areaToDelete, sharedMap, modalState]
-  );
-
-  const handleAreaDrawn = useCallback(
-    createAreaDrawnHandler(
-      drawingMode.pendingAreaData,
-      sharedMap,
-      drawingMode.setDrawingMode,
-      drawingMode.setPendingAreaData,
-      () => {
-        // Force immediate re-render by triggering a state update
-        console.log('Area created, triggering immediate re-render');
+  const handleSaveArea = useCallback(async (areaData: any) => {
+    if (!modalState.editingArea) {
+      // Create new area
+      try {
+        const newArea = {
+          id: `area_${Date.now()}`,
+          ...areaData
+        };
+        await sharedMap.addInteractiveArea(newArea);
+        modalState.setShowAreaModal(false);
+        drawingMode.setPendingAreaData(null);
+        drawingMode.setDrawingMode(false);
+      } catch (error) {
+        console.error('Failed to create area:', error);
       }
-    ),
-    [drawingMode.pendingAreaData, sharedMap, drawingMode]
-  );
+    } else {
+      // Update existing area
+      try {
+        await sharedMap.updateInteractiveArea(modalState.editingArea.id, areaData);
+        modalState.setShowAreaModal(false);
+        modalState.setEditingArea(null);
+      } catch (error) {
+        console.error('Failed to update area:', error);
+      }
+    }
+  }, [modalState.editingArea, sharedMap, modalState.setShowAreaModal, modalState.setEditingArea, drawingMode.setPendingAreaData, drawingMode.setDrawingMode]);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (modalState.areaToDelete) {
+      try {
+        await sharedMap.removeInteractiveArea(modalState.areaToDelete.id);
+        modalState.setAreaToDelete(null);
+      } catch (error) {
+        console.error('Failed to delete area:', error);
+      }
+    }
+  }, [modalState.areaToDelete, sharedMap, modalState.setAreaToDelete]);
+
+  const handleAreaDrawn = useCallback(async (bounds: { x: number; y: number; width: number; height: number }) => {
+    if (!drawingMode.pendingAreaData) return;
+
+    try {
+      // Create new area with drawn bounds
+      const newArea: InteractiveArea = {
+        id: `area_${Date.now()}`,
+        name: drawingMode.pendingAreaData.name || 'New Area',
+        type: drawingMode.pendingAreaData.type || 'custom',
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        color: drawingMode.pendingAreaData.color || '#4A90E2',
+        description: drawingMode.pendingAreaData.description || ''
+      };
+
+      await sharedMap.addInteractiveArea(newArea);
+
+      // Exit drawing mode
+      drawingMode.setDrawingMode(false);
+      drawingMode.setPendingAreaData(null);
+
+      // Force immediate re-render by triggering a state update
+      console.log('Area created, triggering immediate re-render');
+    } catch (error) {
+      console.error('Failed to create area:', error);
+    }
+  }, [drawingMode.pendingAreaData, sharedMap, drawingMode.setDrawingMode, drawingMode.setPendingAreaData]);
 
   // Collision area handlers
-  const handleSaveCollisionArea = useCallback(
-    createCollisionAreaSaveHandler(
-      collisionModalState.editingCollisionArea,
-      sharedMap,
-      collisionModalState.setShowCollisionAreaModal,
-      collisionModalState.setEditingCollisionArea,
-      collisionDrawingMode.setPendingCollisionAreaData,
-      collisionDrawingMode.setCollisionDrawingMode
-    ),
-    [collisionModalState.editingCollisionArea, sharedMap, collisionModalState, collisionDrawingMode]
-  );
-
-  const handleConfirmDeleteCollisionArea = useCallback(
-    createCollisionAreaDeleteHandler(
-      collisionModalState.collisionAreaToDelete,
-      sharedMap,
-      collisionModalState.setCollisionAreaToDelete
-    ),
-    [collisionModalState.collisionAreaToDelete, sharedMap, collisionModalState]
-  );
-
-  const handleCollisionAreaDrawn = useCallback(
-    createCollisionAreaDrawnHandler(
-      collisionDrawingMode.pendingCollisionAreaData,
-      sharedMap,
-      collisionDrawingMode.setCollisionDrawingMode,
-      collisionDrawingMode.setPendingCollisionAreaData,
-      () => {
-        // Force immediate re-render by triggering a state update
-        console.log('Collision area created, triggering immediate re-render');
+  const handleSaveCollisionArea = useCallback(async (areaData: any) => {
+    if (!collisionModalState.editingCollisionArea) {
+      // Create new collision area
+      try {
+        const newArea = {
+          id: `collision_${Date.now()}`,
+          ...areaData
+        };
+        await sharedMap.addCollisionArea(newArea);
+        collisionModalState.setShowCollisionAreaModal(false);
+        collisionDrawingMode.setPendingCollisionAreaData(null);
+        collisionDrawingMode.setCollisionDrawingMode(false);
+      } catch (error) {
+        console.error('Failed to create collision area:', error);
       }
-    ),
-    [collisionDrawingMode.pendingCollisionAreaData, sharedMap, collisionDrawingMode]
-  );
+    } else {
+      // Update existing collision area
+      try {
+        await sharedMap.updateCollisionArea(collisionModalState.editingCollisionArea.id, areaData);
+        collisionModalState.setShowCollisionAreaModal(false);
+        collisionModalState.setEditingCollisionArea(null);
+      } catch (error) {
+        console.error('Failed to update collision area:', error);
+      }
+    }
+  }, [collisionModalState.editingCollisionArea, sharedMap, collisionModalState.setShowCollisionAreaModal, collisionModalState.setEditingCollisionArea, collisionDrawingMode.setPendingCollisionAreaData, collisionDrawingMode.setCollisionDrawingMode]);
+
+  const handleConfirmDeleteCollisionArea = useCallback(async () => {
+    if (collisionModalState.collisionAreaToDelete) {
+      try {
+        await sharedMap.removeCollisionArea(collisionModalState.collisionAreaToDelete.id);
+        collisionModalState.setCollisionAreaToDelete(null);
+      } catch (error) {
+        console.error('Failed to delete collision area:', error);
+      }
+    }
+  }, [collisionModalState.collisionAreaToDelete, sharedMap, collisionModalState.setCollisionAreaToDelete]);
+
+  const handleCollisionAreaDrawn = useCallback(async (bounds: { x: number; y: number; width: number; height: number }) => {
+    if (!collisionDrawingMode.pendingCollisionAreaData) return;
+
+    try {
+      // Create new collision area with drawn bounds
+      const newArea = {
+        id: `collision_${Date.now()}`,
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        ...collisionDrawingMode.pendingCollisionAreaData
+      };
+
+      await sharedMap.addCollisionArea(newArea);
+
+      // Exit drawing mode
+      collisionDrawingMode.setCollisionDrawingMode(false);
+      collisionDrawingMode.setPendingCollisionAreaData(null);
+
+      // Force immediate re-render by triggering a state update
+      console.log('Collision area created, triggering immediate re-render');
+    } catch (error) {
+      console.error('Failed to create collision area:', error);
+    }
+  }, [collisionDrawingMode.pendingCollisionAreaData, sharedMap, collisionDrawingMode.setCollisionDrawingMode, collisionDrawingMode.setPendingCollisionAreaData]);
 
   // Modal close handler that combines drawing mode exit
   const handleCloseModals = useCallback(() => {

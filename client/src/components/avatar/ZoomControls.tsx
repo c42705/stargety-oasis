@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Button, Space, Typography, Slider, Tooltip, InputNumber } from 'antd';
+import { Button, Space, Slider, Tooltip, InputNumber } from 'antd';
 import { ZoomInOutlined, ZoomOutOutlined, ExpandOutlined, CompressOutlined } from '@ant-design/icons';
 
 

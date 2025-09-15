@@ -59,7 +59,6 @@ export const GridOverlayComponent: React.FC<GridOverlayProps> = ({
   });
 
   const [canvasSize, setCanvasSize] = useState<Dimensions>({ width: 400, height: 400 });
-  const [scale, setScale] = useState(1);
   const [hoveredFrame, setHoveredFrame] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<Point | null>(null);
@@ -157,13 +156,7 @@ export const GridOverlayComponent: React.FC<GridOverlayProps> = ({
     };
   }, [zoomState]);
 
-  // Convert image coordinates to canvas coordinates
-  const imageToCanvasCoords = useCallback((imagePoint: Point): Point => {
-    return {
-      x: imagePoint.x * scale,
-      y: imagePoint.y * scale
-    };
-  }, [scale]);
+
 
   // Find frame at given image coordinates
   const getFrameAtPosition = useCallback((imagePos: Point): number | null => {
@@ -211,7 +204,6 @@ export const GridOverlayComponent: React.FC<GridOverlayProps> = ({
       ctx.lineWidth = 1;
       ctx.globalAlpha = gridState.opacity;
 
-      const { frameWidth, frameHeight } = calculateFrameDimensions();
       const totalFrames = gridState.columns * gridState.rows;
 
       // Draw grid lines and frame highlights
@@ -255,7 +247,7 @@ export const GridOverlayComponent: React.FC<GridOverlayProps> = ({
     img.src = imageData;
   }, [
     imageData, gridState, selectedFrames, hoveredFrame, zoomState,
-    calculateFrameDimensions, getFrameRect
+    getFrameRect, imageDimensions.width, imageDimensions.height
   ]);
 
   // Handle canvas resize
@@ -277,7 +269,6 @@ export const GridOverlayComponent: React.FC<GridOverlayProps> = ({
       height: imageDimensions.height * newScale
     };
 
-    setScale(newScale);
     setCanvasSize(newCanvasSize);
   }, [imageDimensions]);
 
@@ -311,7 +302,7 @@ export const GridOverlayComponent: React.FC<GridOverlayProps> = ({
     const frameIndex = getFrameAtPosition(imagePos);
 
     setHoveredFrame(frameIndex);
-  }, [canvasToImageCoords, getFrameAtPosition, isDragging, dragStart, setZoomState]);
+  }, [canvasToImageCoords, getFrameAtPosition, isDragging, dragStart, setZoomState, zoomState]);
 
   const handleMouseDown = useCallback((event: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
