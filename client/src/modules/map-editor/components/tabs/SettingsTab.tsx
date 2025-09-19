@@ -38,7 +38,7 @@ const MAP_SIZE_PRESETS = {
 // Map size limits
 const MAP_SIZE_LIMITS = {
   min: { width: 400, height: 300 },
-  max: { width: 4000, height: 3000 }
+  max: { width: 8000, height: 4000 }
 };
 
 interface SettingsTabProps {
@@ -127,7 +127,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       console.error('Failed to update map size:', error);
       message.error('Failed to update map size');
     }
-  }, [mapData.interactiveAreas, updateInteractiveAreas]);
+  }, [mapData.interactiveAreas, updateInteractiveAreas, sharedMap]);
 
   // Handle preset selection
   const handlePresetChange = useCallback((preset: string) => {

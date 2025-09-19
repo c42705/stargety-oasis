@@ -19,16 +19,35 @@ export interface GridPattern {
 }
 
 export interface EditorState {
-  tool: 'select' | 'move' | 'resize' | 'delete' | 'pan' | 'draw-collision' | 'erase-collision';
-  zoom: number;
+  tool: EditorTool;
+  zoom: number; // Zoom percentage (100 = 1.0x)
   mousePosition: { x: number; y: number };
-  saveStatus: 'saved' | 'unsaved' | 'saving';
+  saveStatus: SaveStatus;
   canUndo: boolean;
   canRedo: boolean;
   isPanning: boolean;
 }
 
-export type EditorTool = EditorState['tool'];
+export type EditorTool = 'select' | 'move' | 'resize' | 'delete' | 'pan' | 'draw-collision' | 'erase-collision';
+
+export type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error';
+
+export interface ZoomState {
+  current: number;
+  percentage: number;
+  isAtMin: boolean;
+  isAtMax: boolean;
+  isExtreme: boolean;
+  requiresOptimization: boolean;
+}
+
+export interface PerformanceMetrics {
+  fps: number;
+  objectCount: number;
+  zoom: number;
+  isOptimized: boolean;
+  renderTime: number;
+}
 
 export type TabId = 'areas' | 'terrain' | 'assets' | 'layers' | 'collision' | 'settings';
 

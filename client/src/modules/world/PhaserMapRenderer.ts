@@ -187,10 +187,15 @@ export class PhaserMapRenderer {
    * Render background elements
    */
   private renderBackground(): void {
-    if (!this.mapData) return;
+    if (!this.mapData) {
+      console.warn('🖼️ BACKGROUND: Cannot render - no map data available');
+      return;
+    }
 
     console.log('🖼️ RENDERING BACKGROUND:', {
       hasBackgroundImage: !!this.mapData.backgroundImage,
+      backgroundImageLength: this.mapData.backgroundImage?.length || 0,
+      backgroundImagePreview: this.mapData.backgroundImage ? this.mapData.backgroundImage.substring(0, 50) + '...' : 'none',
       worldDimensions: this.mapData.worldDimensions,
       backgroundImageDimensions: this.mapData.backgroundImageDimensions
     });
@@ -203,36 +208,59 @@ export class PhaserMapRenderer {
         // Create a unique texture key for this background image
         const textureKey = `background_${Date.now()}`;
 
+        console.log('🖼️ BACKGROUND: Creating texture with key:', textureKey);
+
         // Check if texture already exists and destroy it
         if (this.scene.textures.exists(textureKey)) {
+          console.log('🖼️ BACKGROUND: Removing existing texture:', textureKey);
           this.scene.textures.remove(textureKey);
         }
 
         // Check if it's a data URL or static URL
         const isDataUrl = this.mapData.backgroundImage.startsWith('data:');
 
+        console.log('🖼️ BACKGROUND: Image type detection:', {
+          isDataUrl,
+          imageLength: this.mapData.backgroundImage.length,
+          imageStart: this.mapData.backgroundImage.substring(0, 30)
+        });
+
         if (isDataUrl) {
+          console.log('🖼️ BACKGROUND: Adding base64 texture to Phaser');
           // Create texture from base64 data URL
           this.scene.textures.addBase64(textureKey, this.mapData.backgroundImage);
+
+          // Check if texture was added successfully
+          setTimeout(() => {
+            const textureExists = this.scene.textures.exists(textureKey);
+            console.log('🖼️ BACKGROUND: Base64 texture creation result:', {
+              textureKey,
+              exists: textureExists,
+              textureManager: !!this.scene.textures
+            });
+
+            if (textureExists) {
+              console.log('🖼️ BACKGROUND TEXTURE LOADED (base64):', textureKey);
+              this.createCoverModeBackground(textureKey);
+            } else {
+              console.error('❌ BACKGROUND: Base64 texture creation failed');
+              this.renderDefaultBackground();
+            }
+          }, 100);
         } else {
+          console.log('🖼️ BACKGROUND: Loading external URL texture');
           // Load from static URL
           this.scene.load.image(textureKey, this.mapData.backgroundImage);
           this.scene.load.start();
-        }
 
-        // Wait for texture to load, then create the image
-        const textureLoadHandler = (key: string) => {
-          if (key === textureKey) {
-            console.log('🖼️ BACKGROUND TEXTURE LOADED:', key);
+          // Wait for texture to load, then create the image
+          const textureLoadHandler = (key: string) => {
+            if (key === textureKey) {
+              console.log('🖼️ BACKGROUND TEXTURE LOADED (external):', key);
+              this.createCoverModeBackground(textureKey);
+            }
+          };
 
-            // Create the background image with cover mode scaling
-            this.createCoverModeBackground(textureKey);
-          }
-        };
-
-        if (isDataUrl) {
-          this.scene.textures.once('addtexture', textureLoadHandler);
-        } else {
           this.scene.load.once('filecomplete-image-' + textureKey, textureLoadHandler);
         }
 
@@ -268,58 +296,110 @@ export class PhaserMapRenderer {
   }
 
   /**
-   * Create background image with cover mode scaling
-   * This ensures the background fills the entire world area without empty spaces
+   * Create background image with 1:1 pixel mapping (no scaling)
+   * This ensures the background displays at its native resolution
    */
   private createCoverModeBackground(textureKey: string): void {
-    if (!this.mapData) return;
+    console.log('🖼️ BACKGROUND: createCoverModeBackground called with textureKey:', textureKey);
+
+    if (!this.mapData) {
+      console.error('🖼️ BACKGROUND: Cannot create background - no map data');
+      return;
+    }
 
     const worldWidth = this.mapData.worldDimensions.width;
     const worldHeight = this.mapData.worldDimensions.height;
 
-    // Get the original image dimensions
-    const texture = this.scene.textures.get(textureKey);
-    const imageWidth = texture.source[0].width;
-    const imageHeight = texture.source[0].height;
+    console.log('🖼️ BACKGROUND: World dimensions:', { worldWidth, worldHeight });
 
-    // Calculate scale factors for both dimensions
-    const scaleX = worldWidth / imageWidth;
-    const scaleY = worldHeight / imageHeight;
+    try {
+      // Get the original image dimensions
+      const texture = this.scene.textures.get(textureKey);
 
-    // Use the larger scale to ensure the image covers the entire area (cover mode)
-    // This may crop parts of the image but ensures no empty areas
-    const coverScale = Math.max(scaleX, scaleY);
-
-    // Calculate final scaled dimensions
-    const scaledWidth = imageWidth * coverScale;
-    const scaledHeight = imageHeight * coverScale;
-
-    // Create the background image centered in the world
-    const backgroundImage = this.scene.add.image(
-      worldWidth / 2,
-      worldHeight / 2,
-      textureKey
-    );
-
-    // Apply cover scale
-    backgroundImage.setScale(coverScale);
-
-    // Set depth to ensure it's behind other elements
-    backgroundImage.setDepth(-1000);
-
-    // Add to background group
-    this.backgroundGroup.add(backgroundImage);
-
-    console.log('🖼️ COVER MODE BACKGROUND CREATED:', {
-      world: { width: worldWidth, height: worldHeight },
-      image: { width: imageWidth, height: imageHeight },
-      scale: { x: scaleX, y: scaleY, cover: coverScale },
-      final: { width: scaledWidth, height: scaledHeight },
-      cropped: {
-        width: scaledWidth > worldWidth,
-        height: scaledHeight > worldHeight
+      if (!texture) {
+        console.error('🖼️ BACKGROUND: Texture not found:', textureKey);
+        this.renderDefaultBackground();
+        return;
       }
-    });
+
+      console.log('🖼️ BACKGROUND: Texture retrieved successfully:', {
+        textureKey,
+        hasSource: !!texture.source,
+        sourceLength: texture.source?.length || 0
+      });
+
+      if (!texture.source || texture.source.length === 0) {
+        console.error('🖼️ BACKGROUND: Texture has no source data');
+        this.renderDefaultBackground();
+        return;
+      }
+
+      const imageWidth = texture.source[0].width;
+      const imageHeight = texture.source[0].height;
+
+      console.log('🖼️ BACKGROUND: Image dimensions from texture:', { imageWidth, imageHeight });
+
+      if (!imageWidth || !imageHeight || imageWidth <= 0 || imageHeight <= 0) {
+        console.error('🖼️ BACKGROUND: Invalid image dimensions:', { imageWidth, imageHeight });
+        this.renderDefaultBackground();
+        return;
+      }
+
+      // CRITICAL FIX: Use 1:1 pixel mapping instead of cover mode scaling
+      // This matches how the map editor displays the background image
+      const backgroundImage = this.scene.add.image(
+        0, // Position at origin
+        0, // Position at origin
+        textureKey
+      );
+
+      console.log('🖼️ BACKGROUND: Image object created:', {
+        position: { x: 0, y: 0 },
+        textureKey,
+        imageExists: !!backgroundImage,
+        nativeImageSize: { width: imageWidth, height: imageHeight }
+      });
+
+      // Set origin to top-left for consistent positioning
+      backgroundImage.setOrigin(0, 0);
+
+      // Use 1:1 scale (no scaling) for pixel-perfect display
+      backgroundImage.setScale(1, 1);
+
+      // Set depth to ensure it's behind other elements
+      backgroundImage.setDepth(-1000);
+
+      // Add to background group
+      this.backgroundGroup.add(backgroundImage);
+
+      console.log('🖼️ BACKGROUND IMAGE CREATED SUCCESSFULLY (1:1 PIXEL MAPPING):', {
+        world: { width: worldWidth, height: worldHeight },
+        image: { width: imageWidth, height: imageHeight },
+        scale: { x: 1, y: 1 },
+        position: { x: 0, y: 0 },
+        origin: { x: 0, y: 0 },
+        depth: backgroundImage.depth,
+        visible: backgroundImage.visible,
+        alpha: backgroundImage.alpha,
+        pixelPerfect: true
+      });
+
+      // Update the scene's world bounds to match the background image dimensions
+      // This ensures the camera and world size match the actual image size
+      if (this.scene.cameras && this.scene.cameras.main) {
+        console.log('🌍 BACKGROUND: Updating camera bounds to match image dimensions');
+        this.scene.cameras.main.setBounds(0, 0, imageWidth, imageHeight);
+
+        // Update the game scene's world bounds if it has the method
+        if ((this.scene as any).updateWorldBoundsFromBackgroundImage) {
+          (this.scene as any).updateWorldBoundsFromBackgroundImage(imageWidth, imageHeight);
+        }
+      }
+
+    } catch (error) {
+      console.error('❌ BACKGROUND: Error in createCoverModeBackground:', error);
+      this.renderDefaultBackground();
+    }
   }
 
   /**

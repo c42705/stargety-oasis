@@ -42,11 +42,11 @@ class GameScene extends Phaser.Scene {
   private rotationTween?: Phaser.Tweens.Tween;
 
   // Zoom and camera properties
-  private defaultZoom: number = 1.10;
+  private defaultZoom: number = 1.65;
   private minZoom: number = 0.3;
   private maxZoom: number = 3;
   private zoomStep: number = 0.2;
-  private worldBounds = { width: 800, height: 600 }; // Default, will be updated from SharedMapSystem
+  public worldBounds = { width: 800, height: 600 }; // Default, will be updated from SharedMapSystem
 
   // Camera panning properties
   private isPanning: boolean = false;
@@ -69,6 +69,20 @@ class GameScene extends Phaser.Scene {
   private adaptiveLerpFactor: number = 0.15;
   private maxLerpFactor: number = 0.25;
   private minLerpFactor: number = 0.08;
+
+  // Debug visual elements
+  // Set to false to disable debug overlays in production
+  // To toggle at runtime: window.phaserGame.scene.scenes[0].toggleDebugOverlays()
+  private DEBUG_CAMERA_CENTERING: boolean = true;
+  private debugPlayerCross?: Phaser.GameObjects.Graphics;
+  private debugCameraCross?: Phaser.GameObjects.Graphics;
+  private debugViewportBounds?: Phaser.GameObjects.Graphics;
+  private debugWorldCenterCross?: Phaser.GameObjects.Graphics;
+  private debugPlayerPositionText?: Phaser.GameObjects.Text;
+  private debugCameraScrollText?: Phaser.GameObjects.Text;
+
+  // Prevent multiple simultaneous calls to setDefaultZoomAndCenter
+  private isSettingDefaultZoom: boolean = false;
 
   // Player properties
   private playerSize: number = 32; // Player sprite size for collision detection and bounds
@@ -148,10 +162,23 @@ class GameScene extends Phaser.Scene {
 
     // Create default player sprite immediately using Terra Branford, then load avatar asynchronously
     const defaultTexture = this.textures.exists('terra-branford') ? 'terra-branford' : 'player-fallback';
-    this.player = this.add.sprite(400, 300, defaultTexture);
+
+    // Calculate initial player position based on world bounds (center of world)
+    const initialX = this.worldBounds.width / 2;
+    const initialY = this.worldBounds.height / 2;
+
+    this.player = this.add.sprite(initialX, initialY, defaultTexture);
     this.player.setDisplaySize(64, 64); // Larger size for better visibility
+    this.player.setOrigin(0.5, 0.5); // Ensure sprite is centered on its position
     this.player.setDepth(10);
     this.originalY = this.player.y;
+
+    console.log('🎮 PLAYER CREATED:', {
+      position: { x: this.player.x, y: this.player.y },
+      worldBounds: this.worldBounds,
+      origin: { x: this.player.originX, y: this.player.originY },
+      displaySize: { width: this.player.displayWidth, height: this.player.displayHeight }
+    });
 
     // Load avatar asynchronously and update sprite when ready
     this.initializePlayer();
@@ -273,6 +300,7 @@ class GameScene extends Phaser.Scene {
 
           this.player = avatarSprite;
           this.player.setPosition(oldX, oldY);
+          this.player.setOrigin(0.5, 0.5); // Ensure avatar sprite is centered on its position
           this.player.setDepth(10);
         }
       } else {
@@ -288,6 +316,7 @@ class GameScene extends Phaser.Scene {
 
             this.player = avatarSprite;
             this.player.setPosition(oldX, oldY);
+            this.player.setOrigin(0.5, 0.5); // Ensure avatar sprite is centered on its position
             this.player.setDepth(10);
           }
         } catch (error) {
@@ -301,6 +330,12 @@ class GameScene extends Phaser.Scene {
         x: this.player.x,
         y: this.player.y,
       });
+
+      // Apply camera settings after player is fully initialized
+      this.time.delayedCall(50, () => {
+        this.setDefaultZoomAndCenter();
+        console.log('🎮 PLAYER INIT: Applied camera settings after player initialization');
+      });
     } catch (error) {
       console.error('Failed to load player avatar, keeping default sprite:', error);
 
@@ -309,6 +344,12 @@ class GameScene extends Phaser.Scene {
         playerId: this.playerId,
         x: this.player.x,
         y: this.player.y,
+      });
+
+      // Apply camera settings even with default sprite
+      this.time.delayedCall(50, () => {
+        this.setDefaultZoomAndCenter();
+        console.log('🎮 PLAYER INIT: Applied camera settings after player initialization (fallback)');
       });
     }
   }
@@ -789,11 +830,16 @@ class GameScene extends Phaser.Scene {
     const camera = this.cameras.main;
 
     // Calculate target camera position (center on player with offset)
-    const targetX = playerX - camera.width / (2 * camera.zoom) + this.cameraFollowOffset.x;
-    const targetY = playerY - camera.height / (2 * camera.zoom) + this.cameraFollowOffset.y;
+    // The camera scroll position should be: playerPosition - (viewportSize / 2)
+    // This ensures the player appears in the exact center of the viewport
+    const viewportWidth = camera.width / camera.zoom;
+    const viewportHeight = camera.height / camera.zoom;
+
+    const targetScrollX = playerX - (viewportWidth / 2) + this.cameraFollowOffset.x;
+    const targetScrollY = playerY - (viewportHeight / 2) + this.cameraFollowOffset.y;
 
     // Apply world bounds constraints
-    const constrainedTarget = this.constrainCameraToWorldBounds(targetX, targetY);
+    const constrainedTarget = this.constrainCameraToWorldBounds(targetScrollX, targetScrollY);
 
     // Calculate distance from current camera position to target
     const currentScrollX = camera.scrollX;
@@ -823,11 +869,39 @@ class GameScene extends Phaser.Scene {
     if (Math.abs(newScrollX - currentScrollX) > threshold || Math.abs(newScrollY - currentScrollY) > threshold) {
       camera.setScroll(newScrollX, newScrollY);
 
-
+      // Debug logging for camera following (only log significant changes)
+      if (Math.abs(newScrollX - currentScrollX) > 5 || Math.abs(newScrollY - currentScrollY) > 5) {
+        console.log('🎯 CAMERA FOLLOWING UPDATE:', {
+          playerPos: { x: playerX, y: playerY },
+          viewportSize: { width: viewportWidth, height: viewportHeight },
+          targetScroll: { x: targetScrollX, y: targetScrollY },
+          constrainedScroll: { x: constrainedTarget.x, y: constrainedTarget.y },
+          newScroll: { x: newScrollX, y: newScrollY },
+          distance: totalDistance,
+          lerpFactor: this.adaptiveLerpFactor,
+          zoomFactor,
+          distanceFactor,
+          zoom: camera.zoom,
+          // Calculate where player appears in viewport after update
+          playerInViewport: {
+            x: playerX - newScrollX,
+            y: playerY - newScrollY
+          },
+          viewportCenter: {
+            x: viewportWidth / 2,
+            y: viewportHeight / 2
+          }
+        });
+      }
     }
 
     this.lastPlayerX = playerX;
     this.lastPlayerY = playerY;
+
+    // Update debug overlays if enabled
+    if (this.DEBUG_CAMERA_CENTERING) {
+      this.updateDebugOverlays();
+    }
   }
 
   // Camera control methods
@@ -868,33 +942,172 @@ class GameScene extends Phaser.Scene {
    * Instantly center camera on player (no lerp)
    */
   public centerCameraOnPlayer(): void {
-    if (!this.player) return;
+    if (!this.player) {
+      console.warn('🎯 CAMERA CENTERING: No player found');
+      return;
+    }
 
     const camera = this.cameras.main;
-    const targetX = this.player.x - camera.width / (2 * camera.zoom) + this.cameraFollowOffset.x;
-    const targetY = this.player.y - camera.height / (2 * camera.zoom) + this.cameraFollowOffset.y;
 
-    const constrainedTarget = this.constrainCameraToWorldBounds(targetX, targetY);
+    // Calculate viewport dimensions in world coordinates
+    const viewportWidth = camera.width / camera.zoom;
+    const viewportHeight = camera.height / camera.zoom;
+
+    // Calculate target camera scroll position to center player
+    // Camera scroll position = player position - half viewport size + any offset
+    const targetScrollX = this.player.x - (viewportWidth / 2) + this.cameraFollowOffset.x;
+    const targetScrollY = this.player.y - (viewportHeight / 2) + this.cameraFollowOffset.y;
+
+    // Apply world bounds constraints to prevent camera from going outside world
+    const constrainedTarget = this.constrainCameraToWorldBounds(targetScrollX, targetScrollY);
+
+    // Set the camera scroll position
     camera.setScroll(constrainedTarget.x, constrainedTarget.y);
 
+    // Update tracking variables
     this.lastPlayerX = this.player.x;
     this.lastPlayerY = this.player.y;
 
+    console.log('🎯 CAMERA CENTERED ON PLAYER:', {
+      playerPos: { x: this.player.x, y: this.player.y },
+      playerOrigin: { x: this.player.originX, y: this.player.originY },
+      viewportSize: { width: viewportWidth, height: viewportHeight },
+      cameraSize: { width: camera.width, height: camera.height },
+      zoom: camera.zoom,
+      worldBounds: this.worldBounds,
+      targetScroll: { x: targetScrollX, y: targetScrollY },
+      constrainedScroll: { x: constrainedTarget.x, y: constrainedTarget.y },
+      finalScroll: { x: camera.scrollX, y: camera.scrollY },
+      cameraFollowOffset: this.cameraFollowOffset,
+      // Calculate where player appears in viewport
+      playerInViewport: {
+        x: this.player.x - camera.scrollX,
+        y: this.player.y - camera.scrollY
+      },
+      viewportCenter: {
+        x: viewportWidth / 2,
+        y: viewportHeight / 2
+      }
+    });
 
+    // Update debug overlays if enabled
+    if (this.DEBUG_CAMERA_CENTERING) {
+      this.updateDebugOverlays();
+    }
+  }
+
+  // Update world bounds from background image dimensions (called by PhaserMapRenderer)
+  public updateWorldBoundsFromBackgroundImage(imageWidth: number, imageHeight: number): void {
+    console.log('🌍 CANVAS: Updating world bounds from background image', {
+      timestamp: new Date().toISOString(),
+      imageWidth,
+      imageHeight,
+      currentWorldBounds: this.worldBounds,
+      playerPosition: this.player ? { x: this.player.x, y: this.player.y } : null
+    });
+
+    const oldBounds = { ...this.worldBounds };
+    const newBounds = {
+      width: imageWidth,
+      height: imageHeight
+    };
+
+    this.worldBounds = newBounds;
+
+    // Update camera bounds to match the background image exactly
+    this.cameras.main.setBounds(0, 0, imageWidth, imageHeight);
+
+    // If player exists and world bounds changed significantly, reposition player if needed
+    if (this.player && (oldBounds.width !== newBounds.width || oldBounds.height !== newBounds.height)) {
+      const oldCenterX = oldBounds.width / 2;
+      const oldCenterY = oldBounds.height / 2;
+
+      // Check if player is near the old center (within 100 pixels)
+      const distanceFromOldCenter = Math.sqrt(
+        Math.pow(this.player.x - oldCenterX, 2) +
+        Math.pow(this.player.y - oldCenterY, 2)
+      );
+
+      if (distanceFromOldCenter < 100) {
+        // Move player to new world center
+        const newCenterX = imageWidth / 2;
+        const newCenterY = imageHeight / 2;
+        this.player.setPosition(newCenterX, newCenterY);
+
+        console.log('🎮 PLAYER REPOSITIONED TO NEW WORLD CENTER:', {
+          oldBounds,
+          newBounds,
+          oldPosition: { x: oldCenterX, y: oldCenterY },
+          newPosition: { x: newCenterX, y: newCenterY },
+          distanceFromOldCenter
+        });
+      }
+    }
+
+    console.log('🌍 CANVAS: World bounds updated from background image', {
+      oldBounds,
+      newBounds,
+      cameraBounds: {
+        x: 0,
+        y: 0,
+        width: imageWidth,
+        height: imageHeight
+      },
+      playerPosition: this.player ? { x: this.player.x, y: this.player.y } : null
+    });
+
+    // Re-center camera on player with updated world bounds
+    if (this.player) {
+      this.time.delayedCall(50, () => {
+        this.setDefaultZoomAndCenter();
+        console.log('🎮 CAMERA RE-CENTERED AFTER WORLD BOUNDS UPDATE');
+      });
+    }
   }
 
   // Update world bounds from SharedMapSystem
   private updateWorldBoundsFromMapData(): void {
     const mapData = this.sharedMapSystem.getMapData();
-    if (mapData && mapData.worldDimensions) {
-      const newBounds = {
-        width: mapData.worldDimensions.width,
-        height: mapData.worldDimensions.height
-      };
+    if (mapData) {
+      console.log('🌍 CANVAS: Updating world bounds from map data', {
+        timestamp: new Date().toISOString(),
+        hasWorldDimensions: !!mapData.worldDimensions,
+        worldDimensions: mapData.worldDimensions,
+        hasBackgroundImage: !!mapData.backgroundImage,
+        backgroundImageDimensions: mapData.backgroundImageDimensions,
+        currentWorldBounds: this.worldBounds
+      });
+
+      // CRITICAL FIX: Use background image dimensions if available, otherwise fall back to world dimensions
+      let newBounds;
+      if (mapData.backgroundImageDimensions) {
+        // Canvas should match background image dimensions for 1:1 pixel mapping
+        newBounds = {
+          width: mapData.backgroundImageDimensions.width,
+          height: mapData.backgroundImageDimensions.height
+        };
+        console.log('🌍 CANVAS: Using background image dimensions for world bounds', newBounds);
+      } else if (mapData.worldDimensions) {
+        // Fallback to world dimensions if no background image
+        newBounds = {
+          width: mapData.worldDimensions.width,
+          height: mapData.worldDimensions.height
+        };
+        console.log('🌍 CANVAS: Using world dimensions for world bounds', newBounds);
+      } else {
+        console.warn('🌍 CANVAS: No dimensions available, keeping current bounds');
+        return;
+      }
 
       this.worldBounds = newBounds;
 
-      // Update camera bounds
+      console.log('🌍 CANVAS: World bounds updated', {
+        oldBounds: this.worldBounds,
+        newBounds,
+        source: mapData.backgroundImageDimensions ? 'backgroundImageDimensions' : 'worldDimensions'
+      });
+
+      // Update camera bounds to match the new world bounds
       this.cameras.main.setBounds(0, 0, this.worldBounds.width, this.worldBounds.height);
 
       // Update background size
@@ -910,7 +1123,7 @@ class GameScene extends Phaser.Scene {
   // Set up listeners for map dimension changes
   private setupMapDimensionListeners(): void {
     // Listen for dimension changes from SharedMapSystem
-    this.sharedMapSystem.on('map:dimensionsChanged', (event: any) => {
+    this.sharedMapSystem.on('map:dimensionsChanged', () => {
       this.updateWorldBoundsFromMapData();
     });
 
@@ -939,20 +1152,60 @@ class GameScene extends Phaser.Scene {
     const currentZoom = this.cameras.main.zoom;
     const newZoom = Math.min(currentZoom + this.zoomStep, this.maxZoom);
 
-    // Disable camera following when manually zooming
+    console.log('🔍 ZOOM IN:', {
+      currentZoom,
+      newZoom,
+      zoomStep: this.zoomStep,
+      maxZoom: this.maxZoom
+    });
+
+    // Apply new zoom level
+    this.cameras.main.setZoom(newZoom);
+
+    // Re-center camera on player with new zoom level
+    if (this.player) {
+      this.centerCameraOnPlayer();
+      console.log('🎯 PLAYER RE-CENTERED AFTER ZOOM IN');
+    }
+
+    // Temporarily disable camera following to prevent immediate override
     this.manualCameraControl = true;
 
-    this.cameras.main.setZoom(newZoom);
+    // Re-enable camera following after a short delay to allow manual zoom control
+    this.time.delayedCall(1000, () => {
+      this.manualCameraControl = false;
+      console.log('🎯 CAMERA FOLLOWING RE-ENABLED AFTER ZOOM IN');
+    });
   }
 
   public zoomOut(): void {
     const currentZoom = this.cameras.main.zoom;
     const newZoom = Math.max(currentZoom - this.zoomStep, this.minZoom);
 
-    // Disable camera following when manually zooming
+    console.log('🔍 ZOOM OUT:', {
+      currentZoom,
+      newZoom,
+      zoomStep: this.zoomStep,
+      minZoom: this.minZoom
+    });
+
+    // Apply new zoom level
+    this.cameras.main.setZoom(newZoom);
+
+    // Re-center camera on player with new zoom level
+    if (this.player) {
+      this.centerCameraOnPlayer();
+      console.log('🎯 PLAYER RE-CENTERED AFTER ZOOM OUT');
+    }
+
+    // Temporarily disable camera following to prevent immediate override
     this.manualCameraControl = true;
 
-    this.cameras.main.setZoom(newZoom);
+    // Re-enable camera following after a short delay to allow manual zoom control
+    this.time.delayedCall(1000, () => {
+      this.manualCameraControl = false;
+      console.log('🎯 CAMERA FOLLOWING RE-ENABLED AFTER ZOOM OUT');
+    });
   }
 
   public resetZoom(): void {
@@ -1010,52 +1263,78 @@ class GameScene extends Phaser.Scene {
 
   /**
    * Set default zoom level and center camera on player
+   * Configures camera with 165% zoom, centers on player, and enables following
    */
   public setDefaultZoomAndCenter(): void {
+    // Prevent multiple simultaneous calls
+    if (this.isSettingDefaultZoom) {
+      console.log('🎮 SKIPPING DEFAULT ZOOM AND CENTER (already in progress)');
+      return;
+    }
+
+    this.isSettingDefaultZoom = true;
     const camera = this.cameras.main;
 
-    console.log('🎮 SETTING DEFAULT ZOOM AND CENTER:', {
+    console.log('🎮 SETTING DEFAULT ZOOM AND CENTER (165%):', {
       defaultZoom: this.defaultZoom,
+      zoomPercentage: `${Math.round(this.defaultZoom * 100)}%`,
       playerPosition: this.player ? { x: this.player.x, y: this.player.y } : 'no player',
-      currentZoom: camera.zoom
+      currentZoom: camera.zoom,
+      worldBounds: this.worldBounds
     });
 
-    // Set the default zoom level
+    // Set the default zoom level (165%)
     camera.setZoom(this.defaultZoom);
 
     // Center camera on player if player exists
     if (this.player) {
       this.centerCameraOnPlayer();
-      console.log('🎮 CAMERA CENTERED ON PLAYER:', {
+      console.log('🎮 CAMERA CENTERED ON PLAYER (165%):', {
         playerPos: { x: this.player.x, y: this.player.y },
         cameraScroll: { x: camera.scrollX, y: camera.scrollY },
-        zoom: camera.zoom
+        zoom: camera.zoom,
+        zoomPercentage: `${Math.round(camera.zoom * 100)}%`
       });
     } else {
       // Fallback: center on world center
       const centerX = this.worldBounds.width / 2;
       const centerY = this.worldBounds.height / 2;
       camera.centerOn(centerX, centerY);
-      console.log('🎮 CAMERA CENTERED ON WORLD CENTER:', {
+      console.log('🎮 CAMERA CENTERED ON WORLD CENTER (165%):', {
         worldCenter: { x: centerX, y: centerY },
         cameraScroll: { x: camera.scrollX, y: camera.scrollY },
-        zoom: camera.zoom
+        zoom: camera.zoom,
+        zoomPercentage: `${Math.round(camera.zoom * 100)}%`
       });
     }
 
-    // Enable camera following
+    // Enable camera following with adaptive lerp system
     this.isFollowingPlayer = true;
     this.manualCameraControl = false;
 
-    console.log('🎮 DEFAULT ZOOM AND CENTER COMPLETE:', {
+    console.log('🎮 DEFAULT ZOOM AND CENTER COMPLETE (165%):', {
       finalZoom: camera.zoom,
+      finalZoomPercentage: `${Math.round(camera.zoom * 100)}%`,
       isFollowing: this.isFollowingPlayer,
-      manualControl: this.manualCameraControl
+      manualControl: this.manualCameraControl,
+      adaptiveLerpEnabled: true
+    });
+
+    // Initialize debug overlays if enabled (with a small delay to ensure camera is settled)
+    if (this.DEBUG_CAMERA_CENTERING) {
+      this.time.delayedCall(50, () => {
+        this.initializeDebugOverlays();
+      });
+    }
+
+    // Reset the flag after a short delay to allow for future calls
+    this.time.delayedCall(200, () => {
+      this.isSettingDefaultZoom = false;
     });
   }
 
   public fitMapToViewport(): void {
-    // This method ensures the entire map is visible when the viewport changes
+    // This method handles viewport changes while preserving player centering
     const camera = this.cameras.main;
     const gameWidth = this.scale.gameSize.width;
     const gameHeight = this.scale.gameSize.height;
@@ -1064,7 +1343,8 @@ class GameScene extends Phaser.Scene {
       gameWidth,
       gameHeight,
       worldBounds: this.worldBounds,
-      currentZoom: camera.zoom
+      currentZoom: camera.zoom,
+      playerExists: !!this.player
     });
 
     if (gameWidth === 0 || gameHeight === 0) {
@@ -1072,6 +1352,7 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
+    // Calculate the zoom level needed to fit the entire world in the viewport
     const scaleX = gameWidth / this.worldBounds.width;
     const scaleY = gameHeight / this.worldBounds.height;
     const fitZoom = Math.min(scaleX, scaleY, 1);
@@ -1082,20 +1363,237 @@ class GameScene extends Phaser.Scene {
       fitZoom
     });
 
+    // Set the new zoom level
     camera.setZoom(fitZoom);
 
-    // Center the camera
-    const centerX = this.worldBounds.width / 2;
-    const centerY = this.worldBounds.height / 2;
-    camera.centerOn(centerX, centerY);
+    // If player exists, re-center camera on player to maintain player centering
+    // Otherwise, center on world center as fallback
+    if (this.player) {
+      console.log('📐 RE-CENTERING CAMERA ON PLAYER AFTER VIEWPORT RESIZE');
+      this.centerCameraOnPlayer();
+    } else {
+      console.log('📐 CENTERING CAMERA ON WORLD CENTER (no player)');
+      const centerX = this.worldBounds.width / 2;
+      const centerY = this.worldBounds.height / 2;
+      camera.centerOn(centerX, centerY);
+    }
 
     console.log('📐 FIT MAP RESULT:', {
       finalZoom: camera.zoom,
-      centerX,
-      centerY,
       scrollX: camera.scrollX,
-      scrollY: camera.scrollY
+      scrollY: camera.scrollY,
+      playerCentered: !!this.player
     });
+
+    // Update debug overlays if enabled
+    if (this.DEBUG_CAMERA_CENTERING) {
+      this.updateDebugOverlays();
+    }
+  }
+
+  // ===== DEBUG VISUAL OVERLAYS =====
+
+  /**
+   * Initialize debug visual overlays for camera centering diagnostics
+   */
+  private initializeDebugOverlays(): void {
+    if (!this.DEBUG_CAMERA_CENTERING) return;
+
+    console.log('🔧 INITIALIZING DEBUG OVERLAYS');
+
+    // Clean up existing debug elements
+    this.cleanupDebugOverlays();
+
+    // Create debug graphics objects
+    this.createDebugCrosshairs();
+    this.createDebugViewportBounds();
+    this.createDebugTextOverlays();
+
+    // Update debug elements immediately
+    this.updateDebugOverlays();
+  }
+
+  /**
+   * Create debug crosshair elements
+   */
+  private createDebugCrosshairs(): void {
+    // Player center cross (red)
+    this.debugPlayerCross = this.add.graphics();
+    this.debugPlayerCross.setDepth(1000);
+
+    // Camera center cross (blue)
+    this.debugCameraCross = this.add.graphics();
+    this.debugCameraCross.setDepth(1001);
+
+    // World center cross (yellow)
+    this.debugWorldCenterCross = this.add.graphics();
+    this.debugWorldCenterCross.setDepth(1002);
+  }
+
+  /**
+   * Create debug viewport bounds rectangle
+   */
+  private createDebugViewportBounds(): void {
+    this.debugViewportBounds = this.add.graphics();
+    this.debugViewportBounds.setDepth(999);
+  }
+
+  /**
+   * Create debug text overlays
+   */
+  private createDebugTextOverlays(): void {
+    const textStyle = {
+      fontSize: '14px',
+      color: '#ffffff',
+      backgroundColor: '#000000',
+      padding: { x: 4, y: 2 }
+    };
+
+    // Player position text (top-left)
+    this.debugPlayerPositionText = this.add.text(10, 10, '', textStyle);
+    this.debugPlayerPositionText.setDepth(1003);
+    this.debugPlayerPositionText.setScrollFactor(0); // Fixed to camera
+
+    // Camera scroll text (top-right)
+    this.debugCameraScrollText = this.add.text(0, 10, '', textStyle);
+    this.debugCameraScrollText.setDepth(1003);
+    this.debugCameraScrollText.setScrollFactor(0); // Fixed to camera
+  }
+
+  /**
+   * Update all debug overlays with current values
+   */
+  private updateDebugOverlays(): void {
+    if (!this.DEBUG_CAMERA_CENTERING || !this.player) return;
+
+    // Ensure debug overlays are initialized
+    if (!this.debugPlayerCross || !this.debugCameraCross || !this.debugViewportBounds ||
+        !this.debugWorldCenterCross || !this.debugPlayerPositionText || !this.debugCameraScrollText) {
+      return;
+    }
+
+    const camera = this.cameras.main;
+    const viewportWidth = camera.width / camera.zoom;
+    const viewportHeight = camera.height / camera.zoom;
+
+    // Calculate positions
+    const playerX = this.player.x;
+    const playerY = this.player.y;
+    const cameraViewportCenterX = camera.scrollX + viewportWidth / 2;
+    const cameraViewportCenterY = camera.scrollY + viewportHeight / 2;
+    const worldCenterX = this.worldBounds.width / 2;
+    const worldCenterY = this.worldBounds.height / 2;
+
+    // Update crosshairs
+    this.drawCrosshair(this.debugPlayerCross!, playerX, playerY, 0xff0000, 20); // Red
+    this.drawCrosshair(this.debugCameraCross!, cameraViewportCenterX, cameraViewportCenterY, 0x0000ff, 20); // Blue
+    this.drawCrosshair(this.debugWorldCenterCross!, worldCenterX, worldCenterY, 0xffff00, 25); // Yellow
+
+    // Update viewport bounds
+    this.drawViewportBounds(camera.scrollX, camera.scrollY, viewportWidth, viewportHeight);
+
+    // Update text overlays
+    this.updateDebugText(playerX, playerY, camera.scrollX, camera.scrollY, cameraViewportCenterX, cameraViewportCenterY);
+  }
+
+  /**
+   * Draw a crosshair at the specified position
+   */
+  private drawCrosshair(graphics: Phaser.GameObjects.Graphics, x: number, y: number, color: number, size: number): void {
+    graphics.clear();
+    graphics.lineStyle(2, color, 1);
+
+    // Horizontal line
+    graphics.moveTo(x - size/2, y);
+    graphics.lineTo(x + size/2, y);
+
+    // Vertical line
+    graphics.moveTo(x, y - size/2);
+    graphics.lineTo(x, y + size/2);
+
+    graphics.strokePath();
+  }
+
+  /**
+   * Draw viewport bounds rectangle
+   */
+  private drawViewportBounds(scrollX: number, scrollY: number, width: number, height: number): void {
+    if (!this.debugViewportBounds) return;
+
+    this.debugViewportBounds.clear();
+    this.debugViewportBounds.lineStyle(2, 0x00ff00, 0.8); // Green with transparency
+    this.debugViewportBounds.strokeRect(scrollX, scrollY, width, height);
+  }
+
+  /**
+   * Update debug text overlays
+   */
+  private updateDebugText(
+    playerX: number,
+    playerY: number,
+    scrollX: number,
+    scrollY: number,
+    cameraViewportCenterX: number,
+    cameraViewportCenterY: number
+  ): void {
+    if (!this.debugPlayerPositionText || !this.debugCameraScrollText) return;
+
+    // Player position text
+    const playerText = `Player: (${Math.round(playerX)}, ${Math.round(playerY)})`;
+    this.debugPlayerPositionText.setText(playerText);
+
+    // Camera scroll text (position in top-right)
+    const cameraText = `Camera: (${Math.round(scrollX)}, ${Math.round(scrollY)})\nViewport Center: (${Math.round(cameraViewportCenterX)}, ${Math.round(cameraViewportCenterY)})`;
+    this.debugCameraScrollText.setText(cameraText);
+
+    // Position camera text in top-right
+    const camera = this.cameras.main;
+    this.debugCameraScrollText.setPosition(camera.width - 250, 10);
+  }
+
+  /**
+   * Clean up existing debug overlays
+   */
+  private cleanupDebugOverlays(): void {
+    if (this.debugPlayerCross) {
+      this.debugPlayerCross.destroy();
+      this.debugPlayerCross = undefined;
+    }
+    if (this.debugCameraCross) {
+      this.debugCameraCross.destroy();
+      this.debugCameraCross = undefined;
+    }
+    if (this.debugViewportBounds) {
+      this.debugViewportBounds.destroy();
+      this.debugViewportBounds = undefined;
+    }
+    if (this.debugWorldCenterCross) {
+      this.debugWorldCenterCross.destroy();
+      this.debugWorldCenterCross = undefined;
+    }
+    if (this.debugPlayerPositionText) {
+      this.debugPlayerPositionText.destroy();
+      this.debugPlayerPositionText = undefined;
+    }
+    if (this.debugCameraScrollText) {
+      this.debugCameraScrollText.destroy();
+      this.debugCameraScrollText = undefined;
+    }
+  }
+
+  /**
+   * Toggle debug overlays on/off
+   */
+  public toggleDebugOverlays(): void {
+    this.DEBUG_CAMERA_CENTERING = !this.DEBUG_CAMERA_CENTERING;
+
+    if (this.DEBUG_CAMERA_CENTERING) {
+      console.log('🔧 DEBUG OVERLAYS ENABLED');
+      this.initializeDebugOverlays();
+    } else {
+      console.log('🔧 DEBUG OVERLAYS DISABLED');
+      this.cleanupDebugOverlays();
+    }
   }
 }
 
@@ -1221,6 +1719,12 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
     gameSceneRef.current = gameScene;
     console.log('🎮 Game scene created and stored in ref:', gameScene);
 
+    console.log('🌍 CANVAS: Creating Phaser game configuration', {
+      timestamp: new Date().toISOString(),
+      containerElement: !!gameRef.current,
+      scaleMode: 'RESIZE with CENTER_BOTH'
+    });
+
     const config: Phaser.Types.Core.GameConfig = {
       type: Phaser.AUTO,
       width: '100%',
@@ -1239,6 +1743,23 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
     try {
       phaserGameRef.current = new Phaser.Game(config);
       console.log('Phaser game created successfully:', phaserGameRef.current);
+
+      // Log canvas dimensions for comparison with edit mode
+      setTimeout(() => {
+        const canvas = phaserGameRef.current?.canvas;
+        if (canvas && gameSceneRef.current) {
+          console.log('🎮 WORLD MODE: Canvas ready', {
+            timestamp: new Date().toISOString(),
+            canvasSize: { width: canvas.width, height: canvas.height },
+            gameSize: {
+              width: phaserGameRef.current?.scale.gameSize.width,
+              height: phaserGameRef.current?.scale.gameSize.height
+            },
+            worldBounds: gameSceneRef.current.worldBounds,
+            mode: 'world'
+          });
+        }
+      }, 1000);
 
       // Store game instance globally for debugging
       (window as any).phaserGame = phaserGameRef.current;

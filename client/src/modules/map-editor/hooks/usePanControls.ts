@@ -73,20 +73,36 @@ export const usePanControls = ({
 
   // Update cursor based on current state
   const updateCursor = useCallback(() => {
-    if (!canvasElement) return;
+    if (!canvasElement) {
+      console.log('🎯 PAN CURSOR: No canvas element available');
+      return;
+    }
+
+    let newCursor = 'default';
 
     if (isPanning) {
-      canvasElement.style.cursor = 'grabbing';
+      newCursor = 'grabbing';
     } else if (canPanWithSpace || canPanWithTool) {
-      canvasElement.style.cursor = 'grab';
+      newCursor = 'grab';
     } else {
       // Reset to default cursor for other tools
-      canvasElement.style.cursor = currentTool === 'select' ? 'default' :
-                                   currentTool === 'move' ? 'move' :
-                                   currentTool === 'resize' ? 'nw-resize' :
-                                   currentTool === 'delete' ? 'crosshair' :
-                                   'default';
+      newCursor = currentTool === 'select' ? 'default' :
+                  currentTool === 'move' ? 'move' :
+                  currentTool === 'resize' ? 'nw-resize' :
+                  currentTool === 'delete' ? 'crosshair' :
+                  'default';
     }
+
+    console.log('🎯 PAN CURSOR: Setting cursor', {
+      currentTool,
+      isPanning,
+      canPanWithSpace,
+      canPanWithTool,
+      newCursor,
+      elementType: canvasElement.tagName
+    });
+
+    canvasElement.style.cursor = newCursor;
   }, [canvasElement, isPanning, canPanWithSpace, canPanWithTool, currentTool]);
 
   // Update cursor when canvas element becomes available

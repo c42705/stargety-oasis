@@ -11,7 +11,7 @@
 
 .fabric-map-canvas canvas {
   display: block;
-  cursor: crosshair;
+  /* Cursor is managed dynamically by JavaScript based on current tool and state */
   background: transparent;
 }
 
@@ -35,22 +35,8 @@
   position: relative;
 }
 
-/* Custom cursor states */
-.fabric-map-canvas.mode-select canvas {
-  cursor: default;
-}
-
-.fabric-map-canvas.mode-move canvas {
-  cursor: move;
-}
-
-.fabric-map-canvas.mode-draw canvas {
-  cursor: crosshair;
-}
-
-.fabric-map-canvas.mode-erase canvas {
-  cursor: not-allowed;
-}
+/* Custom cursor states - Removed static cursor rules */
+/* Cursors are now managed dynamically by JavaScript based on tool state and pan controls */
 
 /* Object selection styles */
 .fabric-map-canvas .canvas-container .upper-canvas {

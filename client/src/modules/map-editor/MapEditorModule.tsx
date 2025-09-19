@@ -3,6 +3,7 @@ import { Map, Eye, Square, Shield } from 'lucide-react';
 import { useMapData, InteractiveArea } from '../../shared/MapDataContext';
 // import { useSharedMap } from '../../shared/useSharedMap';
 import { useSharedMapCompat as useSharedMap } from '../../stores/useSharedMapCompat';
+import { SharedMapSystem } from '../../shared/SharedMapSystem';
 import { FabricMapCanvas } from './FabricMapCanvas';
 import * as fabric from 'fabric';
 import { AreaFormModal } from '../../components/AreaFormModal';
@@ -32,6 +33,15 @@ import { useBackgroundInfoIntegration } from './hooks/useBackgroundInfoPanel';
 import { MapEditorModuleProps, TabId, GridConfig } from './types/editor.types';
 import { EDITOR_TABS, KEYBOARD_SHORTCUTS } from './constants/editorConstants';
 
+// Import zoom utilities
+import {
+  calculateZoomToObject,
+  getViewportDimensions,
+  applyZoomAndPan,
+  validateZoomOperation,
+  getZoomState
+} from './utils/zoomUtils';
+
 
 
 
@@ -55,14 +65,38 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   // Use shared map data
   const { interactiveAreas: areas, impassableAreas } = mapData;
 
+  // Get effective dimensions from centralized system
+  const getEffectiveDimensions = useCallback(() => {
+    try {
+      return SharedMapSystem.getInstance().getEffectiveDimensions();
+    } catch {
+      return mapData.worldDimensions;
+    }
+  }, [mapData.worldDimensions]);
+
+  const effectiveDimensions = getEffectiveDimensions();
+
   // Use extracted hooks
   const editorState = useEditorState();
-  const gridConfig = useGridConfig();
+  const gridConfig = useGridConfig(editorState.editorState.zoom / 100); // Pass current zoom as decimal
   const modalState = useModalState();
   const drawingMode = useDrawingMode();
   const collisionModalState = useCollisionModalState();
   const collisionDrawingMode = useCollisionDrawingMode();
   const backgroundInfoPanel = useBackgroundInfoIntegration();
+
+  // Watch for effective dimension changes and re-apply fit-to-screen
+  useEffect(() => {
+    if (fabricCanvasRef.current && effectiveDimensions) {
+      // Re-apply fit-to-screen when effective dimensions change (but don't force it to allow manual zoom to take precedence)
+      setTimeout(() => {
+        editorState.onFitToScreen(false); // Don't force - respect manual zoom
+        console.log('🎯 EDIT MODE: Re-applied zoom to fit after effective dimension change', {
+          effectiveDimensions
+        });
+      }, 100);
+    }
+  }, [effectiveDimensions.width, effectiveDimensions.height, editorState]);
 
   // Create handlers using extracted utilities
   const handleSaveArea = useCallback(async (areaData: any) => {
@@ -269,48 +303,33 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
             }}
             onToolChange={editorState.onToolChange}
             onZoomToObject={(object) => {
-              // Zoom to fit the selected object
-              if (fabricCanvasRef.current && object) {
-                const canvas = fabricCanvasRef.current;
-                const objectBounds = object.getBoundingRect();
+              // Zoom to fit the selected object using unified zoom utilities
+              if (!fabricCanvasRef.current || !object) return;
 
-                // Ensure object has valid dimensions
-                if (objectBounds.width <= 0 || objectBounds.height <= 0) {
-                  console.warn('Object has invalid dimensions for zoom:', objectBounds);
+              const canvas = fabricCanvasRef.current;
+              const objectBounds = object.getBoundingRect();
+
+              try {
+                // Calculate zoom to object using utility function
+                const { zoom: fitZoom, centerX, centerY } = calculateZoomToObject(
+                  objectBounds,
+                  canvas.getWidth(),
+                  canvas.getHeight(),
+                  { padding: 100 } // Use default object focus max zoom (3.1x)
+                );
+
+                // Validate zoom operation
+                const validation = validateZoomOperation(canvas, fitZoom, 'zoom to object');
+                if (!validation.isValid) {
+                  console.warn('🎯 ZOOM TO OBJECT BLOCKED:', validation.error);
                   return;
                 }
 
-                // Calculate zoom to fit object with some padding
-                const padding = 100;
-                const containerWidth = canvas.getWidth();
-                const containerHeight = canvas.getHeight();
+                // Get viewport dimensions for centering
+                const viewportDims = getViewportDimensions(canvas.getElement().parentElement || canvas.getElement());
 
-                // Ensure container has valid dimensions
-                if (containerWidth <= 0 || containerHeight <= 0) {
-                  console.warn('Canvas has invalid dimensions for zoom:', { containerWidth, containerHeight });
-                  return;
-                }
-
-                const zoomX = (containerWidth - padding * 2) / objectBounds.width;
-                const zoomY = (containerHeight - padding * 2) / objectBounds.height;
-
-                // Apply zoom constraints: min 0.1x, max 3.0x for object focus
-                const fitZoom = Math.max(0.1, Math.min(zoomX, zoomY, 3.0));
-
-                // Center the object in viewport
-                const centerX = objectBounds.left + objectBounds.width / 2;
-                const centerY = objectBounds.top + objectBounds.height / 2;
-
-                const viewportCenterX = containerWidth / 2;
-                const viewportCenterY = containerHeight / 2;
-
-                // Apply zoom and pan
-                canvas.setZoom(fitZoom);
-                canvas.absolutePan(new fabric.Point(
-                  viewportCenterX - centerX * fitZoom,
-                  viewportCenterY - centerY * fitZoom
-                ));
-                canvas.renderAll();
+                // Apply zoom and pan using utility function
+                applyZoomAndPan(canvas, fitZoom, centerX, centerY, viewportDims);
 
                 // Update editor state zoom
                 editorState.setEditorState(prev => ({
@@ -318,13 +337,18 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
                   zoom: Math.round(fitZoom * 100)
                 }));
 
+                const zoomState = getZoomState(fitZoom);
                 console.log('🎯 ZOOMED TO OBJECT:', {
                   objectBounds,
                   fitZoom,
                   centerX,
                   centerY,
+                  zoomPercentage: `${zoomState.percentage}%`,
+                  isExtreme: zoomState.isExtreme,
                   objectType: (object as any).type || 'unknown'
                 });
+              } catch (error) {
+                console.error('🎯 ZOOM TO OBJECT ERROR:', error);
               }
             }}
           />
@@ -387,8 +411,8 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
           style={{ position: 'relative' }}
         >
           <FabricMapCanvas
-            width={mapData.worldDimensions.width}
-            height={mapData.worldDimensions.height}
+            width={effectiveDimensions.width}
+            height={effectiveDimensions.height}
             gridVisible={gridConfig.gridConfig.visible}
             gridSpacing={gridConfig.gridConfig.spacing}
             gridPattern={gridConfig.gridConfig.pattern}
@@ -408,8 +432,22 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
             onCollisionAreaDrawn={handleCollisionAreaDrawn}
             className="map-editor-canvas"
             onCanvasReady={(canvas) => {
+              console.log('🎨 EDIT MODE: Canvas ready with centralized dimensions', {
+                timestamp: new Date().toISOString(),
+                canvasSize: { width: canvas.width, height: canvas.height },
+                effectiveDimensions,
+                worldDimensions: mapData.worldDimensions,
+                backgroundImageDimensions: sharedMap.mapData?.backgroundImageDimensions,
+                mode: 'edit'
+              });
               editorState.setFabricCanvas(canvas);
               fabricCanvasRef.current = canvas;
+
+              // Automatically fit map to viewport when entering edit mode (force it on initial load)
+              setTimeout(() => {
+                editorState.onFitToScreen(true); // Force on initial canvas ready
+                console.log('🎯 EDIT MODE: Auto-applied zoom to fit on canvas ready');
+              }, 100);
             }}
             backgroundInfoPanelVisible={backgroundInfoPanel.isPanelVisible}
             onBackgroundInfoPanelClose={backgroundInfoPanel.hidePanel}

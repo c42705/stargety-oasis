@@ -75,9 +75,22 @@ export const DEFAULT_EDITOR_STATE: EditorState = {
 };
 
 export const ZOOM_LIMITS = {
-  MIN: 10,
-  MAX: 500,
-  STEP: 20
+  MIN: 10,        // 0.1x minimum zoom
+  MAX: 500,       // 5.0x maximum zoom (supports 3.1x+ requirement)
+  STEP: 20,       // 20% zoom steps
+  EXTREME_MAX: 1000, // 10.0x for extreme zoom testing
+  OBJECT_FOCUS_MAX: 310 // 3.1x for object focus operations
+} as const;
+
+export const ZOOM_CONFIG = {
+  // Convert percentage to decimal
+  MIN_DECIMAL: ZOOM_LIMITS.MIN / 100,           // 0.1
+  MAX_DECIMAL: ZOOM_LIMITS.MAX / 100,           // 5.0
+  EXTREME_MAX_DECIMAL: ZOOM_LIMITS.EXTREME_MAX / 100, // 10.0
+  OBJECT_FOCUS_MAX_DECIMAL: ZOOM_LIMITS.OBJECT_FOCUS_MAX / 100, // 3.1
+  STEP_MULTIPLIER: 1.2,                        // 20% zoom step multiplier
+  FIT_SCREEN_PADDING: 50,                      // Padding for fit-to-screen operations
+  MANUAL_ZOOM_TIMEOUT: 500                     // Timeout for manual zoom operations
 } as const;
 
 export const KEYBOARD_SHORTCUTS = {

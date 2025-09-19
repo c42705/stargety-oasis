@@ -374,7 +374,95 @@ export class SharedMapSystem {
   }
 
   /**
-   * Update world dimensions and trigger synchronization
+   * CENTRALIZED DIMENSION MANAGEMENT
+   * This is the single source of truth for all dimension operations
+   */
+
+  /**
+   * Get the current effective dimensions (prioritizes background image dimensions)
+   */
+  public getEffectiveDimensions(): { width: number; height: number } {
+    if (!this.mapData) {
+      return { width: 800, height: 600 }; // Fallback
+    }
+
+    // Priority: backgroundImageDimensions > worldDimensions > fallback
+    if (this.mapData.backgroundImageDimensions) {
+      return { ...this.mapData.backgroundImageDimensions };
+    }
+
+    if (this.mapData.worldDimensions) {
+      return { ...this.mapData.worldDimensions };
+    }
+
+    return { width: 800, height: 600 }; // Fallback
+  }
+
+  /**
+   * Update dimensions from background image (single source of truth)
+   */
+  public async updateDimensionsFromBackgroundImage(
+    imageUrl: string,
+    imageDimensions: { width: number; height: number },
+    source: 'upload' | 'load' | 'default' = 'load'
+  ): Promise<void> {
+    if (!this.mapData) {
+      throw new Error('Map data not initialized');
+    }
+
+    // Validate dimensions
+    const validatedDimensions = this.validateAndScaleImageDimensions(imageDimensions.width, imageDimensions.height);
+
+    const previousDimensions = this.getEffectiveDimensions();
+
+    // Update all dimension-related fields in sync
+    this.mapData.backgroundImage = imageUrl;
+    this.mapData.backgroundImageDimensions = validatedDimensions;
+    this.mapData.worldDimensions = validatedDimensions; // Keep in sync
+
+    console.log('🎯 CENTRALIZED DIMENSIONS UPDATE:', {
+      source,
+      imageUrl: imageUrl.substring(0, 50) + '...',
+      originalDimensions: imageDimensions,
+      validatedDimensions,
+      previousDimensions,
+      scaled: validatedDimensions.scaled
+    });
+
+    // Record change for history
+    this.recordChange({
+      id: `change_${Date.now()}`,
+      type: 'update',
+      elementType: 'worldDimensions',
+      before: {
+        worldDimensions: previousDimensions,
+        backgroundImageDimensions: this.mapData.backgroundImageDimensions
+      },
+      after: {
+        worldDimensions: validatedDimensions,
+        backgroundImageDimensions: validatedDimensions
+      },
+      timestamp: new Date(),
+      userId: 'current_user'
+    });
+
+    // Mark as changed and schedule auto-save
+    this.markAsChanged();
+
+    // Emit unified dimension change event
+    this.emit('map:dimensionsChanged', {
+      dimensions: validatedDimensions,
+      previousDimensions,
+      mapData: this.mapData,
+      source: `background-${source}`
+    });
+
+    // Also emit general map changed event
+    this.emit('map:changed', { mapData: this.mapData, source: `background-${source}` });
+  }
+
+  /**
+   * Update world dimensions manually (legacy support, syncs with background dimensions)
    */
   public async updateWorldDimensions(dimensions: { width: number; height: number }, source: 'world' | 'editor' = 'editor'): Promise<void> {
     if (!this.mapData) {
@@ -386,18 +474,26 @@ export class SharedMapSystem {
       throw new Error('World dimensions must be positive numbers');
     }
 
-    if (dimensions.width > 4000 || dimensions.height > 3000) {
-      throw new Error('World dimensions exceed maximum allowed size (4000×3000)');
+    if (dimensions.width > SharedMapSystem.MAX_WORLD_WIDTH || dimensions.height > SharedMapSystem.MAX_WORLD_HEIGHT) {
+      throw new Error(`World dimensions exceed maximum allowed size (${SharedMapSystem.MAX_WORLD_WIDTH}×${SharedMapSystem.MAX_WORLD_HEIGHT})`);
     }
 
     if (dimensions.width < 400 || dimensions.height < 300) {
       throw new Error('World dimensions are below minimum required size (400×300)');
     }
 
-    const previousDimensions = { ...this.mapData.worldDimensions };
+    const previousDimensions = this.getEffectiveDimensions();
 
-    // Update world dimensions
+    // Update both world and background image dimensions to keep them in sync
     this.mapData.worldDimensions = dimensions;
+    this.mapData.backgroundImageDimensions = dimensions;
+
+    console.log('🎯 CENTRALIZED WORLD DIMENSIONS UPDATE:', {
+      source,
+      dimensions,
+      previousDimensions,
+      syncedWithBackground: true
+    });
 
     // Record change for history
     this.recordChange({
@@ -407,7 +503,7 @@ export class SharedMapSystem {
       before: { worldDimensions: previousDimensions },
       after: { worldDimensions: dimensions },
       timestamp: new Date(),
-      userId: 'current_user' // TODO: Get from auth context
+      userId: 'current_user'
     });
 
     // Mark as changed and schedule auto-save
@@ -423,12 +519,6 @@ export class SharedMapSystem {
 
     // Also emit general map changed event
     this.emit('map:changed', { mapData: this.mapData, source });
-
-    console.log('World dimensions updated:', {
-      from: previousDimensions,
-      to: dimensions,
-      source
-    });
   }
 
   /**
@@ -625,6 +715,53 @@ export class SharedMapSystem {
       width: SharedMapSystem.MAX_WORLD_WIDTH,
       height: SharedMapSystem.MAX_WORLD_HEIGHT
     };
+  }
+
+  /**
+   * Detect and update dimensions from actual loaded image
+   * This fixes mismatches between stored and actual dimensions
+   */
+  public async detectAndUpdateImageDimensions(imageUrl?: string): Promise<void> {
+    if (!this.mapData) {
+      throw new Error('Map data not initialized');
+    }
+
+    const targetImageUrl = imageUrl || this.mapData.backgroundImage;
+    if (!targetImageUrl) {
+      console.warn('🔍 DIMENSION DETECTION: No background image to detect dimensions from');
+      return;
+    }
+
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+
+      img.onload = async () => {
+        const actualDimensions = { width: img.width, height: img.height };
+        const storedDimensions = this.getEffectiveDimensions();
+
+        console.log('🔍 DIMENSION DETECTION COMPLETE:', {
+          imageUrl: targetImageUrl.substring(0, 50) + '...',
+          actualDimensions,
+          storedDimensions,
+          mismatch: actualDimensions.width !== storedDimensions.width || actualDimensions.height !== storedDimensions.height
+        });
+
+        // If there's a mismatch, update to actual dimensions
+        if (actualDimensions.width !== storedDimensions.width || actualDimensions.height !== storedDimensions.height) {
+          console.log('🔧 FIXING DIMENSION MISMATCH: Updating to actual image dimensions');
+          await this.updateDimensionsFromBackgroundImage(targetImageUrl, actualDimensions, 'load');
+        }
+
+        resolve();
+      };
+
+      img.onerror = (error) => {
+        console.error('❌ DIMENSION DETECTION FAILED:', error);
+        reject(new Error(`Failed to load image for dimension detection: ${targetImageUrl}`));
+      };
+
+      img.src = targetImageUrl;
+    });
   }
 
   /**
@@ -856,29 +993,24 @@ export class SharedMapSystem {
   }
 
   /**
-   * Load default background image and get its dimensions
+   * Load default background image and get its actual dimensions
    */
   private async loadDefaultBackgroundImage(): Promise<{ imageUrl: string; width: number; height: number }> {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
-        console.log('🖼️ DEFAULT BACKGROUND IMAGE LOADED:', {
+        console.log('🖼️ DEFAULT BACKGROUND IMAGE LOADED (ACTUAL DIMENSIONS):', {
           width: img.width,
           height: img.height,
           staticUrl: '/default-background.jpg'
         });
 
-        // Validate and scale dimensions if necessary
-        const validatedDimensions = this.validateAndScaleImageDimensions(img.width, img.height);
-
-        if (validatedDimensions.scaled) {
-          console.log('🖼️ DEFAULT BACKGROUND SCALED TO FIT LIMITS:', validatedDimensions);
-        }
-
+        // Return actual dimensions without validation/scaling for default image
+        // The centralized dimension system will handle validation
         resolve({
-          imageUrl: '/default-background.jpg', // Use static resource URL instead of data URL
-          width: validatedDimensions.width,
-          height: validatedDimensions.height
+          imageUrl: '/default-background.jpg',
+          width: img.width,
+          height: img.height
         });
       };
 
@@ -893,37 +1025,32 @@ export class SharedMapSystem {
   }
 
   /**
-   * Create default map data
+   * Create default map data using centralized dimension management
    */
   private async createDefaultMap(): Promise<SharedMapData> {
-    console.log('🗺️ CREATING DEFAULT MAP WITH BACKGROUND IMAGE');
+    console.log('🗺️ CREATING DEFAULT MAP WITH CENTRALIZED DIMENSION MANAGEMENT');
 
-    // Load default background image
+    // Load default background image and get actual dimensions
     let backgroundImage: string | undefined;
-    let backgroundImageDimensions: { width: number; height: number } | undefined;
-    let worldWidth = 800;
-    let worldHeight = 600;
+    let effectiveDimensions = { width: 800, height: 600 }; // Fallback
 
     try {
       const imageData = await this.loadDefaultBackgroundImage();
-      backgroundImage = imageData.imageUrl; // Use static URL instead of data URL
-      backgroundImageDimensions = {
-        width: imageData.width,
-        height: imageData.height
-      };
+      backgroundImage = imageData.imageUrl;
 
-      // Use image dimensions as world dimensions
-      worldWidth = imageData.width;
-      worldHeight = imageData.height;
+      // Validate and scale dimensions using centralized logic
+      const validatedDimensions = this.validateAndScaleImageDimensions(imageData.width, imageData.height);
+      effectiveDimensions = validatedDimensions;
 
-      console.log('🖼️ DEFAULT BACKGROUND SET:', {
-        worldDimensions: { width: worldWidth, height: worldHeight },
-        imageDimensions: backgroundImageDimensions,
+      console.log('🖼️ DEFAULT BACKGROUND PROCESSED WITH CENTRALIZED DIMENSIONS:', {
+        originalDimensions: { width: imageData.width, height: imageData.height },
+        effectiveDimensions,
+        scaled: validatedDimensions.scaled,
         staticUrl: backgroundImage
       });
     } catch (error) {
-      console.warn('⚠️ FAILED TO LOAD DEFAULT BACKGROUND, USING FALLBACK:', error);
-      // Continue without background image
+      console.warn('⚠️ FAILED TO LOAD DEFAULT BACKGROUND, USING FALLBACK DIMENSIONS:', error);
+      // Continue with fallback dimensions
     }
 
     const defaultMap: SharedMapData = {
@@ -932,8 +1059,8 @@ export class SharedMapSystem {
           id: 'meeting-room-default',
           name: 'Meeting Room',
           type: 'meeting-room',
-          x: Math.floor(worldWidth * 0.2), // 20% from left
-          y: Math.floor(worldHeight * 0.25), // 25% from top
+          x: Math.floor(effectiveDimensions.width * 0.2), // 20% from left
+          y: Math.floor(effectiveDimensions.height * 0.25), // 25% from top
           width: 120,
           height: 80,
           color: '#4A90E2',
@@ -943,8 +1070,8 @@ export class SharedMapSystem {
           id: 'coffee-corner-default',
           name: 'Coffee Corner',
           type: 'coffee-corner',
-          x: Math.floor(worldWidth * 0.6), // 60% from left
-          y: Math.floor(worldHeight * 0.7), // 70% from top
+          x: Math.floor(effectiveDimensions.width * 0.6), // 60% from left
+          y: Math.floor(effectiveDimensions.height * 0.7), // 70% from top
           width: 100,
           height: 80,
           color: '#D2691E',
@@ -954,26 +1081,23 @@ export class SharedMapSystem {
       impassableAreas: [
         {
           id: 'wall-default',
-          x: Math.floor(worldWidth * 0.3), // 30% from left
-          y: Math.floor(worldHeight * 0.15), // 15% from top
+          x: Math.floor(effectiveDimensions.width * 0.3), // 30% from left
+          y: Math.floor(effectiveDimensions.height * 0.15), // 15% from top
           width: 80,
           height: 20,
           name: 'Wall Section'
         }
       ],
-      worldDimensions: {
-        width: worldWidth,
-        height: worldHeight
-      },
+      worldDimensions: effectiveDimensions,
       backgroundImage: backgroundImage,
-      backgroundImageDimensions: backgroundImageDimensions,
+      backgroundImageDimensions: effectiveDimensions, // Keep in sync
       version: 1,
       lastModified: new Date(),
       createdBy: 'system',
       metadata: {
-        name: 'Default Map - Zep Style',
-        description: 'Default virtual world map with Zep-style background',
-        tags: ['default', 'starter', 'zep'],
+        name: 'Stargety Oasis',
+        description: 'Default Zep-style virtual office space',
+        tags: ['default', 'office', 'zep-style'],
         isPublic: true
       },
       layers: [

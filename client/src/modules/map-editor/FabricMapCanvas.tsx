@@ -17,12 +17,19 @@ import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react'
 import * as fabric from 'fabric';
 // import { useSharedMap } from '../../shared/useSharedMap';
 import { useSharedMapCompat as useSharedMap } from '../../stores/useSharedMapCompat';
+import { SharedMapSystem } from '../../shared/SharedMapSystem';
 import { InteractiveArea, ImpassableArea } from '../../shared/MapDataContext';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 import { MapEditorCameraControls } from './hooks/useMapEditorCamera';
 import { usePanControls, PanMethod } from './hooks/usePanControls';
 import { BackgroundInfoPanel } from './components/BackgroundInfoPanel';
 import { GRID_PATTERNS } from './constants/editorConstants';
+import {
+  optimizeCanvasRendering,
+  createOptimizedCanvasHandlers,
+  CanvasPerformanceMonitor,
+  shouldOptimizePerformance
+} from './utils/performanceUtils';
 import './FabricMapCanvas.css';
 
 interface FabricMapCanvasProps {
@@ -93,6 +100,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   const [areasToDelete, setAreasToDelete] = useState<{ id: string; name: string }[]>([]);
   const [forceRender, setForceRender] = useState(0);
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const performanceMonitorRef = useRef<CanvasPerformanceMonitor | null>(null);
 
   // Background info panel state managed by parent component
 
@@ -105,6 +113,14 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       console.log('🎮 Pan state changed:', { isPanning, method });
     }
   });
+
+  // Update pan controls when canvas element becomes available
+  useEffect(() => {
+    if (canvasRef.current && panControls.actions.updateCursor) {
+      console.log('🎯 PAN: Canvas element available, updating cursor for tool:', currentTool);
+      panControls.actions.updateCursor();
+    }
+  }, [isInitialized, currentTool, panControls.actions]);
 
   // Log initialization state changes for debugging
   useEffect(() => {
@@ -460,6 +476,28 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
       console.log('🚀 FABRIC CANVAS INITIALIZED:', { width, height });
 
+      // Detect and fix any dimension mismatches
+      setTimeout(async () => {
+        try {
+          const mapSystem = SharedMapSystem.getInstance();
+          await mapSystem.detectAndUpdateImageDimensions();
+          console.log('✅ DIMENSION DETECTION COMPLETED ON CANVAS INIT');
+        } catch (error) {
+          console.warn('⚠️ DIMENSION DETECTION FAILED ON CANVAS INIT:', error);
+        }
+      }, 100);
+
+      // Initialize performance monitoring for high zoom levels
+      performanceMonitorRef.current = new CanvasPerformanceMonitor(canvas);
+
+      // Apply initial performance optimizations
+      const currentZoom = canvas.getZoom();
+      if (shouldOptimizePerformance(currentZoom)) {
+        optimizeCanvasRendering(canvas, currentZoom);
+        performanceMonitorRef.current.startMonitoring();
+        console.log('🚀 Performance optimizations enabled for zoom level:', currentZoom);
+      }
+
       // Notify parent component that canvas is ready
       if (onCanvasReady) {
         onCanvasReady(canvas);
@@ -492,6 +530,12 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       setupCanvasEventListeners(canvas);
 
       return () => {
+        // Cleanup performance monitor
+        if (performanceMonitorRef.current) {
+          performanceMonitorRef.current.stopMonitoring();
+          performanceMonitorRef.current = null;
+        }
+
         canvas.dispose();
         fabricCanvasRef.current = null;
         setIsInitialized(false);
@@ -504,9 +548,12 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     const canvas = fabricCanvasRef.current;
     if (canvas && isInitialized) {
       // Resize canvas while preserving all objects and references
-
       canvas.setDimensions({ width, height });
       canvas.renderAll();
+
+      // Force background image update when dimensions change
+      console.log('🔄 CANVAS DIMENSIONS CHANGED, WILL TRIGGER BACKGROUND UPDATE');
+      // Note: Background update will be triggered by the backgroundImageUrl dependency
     }
   }, [width, height, isInitialized]);
 
@@ -983,6 +1030,51 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     }
   }, [isInitialized, backgroundImageUrl, updateBackgroundImage]);
 
+  // Listen for SharedMapSystem events to handle background image updates
+  useEffect(() => {
+    const handleMapChanged = (event: any) => {
+      console.log('🔄 SHARED MAP CHANGED EVENT RECEIVED:', {
+        timestamp: new Date().toISOString(),
+        hasMapData: !!event.mapData,
+        hasBackgroundImage: !!event.mapData?.backgroundImage,
+        source: event.source || 'unknown'
+      });
+
+      // Force background image update when map data changes
+      if (fabricCanvasRef.current && isInitialized && event.mapData?.backgroundImage) {
+        console.log('🔄 TRIGGERING BACKGROUND UPDATE FROM MAP CHANGE');
+        setTimeout(() => {
+          updateBackgroundImage();
+        }, 100); // Small delay to ensure state is updated
+      }
+    };
+
+    const handleDimensionsChanged = (event: any) => {
+      console.log('📐 DIMENSIONS CHANGED EVENT RECEIVED:', {
+        timestamp: new Date().toISOString(),
+        dimensions: event.dimensions,
+        previousDimensions: event.previousDimensions,
+        source: event.source || 'unknown'
+      });
+
+      // Canvas dimensions will be updated via props from MapEditorModule
+      // No need to manually resize here as it's handled by the width/height props
+    };
+
+    // Get the SharedMapSystem instance directly
+    const mapSystem = SharedMapSystem.getInstance();
+
+    // Set up event listeners
+    mapSystem.on('map:changed', handleMapChanged);
+    mapSystem.on('map:dimensionsChanged', handleDimensionsChanged);
+
+    // Cleanup
+    return () => {
+      mapSystem.off('map:changed', handleMapChanged);
+      mapSystem.off('map:dimensionsChanged', handleDimensionsChanged);
+    };
+  }, [isInitialized, updateBackgroundImage]);
+
   // Update layer order to ensure proper stacking: background → grid → interactive elements
   const updateLayerOrder = useCallback((skipBackgroundCheck = false) => {
     const canvas = fabricCanvasRef.current;
@@ -1374,6 +1466,18 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       canvas.setZoom(zoom);
       canvas.absolutePan(new fabric.Point(-scrollX * zoom, -scrollY * zoom));
       canvas.renderAll();
+
+      // Apply performance optimizations based on zoom level
+      optimizeCanvasRendering(canvas, zoom);
+
+      // Start/stop performance monitoring based on zoom level
+      if (performanceMonitorRef.current) {
+        if (shouldOptimizePerformance(zoom)) {
+          performanceMonitorRef.current.startMonitoring();
+        } else {
+          performanceMonitorRef.current.stopMonitoring();
+        }
+      }
     }
   }, [cameraControls?.cameraState.zoom, cameraControls?.cameraState.scrollX, cameraControls?.cameraState.scrollY, isInitialized]);
 
