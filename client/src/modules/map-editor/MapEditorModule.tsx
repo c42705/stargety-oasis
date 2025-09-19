@@ -136,19 +136,11 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   // Collision area handlers
   const handleSaveCollisionArea = useCallback(async (areaData: any) => {
     if (!collisionModalState.editingCollisionArea) {
-      // Create new collision area
-      try {
-        const newArea = {
-          id: `collision_${Date.now()}`,
-          ...areaData
-        };
-        await sharedMap.addCollisionArea(newArea);
-        collisionModalState.setShowCollisionAreaModal(false);
-        collisionDrawingMode.setPendingCollisionAreaData(null);
-        collisionDrawingMode.setCollisionDrawingMode(false);
-      } catch (error) {
-        console.error('Failed to create collision area:', error);
-      }
+      // Start drawing mode for new collision area
+      console.log('🎯 STARTING COLLISION DRAWING MODE:', areaData);
+      collisionDrawingMode.setPendingCollisionAreaData(areaData);
+      collisionDrawingMode.setCollisionDrawingMode(true);
+      collisionModalState.setShowCollisionAreaModal(false);
     } else {
       // Update existing collision area
       try {
@@ -252,8 +244,28 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
           <LayersTab
             fabricCanvas={fabricCanvasRef.current}
             onObjectSelect={(object) => {
-              // Handle object selection
-              console.log('Object selected from layers:', object);
+              // Handle object selection - ensure object is properly selected after zoom
+              if (fabricCanvasRef.current && object) {
+                const canvas = fabricCanvasRef.current;
+
+                // Make sure the object is selectable (not locked)
+                if (object.selectable !== false) {
+                  canvas.setActiveObject(object);
+                  canvas.renderAll();
+
+                  console.log('✅ OBJECT SELECTED FROM LAYERS:', {
+                    objectType: (object as any).type || 'unknown',
+                    objectId: (object as any).id || 'unknown',
+                    selectable: object.selectable,
+                    visible: object.visible
+                  });
+                } else {
+                  console.log('⚠️ OBJECT IS LOCKED AND CANNOT BE SELECTED:', {
+                    objectType: (object as any).type || 'unknown',
+                    locked: (object as any).locked
+                  });
+                }
+              }
             }}
             onToolChange={editorState.onToolChange}
             onZoomToObject={(object) => {
@@ -262,14 +274,28 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
                 const canvas = fabricCanvasRef.current;
                 const objectBounds = object.getBoundingRect();
 
+                // Ensure object has valid dimensions
+                if (objectBounds.width <= 0 || objectBounds.height <= 0) {
+                  console.warn('Object has invalid dimensions for zoom:', objectBounds);
+                  return;
+                }
+
                 // Calculate zoom to fit object with some padding
                 const padding = 100;
                 const containerWidth = canvas.getWidth();
                 const containerHeight = canvas.getHeight();
 
+                // Ensure container has valid dimensions
+                if (containerWidth <= 0 || containerHeight <= 0) {
+                  console.warn('Canvas has invalid dimensions for zoom:', { containerWidth, containerHeight });
+                  return;
+                }
+
                 const zoomX = (containerWidth - padding * 2) / objectBounds.width;
                 const zoomY = (containerHeight - padding * 2) / objectBounds.height;
-                const fitZoom = Math.min(zoomX, zoomY, 2.0); // Max zoom 2x for object focus
+
+                // Apply zoom constraints: min 0.1x, max 3.0x for object focus
+                const fitZoom = Math.max(0.1, Math.min(zoomX, zoomY, 3.0));
 
                 // Center the object in viewport
                 const centerX = objectBounds.left + objectBounds.width / 2;
@@ -278,6 +304,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
                 const viewportCenterX = containerWidth / 2;
                 const viewportCenterY = containerHeight / 2;
 
+                // Apply zoom and pan
                 canvas.setZoom(fitZoom);
                 canvas.absolutePan(new fabric.Point(
                   viewportCenterX - centerX * fitZoom,
@@ -290,6 +317,14 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
                   ...prev,
                   zoom: Math.round(fitZoom * 100)
                 }));
+
+                console.log('🎯 ZOOMED TO OBJECT:', {
+                  objectBounds,
+                  fitZoom,
+                  centerX,
+                  centerY,
+                  objectType: (object as any).type || 'unknown'
+                });
               }
             }}
           />

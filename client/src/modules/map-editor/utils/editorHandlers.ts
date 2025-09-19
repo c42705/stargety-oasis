@@ -9,7 +9,31 @@ export const handleToolChange = (
   tool: EditorTool,
   setEditorState: React.Dispatch<React.SetStateAction<EditorState>>
 ): void => {
-  setEditorState(prev => ({ ...prev, tool }));
+  console.log('🔧 TOOL: Tool change initiated', {
+    timestamp: new Date().toISOString(),
+    newTool: tool,
+    source: 'editorHandlers.handleToolChange'
+  });
+
+  setEditorState(prev => {
+    console.log('🔧 TOOL: State transition', {
+      timestamp: new Date().toISOString(),
+      previousTool: prev.tool,
+      newTool: tool,
+      previousState: {
+        zoom: prev.zoom,
+        canUndo: prev.canUndo,
+        canRedo: prev.canRedo
+      }
+    });
+
+    return { ...prev, tool };
+  });
+
+  console.log('🔧 TOOL: Tool change completed', {
+    timestamp: new Date().toISOString(),
+    activeTool: tool
+  });
 };
 
 /**

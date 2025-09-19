@@ -151,7 +151,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   }, [customMapSize, handleMapSizeChange]);
 
   // Handle background image upload
-  const handleImageUpload = useCallback(async (file: File) => {
+  const handleImageUpload = useCallback((file: File) => {
     console.log('🖼️ BACKGROUND IMAGE UPLOAD STARTED:', {
       fileName: file.name,
       fileSize: file.size,
@@ -167,139 +167,141 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       return false;
     }
 
-    try {
-      // Create a canvas to resize the image if needed
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        message.error('Canvas not supported in this browser');
-        return false;
-      }
-
-      const img = new window.Image();
-      img.onload = async () => {
-        console.log('🖼️ IMAGE LOADED:', {
-          width: img.width,
-          height: img.height,
-          naturalWidth: img.naturalWidth,
-          naturalHeight: img.naturalHeight
-        });
-
-        // Calculate optimal size to keep under localStorage limits
-        let targetWidth = img.width;
-        let targetHeight = img.height;
-        const maxDimension = 2048; // Maximum dimension to keep file size reasonable
-
-        if (img.width > maxDimension || img.height > maxDimension) {
-          const scale = Math.min(maxDimension / img.width, maxDimension / img.height);
-          targetWidth = Math.floor(img.width * scale);
-          targetHeight = Math.floor(img.height * scale);
-          console.log('🖼️ RESIZING IMAGE FOR STORAGE:', {
-            original: { width: img.width, height: img.height },
-            target: { width: targetWidth, height: targetHeight },
-            scale: scale
-          });
-        }
-
-        // Set canvas size and draw image
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
-        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
-
-        // Convert to base64 with quality optimization
-        const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8); // 80% quality to reduce size
-        console.log('🖼️ OPTIMIZED IMAGE DATA URL LENGTH:', imageDataUrl.length);
-
-        // Check if the optimized image is still too large
-        const estimatedSizeInMB = imageDataUrl.length / 1024 / 1024;
-        if (estimatedSizeInMB > 3) { // Conservative limit for localStorage
-          console.error('❌ OPTIMIZED IMAGE STILL TOO LARGE:', estimatedSizeInMB, 'MB');
-          message.error(`Image is still too large after optimization (${estimatedSizeInMB.toFixed(1)}MB). Please use a smaller image.`);
+    // Process the image asynchronously
+    setTimeout(async () => {
+      try {
+        // Create a canvas to resize the image if needed
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          message.error('Canvas not supported in this browser');
           return;
         }
 
-        // Background image will be stored in shared map system
-
-        // Save background image to SharedMapSystem
-        try {
-          console.log('🖼️ SAVING BACKGROUND IMAGE TO SHARED MAP SYSTEM');
-
-          // Update map data with background image (use original dimensions for scaling)
-          await sharedMap.updateMapData({
-            backgroundImage: imageDataUrl,
-            backgroundImageDimensions: {
-              width: img.width, // Original dimensions for proper scaling
-              height: img.height
-            }
+        const img = new window.Image();
+        img.onload = async () => {
+          console.log('🖼️ IMAGE LOADED:', {
+            width: img.width,
+            height: img.height,
+            naturalWidth: img.naturalWidth,
+            naturalHeight: img.naturalHeight
           });
 
-          console.log('🖼️ BACKGROUND IMAGE SAVED TO SHARED MAP SYSTEM');
+          // Calculate optimal size to keep under localStorage limits
+          let targetWidth = img.width;
+          let targetHeight = img.height;
+          const maxDimension = 2048; // Maximum dimension to keep file size reasonable
 
-          // Show modal with resize options
-          Modal.confirm({
-            title: 'Background Image Detected',
-            content: (
-              <div>
-                <p>Image dimensions: {img.width}×{img.height}</p>
-                <p>Current map size: {mapData.worldDimensions.width}×{mapData.worldDimensions.height}</p>
-                {targetWidth !== img.width && (
-                  <p style={{ color: '#1890ff', fontSize: '12px' }}>
-                    Note: Image was optimized for storage ({targetWidth}×{targetHeight})
-                  </p>
-                )}
-                <p>How would you like to handle the image?</p>
-              </div>
-            ),
-            okText: 'Resize Map to Image',
-            cancelText: 'Keep Current Size',
-            onOk: async () => {
-              console.log('🖼️ USER CHOSE TO RESIZE MAP TO IMAGE');
-              await handleMapSizeChange({ width: img.width, height: img.height });
-              message.success('Map resized to match background image');
-            },
-            onCancel: () => {
-              console.log('🖼️ USER CHOSE TO KEEP CURRENT MAP SIZE');
-              message.info('Background image added without resizing map');
-            }
-          });
-
-        } catch (error) {
-          console.error('❌ FAILED TO SAVE BACKGROUND IMAGE:', error);
-          if (error instanceof Error && error.message.includes('QuotaExceededError')) {
-            message.error('Storage quota exceeded. Please use a smaller image or clear browser data.');
-          } else {
-            message.error('Failed to save background image. Please try a smaller image.');
+          if (img.width > maxDimension || img.height > maxDimension) {
+            const scale = Math.min(maxDimension / img.width, maxDimension / img.height);
+            targetWidth = Math.floor(img.width * scale);
+            targetHeight = Math.floor(img.height * scale);
+            console.log('🖼️ RESIZING IMAGE FOR STORAGE:', {
+              original: { width: img.width, height: img.height },
+              target: { width: targetWidth, height: targetHeight },
+              scale: scale
+            });
           }
-        }
-      };
 
-      img.onerror = (error) => {
-        console.error('❌ FAILED TO LOAD IMAGE:', error);
-        message.error('Failed to load image. Please check the file format.');
-      };
+          // Set canvas size and draw image
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
 
-      // Read file as data URL
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        console.log('🖼️ FILE READER LOADED');
-        const result = e.target?.result as string;
-        if (result) {
-          img.src = result;
-        }
-      };
+          // Convert to base64 with quality optimization
+          const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8); // 80% quality to reduce size
+          console.log('🖼️ OPTIMIZED IMAGE DATA URL LENGTH:', imageDataUrl.length);
 
-      reader.onerror = (error) => {
-        console.error('❌ FILE READER ERROR:', error);
-        message.error('Failed to read image file');
-      };
+          // Check if the optimized image is still too large
+          const estimatedSizeInMB = imageDataUrl.length / 1024 / 1024;
+          if (estimatedSizeInMB > 3) { // Conservative limit for localStorage
+            console.error('❌ OPTIMIZED IMAGE STILL TOO LARGE:', estimatedSizeInMB, 'MB');
+            message.error(`Image is still too large after optimization (${estimatedSizeInMB.toFixed(1)}MB). Please use a smaller image.`);
+            return;
+          }
 
-      reader.readAsDataURL(file);
-    } catch (error) {
-      console.error('❌ IMAGE UPLOAD ERROR:', error);
-      message.error('Failed to upload image');
-    }
+          // Save background image to SharedMapSystem
+          try {
+            console.log('🖼️ SAVING BACKGROUND IMAGE TO SHARED MAP SYSTEM');
 
-    return false; // Prevent default upload
+            // Update map data with background image (use original dimensions for scaling)
+            await sharedMap.updateMapData({
+              backgroundImage: imageDataUrl,
+              backgroundImageDimensions: {
+                width: img.width, // Original dimensions for proper scaling
+                height: img.height
+              }
+            });
+
+            console.log('🖼️ BACKGROUND IMAGE SAVED TO SHARED MAP SYSTEM');
+
+            // Show modal with resize options
+            Modal.confirm({
+              title: 'Background Image Detected',
+              content: (
+                <div>
+                  <p>Image dimensions: {img.width}×{img.height}</p>
+                  <p>Current map size: {mapData.worldDimensions.width}×{mapData.worldDimensions.height}</p>
+                  {targetWidth !== img.width && (
+                    <p style={{ color: '#1890ff', fontSize: '12px' }}>
+                      Note: Image was optimized for storage ({targetWidth}×{targetHeight})
+                    </p>
+                  )}
+                  <p>How would you like to handle the image?</p>
+                </div>
+              ),
+              okText: 'Resize Map to Image',
+              cancelText: 'Keep Current Size',
+              onOk: async () => {
+                console.log('🖼️ USER CHOSE TO RESIZE MAP TO IMAGE');
+                await handleMapSizeChange({ width: img.width, height: img.height });
+                message.success('Map resized to match background image');
+              },
+              onCancel: () => {
+                console.log('🖼️ USER CHOSE TO KEEP CURRENT MAP SIZE');
+                message.info('Background image added without resizing map');
+              }
+            });
+
+          } catch (error) {
+            console.error('❌ FAILED TO SAVE BACKGROUND IMAGE:', error);
+            if (error instanceof Error && error.message.includes('QuotaExceededError')) {
+              message.error('Storage quota exceeded. Please use a smaller image or clear browser data.');
+            } else {
+              message.error('Failed to save background image. Please try a smaller image.');
+            }
+          }
+        };
+
+        img.onerror = (error) => {
+          console.error('❌ FAILED TO LOAD IMAGE:', error);
+          message.error('Failed to load image. Please check the file format.');
+        };
+
+        // Read file as data URL
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          console.log('🖼️ FILE READER LOADED');
+          const result = e.target?.result as string;
+          if (result) {
+            img.src = result;
+          }
+        };
+
+        reader.onerror = (error) => {
+          console.error('❌ FILE READER ERROR:', error);
+          message.error('Failed to read image file');
+        };
+
+        reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('❌ IMAGE UPLOAD ERROR:', error);
+        message.error('Failed to upload image');
+      }
+    }, 0);
+
+    // Return false to prevent automatic upload
+    return false;
   }, [mapData.worldDimensions, handleMapSizeChange, sharedMap]);
 
   // Handle reset to default map

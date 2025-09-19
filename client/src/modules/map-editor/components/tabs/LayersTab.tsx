@@ -17,6 +17,7 @@ import {
   Layers as LayersIcon
 } from 'lucide-react';
 import * as fabric from 'fabric';
+import { EditorTool } from '../../types/editor.types';
 
 const { Title, Text } = Typography;
 
@@ -43,7 +44,7 @@ interface LayerGroup {
 interface LayersTabProps {
   fabricCanvas?: fabric.Canvas | null;
   onObjectSelect?: (object: fabric.Object) => void;
-  onToolChange?: (tool: 'resize') => void;
+  onToolChange?: (tool: EditorTool) => void;
   onZoomToObject?: (object: fabric.Object) => void;
   onEditInteractiveArea?: (areaId: string) => void;
   onEditCollisionArea?: (areaId: string) => void;
@@ -60,6 +61,12 @@ export const LayersTab: React.FC<LayersTabProps> = ({
   onDeleteObject
 }) => {
   const [expandedKeys, setExpandedKeys] = useState<string[]>(['background', 'interactive', 'collision']);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Force refresh of layer data
+  const forceRefresh = useCallback(() => {
+    setRefreshTrigger(prev => prev + 1);
+  }, []);
 
   // Get layer data from canvas
   const layerGroups = useMemo((): LayerGroup[] => {
@@ -185,25 +192,66 @@ export const LayersTab: React.FC<LayersTabProps> = ({
         locked: gridObjects.every(obj => obj.locked)
       }
     ].filter(group => group.objects.length > 0); // Only show groups with objects
-  }, [fabricCanvas]);
+  }, [fabricCanvas, refreshTrigger]);
 
   // Handle object selection
   const handleObjectSelect = useCallback((layerObject: LayerObject) => {
-    if (!layerObject.fabricObject) return;
+    console.log('🔧 TOOL: Object selection initiated from LayersTab', {
+      timestamp: new Date().toISOString(),
+      objectName: layerObject.name,
+      objectType: layerObject.type,
+      objectId: layerObject.id,
+      hasFabricObject: !!layerObject.fabricObject,
+      hasCanvas: !!fabricCanvas,
+      hasOnToolChange: !!onToolChange,
+      source: 'LayersTab.handleObjectSelect'
+    });
+
+    if (!layerObject.fabricObject) {
+      console.warn('🔧 TOOL: Cannot select object - no fabric object', {
+        timestamp: new Date().toISOString(),
+        objectName: layerObject.name,
+        objectType: layerObject.type
+      });
+      return;
+    }
+
+    // Switch to select tool first to enable interaction
+    console.log('🔧 TOOL: Switching to select tool for object interaction', {
+      timestamp: new Date().toISOString(),
+      objectName: layerObject.name,
+      requestedTool: 'select'
+    });
+    onToolChange?.('select');
 
     // Select the object on canvas
     if (fabricCanvas) {
+      console.log('🔧 TOOL: Setting active object on canvas', {
+        timestamp: new Date().toISOString(),
+        objectName: layerObject.name,
+        objectType: layerObject.fabricObject.type,
+        canvasObjectCount: fabricCanvas.getObjects().length
+      });
       fabricCanvas.setActiveObject(layerObject.fabricObject);
       fabricCanvas.renderAll();
+    } else {
+      console.warn('🔧 TOOL: Cannot set active object - no canvas available');
     }
 
-    // Switch to resize tool
-    onToolChange?.('resize');
-
     // Zoom to object
+    console.log('🔧 TOOL: Triggering zoom to object', {
+      timestamp: new Date().toISOString(),
+      objectName: layerObject.name,
+      hasZoomCallback: !!onZoomToObject
+    });
     onZoomToObject?.(layerObject.fabricObject);
 
     // Notify parent component
+    console.log('🔧 TOOL: Notifying parent component of object selection', {
+      timestamp: new Date().toISOString(),
+      objectName: layerObject.name,
+      hasSelectCallback: !!onObjectSelect
+    });
     onObjectSelect?.(layerObject.fabricObject);
   }, [fabricCanvas, onToolChange, onZoomToObject, onObjectSelect]);
 
@@ -217,9 +265,10 @@ export const LayersTab: React.FC<LayersTabProps> = ({
         obj.fabricObject.visible = newVisibility;
       }
     });
-    
+
     fabricCanvas.renderAll();
-  }, [fabricCanvas]);
+    forceRefresh(); // Force UI update
+  }, [fabricCanvas, forceRefresh]);
 
   // Toggle object visibility
   const handleObjectVisibilityToggle = useCallback((layerObject: LayerObject, e: React.MouseEvent) => {
@@ -229,7 +278,8 @@ export const LayersTab: React.FC<LayersTabProps> = ({
 
     layerObject.fabricObject.visible = !layerObject.visible;
     fabricCanvas.renderAll();
-  }, [fabricCanvas]);
+    forceRefresh(); // Force UI update
+  }, [fabricCanvas, forceRefresh]);
 
   // Toggle layer lock state
   const handleLayerLockToggle = useCallback((layerGroup: LayerGroup) => {
@@ -245,7 +295,8 @@ export const LayersTab: React.FC<LayersTabProps> = ({
     });
 
     fabricCanvas.renderAll();
-  }, [fabricCanvas]);
+    forceRefresh(); // Force UI update
+  }, [fabricCanvas, forceRefresh]);
 
   // Toggle object lock state
   const handleObjectLockToggle = useCallback((layerObject: LayerObject, e: React.MouseEvent) => {
@@ -259,7 +310,8 @@ export const LayersTab: React.FC<LayersTabProps> = ({
     layerObject.fabricObject.evented = !newLockState;
 
     fabricCanvas.renderAll();
-  }, [fabricCanvas]);
+    forceRefresh(); // Force UI update
+  }, [fabricCanvas, forceRefresh]);
 
   // Handle edit object
   const handleEditObject = useCallback((layerObject: LayerObject, e: React.MouseEvent) => {

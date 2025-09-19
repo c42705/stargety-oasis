@@ -640,45 +640,111 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
   // Update canvas selection behavior based on current tool
   useEffect(() => {
+    console.log('🔧 TOOL: Canvas tool behavior update triggered', {
+      timestamp: new Date().toISOString(),
+      currentTool,
+      drawingMode,
+      collisionDrawingMode,
+      hasCanvas: !!fabricCanvasRef.current,
+      source: 'FabricMapCanvas.toolBehaviorEffect'
+    });
+
     if (fabricCanvasRef.current) {
       const canvas = fabricCanvasRef.current;
       const isInDrawingMode = drawingMode || collisionDrawingMode;
       const isPanTool = currentTool === 'pan';
       const shouldDisableSelection = isInDrawingMode || isPanTool;
 
+      console.log('🔧 TOOL: Updating canvas behavior', {
+        timestamp: new Date().toISOString(),
+        currentTool,
+        isInDrawingMode,
+        isPanTool,
+        shouldDisableSelection,
+        canvasSelection: canvas.selection,
+        objectCount: canvas.getObjects().length
+      });
+
       canvas.selection = !shouldDisableSelection;
 
       if (isInDrawingMode) {
         canvas.defaultCursor = 'crosshair';
         canvas.hoverCursor = 'crosshair';
+        console.log('🔧 TOOL: Set drawing mode cursors (crosshair)');
       } else {
         // Let pan controls manage cursor for all non-drawing modes
         panControls.actions.updateCursor();
+        console.log('🔧 TOOL: Delegated cursor management to pan controls');
       }
 
       // Disable object selection in drawing mode or pan mode
+      let objectsModified = 0;
       canvas.forEachObject((obj) => {
+        const wasSelectable = obj.selectable;
+        const wasEvented = obj.evented;
         obj.selectable = !shouldDisableSelection;
         obj.evented = !shouldDisableSelection;
+
+        if (wasSelectable !== obj.selectable || wasEvented !== obj.evented) {
+          objectsModified++;
+        }
+      });
+
+      console.log('🔧 TOOL: Canvas objects updated', {
+        timestamp: new Date().toISOString(),
+        objectsModified,
+        totalObjects: canvas.getObjects().length,
+        selectionEnabled: canvas.selection
       });
 
       canvas.renderAll();
+
+      console.log('🔧 TOOL: Canvas render completed for tool change');
+    } else {
+      console.warn('🔧 TOOL: Canvas not available for tool behavior update');
     }
   }, [drawingMode, collisionDrawingMode, currentTool, panControls.actions]);
 
   // Handle background image changes - use a stable reference to prevent constant re-renders
   const backgroundImageUrl = useMemo(() => {
-    return sharedMap.mapData?.backgroundImage;
+    const bgImage = sharedMap.mapData?.backgroundImage;
+    console.log('🖼️ BACKGROUND: Background image URL computed', {
+      timestamp: new Date().toISOString(),
+      hasBackgroundImage: !!bgImage,
+      backgroundImageType: bgImage ? (bgImage.startsWith('data:') ? 'data-url' : 'external-url') : 'none',
+      backgroundImageLength: bgImage?.length || 0,
+      backgroundImagePreview: bgImage ? bgImage.substring(0, 50) + '...' : 'none',
+      mapDataExists: !!sharedMap.mapData,
+      source: 'FabricMapCanvas.backgroundImageUrl.useMemo'
+    });
+    return bgImage;
   }, [sharedMap.mapData?.backgroundImage]);
 
   // Update background image with cover mode scaling (same as game world)
   const updateBackgroundImage = useCallback(() => {
-    const canvas = fabricCanvasRef.current;
-    if (!canvas || !sharedMap.mapData) return;
+    console.log('🖼️ BACKGROUND: updateBackgroundImage called', {
+      timestamp: new Date().toISOString(),
+      hasCanvas: !!fabricCanvasRef.current,
+      hasMapData: !!sharedMap.mapData,
+      backgroundImageUrl: backgroundImageUrl ? backgroundImageUrl.substring(0, 50) + '...' : 'none',
+      source: 'FabricMapCanvas.updateBackgroundImage'
+    });
 
-    console.log('🖼️ UPDATING FABRIC CANVAS BACKGROUND:', {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas || !sharedMap.mapData) {
+      console.warn('🖼️ BACKGROUND: Cannot update background - missing canvas or map data', {
+        timestamp: new Date().toISOString(),
+        hasCanvas: !!canvas,
+        hasMapData: !!sharedMap.mapData
+      });
+      return;
+    }
+
+    console.log('🖼️ BACKGROUND: Starting background update process', {
+      timestamp: new Date().toISOString(),
       hasBackgroundImage: !!sharedMap.mapData.backgroundImage,
-      canvasSize: { width: canvas.width, height: canvas.height }
+      canvasSize: { width: canvas.width, height: canvas.height },
+      canvasObjectCount: canvas.getObjects().length
     });
 
     // Background info panel status is managed by parent component
@@ -688,24 +754,56 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       (obj as any).isBackgroundImage === true || (obj as any).backgroundImageId === 'map-background-image'
     );
     if (existingBackground) {
-      console.log('🗑️ REMOVING EXISTING BACKGROUND IMAGE BEFORE ADDING NEW ONE');
+      console.log('🗑️ BACKGROUND: Removing existing background image', {
+        timestamp: new Date().toISOString(),
+        existingBackgroundType: existingBackground.type,
+        existingBackgroundId: (existingBackground as any).backgroundImageId,
+        isBackgroundImage: (existingBackground as any).isBackgroundImage
+      });
       canvas.remove(existingBackground);
       // Clear the reference since we're replacing it
       (canvas as any)._backgroundImageRef = null;
+    } else {
+      console.log('🖼️ BACKGROUND: No existing background image found to remove');
     }
 
     // Add new background image if available
     if (backgroundImageUrl) {
-      console.log('🖼️ ADDING BACKGROUND IMAGE TO FABRIC CANVAS:', {
-        backgroundImageUrl,
+      console.log('🖼️ BACKGROUND: Starting Fabric.js image loading', {
+        timestamp: new Date().toISOString(),
+        backgroundImageUrl: backgroundImageUrl.substring(0, 100) + '...',
+        backgroundImageLength: backgroundImageUrl.length,
         canvasSize: { width: canvas.width, height: canvas.height }
       });
 
-      fabric.Image.fromURL(backgroundImageUrl, {
-        crossOrigin: 'anonymous'
-      }).then((img: fabric.Image) => {
+      // Determine if we need crossOrigin based on URL type
+      const isDataUrl = backgroundImageUrl.startsWith('data:');
+      const fabricOptions = isDataUrl ? {} : { crossOrigin: 'anonymous' as any };
+
+      console.log('🖼️ BACKGROUND: Fabric.js loading configuration', {
+        timestamp: new Date().toISOString(),
+        isDataUrl,
+        fabricOptions,
+        willUseCrossOrigin: !isDataUrl
+      });
+
+      fabric.Image.fromURL(backgroundImageUrl, fabricOptions).then((img: fabric.Image) => {
+        console.log('🖼️ BACKGROUND: Fabric.js image loading completed', {
+          timestamp: new Date().toISOString(),
+          hasCanvas: !!canvas,
+          hasImage: !!img,
+          imageType: img?.type,
+          imageWidth: img?.width,
+          imageHeight: img?.height
+        });
+
         if (!canvas || !img) {
-          console.error('❌ Failed to create fabric image from background');
+          console.error('❌ BACKGROUND: Failed to create fabric image from background', {
+            timestamp: new Date().toISOString(),
+            hasCanvas: !!canvas,
+            hasImage: !!img,
+            backgroundImageUrl: backgroundImageUrl.substring(0, 50) + '...'
+          });
           return;
         }
 
@@ -751,13 +849,23 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
           (img as any).isBackgroundImage = true;
           (img as any).backgroundImageId = 'map-background-image';
           (img as any).mapElementType = 'background';
+
+          // Lock background image by default to prevent accidental modification
+          (img as any).locked = true;
+          img.selectable = false;
+          img.evented = false;
+          img.hoverCursor = 'default';
+          img.moveCursor = 'default';
         });
 
         console.log('🖼️ BACKGROUND IMAGE CONFIGURED:', {
           position: { left: 0, top: 0 },
           scale: { x: 1, y: 1 },
           size: { width: imageWidth, height: imageHeight },
-          hasBackgroundProperty: (img as any).isBackgroundImage
+          hasBackgroundProperty: (img as any).isBackgroundImage,
+          locked: (img as any).locked,
+          selectable: img.selectable,
+          evented: img.evented
         });
 
         // Add to canvas and send to back (behind grid and other elements)
@@ -775,8 +883,9 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
           backgroundImageVisible: backgroundCount > 0,
           imageProperties: {
             isBackgroundImage: (img as any).isBackgroundImage,
-            selectable: (img as any).selectable,
-            evented: (img as any).evented
+            locked: (img as any).locked,
+            selectable: img.selectable,
+            evented: img.evented
           }
         });
 
@@ -821,7 +930,17 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         }, 100);
 
       }).catch((error: any) => {
-        console.error('❌ FAILED TO LOAD BACKGROUND IMAGE:', error);
+        console.error('❌ BACKGROUND: Failed to load background image', {
+          timestamp: new Date().toISOString(),
+          error: error.message || error,
+          errorType: error.constructor?.name,
+          backgroundImageUrl: backgroundImageUrl ? backgroundImageUrl.substring(0, 100) + '...' : 'none',
+          backgroundImageLength: backgroundImageUrl?.length || 0,
+          isDataUrl: backgroundImageUrl?.startsWith('data:') || false,
+          fabricOptions,
+          canvasSize: { width: canvas.width, height: canvas.height },
+          source: 'FabricMapCanvas.updateBackgroundImage.catch'
+        });
         // Background info panel error handled by parent
       });
     } else {
@@ -833,9 +952,34 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
   // Priority background loading - triggers immediately when canvas is ready
   useEffect(() => {
+    console.log('🖼️ BACKGROUND: Priority background loading effect triggered', {
+      timestamp: new Date().toISOString(),
+      hasCanvas: !!fabricCanvasRef.current,
+      isInitialized,
+      backgroundImageUrl: backgroundImageUrl ? backgroundImageUrl.substring(0, 50) + '...' : 'undefined',
+      backgroundImageDefined: backgroundImageUrl !== undefined,
+      shouldTriggerUpdate: !!(fabricCanvasRef.current && isInitialized && backgroundImageUrl !== undefined),
+      source: 'FabricMapCanvas.priorityBackgroundLoading'
+    });
+
     if (fabricCanvasRef.current && isInitialized && backgroundImageUrl !== undefined) {
-      console.log('🚀 PRIORITY BACKGROUND LOADING INITIATED');
+      console.log('🚀 BACKGROUND: Priority background loading initiated', {
+        timestamp: new Date().toISOString(),
+        canvasReady: true,
+        initialized: true,
+        backgroundImageExists: !!backgroundImageUrl
+      });
       updateBackgroundImage();
+    } else {
+      console.log('🖼️ BACKGROUND: Priority background loading skipped', {
+        timestamp: new Date().toISOString(),
+        hasCanvas: !!fabricCanvasRef.current,
+        isInitialized,
+        backgroundImageDefined: backgroundImageUrl !== undefined,
+        reason: !fabricCanvasRef.current ? 'no-canvas' :
+                !isInitialized ? 'not-initialized' :
+                backgroundImageUrl === undefined ? 'no-background-url' : 'unknown'
+      });
     }
   }, [isInitialized, backgroundImageUrl, updateBackgroundImage]);
 

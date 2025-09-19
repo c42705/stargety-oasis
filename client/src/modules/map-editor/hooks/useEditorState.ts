@@ -16,8 +16,20 @@ export const useEditorState = () => {
 
 
   const onToolChange = useCallback((tool: EditorTool) => {
+    console.log('🔧 TOOL: onToolChange called in useEditorState', {
+      timestamp: new Date().toISOString(),
+      requestedTool: tool,
+      currentState: editorState,
+      source: 'useEditorState.onToolChange'
+    });
+
     handleToolChange(tool, setEditorState);
-  }, []);
+
+    console.log('🔧 TOOL: handleToolChange completed in useEditorState', {
+      timestamp: new Date().toISOString(),
+      toolAfterChange: tool
+    });
+  }, [editorState]);
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
     // TODO: Update mouse position in world coordinates when camera controls are implemented
