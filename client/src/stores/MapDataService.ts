@@ -193,13 +193,13 @@ export class MapDataService {
         tags: Array.isArray(data.metadata?.tags) ? data.metadata.tags : []
       },
       worldDimensions: {
-        width: data.worldDimensions?.width || 7603,
-        height: data.worldDimensions?.height || 3679
+        width: data.worldDimensions?.width || 800,
+        height: data.worldDimensions?.height || 600
       },
       backgroundImage: data.backgroundImage || '/default-background.jpg',
       backgroundImageDimensions: data.backgroundImageDimensions || {
-        width: 7603,
-        height: 3679
+        width: data.worldDimensions?.width || 800,
+        height: data.worldDimensions?.height || 600
       },
       interactiveAreas: Array.isArray(data.interactiveAreas) ? data.interactiveAreas : [],
       impassableAreas: Array.isArray(data.impassableAreas) ? data.impassableAreas : []
