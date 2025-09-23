@@ -87,7 +87,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
         width: 400,
       });
     }
-  }, [isOpen, onClose, onConfirm, title, message, confirmText, cancelText, type, modal]);
+  }, [isOpen, onClose, onConfirm, title, message, content, showUndoWarning, confirmText, cancelText, type, modal]);
 
   // Return null since Modal.confirm() handles the rendering
   return null;

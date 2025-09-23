@@ -13,7 +13,7 @@
  * - Cross-tab synchronization support
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { SharedMapSystem, MapEventType } from './SharedMapSystem';
 import MapSyncStatus from '../components/MapSyncStatus';
 
@@ -35,6 +35,68 @@ export const MapSynchronizer: React.FC<MapSynchronizerProps> = ({
   const mapSystemRef = useRef<SharedMapSystem | null>(null);
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSyncTimestamp = useRef<number>(0);
+
+  // Perform actual synchronization
+  const performSync = useCallback((eventType: string, data: any) => {
+    const now = Date.now();
+
+    // Prevent rapid successive syncs
+    if (now - lastSyncTimestamp.current < 50) {
+      return;
+    }
+
+    lastSyncTimestamp.current = now;
+
+    try {
+      // Emit synchronization event to all connected interfaces
+      if (mapSystemRef.current) {
+        mapSystemRef.current.emit('map:sync:started' as MapEventType, {
+          eventType,
+          data,
+          timestamp: now
+        });
+
+        // Validate data before sync
+        if (data.mapData && !validateMapData(data.mapData)) {
+          throw new Error('Invalid map data structure detected during sync');
+        }
+
+        // Emit completion event
+        mapSystemRef.current.emit('map:sync:completed' as MapEventType, {
+          eventType,
+          data,
+          timestamp: now,
+          success: true
+        });
+      }
+
+      console.log(`Map synchronized: ${eventType}`, data);
+
+    } catch (error) {
+      console.error('Synchronization failed:', error);
+
+      if (mapSystemRef.current) {
+        mapSystemRef.current.emit('map:sync:error' as MapEventType, {
+          error: error instanceof Error ? error.message : 'Unknown sync error',
+          eventType,
+          timestamp: now
+        });
+      }
+
+      onSyncError?.(error instanceof Error ? error.message : 'Synchronization failed');
+    }
+  }, [onSyncError]);
+
+  // Debounced synchronization to prevent excessive updates
+  const debouncedSync = useCallback((eventType: string, data: any) => {
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+
+    syncTimeoutRef.current = setTimeout(() => {
+      performSync(eventType, data);
+    }, syncDebounceMs);
+  }, [performSync, syncDebounceMs]);
 
   useEffect(() => {
     // Initialize map system
@@ -123,69 +185,9 @@ export const MapSynchronizer: React.FC<MapSynchronizerProps> = ({
         clearTimeout(syncTimeoutRef.current);
       }
     };
-  }, [enableCrossTabSync, onSyncError, onSyncSuccess]);
+  }, [enableCrossTabSync, onSyncError, onSyncSuccess, debouncedSync, performSync]);
 
-  // Debounced synchronization to prevent excessive updates
-  const debouncedSync = (eventType: string, data: any) => {
-    if (syncTimeoutRef.current) {
-      clearTimeout(syncTimeoutRef.current);
-    }
 
-    syncTimeoutRef.current = setTimeout(() => {
-      performSync(eventType, data);
-    }, syncDebounceMs);
-  };
-
-  // Perform actual synchronization
-  const performSync = (eventType: string, data: any) => {
-    const now = Date.now();
-    
-    // Prevent rapid successive syncs
-    if (now - lastSyncTimestamp.current < 50) {
-      return;
-    }
-    
-    lastSyncTimestamp.current = now;
-
-    try {
-      // Emit synchronization event to all connected interfaces
-      if (mapSystemRef.current) {
-        mapSystemRef.current.emit('map:sync:started' as MapEventType, {
-          eventType,
-          data,
-          timestamp: now
-        });
-
-        // Validate data before sync
-        if (data.mapData && !validateMapData(data.mapData)) {
-          throw new Error('Invalid map data structure detected during sync');
-        }
-
-        // Emit completion event
-        mapSystemRef.current.emit('map:sync:completed' as MapEventType, {
-          eventType,
-          data,
-          timestamp: now,
-          success: true
-        });
-      }
-
-      console.log(`Map synchronized: ${eventType}`, data);
-
-    } catch (error) {
-      console.error('Synchronization failed:', error);
-      
-      if (mapSystemRef.current) {
-        mapSystemRef.current.emit('map:sync:error' as MapEventType, {
-          error: error instanceof Error ? error.message : 'Unknown sync error',
-          eventType,
-          timestamp: now
-        });
-      }
-      
-      onSyncError?.(error instanceof Error ? error.message : 'Synchronization failed');
-    }
-  };
 
   // Validate map data structure
   const validateMapData = (data: any): boolean => {
@@ -206,15 +208,7 @@ export const MapSynchronizer: React.FC<MapSynchronizerProps> = ({
     }
   };
 
-  // Force synchronization (useful for manual triggers)
-  const forceSynchronization = () => {
-    if (mapSystemRef.current) {
-      const currentData = mapSystemRef.current.getMapData();
-      if (currentData) {
-        performSync('map:force:sync', { mapData: currentData, source: 'manual' });
-      }
-    }
-  };
+
 
   // Force sync method is available via the hook
   // React.useImperativeHandle would need a proper ref setup

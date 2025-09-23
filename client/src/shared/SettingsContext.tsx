@@ -44,6 +44,13 @@ interface SettingsProviderProps {
 export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children, currentUser }) => {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
 
+  // Check if user is admin
+  const isAdmin = useCallback((username: string): boolean => {
+    return username.toLowerCase().includes('admin') ||
+           username.toLowerCase() === 'administrator' ||
+           username.toLowerCase() === 'root';
+  }, []);
+
   // Load settings from localStorage on mount
   useEffect(() => {
     try {
@@ -69,14 +76,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children, cu
         adminMode: isAdmin(currentUser),
       }));
     }
-  }, [currentUser]);
-
-  // Check if user is admin
-  const isAdmin = useCallback((username: string): boolean => {
-    return username.toLowerCase().includes('admin') ||
-           username.toLowerCase() === 'administrator' ||
-           username.toLowerCase() === 'root';
-  }, []);
+  }, [currentUser, isAdmin]);
 
   // Update video service preference
   const updateVideoService = useCallback((service: VideoServiceType) => {

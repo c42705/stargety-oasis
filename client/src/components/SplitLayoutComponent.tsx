@@ -1,6 +1,5 @@
 import React, { useState, useCallback } from 'react';
 import { Splitter, Typography } from 'antd';
-import { useAuth } from '../shared/AuthContext';
 import './SplitLayoutComponent.css';
 
 interface SplitLayoutComponentProps {
@@ -20,7 +19,7 @@ export const SplitLayoutComponent: React.FC<SplitLayoutComponentProps> = ({
   rightBottomPanel,
   className = ''
 }) => {
-  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
+  const leftPanelCollapsed = false;
   const [rightTopPanelSize, setRightTopPanelSize] = useState(60); // Percentage
 
 
@@ -37,7 +36,7 @@ export const SplitLayoutComponent: React.FC<SplitLayoutComponentProps> = ({
       >
         {/* Left Panel - World/Game Area */}
         <Splitter.Panel
-          defaultSize={leftPanelCollapsed ? 50 : 600}
+          defaultSize={leftPanelCollapsed ? "30%" : "70%"}
           min={leftPanelCollapsed ? 50 : 250}
           max={leftPanelCollapsed ? 50 : "80%"}
           collapsible={{

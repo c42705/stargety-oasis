@@ -26,7 +26,6 @@ import { BackgroundInfoPanel } from './components/BackgroundInfoPanel';
 import { GRID_PATTERNS } from './constants/editorConstants';
 import {
   optimizeCanvasRendering,
-  createOptimizedCanvasHandlers,
   CanvasPerformanceMonitor,
   shouldOptimizePerformance
 } from './utils/performanceUtils';
@@ -441,7 +440,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     setAreasToDelete([]);
   }, []);
 
-  // Initialize Fabric.js canvas
+  // Initialize Fabric.js canvas - runs only once to prevent recreation
   useEffect(() => {
     if (canvasRef.current && !fabricCanvasRef.current) {
       const canvas = new fabric.Canvas(canvasRef.current, {
@@ -503,29 +502,6 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         onCanvasReady(canvas);
       }
 
-      // Configure canvas for current tool
-      const updateCanvasForCurrentTool = () => {
-        const isInDrawingMode = drawingMode || collisionDrawingMode;
-        const isPanTool = currentTool === 'pan';
-
-        if (isInDrawingMode) {
-          canvas.selection = false; // Disable selection during drawing
-          canvas.defaultCursor = 'crosshair';
-          canvas.hoverCursor = 'crosshair';
-          canvas.moveCursor = 'crosshair';
-        } else if (isPanTool) {
-          canvas.selection = false; // Disable selection in pan mode
-          // Let pan controls manage cursor for pan tool
-          panControls.actions.updateCursor();
-        } else {
-          canvas.selection = true; // Enable selection for other tools
-          // Let pan controls manage cursor (handles Space key states)
-          panControls.actions.updateCursor();
-        }
-      };
-
-      updateCanvasForCurrentTool();
-
       // Set up event listeners
       setupCanvasEventListeners(canvas);
 
@@ -541,7 +517,32 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         setIsInitialized(false);
       };
     }
-  }, []); // Remove width/height dependencies to prevent canvas recreation
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Intentionally empty - canvas should only be created once
+
+  // Configure canvas for current tool - separate effect for tool changes
+  useEffect(() => {
+    const canvas = fabricCanvasRef.current;
+    if (canvas && isInitialized) {
+      const isInDrawingMode = drawingMode || collisionDrawingMode;
+      const isPanTool = currentTool === 'pan';
+
+      if (isInDrawingMode) {
+        canvas.selection = false; // Disable selection during drawing
+        canvas.defaultCursor = 'crosshair';
+        canvas.hoverCursor = 'crosshair';
+        canvas.moveCursor = 'crosshair';
+      } else if (isPanTool) {
+        canvas.selection = false; // Disable selection in pan mode
+        // Let pan controls manage cursor for pan tool
+        panControls.actions.updateCursor();
+      } else {
+        canvas.selection = true; // Enable selection for other tools
+        // Let pan controls manage cursor (handles Space key states)
+        panControls.actions.updateCursor();
+      }
+    }
+  }, [drawingMode, collisionDrawingMode, currentTool, panControls.actions, isInitialized]);
 
   // Handle canvas resizing without recreation
   useEffect(() => {
@@ -673,7 +674,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [gridVisible, gridSpacing, onSelectionChanged, onObjectModified, drawingMode, collisionDrawingMode, isDrawing, startPoint, drawingRect, onAreaDrawn, drawingAreaData, cameraControls, currentTool, panControls, handleObjectModified, handleObjectMoving, handleObjectScaling, handleDeleteSelectedAreas]);
+  }, [onSelectionChanged, onObjectModified, drawingMode, collisionDrawingMode, cameraControls, currentTool, panControls, handleObjectModified, handleObjectMoving, handleObjectScaling, handleDeleteSelectedAreas]);
 
 
 
@@ -765,9 +766,10 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       source: 'FabricMapCanvas.backgroundImageUrl.useMemo'
     });
     return bgImage;
-  }, [sharedMap.mapData?.backgroundImage]);
+  }, [sharedMap.mapData]);
 
   // Update background image with cover mode scaling (same as game world)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const updateBackgroundImage = useCallback(() => {
     console.log('🖼️ BACKGROUND: updateBackgroundImage called', {
       timestamp: new Date().toISOString(),
@@ -968,7 +970,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
             setTimeout(() => {
               // Background image fully integrated - marking ready
               setIsBackgroundReady(true);
-              updateLayerOrder(true); // Skip background check since we just added it
+              updateLayerOrder(true); // Skip background check since we just added it // eslint-disable-line react-hooks/exhaustive-deps
               // Background info panel success handled by parent
             }, 50);
           } else {
@@ -995,6 +997,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       // Mark background as ready even when no image (transparent background)
       setIsBackgroundReady(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backgroundImageUrl, sharedMap.mapData]);
 
   // Priority background loading - triggers immediately when canvas is ready
@@ -1479,7 +1482,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         }
       }
     }
-  }, [cameraControls?.cameraState.zoom, cameraControls?.cameraState.scrollX, cameraControls?.cameraState.scrollY, isInitialized]);
+  }, [cameraControls, isInitialized]);
 
   // Update canvas configuration when drawing mode changes
   useEffect(() => {

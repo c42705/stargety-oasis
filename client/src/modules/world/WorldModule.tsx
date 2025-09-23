@@ -77,9 +77,11 @@ class GameScene extends Phaser.Scene {
   private debugPlayerCross?: Phaser.GameObjects.Graphics;
   private debugCameraCross?: Phaser.GameObjects.Graphics;
   private debugViewportBounds?: Phaser.GameObjects.Graphics;
+  private debugViewportBorder?: Phaser.GameObjects.Graphics; // New: visible viewport border
   private debugWorldCenterCross?: Phaser.GameObjects.Graphics;
   private debugPlayerPositionText?: Phaser.GameObjects.Text;
   private debugCameraScrollText?: Phaser.GameObjects.Text;
+  private debugPlayerFollowingText?: Phaser.GameObjects.Text; // New: text that follows player
 
   // Prevent multiple simultaneous calls to setDefaultZoomAndCenter
   private isSettingDefaultZoom: boolean = false;
@@ -1391,6 +1393,61 @@ class GameScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Adjust viewport to new container size while preserving zoom level and player centering
+   * This method is called during panel resizes to maintain zoom stability
+   */
+  public adjustViewportWithoutZoomReset(): void {
+    const camera = this.cameras.main;
+    const gameWidth = this.scale.gameSize.width;
+    const gameHeight = this.scale.gameSize.height;
+
+    console.log('📐 ADJUST VIEWPORT WITHOUT ZOOM RESET:', {
+      gameWidth,
+      gameHeight,
+      worldBounds: this.worldBounds,
+      currentZoom: camera.zoom,
+      playerExists: !!this.player
+    });
+
+    if (gameWidth === 0 || gameHeight === 0) {
+      console.log('⚠️ ADJUST VIEWPORT: Invalid game dimensions');
+      return;
+    }
+
+    // Preserve the current zoom level - DO NOT CHANGE IT
+    const preservedZoom = camera.zoom;
+
+    // Update camera bounds to match the new viewport size
+    // This ensures the camera system knows about the new container dimensions
+    camera.setBounds(0, 0, this.worldBounds.width, this.worldBounds.height);
+
+    // Re-center camera on player to maintain player centering with preserved zoom
+    if (this.player) {
+      console.log('📐 RE-CENTERING CAMERA ON PLAYER (ZOOM PRESERVED)');
+      this.centerCameraOnPlayer();
+    } else {
+      console.log('📐 CENTERING CAMERA ON WORLD CENTER (ZOOM PRESERVED)');
+      const centerX = this.worldBounds.width / 2;
+      const centerY = this.worldBounds.height / 2;
+      camera.centerOn(centerX, centerY);
+    }
+
+    console.log('📐 VIEWPORT ADJUSTMENT RESULT:', {
+      preservedZoom,
+      finalZoom: camera.zoom,
+      scrollX: camera.scrollX,
+      scrollY: camera.scrollY,
+      playerCentered: !!this.player,
+      zoomWasPreserved: camera.zoom === preservedZoom
+    });
+
+    // Update debug overlays if enabled
+    if (this.DEBUG_CAMERA_CENTERING) {
+      this.updateDebugOverlays();
+    }
+  }
+
   // ===== DEBUG VISUAL OVERLAYS =====
 
   /**
@@ -1436,6 +1493,11 @@ class GameScene extends Phaser.Scene {
   private createDebugViewportBounds(): void {
     this.debugViewportBounds = this.add.graphics();
     this.debugViewportBounds.setDepth(999);
+
+    // Create visible viewport border that stays within the rendered area
+    this.debugViewportBorder = this.add.graphics();
+    this.debugViewportBorder.setDepth(1004);
+    this.debugViewportBorder.setScrollFactor(0); // Fixed to camera viewport
   }
 
   /**
@@ -1449,15 +1511,28 @@ class GameScene extends Phaser.Scene {
       padding: { x: 4, y: 2 }
     };
 
-    // Player position text (top-left)
+    const playerFollowingStyle = {
+      fontSize: '9px',
+      color: '#ffff00',
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      padding: { x: 4, y: 3 },
+      lineSpacing: 1
+    };
+
+    // Player position text (top-left, fixed to camera)
     this.debugPlayerPositionText = this.add.text(10, 10, '', textStyle);
     this.debugPlayerPositionText.setDepth(1003);
     this.debugPlayerPositionText.setScrollFactor(0); // Fixed to camera
 
-    // Camera scroll text (top-right)
+    // Camera scroll text (top-right, fixed to camera)
     this.debugCameraScrollText = this.add.text(0, 10, '', textStyle);
     this.debugCameraScrollText.setDepth(1003);
     this.debugCameraScrollText.setScrollFactor(0); // Fixed to camera
+
+    // Player following text (follows player in world coordinates)
+    this.debugPlayerFollowingText = this.add.text(0, 0, '', playerFollowingStyle);
+    this.debugPlayerFollowingText.setDepth(1005);
+    this.debugPlayerFollowingText.setScrollFactor(1); // Follows world coordinates
   }
 
   /**
@@ -1468,7 +1543,8 @@ class GameScene extends Phaser.Scene {
 
     // Ensure debug overlays are initialized
     if (!this.debugPlayerCross || !this.debugCameraCross || !this.debugViewportBounds ||
-        !this.debugWorldCenterCross || !this.debugPlayerPositionText || !this.debugCameraScrollText) {
+        !this.debugViewportBorder || !this.debugWorldCenterCross || !this.debugPlayerPositionText ||
+        !this.debugCameraScrollText || !this.debugPlayerFollowingText) {
       return;
     }
 
@@ -1489,11 +1565,17 @@ class GameScene extends Phaser.Scene {
     this.drawCrosshair(this.debugCameraCross!, cameraViewportCenterX, cameraViewportCenterY, 0x0000ff, 20); // Blue
     this.drawCrosshair(this.debugWorldCenterCross!, worldCenterX, worldCenterY, 0xffff00, 25); // Yellow
 
-    // Update viewport bounds
+    // Update viewport bounds (world coordinates)
     this.drawViewportBounds(camera.scrollX, camera.scrollY, viewportWidth, viewportHeight);
+
+    // Update visible viewport border (screen coordinates)
+    this.drawViewportBorder();
 
     // Update text overlays
     this.updateDebugText(playerX, playerY, camera.scrollX, camera.scrollY, cameraViewportCenterX, cameraViewportCenterY);
+
+    // Update player following text
+    this.updatePlayerFollowingText(playerX, playerY, camera.zoom);
   }
 
   /**
@@ -1515,7 +1597,7 @@ class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Draw viewport bounds rectangle
+   * Draw viewport bounds rectangle (world coordinates)
    */
   private drawViewportBounds(scrollX: number, scrollY: number, width: number, height: number): void {
     if (!this.debugViewportBounds) return;
@@ -1523,6 +1605,63 @@ class GameScene extends Phaser.Scene {
     this.debugViewportBounds.clear();
     this.debugViewportBounds.lineStyle(2, 0x00ff00, 0.8); // Green with transparency
     this.debugViewportBounds.strokeRect(scrollX, scrollY, width, height);
+  }
+
+  /**
+   * Draw visible viewport border (screen coordinates - always visible)
+   */
+  private drawViewportBorder(): void {
+    if (!this.debugViewportBorder) return;
+
+    const camera = this.cameras.main;
+    const scale = this.scale;
+
+    this.debugViewportBorder.clear();
+    this.debugViewportBorder.lineStyle(3, 0x00ff00, 1); // Bright green, fully opaque
+
+    // Get the actual game size and display size from scale manager
+    const gameSize = scale.gameSize;
+    const displaySize = scale.displaySize;
+    const canvas = scale.canvas;
+
+    // Calculate any offset due to centering or scaling
+    const offsetX = (displaySize.width - gameSize.width) / 2;
+    const offsetY = (displaySize.height - gameSize.height) / 2;
+
+    // Use the actual camera viewport dimensions
+    const viewportWidth = camera.width;
+    const viewportHeight = camera.height;
+
+    // For RESIZE mode with CENTER_BOTH, the game should fill the container
+    // So we should use the camera dimensions directly without offsets
+    const padding = 2; // Reduced padding for better visibility
+
+    // Draw border using camera dimensions (should match the actual viewport)
+    this.debugViewportBorder.strokeRect(
+      padding,
+      padding,
+      viewportWidth - (padding * 2),
+      viewportHeight - (padding * 2)
+    );
+
+    // Debug log to help diagnose the issue (only log occasionally to avoid spam)
+    if (Math.random() < 0.01) { // Log ~1% of the time
+      console.log('🔍 VIEWPORT BORDER DEBUG:', {
+        gameSize: { width: gameSize.width, height: gameSize.height },
+        displaySize: { width: displaySize.width, height: displaySize.height },
+        canvasSize: canvas ? { width: canvas.width, height: canvas.height } : 'no canvas',
+        cameraSize: { width: camera.width, height: camera.height },
+        calculatedOffset: { x: offsetX, y: offsetY },
+        actualBorderRect: {
+          x: padding,
+          y: padding,
+          width: viewportWidth - (padding * 2),
+          height: viewportHeight - (padding * 2)
+        },
+        scaleMode: scale.scaleMode,
+        zoom: camera.zoom
+      });
+    }
   }
 
   /**
@@ -1542,13 +1681,441 @@ class GameScene extends Phaser.Scene {
     const playerText = `Player: (${Math.round(playerX)}, ${Math.round(playerY)})`;
     this.debugPlayerPositionText.setText(playerText);
 
-    // Camera scroll text (position in top-right)
-    const cameraText = `Camera: (${Math.round(scrollX)}, ${Math.round(scrollY)})\nViewport Center: (${Math.round(cameraViewportCenterX)}, ${Math.round(cameraViewportCenterY)})`;
+    // Enhanced camera text with viewport boundary info
+    const camera = this.cameras.main;
+    const scale = this.scale;
+    const gameSize = scale.gameSize;
+    const displaySize = scale.displaySize;
+
+    const cameraText = [
+      `Camera: (${Math.round(scrollX)}, ${Math.round(scrollY)})`,
+      `Viewport Center: (${Math.round(cameraViewportCenterX)}, ${Math.round(cameraViewportCenterY)})`,
+      ``,
+      `🔍 BOUNDARY CHECK:`,
+      `Camera: ${camera.width}×${camera.height}`,
+      `Game: ${Math.round(gameSize.width)}×${Math.round(gameSize.height)}`,
+      `Display: ${Math.round(displaySize.width)}×${Math.round(displaySize.height)}`,
+      `Match: ${camera.width === gameSize.width && camera.height === gameSize.height ? '✅' : '❌'}`
+    ].join('\n');
+
     this.debugCameraScrollText.setText(cameraText);
 
     // Position camera text in top-right
+    this.debugCameraScrollText.setPosition(camera.width - 280, 10);
+  }
+
+  /**
+   * Update player following text that moves with the player
+   */
+  private updatePlayerFollowingText(playerX: number, playerY: number, zoom: number): void {
+    if (!this.debugPlayerFollowingText) return;
+
     const camera = this.cameras.main;
-    this.debugCameraScrollText.setPosition(camera.width - 250, 10);
+
+    // Calculate viewport dimensions in world coordinates
+    const viewportWidth = camera.width / zoom;
+    const viewportHeight = camera.height / zoom;
+
+    // Get camera scroll position and center
+    const scrollX = camera.scrollX;
+    const scrollY = camera.scrollY;
+    const cameraCenterX = scrollX + (viewportWidth / 2);
+    const cameraCenterY = scrollY + (viewportHeight / 2);
+
+    // Calculate actual pixel dimensions at current zoom
+    const pixelWidth = Math.round(camera.width);
+    const pixelHeight = Math.round(camera.height);
+
+    // Get player state information
+    const playerOriginX = this.player?.originX || 0;
+    const playerOriginY = this.player?.originY || 0;
+    const playerVisible = this.player?.visible || false;
+
+    // Calculate distance from player to camera center
+    const distanceToCenter = Math.round(Math.sqrt(
+      Math.pow(playerX - cameraCenterX, 2) + Math.pow(playerY - cameraCenterY, 2)
+    ));
+
+    // Get scale manager info for debugging
+    const scale = this.scale;
+    const gameSize = scale.gameSize;
+    const displaySize = scale.displaySize;
+    const canvas = scale.canvas;
+
+    // Check if camera dimensions match game dimensions
+    const dimensionsMatch = camera.width === gameSize.width && camera.height === gameSize.height;
+
+    // Enhanced debug data for investigation
+    const scaleManagerDetails = {
+      baseSize: scale.baseSize,
+      parentSize: scale.parentSize,
+      scaleMode: scale.scaleMode,
+      autoCenter: scale.autoCenter,
+      canvasSize: canvas ? { width: canvas.width, height: canvas.height } : null
+    };
+
+    // Create comprehensive debug text with all metrics including boundary check
+    const followingText = [
+      `🎯 PLAYER DATA`,
+      `Pos: (${Math.round(playerX)}, ${Math.round(playerY)})`,
+      `Origin: (${playerOriginX.toFixed(1)}, ${playerOriginY.toFixed(1)})`,
+      `Visible: ${playerVisible}`,
+      `Distance to Center: ${distanceToCenter}px`,
+      ``,
+      `📷 CAMERA DATA`,
+      `Scroll: (${Math.round(scrollX)}, ${Math.round(scrollY)})`,
+      `Center: (${Math.round(cameraCenterX)}, ${Math.round(cameraCenterY)})`,
+      `Size: ${pixelWidth}×${pixelHeight}px`,
+      ``,
+      `🔍 VIEWPORT DATA`,
+      `World Size: ${Math.round(viewportWidth)}×${Math.round(viewportHeight)}`,
+      `Zoom: ${Math.round(zoom * 100)}% (${zoom.toFixed(3)}x)`,
+      `Pixel Ratio: 1:${Math.round(1/zoom)}`,
+      ``,
+      `🔍 BOUNDARY CHECK`,
+      `Camera: ${camera.width}×${camera.height}`,
+      `Game: ${Math.round(gameSize.width)}×${Math.round(gameSize.height)}`,
+      `Display: ${Math.round(displaySize.width)}×${Math.round(displaySize.height)}`,
+      `Match: ${dimensionsMatch ? '✅' : '❌'}`,
+      ``,
+      `📐 SCALE DATA`,
+      `Mode: ${scale.scaleMode} (AutoCenter: ${scale.autoCenter})`,
+      `Scale Factor: ${(camera.width / gameSize.width).toFixed(3)}`,
+      `Base: ${Math.round(scaleManagerDetails.baseSize.width)}×${Math.round(scaleManagerDetails.baseSize.height)}`,
+      `Parent: ${Math.round(scaleManagerDetails.parentSize.width)}×${Math.round(scaleManagerDetails.parentSize.height)}`,
+      `Canvas: ${scaleManagerDetails.canvasSize ? `${scaleManagerDetails.canvasSize.width}×${scaleManagerDetails.canvasSize.height}` : 'null'}`
+    ].join('\n');
+
+    this.debugPlayerFollowingText.setText(followingText);
+
+    // Position text below and to the right of the player (bottom-right relative to player)
+    // Adjusted positioning to accommodate the expanded debug information
+    const offsetX = 30; // Right of player (slightly more space)
+    const offsetY = 45;  // Below player (positive Y moves down, more space for larger text block)
+    this.debugPlayerFollowingText.setPosition(playerX + offsetX, playerY + offsetY);
+  }
+
+  /**
+   * Validate object positioning relative to world bounds and camera viewport (for investigation)
+   */
+  public validateObjectPositioning(): any {
+    const camera = this.cameras.main;
+    const mapData = this.sharedMapSystem.getMapData();
+
+    // Collect all game objects and their positions
+    const gameObjects: any[] = [];
+
+    // Player object
+    if (this.player) {
+      gameObjects.push({
+        type: 'player',
+        name: 'Player Character',
+        x: this.player.x,
+        y: this.player.y,
+        width: this.player.width || 32,
+        height: this.player.height || 32,
+        bounds: {
+          left: this.player.x - (this.player.width || 32) / 2,
+          right: this.player.x + (this.player.width || 32) / 2,
+          top: this.player.y - (this.player.height || 32) / 2,
+          bottom: this.player.y + (this.player.height || 32) / 2
+        },
+        visible: this.player.visible,
+        active: this.player.active
+      });
+    }
+
+    // Interactive areas from map data
+    if (mapData?.interactiveAreas) {
+      mapData.interactiveAreas.forEach(area => {
+        gameObjects.push({
+          type: 'interactive_area',
+          name: area.name,
+          id: area.id,
+          x: area.x + area.width / 2, // Center position
+          y: area.y + area.height / 2,
+          width: area.width,
+          height: area.height,
+          bounds: {
+            left: area.x,
+            right: area.x + area.width,
+            top: area.y,
+            bottom: area.y + area.height
+          },
+          areaType: area.type,
+          color: area.color
+        });
+      });
+    }
+
+    // Collision areas from map data
+    if (mapData?.impassableAreas) {
+      mapData.impassableAreas.forEach(area => {
+        gameObjects.push({
+          type: 'collision_area',
+          name: area.name,
+          id: area.id,
+          x: area.x + area.width / 2, // Center position
+          y: area.y + area.height / 2,
+          width: area.width,
+          height: area.height,
+          bounds: {
+            left: area.x,
+            right: area.x + area.width,
+            top: area.y,
+            bottom: area.y + area.height
+          }
+        });
+      });
+    }
+
+    // Debug objects (if enabled)
+    if (this.DEBUG_CAMERA_CENTERING) {
+      const debugObjects = [
+        { name: 'debugPlayerCross', obj: this.debugPlayerCross },
+        { name: 'debugCameraCross', obj: this.debugCameraCross },
+        { name: 'debugViewportBounds', obj: this.debugViewportBounds },
+        { name: 'debugViewportBorder', obj: this.debugViewportBorder }
+      ];
+
+      debugObjects.forEach(({ name, obj }) => {
+        if (obj) {
+          gameObjects.push({
+            type: 'debug_object',
+            name,
+            x: obj.x || 0,
+            y: obj.y || 0,
+            width: 10, // Approximate size for debug objects
+            height: 10,
+            bounds: {
+              left: (obj.x || 0) - 5,
+              right: (obj.x || 0) + 5,
+              top: (obj.y || 0) - 5,
+              bottom: (obj.y || 0) + 5
+            },
+            visible: obj.visible
+          });
+        }
+      });
+    }
+
+    // Validate positioning
+    const worldBounds = {
+      left: 0,
+      right: this.worldBounds.width,
+      top: 0,
+      bottom: this.worldBounds.height
+    };
+
+    const validation = {
+      timestamp: new Date().toISOString(),
+      worldBounds: { ...this.worldBounds },
+      camera: {
+        bounds: camera.getBounds(),
+        viewport: {
+          left: camera.scrollX,
+          right: camera.scrollX + camera.width,
+          top: camera.scrollY,
+          bottom: camera.scrollY + camera.height
+        },
+        zoom: camera.zoom
+      },
+      totalObjects: gameObjects.length,
+      objectsByType: {
+        player: gameObjects.filter(obj => obj.type === 'player').length,
+        interactive_areas: gameObjects.filter(obj => obj.type === 'interactive_area').length,
+        collision_areas: gameObjects.filter(obj => obj.type === 'collision_area').length,
+        debug_objects: gameObjects.filter(obj => obj.type === 'debug_object').length
+      },
+      positioningIssues: {
+        outsideWorldBounds: gameObjects.filter(obj =>
+          obj.bounds.left < worldBounds.left ||
+          obj.bounds.right > worldBounds.right ||
+          obj.bounds.top < worldBounds.top ||
+          obj.bounds.bottom > worldBounds.bottom
+        ),
+        partiallyOutside: gameObjects.filter(obj =>
+          (obj.bounds.left < worldBounds.left && obj.bounds.right > worldBounds.left) ||
+          (obj.bounds.right > worldBounds.right && obj.bounds.left < worldBounds.right) ||
+          (obj.bounds.top < worldBounds.top && obj.bounds.bottom > worldBounds.top) ||
+          (obj.bounds.bottom > worldBounds.bottom && obj.bounds.top < worldBounds.bottom)
+        ),
+        atWorldEdges: gameObjects.filter(obj =>
+          obj.bounds.left <= 5 || obj.bounds.right >= worldBounds.right - 5 ||
+          obj.bounds.top <= 5 || obj.bounds.bottom >= worldBounds.bottom - 5
+        )
+      },
+      allObjects: gameObjects
+    };
+
+    console.log('🔍 OBJECT POSITIONING VALIDATION:', validation);
+    return validation;
+  }
+
+  /**
+   * Test background image alignment with different aspect ratios (for investigation)
+   */
+  public testBackgroundImageAlignment(): any {
+    const camera = this.cameras.main;
+    const scale = this.scale;
+    const mapData = this.sharedMapSystem.getMapData();
+
+    // Get background image texture if it exists
+    let backgroundTexture: any = null;
+    let backgroundImageObject: any = null;
+
+    // Find the background image in the scene
+    this.children.list.forEach((child: any) => {
+      if (child.texture && child.depth === -1000) {
+        backgroundImageObject = child;
+        backgroundTexture = child.texture;
+      }
+    });
+
+    const alignment = {
+      timestamp: new Date().toISOString(),
+      backgroundImage: {
+        exists: !!backgroundImageObject,
+        texture: backgroundTexture ? {
+          key: backgroundTexture.key,
+          width: backgroundTexture.source[0]?.width || 0,
+          height: backgroundTexture.source[0]?.height || 0
+        } : null,
+        object: backgroundImageObject ? {
+          x: backgroundImageObject.x,
+          y: backgroundImageObject.y,
+          scaleX: backgroundImageObject.scaleX,
+          scaleY: backgroundImageObject.scaleY,
+          originX: backgroundImageObject.originX,
+          originY: backgroundImageObject.originY,
+          width: backgroundImageObject.width,
+          height: backgroundImageObject.height,
+          displayWidth: backgroundImageObject.displayWidth,
+          displayHeight: backgroundImageObject.displayHeight
+        } : null
+      },
+      mapData: {
+        backgroundImageDimensions: mapData?.backgroundImageDimensions || null,
+        worldDimensions: mapData?.worldDimensions || null
+      },
+      worldBounds: { ...this.worldBounds },
+      camera: {
+        bounds: camera.getBounds(),
+        scroll: { x: camera.scrollX, y: camera.scrollY },
+        zoom: camera.zoom
+      },
+      aspectRatios: {
+        background: backgroundTexture ?
+          (backgroundTexture.source[0]?.width / backgroundTexture.source[0]?.height).toFixed(3) : null,
+        world: (this.worldBounds.width / this.worldBounds.height).toFixed(3),
+        camera: (camera.width / camera.height).toFixed(3)
+      },
+      pixelMapping: {
+        is1to1: backgroundImageObject ?
+          (backgroundImageObject.scaleX === 1 && backgroundImageObject.scaleY === 1) : null,
+        positionedAtOrigin: backgroundImageObject ?
+          (backgroundImageObject.x === 0 && backgroundImageObject.y === 0) : null,
+        originTopLeft: backgroundImageObject ?
+          (backgroundImageObject.originX === 0 && backgroundImageObject.originY === 0) : null
+      }
+    };
+
+    console.log('🔍 BACKGROUND IMAGE ALIGNMENT TEST:', alignment);
+    return alignment;
+  }
+
+  /**
+   * Verify canvas size vs map size relationships (for investigation)
+   */
+  public verifyCanvasMapSizeRelationship(): any {
+    const camera = this.cameras.main;
+    const scale = this.scale;
+    const mapData = this.sharedMapSystem.getMapData();
+
+    const verification = {
+      timestamp: new Date().toISOString(),
+      worldBounds: { ...this.worldBounds },
+      mapData: {
+        hasBackgroundImage: !!mapData?.backgroundImage,
+        backgroundImageDimensions: mapData?.backgroundImageDimensions || null,
+        worldDimensions: mapData?.worldDimensions || null
+      },
+      camera: {
+        bounds: camera.getBounds(),
+        width: camera.width,
+        height: camera.height
+      },
+      scale: {
+        gameSize: { width: scale.gameSize.width, height: scale.gameSize.height },
+        displaySize: { width: scale.displaySize.width, height: scale.displaySize.height },
+        baseSize: { width: scale.baseSize.width, height: scale.baseSize.height },
+        parentSize: { width: scale.parentSize.width, height: scale.parentSize.height }
+      },
+      consistency: {
+        worldBoundsMatchCamera: this.worldBounds.width === camera.getBounds().width &&
+                               this.worldBounds.height === camera.getBounds().height,
+        cameraMatchesScale: camera.width === scale.gameSize.width &&
+                           camera.height === scale.gameSize.height,
+        backgroundImageMatchesWorld: mapData?.backgroundImageDimensions ?
+          (mapData.backgroundImageDimensions.width === this.worldBounds.width &&
+           mapData.backgroundImageDimensions.height === this.worldBounds.height) : null
+      }
+    };
+
+    console.log('🔍 CANVAS-MAP SIZE VERIFICATION:', verification);
+    return verification;
+  }
+
+  /**
+   * Test boundary alignment at specific zoom level (for investigation)
+   */
+  public testBoundaryAlignmentAtZoom(zoomLevel: number): any {
+    const camera = this.cameras.main;
+    const scale = this.scale;
+
+    // Set the zoom level
+    camera.setZoom(zoomLevel);
+
+    // Re-center on player
+    if (this.player) {
+      this.centerCameraOnPlayer();
+    }
+
+    // Collect debug data
+    const testResults = {
+      zoomLevel,
+      timestamp: new Date().toISOString(),
+      camera: {
+        width: camera.width,
+        height: camera.height,
+        scrollX: camera.scrollX,
+        scrollY: camera.scrollY,
+        zoom: camera.zoom
+      },
+      scale: {
+        gameSize: { width: scale.gameSize.width, height: scale.gameSize.height },
+        displaySize: { width: scale.displaySize.width, height: scale.displaySize.height },
+        baseSize: { width: scale.baseSize.width, height: scale.baseSize.height },
+        parentSize: { width: scale.parentSize.width, height: scale.parentSize.height },
+        scaleMode: scale.scaleMode,
+        autoCenter: scale.autoCenter
+      },
+      viewport: {
+        worldWidth: camera.width / zoomLevel,
+        worldHeight: camera.height / zoomLevel
+      },
+      dimensionsMatch: camera.width === scale.gameSize.width && camera.height === scale.gameSize.height,
+      worldBounds: { ...this.worldBounds }
+    };
+
+    console.log(`🔍 BOUNDARY TEST @ ${Math.round(zoomLevel * 100)}%:`, testResults);
+
+    // Update debug overlays
+    if (this.DEBUG_CAMERA_CENTERING) {
+      this.updateDebugOverlays();
+    }
+
+    return testResults;
   }
 
   /**
@@ -1567,6 +2134,11 @@ class GameScene extends Phaser.Scene {
       this.debugViewportBounds.destroy();
       this.debugViewportBounds = undefined;
     }
+
+    if (this.debugViewportBorder) {
+      this.debugViewportBorder.destroy();
+      this.debugViewportBorder = undefined;
+    }
     if (this.debugWorldCenterCross) {
       this.debugWorldCenterCross.destroy();
       this.debugWorldCenterCross = undefined;
@@ -1578,6 +2150,11 @@ class GameScene extends Phaser.Scene {
     if (this.debugCameraScrollText) {
       this.debugCameraScrollText.destroy();
       this.debugCameraScrollText = undefined;
+    }
+
+    if (this.debugPlayerFollowingText) {
+      this.debugPlayerFollowingText.destroy();
+      this.debugPlayerFollowingText = undefined;
     }
   }
 
@@ -1615,6 +2192,22 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
   // Note: Video functionality is now handled by the persistent video panel
   const eventBus = useEventBus();
 
+  // Update zoom state function - defined first so it can be used in other callbacks
+  const updateZoomState = useCallback(() => {
+    console.log('🔄 UPDATE ZOOM STATE');
+    if (gameSceneRef.current) {
+      const canIn = gameSceneRef.current.canZoomIn();
+      const canOut = gameSceneRef.current.canZoomOut();
+      const isFollowing = gameSceneRef.current.isCameraFollowingPlayer();
+      console.log('🔄 Zoom state update:', { canIn, canOut, isFollowing });
+      setCanZoomIn(canIn);
+      setCanZoomOut(canOut);
+      setIsCameraFollowing(isFollowing);
+    } else {
+      console.log('❌ Game scene not found in updateZoomState!');
+    }
+  }, []);
+
   // Zoom control handlers
   const handleZoomIn = useCallback(() => {
     console.log('🎮 HANDLE ZOOM IN CLICKED');
@@ -1625,7 +2218,7 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
     } else {
       console.log('❌ Game scene not found!');
     }
-  }, []);
+  }, [updateZoomState]);
 
   const handleZoomOut = useCallback(() => {
     console.log('🎮 HANDLE ZOOM OUT CLICKED');
@@ -1636,7 +2229,7 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
     } else {
       console.log('❌ Game scene not found!');
     }
-  }, []);
+  }, [updateZoomState]);
 
   const handleResetZoom = useCallback(() => {
     console.log('🎮 HANDLE RESET ZOOM CLICKED');
@@ -1647,7 +2240,7 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
     } else {
       console.log('❌ Game scene not found!');
     }
-  }, []);
+  }, [updateZoomState]);
 
   const handleToggleCameraFollow = useCallback(() => {
     console.log('🎮 HANDLE TOGGLE CAMERA FOLLOW CLICKED');
@@ -1667,23 +2260,8 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
     }
   }, [isCameraFollowing]);
 
-  const updateZoomState = useCallback(() => {
-    console.log('🔄 UPDATE ZOOM STATE');
-    if (gameSceneRef.current) {
-      const canIn = gameSceneRef.current.canZoomIn();
-      const canOut = gameSceneRef.current.canZoomOut();
-      const isFollowing = gameSceneRef.current.isCameraFollowingPlayer();
-      console.log('🔄 Zoom state update:', { canIn, canOut, isFollowing });
-      setCanZoomIn(canIn);
-      setCanZoomOut(canOut);
-      setIsCameraFollowing(isFollowing);
-    } else {
-      console.log('❌ Game scene not found in updateZoomState!');
-    }
-  }, []);
 
-
-  const handleAreaClick = (areaId: string) => {
+  const handleAreaClick = useCallback((areaId: string) => {
     // Get area data from SharedMapSystem (localStorage)
     const sharedMapSystem = SharedMapSystem.getInstance();
     const mapData = sharedMapSystem.getMapData();
@@ -1702,7 +2280,7 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
         // The video panel will handle the connection automatically
       }
     }
-  };
+  }, [eventBus]);
 
   useEffect(() => {
     if (!gameRef.current || phaserGameRef.current) {
@@ -1763,6 +2341,22 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
 
       // Store game instance globally for debugging
       (window as any).phaserGame = phaserGameRef.current;
+      (window as any).testBoundaryAlignment = (zoom: number) => {
+        return gameSceneRef.current?.testBoundaryAlignmentAtZoom(zoom);
+      };
+      (window as any).verifyCanvasMapSize = () => {
+        return gameSceneRef.current?.verifyCanvasMapSizeRelationship();
+      };
+      (window as any).testBackgroundAlignment = () => {
+        return gameSceneRef.current?.testBackgroundImageAlignment();
+      };
+      (window as any).validateObjectPositioning = () => {
+        return gameSceneRef.current?.validateObjectPositioning();
+      };
+      console.log('🔍 Boundary test function available as window.testBoundaryAlignment(zoom)');
+      console.log('🔍 Canvas-map verification available as window.verifyCanvasMapSize()');
+      console.log('🔍 Background alignment test available as window.testBackgroundAlignment()');
+      console.log('🔍 Object positioning validation available as window.validateObjectPositioning()');
 
       // Update zoom state after game is ready
       setTimeout(() => {
@@ -1794,7 +2388,8 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
         if (gameSceneRef.current && phaserGameRef.current) {
           // Delay to ensure resize is complete
           setTimeout(() => {
-            gameSceneRef.current?.fitMapToViewport();
+            // Use adjustViewportWithoutZoomReset to preserve zoom level during panel resizes
+            gameSceneRef.current?.adjustViewportWithoutZoomReset();
             updateZoomState();
           }, 100);
         }
@@ -1832,7 +2427,7 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
         delete (window as any).phaserGame;
       }
     };
-  }, [eventBus, user?.username, playerId]);
+  }, [eventBus, user?.username, playerId, handleAreaClick, updateZoomState]);
 
 
 

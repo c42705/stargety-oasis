@@ -96,7 +96,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         });
       }, 100);
     }
-  }, [effectiveDimensions.width, effectiveDimensions.height, editorState]);
+  }, [effectiveDimensions, editorState]);
 
   // Create handlers using extracted utilities
   const handleSaveArea = useCallback(async (areaData: any) => {
@@ -124,7 +124,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         console.error('Failed to update area:', error);
       }
     }
-  }, [modalState.editingArea, sharedMap, modalState.setShowAreaModal, modalState.setEditingArea, drawingMode.setPendingAreaData, drawingMode.setDrawingMode]);
+  }, [modalState, sharedMap, drawingMode]);
 
   const handleConfirmDelete = useCallback(async () => {
     if (modalState.areaToDelete) {
@@ -135,7 +135,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         console.error('Failed to delete area:', error);
       }
     }
-  }, [modalState.areaToDelete, sharedMap, modalState.setAreaToDelete]);
+  }, [modalState, sharedMap]);
 
   const handleAreaDrawn = useCallback(async (bounds: { x: number; y: number; width: number; height: number }) => {
     if (!drawingMode.pendingAreaData) return;
@@ -165,7 +165,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
     } catch (error) {
       console.error('Failed to create area:', error);
     }
-  }, [drawingMode.pendingAreaData, sharedMap, drawingMode.setDrawingMode, drawingMode.setPendingAreaData]);
+  }, [drawingMode, sharedMap]);
 
   // Collision area handlers
   const handleSaveCollisionArea = useCallback(async (areaData: any) => {
@@ -185,7 +185,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         console.error('Failed to update collision area:', error);
       }
     }
-  }, [collisionModalState.editingCollisionArea, sharedMap, collisionModalState.setShowCollisionAreaModal, collisionModalState.setEditingCollisionArea, collisionDrawingMode.setPendingCollisionAreaData, collisionDrawingMode.setCollisionDrawingMode]);
+  }, [collisionModalState, sharedMap, collisionDrawingMode]);
 
   const handleConfirmDeleteCollisionArea = useCallback(async () => {
     if (collisionModalState.collisionAreaToDelete) {
@@ -196,7 +196,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         console.error('Failed to delete collision area:', error);
       }
     }
-  }, [collisionModalState.collisionAreaToDelete, sharedMap, collisionModalState.setCollisionAreaToDelete]);
+  }, [collisionModalState, sharedMap]);
 
   const handleCollisionAreaDrawn = useCallback(async (bounds: { x: number; y: number; width: number; height: number }) => {
     if (!collisionDrawingMode.pendingCollisionAreaData) return;
@@ -223,7 +223,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
     } catch (error) {
       console.error('Failed to create collision area:', error);
     }
-  }, [collisionDrawingMode.pendingCollisionAreaData, sharedMap, collisionDrawingMode.setCollisionDrawingMode, collisionDrawingMode.setPendingCollisionAreaData]);
+  }, [collisionDrawingMode, sharedMap]);
 
   // Modal close handler that combines drawing mode exit
   const handleCloseModals = useCallback(() => {
@@ -461,6 +461,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
                 key={tab.id}
                 className={`editor-panel-tab ${activeTab === tab.id ? 'active' : ''}`}
                 onClick={() => setActiveTab(tab.id)}
+                role="tab"
                 aria-selected={activeTab === tab.id}
               >
                 <span className="tab-icon">{tab.icon}</span>

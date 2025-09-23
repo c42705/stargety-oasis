@@ -13,7 +13,7 @@
  * - No singleton pattern - stateless service functions
  */
 
-import { InteractiveArea, ImpassableArea, MapData } from '../shared/MapDataContext';
+import { MapData } from '../shared/MapDataContext';
 
 // Extended map data structure for the new system
 export interface ExtendedMapData extends MapData {

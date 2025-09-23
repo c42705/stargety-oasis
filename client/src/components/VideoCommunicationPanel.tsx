@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button, Space, Typography, Select, Card, Empty, Spin, Badge } from 'antd';
 import { VideoCameraOutlined, PhoneOutlined, SettingOutlined, DisconnectOutlined } from '@ant-design/icons';
 import { useSettings } from '../shared/SettingsContext';
@@ -7,7 +7,7 @@ import { useEventBus } from '../shared/EventBusContext';
 import { VideoCallModule } from '../modules/video-call/VideoCallModule';
 import { RingCentralModule } from '../modules/ringcentral/RingCentralModule';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 const { Option } = Select;
 
 interface VideoCommunicationPanelProps {
@@ -45,7 +45,7 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
     }
   }, [currentRoom, activeRoom]);
 
-  const handleConnect = async () => {
+  const handleConnect = useCallback(async () => {
     setIsConnecting(true);
     try {
       // Simulate connection delay
@@ -57,7 +57,7 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
     } finally {
       setIsConnecting(false);
     }
-  };
+  }, [activeRoom, onRoomChange]);
 
   // Listen for area selection events from the world
   useEffect(() => {
@@ -75,7 +75,7 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
     const unsubscribe = eventBus.subscribe('area-selected', handleAreaSelected);
 
     return unsubscribe;
-  }, [eventBus, isConnected, isConnecting, onRoomChange, activeRoom]);
+  }, [eventBus, isConnected, isConnecting, onRoomChange, activeRoom, handleConnect]);
 
   const handleDisconnect = () => {
     setIsConnected(false);

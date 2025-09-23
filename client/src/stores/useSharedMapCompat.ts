@@ -56,7 +56,6 @@ interface UseSharedMapReturn {
  */
 export const useSharedMapCompat = (options: UseSharedMapOptions = {}): UseSharedMapReturn => {
   const {
-    autoSave = true,
     saveDelay = 18000,
     source = 'editor'
   } = options;
@@ -77,7 +76,6 @@ export const useSharedMapCompat = (options: UseSharedMapOptions = {}): UseShared
     loadMap,
     exportMap,
     importMap,
-    resetMap,
     addInteractiveArea,
     updateInteractiveArea,
     removeInteractiveArea,

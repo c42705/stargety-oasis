@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { SharedMapSystem, SharedMapData, MapEvent, MapEventType } from './SharedMapSystem';
+import { SharedMapSystem, SharedMapData } from './SharedMapSystem';
 import { InteractiveArea, ImpassableArea } from './MapDataContext';
 
 export interface UseSharedMapOptions {

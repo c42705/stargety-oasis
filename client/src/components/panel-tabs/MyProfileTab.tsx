@@ -89,7 +89,7 @@ export const MyProfileTab: React.FC = () => {
     if (!user) return;
     const cfg = loadAvatarConfig(user.username);
     setAvatarConfig(cfg);
-  }, [user?.username]);
+  }, [user]);
 
   // Compose preview whenever config changes
   useEffect(() => {

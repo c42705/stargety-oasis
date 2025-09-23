@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Form, Input, Button, Checkbox, Alert, Collapse, Space, Typography, Divider } from 'antd';
-import { UserOutlined, LockOutlined, RocketOutlined, DownOutlined, BulbOutlined } from '@ant-design/icons';
+import { UserOutlined, LockOutlined, RocketOutlined, BulbOutlined } from '@ant-design/icons';
 import { useAuth } from '../../shared/AuthContext';
 import appLogo from '../../assets/app-logo.png';
 import magicalBg from '../../assets/magical_bg.png';

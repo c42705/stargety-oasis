@@ -61,12 +61,6 @@ export const LayersTab: React.FC<LayersTabProps> = ({
   onDeleteObject
 }) => {
   const [expandedKeys, setExpandedKeys] = useState<string[]>(['background', 'interactive', 'collision']);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-  // Force refresh of layer data
-  const forceRefresh = useCallback(() => {
-    setRefreshTrigger(prev => prev + 1);
-  }, []);
 
   // Get layer data from canvas
   const layerGroups = useMemo((): LayerGroup[] => {
@@ -192,7 +186,7 @@ export const LayersTab: React.FC<LayersTabProps> = ({
         locked: gridObjects.every(obj => obj.locked)
       }
     ].filter(group => group.objects.length > 0); // Only show groups with objects
-  }, [fabricCanvas, refreshTrigger]);
+  }, [fabricCanvas]);
 
   // Handle object selection
   const handleObjectSelect = useCallback((layerObject: LayerObject) => {
@@ -267,8 +261,7 @@ export const LayersTab: React.FC<LayersTabProps> = ({
     });
 
     fabricCanvas.renderAll();
-    forceRefresh(); // Force UI update
-  }, [fabricCanvas, forceRefresh]);
+  }, [fabricCanvas]);
 
   // Toggle object visibility
   const handleObjectVisibilityToggle = useCallback((layerObject: LayerObject, e: React.MouseEvent) => {
@@ -278,8 +271,7 @@ export const LayersTab: React.FC<LayersTabProps> = ({
 
     layerObject.fabricObject.visible = !layerObject.visible;
     fabricCanvas.renderAll();
-    forceRefresh(); // Force UI update
-  }, [fabricCanvas, forceRefresh]);
+  }, [fabricCanvas]);
 
   // Toggle layer lock state
   const handleLayerLockToggle = useCallback((layerGroup: LayerGroup) => {
@@ -295,8 +287,7 @@ export const LayersTab: React.FC<LayersTabProps> = ({
     });
 
     fabricCanvas.renderAll();
-    forceRefresh(); // Force UI update
-  }, [fabricCanvas, forceRefresh]);
+  }, [fabricCanvas]);
 
   // Toggle object lock state
   const handleObjectLockToggle = useCallback((layerObject: LayerObject, e: React.MouseEvent) => {
@@ -310,8 +301,7 @@ export const LayersTab: React.FC<LayersTabProps> = ({
     layerObject.fabricObject.evented = !newLockState;
 
     fabricCanvas.renderAll();
-    forceRefresh(); // Force UI update
-  }, [fabricCanvas, forceRefresh]);
+  }, [fabricCanvas]);
 
   // Handle edit object
   const handleEditObject = useCallback((layerObject: LayerObject, e: React.MouseEvent) => {
