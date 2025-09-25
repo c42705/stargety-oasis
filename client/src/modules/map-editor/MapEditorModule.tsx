@@ -3,7 +3,7 @@ import { Map, Eye, Square, Shield } from 'lucide-react';
 import { useMapData, InteractiveArea } from '../../shared/MapDataContext';
 // import { useSharedMap } from '../../shared/useSharedMap';
 import { useSharedMapCompat as useSharedMap } from '../../stores/useSharedMapCompat';
-import { SharedMapSystem } from '../../shared/SharedMapSystem';
+import { useWorldDimensions } from '../../shared/useWorldDimensions';
 import { FabricMapCanvas } from './FabricMapCanvas';
 import * as fabric from 'fabric';
 import { AreaFormModal } from '../../components/AreaFormModal';
@@ -65,16 +65,16 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   // Use shared map data
   const { interactiveAreas: areas, impassableAreas } = mapData;
 
-  // Get effective dimensions from centralized system
-  const getEffectiveDimensions = useCallback(() => {
-    try {
-      return SharedMapSystem.getInstance().getEffectiveDimensions();
-    } catch {
-      return mapData.worldDimensions;
-    }
-  }, [mapData.worldDimensions]);
+  // Use WorldDimensionsManager for direct, non-looping dimension access
+  const worldDimensions = useWorldDimensions({
+    subscribeToEffective: true,
+    subscribeToCanvas: true,
+    enableShallowComparison: true,
+    enableLogging: false // Set to true for debugging
+  });
 
-  const effectiveDimensions = getEffectiveDimensions();
+  // Get effective dimensions directly from WorldDimensionsManager (no loops)
+  const effectiveDimensions = worldDimensions.effectiveDimensions;
 
   // Use extracted hooks
   const editorState = useEditorState();
@@ -85,16 +85,28 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   const collisionDrawingMode = useCollisionDrawingMode();
   const backgroundInfoPanel = useBackgroundInfoIntegration();
 
-  // Watch for effective dimension changes and re-apply fit-to-screen
+  // SIMPLIFIED: Handle dimension changes without infinite loops
+  // WorldDimensionsManager prevents circular updates automatically
+  const lastDimensionsRef = useRef<{ width: number; height: number } | null>(null);
+
   useEffect(() => {
-    if (fabricCanvasRef.current && effectiveDimensions) {
-      // Re-apply fit-to-screen when effective dimensions change (but don't force it to allow manual zoom to take precedence)
-      setTimeout(() => {
-        editorState.onFitToScreen(false); // Don't force - respect manual zoom
-        console.log('🎯 EDIT MODE: Re-applied zoom to fit after effective dimension change', {
-          effectiveDimensions
-        });
-      }, 100);
+    // Only update if dimensions actually changed (WorldDimensionsManager handles this internally)
+    const lastDimensions = lastDimensionsRef.current;
+    const dimensionsChanged = !lastDimensions ||
+      lastDimensions.width !== effectiveDimensions.width ||
+      lastDimensions.height !== effectiveDimensions.height;
+
+    if (dimensionsChanged && fabricCanvasRef.current) {
+      lastDimensionsRef.current = { ...effectiveDimensions };
+
+      console.log('🎯 EDIT MODE: Applying fit-to-screen for dimension change', {
+        effectiveDimensions,
+        previousDimensions: lastDimensions,
+        source: 'WorldDimensionsManager'
+      });
+
+      // Apply fit-to-screen immediately (no setTimeout needed)
+      editorState.onFitToScreen(false);
     }
   }, [effectiveDimensions, editorState]);
 
@@ -443,11 +455,9 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
               editorState.setFabricCanvas(canvas);
               fabricCanvasRef.current = canvas;
 
-              // Automatically fit map to viewport when entering edit mode (force it on initial load)
-              setTimeout(() => {
-                editorState.onFitToScreen(true); // Force on initial canvas ready
-                console.log('🎯 EDIT MODE: Auto-applied zoom to fit on canvas ready');
-              }, 100);
+              // Automatically fit map to viewport when entering edit mode (immediate, no timeout)
+              editorState.onFitToScreen(true); // Force on initial canvas ready
+              console.log('🎯 EDIT MODE: Auto-applied zoom to fit on canvas ready (immediate)');
             }}
             backgroundInfoPanelVisible={backgroundInfoPanel.isPanelVisible}
             onBackgroundInfoPanelClose={backgroundInfoPanel.hidePanel}

@@ -13,6 +13,7 @@
  */
 
 import { InteractiveArea, ImpassableArea, MapData } from './MapDataContext';
+import { worldDimensionsManager } from './WorldDimensionsManager';
 
 // Extended map data structure for shared system
 export interface SharedMapData extends MapData {
@@ -379,23 +380,32 @@ export class SharedMapSystem {
    */
 
   /**
-   * Get the current effective dimensions (prioritizes background image dimensions)
+   * Get the current effective dimensions from WorldDimensionsManager (authoritative source)
+   * UPDATED: Now delegates to WorldDimensionsManager for consistency
    */
   public getEffectiveDimensions(): { width: number; height: number } {
-    if (!this.mapData) {
-      return { width: 800, height: 600 }; // Fallback
-    }
+    try {
+      // Use WorldDimensionsManager as the authoritative source
+      return worldDimensionsManager.getEffectiveDimensions();
+    } catch (error) {
+      console.warn('⚠️ SharedMapSystem: Failed to get dimensions from WorldDimensionsManager, using fallback', error);
 
-    // Priority: backgroundImageDimensions > worldDimensions > fallback
-    if (this.mapData.backgroundImageDimensions) {
-      return { ...this.mapData.backgroundImageDimensions };
-    }
+      // Fallback to local map data if WorldDimensionsManager fails
+      if (!this.mapData) {
+        return { width: 800, height: 600 };
+      }
 
-    if (this.mapData.worldDimensions) {
-      return { ...this.mapData.worldDimensions };
-    }
+      // Priority: backgroundImageDimensions > worldDimensions > fallback
+      if (this.mapData.backgroundImageDimensions) {
+        return { ...this.mapData.backgroundImageDimensions };
+      }
 
-    return { width: 800, height: 600 }; // Fallback
+      if (this.mapData.worldDimensions) {
+        return { ...this.mapData.worldDimensions };
+      }
+
+      return { width: 800, height: 600 };
+    }
   }
 
   /**
@@ -415,19 +425,44 @@ export class SharedMapSystem {
 
     const previousDimensions = this.getEffectiveDimensions();
 
-    // Update all dimension-related fields in sync
-    this.mapData.backgroundImage = imageUrl;
-    this.mapData.backgroundImageDimensions = validatedDimensions;
-    this.mapData.worldDimensions = validatedDimensions; // Keep in sync
+    // UPDATED: Sync background dimensions with WorldDimensionsManager
+    try {
+      const backgroundUpdateResult = worldDimensionsManager.updateBackgroundDimensions(validatedDimensions, {
+        source: 'background',
+        skipPersistence: true // We handle persistence here
+      });
 
-    console.log('🎯 CENTRALIZED DIMENSIONS UPDATE:', {
-      source,
-      imageUrl: imageUrl.substring(0, 50) + '...',
-      originalDimensions: imageDimensions,
-      validatedDimensions,
-      previousDimensions,
-      scaled: validatedDimensions.scaled
-    });
+      if (!backgroundUpdateResult.isValid) {
+        throw new Error('WorldDimensionsManager background validation failed: ' + backgroundUpdateResult.errors.join(', '));
+      }
+
+      // Update local map data with validated dimensions
+      this.mapData.backgroundImage = imageUrl;
+      this.mapData.backgroundImageDimensions = backgroundUpdateResult.dimensions;
+      this.mapData.worldDimensions = backgroundUpdateResult.dimensions; // Keep in sync
+
+      console.log('🎯 SHARED MAP SYSTEM: Background image synced with WorldDimensionsManager', {
+        source,
+        imageUrl: imageUrl.substring(0, 50) + '...',
+        originalDimensions: imageDimensions,
+        validatedDimensions: backgroundUpdateResult.dimensions,
+        previousDimensions,
+        scaled: backgroundUpdateResult.scaled
+      });
+    } catch (error) {
+      console.error('❌ SharedMapSystem: Failed to sync background with WorldDimensionsManager', error);
+
+      // Fallback to direct update
+      this.mapData.backgroundImage = imageUrl;
+      this.mapData.backgroundImageDimensions = validatedDimensions;
+      this.mapData.worldDimensions = validatedDimensions;
+
+      console.log('🎯 SHARED MAP SYSTEM: Fallback background update', {
+        source,
+        validatedDimensions,
+        previousDimensions
+      });
+    }
 
     // Record change for history
     this.recordChange({
@@ -464,7 +499,7 @@ export class SharedMapSystem {
   /**
    * Update world dimensions manually (legacy support, syncs with background dimensions)
    */
-  public async updateWorldDimensions(dimensions: { width: number; height: number }, source: 'world' | 'editor' = 'editor'): Promise<void> {
+  public async updateWorldDimensions(dimensions: { width: number; height: number }, source: 'world' | 'editor' | 'migration' = 'editor'): Promise<void> {
     if (!this.mapData) {
       throw new Error('Map data not initialized');
     }
@@ -484,16 +519,45 @@ export class SharedMapSystem {
 
     const previousDimensions = this.getEffectiveDimensions();
 
-    // Update both world and background image dimensions to keep them in sync
-    this.mapData.worldDimensions = dimensions;
-    this.mapData.backgroundImageDimensions = dimensions;
+    // UPDATED: Sync with WorldDimensionsManager first (authoritative source)
+    try {
+      const updateResult = worldDimensionsManager.updateDimensions(dimensions, {
+        source: source === 'world' ? 'world' : 'editor',
+        syncBackground: true,
+        skipPersistence: true // We handle persistence here
+      });
 
-    console.log('🎯 CENTRALIZED WORLD DIMENSIONS UPDATE:', {
-      source,
-      dimensions,
-      previousDimensions,
-      syncedWithBackground: true
-    });
+      if (!updateResult.isValid) {
+        throw new Error('WorldDimensionsManager validation failed: ' + updateResult.errors.join(', '));
+      }
+
+      // Use validated dimensions from WorldDimensionsManager
+      const validatedDimensions = updateResult.dimensions;
+
+      // Update local map data with validated dimensions
+      this.mapData.worldDimensions = validatedDimensions;
+      this.mapData.backgroundImageDimensions = validatedDimensions;
+
+      console.log('🎯 SHARED MAP SYSTEM: Synced with WorldDimensionsManager', {
+        source,
+        originalDimensions: dimensions,
+        validatedDimensions,
+        previousDimensions,
+        scaled: updateResult.scaled
+      });
+    } catch (error) {
+      console.error('❌ SharedMapSystem: Failed to sync with WorldDimensionsManager', error);
+
+      // Fallback to direct update (backward compatibility)
+      this.mapData.worldDimensions = dimensions;
+      this.mapData.backgroundImageDimensions = dimensions;
+
+      console.log('🎯 SHARED MAP SYSTEM: Fallback direct update', {
+        source,
+        dimensions,
+        previousDimensions
+      });
+    }
 
     // Record change for history
     this.recordChange({
@@ -509,16 +573,17 @@ export class SharedMapSystem {
     // Mark as changed and schedule auto-save
     this.markAsChanged();
 
-    // Emit specific event for world dimensions change
-    this.emit('map:dimensionsChanged', {
-      dimensions,
-      previousDimensions,
-      mapData: this.mapData,
-      source
-    });
+    // REDUCED EVENT EMISSIONS: Only emit for backward compatibility
+    // WorldDimensionsManager handles the primary dimension updates
+    console.log('🔄 SharedMapSystem: Emitting legacy events for backward compatibility');
 
-    // Also emit general map changed event
-    this.emit('map:changed', { mapData: this.mapData, source });
+    // Emit general map changed event (reduced from two events to one)
+    this.emit('map:changed', {
+      mapData: this.mapData,
+      source,
+      dimensionsChanged: true,
+      previousDimensions
+    });
   }
 
   /**

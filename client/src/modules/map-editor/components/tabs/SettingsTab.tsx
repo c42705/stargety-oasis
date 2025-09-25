@@ -22,6 +22,7 @@ import { GRID_PATTERNS } from '../../constants/editorConstants';
 import { MapDataManager } from '../../../../components/MapDataManager';
 import { useMapData } from '../../../../shared/MapDataContext';
 import { useSharedMap } from '../../../../shared/useSharedMap';
+import { useWorldDimensions } from '../../../../shared/useWorldDimensions';
 
 
 const { Option } = Select;
@@ -57,6 +58,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const { mapData, updateInteractiveAreas } = useMapData();
   // Auto-save is now controlled by the Zustand store configuration
   const sharedMap = useSharedMap({ source: 'editor' });
+  const worldDimensions = useWorldDimensions();
   const [customMapSize, setCustomMapSize] = useState({
     width: mapData.worldDimensions.width,
     height: mapData.worldDimensions.height
@@ -73,21 +75,28 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     setCustomMapSize(currentDimensions);
   }, [mapData.worldDimensions]);
 
-  // Handle map size changes
+  // Handle map size changes using WorldDimensionsManager
   const handleMapSizeChange = useCallback(async (newDimensions: { width: number; height: number }) => {
     try {
-      // Validate dimensions
-      if (newDimensions.width < MAP_SIZE_LIMITS.min.width ||
-          newDimensions.height < MAP_SIZE_LIMITS.min.height ||
-          newDimensions.width > MAP_SIZE_LIMITS.max.width ||
-          newDimensions.height > MAP_SIZE_LIMITS.max.height) {
-        message.error(`Map size must be between ${MAP_SIZE_LIMITS.min.width}×${MAP_SIZE_LIMITS.min.height} and ${MAP_SIZE_LIMITS.max.width}×${MAP_SIZE_LIMITS.max.height}`);
+      // Validate dimensions using WorldDimensionsManager
+      const validation = worldDimensions.validateDimensions(newDimensions);
+
+      if (!validation.isValid) {
+        message.error(validation.errors.join(', '));
         return;
       }
 
+      // Show warnings if dimensions were scaled
+      if (validation.scaled && validation.warnings.length > 0) {
+        message.warning(validation.warnings.join(', '));
+      }
+
+      // Use the validated dimensions (may be scaled)
+      const finalDimensions = validation.dimensions;
+
       // Check if areas will be outside new boundaries
       const areasOutsideBounds = mapData.interactiveAreas.filter(area =>
-        area.x + area.width > newDimensions.width || area.y + area.height > newDimensions.height
+        area.x + area.width > finalDimensions.width || area.y + area.height > finalDimensions.height
       );
 
       if (areasOutsideBounds.length > 0) {
@@ -104,13 +113,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
         // Adjust areas to fit within new boundaries
         const adjustedAreas = mapData.interactiveAreas.map(area => {
-          if (area.x + area.width > newDimensions.width || area.y + area.height > newDimensions.height) {
+          if (area.x + area.width > finalDimensions.width || area.y + area.height > finalDimensions.height) {
             return {
               ...area,
-              x: Math.min(area.x, newDimensions.width - area.width),
-              y: Math.min(area.y, newDimensions.height - area.height),
-              width: Math.min(area.width, newDimensions.width - area.x),
-              height: Math.min(area.height, newDimensions.height - area.y)
+              x: Math.min(area.x, finalDimensions.width - area.width),
+              y: Math.min(area.y, finalDimensions.height - area.height),
+              width: Math.min(area.width, finalDimensions.width - area.x),
+              height: Math.min(area.height, finalDimensions.height - area.y)
             };
           }
           return area;
@@ -119,15 +128,25 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         updateInteractiveAreas(adjustedAreas);
       }
 
-      // Update map dimensions through SharedMapSystem
-      await sharedMap.updateWorldDimensions(newDimensions);
-      message.success(`Map size updated to ${newDimensions.width}×${newDimensions.height}`);
+      // Update map dimensions through WorldDimensionsManager (direct, synchronous)
+      const updateResult = worldDimensions.updateDimensions(finalDimensions, {
+        source: 'editor',
+        syncBackground: true
+      });
+
+      if (updateResult.isValid) {
+        // Also update SharedMapSystem for persistence compatibility
+        await sharedMap.updateWorldDimensions(finalDimensions);
+        message.success(`Map size updated to ${finalDimensions.width}×${finalDimensions.height}`);
+      } else {
+        message.error('Failed to update map dimensions: ' + updateResult.errors.join(', '));
+      }
 
     } catch (error) {
       console.error('Failed to update map size:', error);
       message.error('Failed to update map size');
     }
-  }, [mapData.interactiveAreas, updateInteractiveAreas, sharedMap]);
+  }, [mapData.interactiveAreas, updateInteractiveAreas, sharedMap, worldDimensions]);
 
   // Handle preset selection
   const handlePresetChange = useCallback((preset: string) => {
@@ -224,13 +243,22 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           try {
             console.log('🖼️ SAVING BACKGROUND IMAGE TO SHARED MAP SYSTEM');
 
-            // Update map data with background image (use original dimensions for scaling)
+            // Update background dimensions in WorldDimensionsManager first
+            const backgroundDimensions = { width: img.width, height: img.height };
+            const backgroundValidation = worldDimensions.updateBackgroundDimensions(backgroundDimensions, {
+              source: 'background',
+              skipPersistence: false
+            });
+
+            if (!backgroundValidation.isValid) {
+              message.error('Invalid background image dimensions: ' + backgroundValidation.errors.join(', '));
+              return;
+            }
+
+            // Update map data with background image (use validated dimensions)
             await sharedMap.updateMapData({
               backgroundImage: imageDataUrl,
-              backgroundImageDimensions: {
-                width: img.width, // Original dimensions for proper scaling
-                height: img.height
-              }
+              backgroundImageDimensions: backgroundValidation.dimensions
             });
 
             console.log('🖼️ BACKGROUND IMAGE SAVED TO SHARED MAP SYSTEM');
@@ -240,11 +268,16 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               title: 'Background Image Detected',
               content: (
                 <div>
-                  <p>Image dimensions: {img.width}×{img.height}</p>
-                  <p>Current map size: {mapData.worldDimensions.width}×{mapData.worldDimensions.height}</p>
+                  <p>Image dimensions: {backgroundValidation.dimensions.width}×{backgroundValidation.dimensions.height}</p>
+                  <p>Current map size: {worldDimensions.worldDimensions.width}×{worldDimensions.worldDimensions.height}</p>
                   {targetWidth !== img.width && (
                     <p style={{ color: '#1890ff', fontSize: '12px' }}>
                       Note: Image was optimized for storage ({targetWidth}×{targetHeight})
+                    </p>
+                  )}
+                  {backgroundValidation.scaled && (
+                    <p style={{ color: '#ff6b35', fontSize: '12px' }}>
+                      Note: Image dimensions were scaled to fit limits
                     </p>
                   )}
                   <p>How would you like to handle the image?</p>
@@ -254,7 +287,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               cancelText: 'Keep Current Size',
               onOk: async () => {
                 console.log('🖼️ USER CHOSE TO RESIZE MAP TO IMAGE');
-                await handleMapSizeChange({ width: img.width, height: img.height });
+                await handleMapSizeChange(backgroundValidation.dimensions);
                 message.success('Map resized to match background image');
               },
               onCancel: () => {
@@ -302,7 +335,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
     // Return false to prevent automatic upload
     return false;
-  }, [mapData.worldDimensions, handleMapSizeChange, sharedMap]);
+  }, [handleMapSizeChange, sharedMap, worldDimensions]);
 
   // Handle reset to default map
   const handleResetToDefault = useCallback(async () => {

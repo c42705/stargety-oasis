@@ -22,10 +22,39 @@ export const SplitLayoutComponent: React.FC<SplitLayoutComponentProps> = ({
   const leftPanelCollapsed = false;
   const [rightTopPanelSize, setRightTopPanelSize] = useState(60); // Percentage
 
-
+  // OPTIMIZATION: Enhanced resize handling with validation
   const handleRightPanelResize = useCallback((sizes: number[]) => {
     if (sizes.length >= 2) {
-      setRightTopPanelSize(sizes[0]);
+      // Validate size constraints to prevent extreme ratios
+      const newSize = Math.max(20, Math.min(80, sizes[0])); // Clamp between 20% and 80%
+      setRightTopPanelSize(newSize);
+
+      // Log resize for debugging (only occasionally to avoid spam)
+      if (Math.random() < 0.1) {
+        console.log('🔧 SPLITTER: Right panel resize', {
+          originalSize: sizes[0],
+          clampedSize: newSize,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+  }, []);
+
+  // OPTIMIZATION: Enhanced main splitter resize handling
+  const handleMainSplitterResize = useCallback((sizes: number[]) => {
+    if (sizes.length >= 2) {
+      // Validate main splitter constraints
+      const leftSize = sizes[0];
+      const rightSize = sizes[1];
+
+      // Log extreme ratios for monitoring
+      if (leftSize < 20 || leftSize > 85 || rightSize < 15 || rightSize > 80) {
+        console.warn('🔧 SPLITTER: Extreme panel ratio detected', {
+          leftSize,
+          rightSize,
+          timestamp: new Date().toISOString()
+        });
+      }
     }
   }, []);
 
@@ -33,12 +62,14 @@ export const SplitLayoutComponent: React.FC<SplitLayoutComponentProps> = ({
     <div className={`split-layout-component ${className}`} style={{ height: '100%', width: '100%' }}>
       <Splitter
         style={{ height: '100%', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)' }}
+        onResize={handleMainSplitterResize}
       >
         {/* Left Panel - World/Game Area */}
+        {/* OPTIMIZATION: Enhanced constraints to prevent extreme ratios */}
         <Splitter.Panel
           defaultSize={leftPanelCollapsed ? "30%" : "70%"}
-          min={leftPanelCollapsed ? 50 : 250}
-          max={leftPanelCollapsed ? 50 : "80%"}
+          min={leftPanelCollapsed ? 50 : 300} // Increased minimum for better game visibility
+          max={leftPanelCollapsed ? 50 : "85%"} // Increased maximum to allow more game space
           collapsible={{
             start: true
           }}
@@ -56,11 +87,12 @@ export const SplitLayoutComponent: React.FC<SplitLayoutComponentProps> = ({
         </Splitter.Panel>
 
         {/* Right Panel - Video & Chat */}
+        {/* OPTIMIZATION: Enhanced right panel constraints */}
         <Splitter.Panel collapsible
           style={{
             backgroundColor: 'var(--color-bg-secondary)',
-            minWidth: 300,
-            maxWidth: '80%'
+            minWidth: 250, // Reduced minimum for better flexibility
+            maxWidth: '70%' // Reduced maximum to ensure game area gets priority
           }}
         >
           <Splitter
@@ -69,11 +101,11 @@ export const SplitLayoutComponent: React.FC<SplitLayoutComponentProps> = ({
             onResize={handleRightPanelResize}
           >
             {/* Top Section - Video Communication */}
+            {/* OPTIMIZATION: Enhanced vertical panel constraints */}
             <Splitter.Panel collapsible
               defaultSize={`${rightTopPanelSize}%`}
-              min="30%"
-              max="80%"
-         
+              min="20%" // Reduced minimum for more flexibility
+              max="85%" // Increased maximum for video priority when needed
             >
          
 

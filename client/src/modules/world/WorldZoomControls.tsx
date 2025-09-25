@@ -46,7 +46,7 @@ export const WorldZoomControls: React.FC<WorldZoomControlsProps> = ({
     >
       <Space direction="vertical" size="small">
         {/* Zoom In Button */}
-        <Tooltip title="Zoom In" placement="left">
+        <Tooltip title="Zoom In (Max: 165%)" placement="left">
           <Button
             type="text"
             icon={<PlusOutlined />}
@@ -79,7 +79,7 @@ export const WorldZoomControls: React.FC<WorldZoomControlsProps> = ({
         </Tooltip>
 
         {/* Zoom Out Button */}
-        <Tooltip title="Zoom Out" placement="left">
+        <Tooltip title="Zoom Out (Min: Map Fits Viewport)" placement="left">
           <Button
             type="text"
             icon={<MinusOutlined />}
@@ -112,13 +112,13 @@ export const WorldZoomControls: React.FC<WorldZoomControlsProps> = ({
         </Tooltip>
 
         {/* Reset Zoom Button */}
-        <Tooltip title="Reset Zoom & Center" placement="left">
+        <Tooltip title="Reset to 165% Zoom & Center on Character" placement="left">
           <Button
             type="text"
             icon={<ExpandOutlined />}
             size="small"
             onClick={() => {
-              console.log('🔘 RESET ZOOM BUTTON CLICKED');
+              console.log('🔘 RESET ZOOM BUTTON CLICKED - Setting to 165% and centering on character');
               onResetZoom();
             }}
             style={{
