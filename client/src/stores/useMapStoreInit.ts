@@ -6,53 +6,25 @@
  * initialization logic from the SharedMapSystem.
  */
 
-import { useEffect, useRef } from 'react';
-import { useMapStore } from './useMapStore';
+import { useMapInit } from '../redux-compat/useMapInit';
 
 interface UseMapStoreInitOptions {
   autoLoad?: boolean;
   source?: 'editor' | 'world' | 'test';
 }
 
-// Global flag to prevent multiple initializations across all components
-let globalInitializationFlag = false;
+
 
 /**
  * Initialize the map store and load data
  */
 export const useMapStoreInit = (options: UseMapStoreInitOptions = {}) => {
-  const { autoLoad = true, source = 'editor' } = options;
-  const { loadMap, mapData, isLoading, error } = useMapStore();
-  const initializationRef = useRef(false);
-
-  useEffect(() => {
-    // Prevent multiple initializations globally
-    if (globalInitializationFlag || initializationRef.current || !autoLoad) {
-      return;
-    }
-
-    globalInitializationFlag = true;
-    initializationRef.current = true;
-
-    const initializeStore = async () => {
-      try {
-        // Initialize map store
-        await loadMap();
-        // Map store initialized successfully
-      } catch (error) {
-        console.error(`❌ FAILED TO INITIALIZE MAP STORE FOR: ${source}`, error);
-      }
-    };
-
-    initializeStore();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoLoad, source]); // Removed loadMap from dependencies to prevent re-initialization
-
+  const { isReady, isLoading, mapData } = useMapInit();
   return {
     mapData,
     isLoading,
-    error,
-    isInitialized: !!mapData && !isLoading
+    error: null,
+    isInitialized: isReady,
   };
 };
 
@@ -61,20 +33,10 @@ export const useMapStoreInit = (options: UseMapStoreInitOptions = {}) => {
  * before rendering content
  */
 export const useEnsureMapStoreInit = () => {
-  const { mapData, isLoading, loadMap } = useMapStore();
-  const hasTriedInit = useRef(false);
-
-  useEffect(() => {
-    if (!mapData && !isLoading && !hasTriedInit.current) {
-      hasTriedInit.current = true;
-      // Ensuring map store is initialized
-      loadMap();
-    }
-  }, [mapData, isLoading, loadMap]);
-
+  const { isReady, isLoading, mapData } = useMapInit();
   return {
-    isReady: !!mapData && !isLoading,
+    isReady,
     isLoading,
-    mapData
+    mapData,
   };
 };

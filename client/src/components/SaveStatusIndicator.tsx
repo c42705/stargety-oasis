@@ -17,7 +17,7 @@ import { Button, Space, Typography, Badge, Spin, Switch, Popover, Alert } from '
 import { SaveOutlined, CheckCircleOutlined, ExclamationCircleOutlined, SettingOutlined } from '@ant-design/icons';
 import { Clock } from 'lucide-react';
 // import { SharedMapSystem } from '../shared/SharedMapSystem';
-import { useMapStore } from '../stores/useMapStore';
+import { useMapStoreCompat as useMapStore } from '../redux-compat/useMapStoreCompat';
 
 interface SaveStatusIndicatorProps {
   className?: string;

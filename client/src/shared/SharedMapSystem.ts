@@ -120,9 +120,9 @@ export class SharedMapSystem {
   private changeHistory: MapChange[] = [];
   private maxHistorySize = 50;
 
-  // Constants for default map creation
-  private static readonly DEFAULT_WORLD_WIDTH = 800;
-  private static readonly DEFAULT_WORLD_HEIGHT = 600;
+  // Constants for default map creation - Updated to match actual map dimensions
+  private static readonly DEFAULT_WORLD_WIDTH = 7603;
+  private static readonly DEFAULT_WORLD_HEIGHT = 3679;
 
   // Maximum world dimensions for performance
   private static readonly MAX_WORLD_WIDTH = 8000;
@@ -392,7 +392,7 @@ export class SharedMapSystem {
 
       // Fallback to local map data if WorldDimensionsManager fails
       if (!this.mapData) {
-        return { width: 800, height: 600 };
+        return { width: 7603, height: 3679 }; // Updated to match actual map dimensions
       }
 
       // Priority: backgroundImageDimensions > worldDimensions > fallback
@@ -404,7 +404,7 @@ export class SharedMapSystem {
         return { ...this.mapData.worldDimensions };
       }
 
-      return { width: 800, height: 600 };
+      return { width: 7603, height: 3679 }; // Updated to match actual map dimensions
     }
   }
 
@@ -1097,7 +1097,7 @@ export class SharedMapSystem {
 
     // Load default background image and get actual dimensions
     let backgroundImage: string | undefined;
-    let effectiveDimensions = { width: 800, height: 600 }; // Fallback
+    let effectiveDimensions = { width: 7603, height: 3679 }; // Updated to match actual map dimensions
 
     try {
       const imageData = await this.loadDefaultBackgroundImage();

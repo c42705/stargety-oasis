@@ -1,0 +1,153 @@
+/**
+ * Simple World Module Styles
+ */
+
+/* Main container */
+.simple-world-module {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+}
+
+/* Game container */
+.game-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* Game canvas */
+.simple-world-module canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Loading overlay */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(26, 26, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 50%, rgba(15, 52, 96, 0.95) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.loading-content {
+  text-align: center;
+  color: white;
+}
+
+.loading-content p {
+  margin-top: 16px;
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+/* Loading spinner */
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top: 3px solid #4a90e2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Game info overlay */
+.game-info {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.controls-hint {
+  background: rgba(0, 0, 0, 0.7);
+  padding: 8px 12px;
+  border-radius: 4px;
+  backdrop-filter: blur(4px);
+}
+
+.controls-hint p {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  text-align: center;
+}
+
+/* Error state */
+.world-module-error {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #2c1810 0%, #3d1a1a 50%, #4a1a1a 100%);
+  color: white;
+}
+
+.error-content {
+  text-align: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 0, 0, 0.3);
+}
+
+.error-content h3 {
+  margin: 0 0 16px 0;
+  color: #ff6b6b;
+}
+
+.error-content p {
+  margin: 0 0 16px 0;
+  opacity: 0.8;
+}
+
+.error-content button {
+  background: #4a90e2;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.error-content button:hover {
+  background: #357abd;
+}
+
+/* Demo specific styles */
+.demo-world {
+  width: 100%;
+  height: 100%;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .controls-hint p {
+    font-size: 11px;
+  }
+  
+  .game-info {
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+  }
+}

@@ -2,6 +2,7 @@ import React from 'react';
 import { Button, Space, Tooltip } from 'antd';
 import { PlusOutlined, MinusOutlined, ExpandOutlined, EyeOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
 
+
 interface WorldZoomControlsProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -14,8 +15,7 @@ interface WorldZoomControlsProps {
 }
 
 /**
- * Zoom controls specifically designed for the WorldModule Phaser.js game
- * Positioned in the lower right corner of the map view
+ * Simplified zoom controls for WorldModule (using Ant Design styling)
  */
 export const WorldZoomControls: React.FC<WorldZoomControlsProps> = ({
   onZoomIn,
@@ -27,151 +27,55 @@ export const WorldZoomControls: React.FC<WorldZoomControlsProps> = ({
   isCameraFollowing,
   className = ''
 }) => {
+  const controlStyle = {
+    position: 'absolute' as const,
+    bottom: '16px',
+    right: '16px',
+    zIndex: 1000,    
+    borderRadius: '8px',
+    padding: '8px',
+    Filter: 'blur(8px)',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
+  };
+
   return (
-    <div 
-      className={`world-zoom-controls ${className}`}
-      style={{
-        position: 'absolute',
-        bottom: '16px',
-        right: '16px',
-        zIndex: 1000,
-        background: 'var(--color-bg-secondary)',
-        borderRadius: '8px',
-        padding: '8px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-        border: '1px solid var(--color-border)',
-        backdropFilter: 'blur(8px)',
-        backgroundColor: 'rgba(var(--color-bg-secondary-rgb), 0.9)'
-      }}
-    >
+    <div className={`world-zoom-controls ${className}`} style={controlStyle}>
       <Space direction="vertical" size="small">
-        {/* Zoom In Button */}
-        <Tooltip title="Zoom In (Max: 165%)" placement="left">
+        <Tooltip title="Zoom In" placement="left">
           <Button
-            type="text"
+            type="primary"
             icon={<PlusOutlined />}
             size="small"
-            onClick={() => {
-              console.log('🔘 ZOOM IN BUTTON CLICKED');
-              onZoomIn();
-            }}
+            onClick={onZoomIn}
             disabled={!canZoomIn}
-            style={{
-              width: '32px',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--color-text-primary)',
-              border: '1px solid var(--color-border-light)',
-              borderRadius: '6px',
-              backgroundColor: 'var(--color-bg-tertiary)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-accent)';
-              e.currentTarget.style.color = 'white';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
-              e.currentTarget.style.color = 'var(--color-text-primary)';
-            }}
           />
         </Tooltip>
 
-        {/* Zoom Out Button */}
-        <Tooltip title="Zoom Out (Min: Map Fits Viewport)" placement="left">
+        <Tooltip title="Zoom Out" placement="left">
           <Button
-            type="text"
+            type="primary"
             icon={<MinusOutlined />}
             size="small"
-            onClick={() => {
-              console.log('🔘 ZOOM OUT BUTTON CLICKED');
-              onZoomOut();
-            }}
+            onClick={onZoomOut}
             disabled={!canZoomOut}
-            style={{
-              width: '32px',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--color-text-primary)',
-              border: '1px solid var(--color-border-light)',
-              borderRadius: '6px',
-              backgroundColor: 'var(--color-bg-tertiary)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-accent)';
-              e.currentTarget.style.color = 'white';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
-              e.currentTarget.style.color = 'var(--color-text-primary)';
-            }}
           />
         </Tooltip>
 
-        {/* Reset Zoom Button */}
-        <Tooltip title="Reset to 165% Zoom & Center on Character" placement="left">
+        <Tooltip title="Reset Zoom" placement="left">
           <Button
-            type="text"
+            type="default"
             icon={<ExpandOutlined />}
             size="small"
-            onClick={() => {
-              console.log('🔘 RESET ZOOM BUTTON CLICKED - Setting to 165% and centering on character');
-              onResetZoom();
-            }}
-            style={{
-              width: '32px',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--color-text-primary)',
-              border: '1px solid var(--color-border-light)',
-              borderRadius: '6px',
-              backgroundColor: 'var(--color-bg-tertiary)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-accent)';
-              e.currentTarget.style.color = 'white';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
-              e.currentTarget.style.color = 'var(--color-text-primary)';
-            }}
+            onClick={onResetZoom}
           />
         </Tooltip>
 
-        {/* Camera Follow Toggle Button */}
         <Tooltip title={isCameraFollowing ? "Disable Camera Follow" : "Enable Camera Follow"} placement="left">
           <Button
-            type="text"
+            type={isCameraFollowing ? "primary" : "default"}
             icon={isCameraFollowing ? <EyeOutlined /> : <EyeInvisibleOutlined />}
             size="small"
-            onClick={() => {
-              console.log('🔘 CAMERA FOLLOW TOGGLE CLICKED');
-              onToggleCameraFollow();
-            }}
-            style={{
-              width: '32px',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: isCameraFollowing ? 'var(--color-accent)' : 'var(--color-text-primary)',
-              border: '1px solid var(--color-border-light)',
-              borderRadius: '6px',
-              backgroundColor: isCameraFollowing ? 'rgba(var(--color-accent-rgb), 0.1)' : 'var(--color-bg-tertiary)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-accent)';
-              e.currentTarget.style.color = 'white';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = isCameraFollowing ? 'rgba(var(--color-accent-rgb), 0.1)' : 'var(--color-bg-tertiary)';
-              e.currentTarget.style.color = isCameraFollowing ? 'var(--color-accent)' : 'var(--color-text-primary)';
-            }}
+            onClick={onToggleCameraFollow}
           />
         </Tooltip>
       </Space>

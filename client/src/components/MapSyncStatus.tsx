@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Badge, Tooltip, Typography } from 'antd';
 import { SyncOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 // import { SharedMapSystem } from '../shared/SharedMapSystem';
-import { useMapStore } from '../stores/useMapStore';
+import { useMapStoreCompat as useMapStore } from '../redux-compat/useMapStoreCompat';
 
 const { Text } = Typography;
 

@@ -14,8 +14,9 @@
  */
 
 import React, { useEffect, useRef, useCallback } from 'react';
+import { logger } from './logger';
 import { SharedMapSystem, MapEventType } from './SharedMapSystem';
-import MapSyncStatus from '../components/MapSyncStatus';
+
 
 interface MapSynchronizerProps {
   children: React.ReactNode;
@@ -70,10 +71,10 @@ export const MapSynchronizer: React.FC<MapSynchronizerProps> = ({
         });
       }
 
-      console.log(`Map synchronized: ${eventType}`, data);
+      logger.info(`Map synchronized: ${eventType}`, data);
 
     } catch (error) {
-      console.error('Synchronization failed:', error);
+      logger.error('Synchronization failed', error as Error);
 
       if (mapSystemRef.current) {
         mapSystemRef.current.emit('map:sync:error' as MapEventType, {
@@ -167,7 +168,7 @@ export const MapSynchronizer: React.FC<MapSynchronizerProps> = ({
             // Trigger synchronization across all interfaces
             performSync('map:external:changed', { mapData: newData, source: 'cross-tab' });
           } catch (error) {
-            console.error('Failed to parse cross-tab map data:', error);
+            logger.warn('Failed to parse cross-tab map data', error as Error);
           }
         }
       };
@@ -216,27 +217,7 @@ export const MapSynchronizer: React.FC<MapSynchronizerProps> = ({
   return (
     <>
       {children}
-      {/* Hidden sync status indicator for debugging */}
-      {process.env.NODE_ENV === 'development' && (
-        <div 
-          style={{
-            position: 'fixed',
-            bottom: '10px',
-            left: '10px',
-            background: 'rgba(0,0,0,0.8)',
-            color: 'white',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            fontSize: '10px',
-            zIndex: 9999,
-            pointerEvents: 'none'
-          }}
-        >
-          Map Sync
-          {/* Map Sync Status */}
-            <MapSyncStatus />
-        </div>
-      )}
+      {/* Map Sync status indicator removed for cleaner UI */}
     </>
   );
 };

@@ -1,9 +1,9 @@
 /**
  * WorldDimensionsManager - Centralized dimension management system
- * 
+ *
  * This class provides a single source of truth for all world dimension operations,
  * eliminating the complex event-driven architecture and circular dependencies.
- * 
+ *
  * Key Features:
  * - Single state store for all dimension-related data
  * - Direct synchronous updates without event loops
@@ -11,6 +11,8 @@
  * - Comprehensive validation and error handling
  * - Performance optimized with minimal re-renders
  */
+import { logger } from './logger';
+
 
 // Types
 export interface Dimensions {
@@ -48,12 +50,12 @@ export const DIMENSION_LIMITS = {
   MIN_HEIGHT: 300,
   MAX_WIDTH: 8000,
   MAX_HEIGHT: 4000,
-  DEFAULT_WIDTH: 800,
-  DEFAULT_HEIGHT: 600,
+  DEFAULT_WIDTH: 7603, // Updated to match actual map dimensions
+  DEFAULT_HEIGHT: 3679, // Updated to match actual map dimensions
 } as const;
 
 export const DIMENSION_PRESETS = {
-  small: { width: 800, height: 600 },
+  small: { width: 7603, height: 3679 }, // Updated to match actual map dimensions
   medium: { width: 1200, height: 800 },
   large: { width: 1600, height: 1200 },
   xlarge: { width: 2400, height: 1600 },
@@ -174,7 +176,7 @@ export class WorldDimensionsManager {
 
     // Prevent circular updates
     if (this.isUpdating) {
-      console.warn('🔄 WorldDimensionsManager: Circular update prevented');
+      logger.warn('WorldDimensionsManager: Circular update prevented');
       return {
         isValid: false,
         dimensions,
@@ -186,9 +188,9 @@ export class WorldDimensionsManager {
 
     // Validate dimensions
     const validation = this.validateDimensions(dimensions);
-    
+
     if (!validation.isValid) {
-      console.error('❌ WorldDimensionsManager: Invalid dimensions', {
+      logger.error('WorldDimensionsManager: Invalid dimensions', {
         dimensions,
         errors: validation.errors,
       });
@@ -222,7 +224,7 @@ export class WorldDimensionsManager {
         this.state.backgroundImageDimensions = newDimensions;
       }
 
-      console.log('✅ WorldDimensionsManager: Dimensions updated', {
+      logger.info('WorldDimensionsManager: Dimensions updated', {
         source,
         previous: previousState.worldDimensions,
         new: newDimensions,
@@ -250,7 +252,7 @@ export class WorldDimensionsManager {
    */
   public updateBackgroundDimensions(dimensions: Dimensions, options: DimensionUpdateOptions = {}): DimensionValidationResult {
     const validation = this.validateDimensions(dimensions);
-    
+
     if (!validation.isValid) {
       return validation;
     }
@@ -276,7 +278,7 @@ export class WorldDimensionsManager {
    */
   public subscribe(callback: DimensionSubscriptionCallback): () => void {
     this.subscribers.add(callback);
-    
+
     // Return unsubscribe function
     return () => {
       this.subscribers.delete(callback);
@@ -338,7 +340,7 @@ export class WorldDimensionsManager {
       try {
         callback(state);
       } catch (error) {
-        console.error('❌ WorldDimensionsManager: Subscriber error', error);
+        logger.error('WorldDimensionsManager: Subscriber error', error as Error);
       }
     });
   }
@@ -352,7 +354,7 @@ export class WorldDimensionsManager {
       };
       localStorage.setItem('worldDimensions', JSON.stringify(storageData));
     } catch (error) {
-      console.warn('⚠️ WorldDimensionsManager: Failed to save to storage', error);
+      logger.warn('WorldDimensionsManager: Failed to save to storage', error as Error);
     }
   }
 
@@ -376,7 +378,7 @@ export class WorldDimensionsManager {
         }
       }
     } catch (error) {
-      console.warn('⚠️ WorldDimensionsManager: Failed to load from storage', error);
+      logger.warn('WorldDimensionsManager: Failed to load from storage', error as Error);
     }
   }
 }

@@ -12,6 +12,8 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useMapStore } from './useMapStore';
 import { useMapStoreInit } from './useMapStoreInit';
 import { InteractiveArea, ImpassableArea } from '../shared/MapDataContext';
+import { useAppSelector } from '../redux/hooks';
+import { selectIsInitializing } from '../redux/selectors/mapSelectors';
 
 interface UseSharedMapOptions {
   autoSave?: boolean;
@@ -87,13 +89,15 @@ export const useSharedMapCompat = (options: UseSharedMapOptions = {}): UseShared
     getMapStatistics
   } = useMapStore();
 
+  // Redux-derived flags
+  const isInitializing = useAppSelector(selectIsInitializing);
+
   // Auto-save timeout reference
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Auto-save functionality
   const scheduleAutoSave = useCallback(() => {
-    // Check if auto-save is enabled in store and not during initialization
-    const { isInitializing } = useMapStore.getState();
+    // Check if auto-save is enabled and not during initialization
     if (!autoSaveEnabled || !isDirty || isInitializing) {
       console.log(`⏸️  Auto-save skipped: enabled=${autoSaveEnabled}, dirty=${isDirty}, initializing=${isInitializing}`);
       return;
@@ -117,7 +121,7 @@ export const useSharedMapCompat = (options: UseSharedMapOptions = {}): UseShared
         console.error('❌ Auto-save failed:', error);
       }
     }, delay);
-  }, [autoSaveEnabled, isDirty, autoSaveDelay, saveDelay, saveMap]);
+  }, [autoSaveEnabled, isDirty, isInitializing, autoSaveDelay, saveDelay, saveMap]);
 
   // Trigger auto-save when data becomes dirty
   useEffect(() => {
@@ -201,6 +205,17 @@ export const useSharedMapCompat = (options: UseSharedMapOptions = {}): UseShared
     return getMapStatistics();
   }, [getMapStatistics]);
 
+  // Ensure saveMap matches Promise<void> signature
+  const saveMapCompat = useCallback(async () => {
+    await saveMap();
+  }, [saveMap]);
+  const loadMapCompat = useCallback(async () => {
+    await loadMap();
+  }, [loadMap]);
+  const importMapCompat = useCallback(async (jsonData: string) => {
+    await importMap(jsonData);
+  }, [importMap]);
+
   return {
     // Map data
     mapData,
@@ -220,10 +235,10 @@ export const useSharedMapCompat = (options: UseSharedMapOptions = {}): UseShared
     removeCollisionArea: handleRemoveCollisionArea,
     
     // Map operations
-    saveMap,
-    loadMap,
+    saveMap: saveMapCompat,
+    loadMap: loadMapCompat,
     exportMap,
-    importMap,
+    importMap: importMapCompat,
     updateWorldDimensions: handleUpdateWorldDimensions,
     updateMapData: handleUpdateMapData,
     

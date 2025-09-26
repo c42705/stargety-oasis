@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { logger } from './shared/logger';
 import { Routes, Route } from 'react-router-dom';
 import { ConfigProvider, Layout, Space, Button, Badge, Typography, Modal, Dropdown, Avatar, App as AntdApp } from 'antd';
 import { LogoutOutlined, UserOutlined, TeamOutlined, DownOutlined, SettingOutlined } from '@ant-design/icons';
@@ -11,6 +12,7 @@ import { ThemeProvider, useTheme } from './shared/ThemeContext';
 import { MapSynchronizer } from './shared/MapSynchronizer';
 import { ModalStateProvider } from './shared/ModalStateManager';
 import { WorldModule } from './modules/world/WorldModule';
+import SimpleWorldModuleDemo from './modules/simple-world-test/SimpleWorldModuleDemo';
 import { LoginModule } from './modules/login/LoginModule';
 import { SplitLayoutComponent } from './components/SplitLayoutComponent';
 import { VideoCommunicationPanel } from './components/VideoCommunicationPanel';
@@ -266,11 +268,11 @@ const AuthenticatedApp: React.FC = () => {
             enableCrossTabSync={true}
             syncDebounceMs={100}
             onSyncError={(error) => {
-              console.error('Map synchronization error:', error);
+              logger.error('Map synchronization error', error);
               // TODO: Add user-visible error notification
             }}
             onSyncSuccess={() => {
-              console.log('Map synchronized successfully');
+              logger.info('Map synchronized successfully');
               // TODO: Add user-visible success notification
             }}
           >
@@ -298,6 +300,12 @@ const App: React.FC = () => {
 
   return (
     <Routes>
+      {/* Simple World Module Demo Route */}
+      <Route
+        path="/simple-world-demo"
+        element={<SimpleWorldModuleDemo />}
+      />
+
       {/* Map Editor Route - accessible to authenticated admin users */}
       <Route
         path="/map-editor"
