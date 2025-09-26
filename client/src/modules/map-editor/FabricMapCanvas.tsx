@@ -20,8 +20,8 @@ import { useSharedMapCompat as useSharedMap } from '../../stores/useSharedMapCom
 import { SharedMapSystem } from '../../shared/SharedMapSystem';
 import { InteractiveArea, ImpassableArea } from '../../shared/MapDataContext';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
-import { MapEditorCameraControls } from './hooks/useMapEditorCamera';
-import { usePanControls, PanMethod } from './hooks/usePanControls';
+/* Remove custom camera logic: Fabric.js viewportTransform will handle pan/zoom */
+/* Pan tool logic is now implemented directly—no usePanControls import */
 import { BackgroundInfoPanel } from './components/BackgroundInfoPanel';
 import { GRID_PATTERNS } from './constants/editorConstants';
 import {
@@ -47,10 +47,11 @@ interface FabricMapCanvasProps {
   drawingAreaData?: Partial<InteractiveArea>;
   drawingCollisionAreaData?: Partial<ImpassableArea>;
   className?: string;
-  cameraControls?: MapEditorCameraControls;
+  // cameraControls removed
   onCanvasReady?: (canvas: fabric.Canvas) => void;
-  currentTool?: 'select' | 'move' | 'resize' | 'delete' | 'pan' | 'draw-collision' | 'erase-collision';
-  // Background info panel props
+  currentTool?: 'select' | 'pan' | 'draw-collision' | 'erase-collision';
+  /** Called whenever zoom changes (e.g. wheel, button, fit) */
+  onZoomChange?: (zoom: number) => void;
   backgroundInfoPanelVisible?: boolean;
   onBackgroundInfoPanelClose?: () => void;
 }
@@ -79,9 +80,9 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   drawingAreaData,
   drawingCollisionAreaData,
   className = '',
-  cameraControls,
   onCanvasReady,
   currentTool = 'select',
+  onZoomChange,
   backgroundInfoPanelVisible = false,
   onBackgroundInfoPanelClose
 }) => {
@@ -101,25 +102,13 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const performanceMonitorRef = useRef<CanvasPerformanceMonitor | null>(null);
 
+  // Always-fresh ref for tool
+  const currentToolRef = useRef(currentTool);
+  currentToolRef.current = currentTool;
+
   // Background info panel state managed by parent component
 
-  // Initialize pan controls hook
-  const panControls = usePanControls({
-    cameraControls,
-    canvasElement: canvasRef.current,
-    currentTool,
-    onPanStateChange: (isPanning: boolean, method: PanMethod) => {
-      console.log('🎮 Pan state changed:', { isPanning, method });
-    }
-  });
-
-  // Update pan controls when canvas element becomes available
-  useEffect(() => {
-    if (canvasRef.current && panControls.actions.updateCursor) {
-      console.log('🎯 PAN: Canvas element available, updating cursor for tool:', currentTool);
-      panControls.actions.updateCursor();
-    }
-  }, [isInitialized, currentTool, panControls.actions]);
+  // Pan tool is now handled directly in event handlers. usePanControls is no longer used.
 
   // Log initialization state changes for debugging
   useEffect(() => {
@@ -534,15 +523,17 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         canvas.moveCursor = 'crosshair';
       } else if (isPanTool) {
         canvas.selection = false; // Disable selection in pan mode
-        // Let pan controls manage cursor for pan tool
-        panControls.actions.updateCursor();
+        canvas.defaultCursor = 'grab';
+        canvas.hoverCursor = 'grab';
+        canvas.moveCursor = 'grab';
       } else {
         canvas.selection = true; // Enable selection for other tools
-        // Let pan controls manage cursor (handles Space key states)
-        panControls.actions.updateCursor();
+        canvas.defaultCursor = 'default';
+        canvas.hoverCursor = 'move';
+        canvas.moveCursor = 'move';
       }
     }
-  }, [drawingMode, collisionDrawingMode, currentTool, panControls.actions, isInitialized]);
+  }, [drawingMode, collisionDrawingMode, currentTool, isInitialized]);
 
   // Handle canvas resizing without recreation
   useEffect(() => {
@@ -558,7 +549,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     }
   }, [width, height, isInitialized]);
 
-  // Set up canvas event listeners
+  // Set up canvas event listeners (CLEAN PAN TOOL IMPLEMENTATION)
   const setupCanvasEventListeners = useCallback((canvas: fabric.Canvas) => {
     // Selection events
     canvas.on('selection:created', (e) => {
@@ -600,39 +591,49 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       }
     });
 
-    // Enhanced pan functionality - supports Space+drag, middle mouse, and pan tool
+    // --- NATIVE FABRIC.JS PAN/ZOOM IMPLEMENTATION ---
+    let isDragging = false;
+    let lastPosX = 0;
+    let lastPosY = 0;
+    let panMoveThrottle = false;
+    let lastViewportTransform: number[] = [];
+
+    // PAN TOOL: Mouse drag to pan via viewportTransform
     canvas.on('mouse:down', (e) => {
-      const pointer = canvas.getPointer(e.e);
       const mouseEvent = e.e as MouseEvent;
+      const tool = currentToolRef.current;
 
-      // Check if we should start panning with any of the supported methods
-      const panMethod = panControls.actions.shouldStartPan(mouseEvent);
-
-      if (panMethod !== 'none') {
-        panControls.startPan(panMethod, pointer.x, pointer.y);
-        // Prevent default behavior and stop event propagation for pan operations
+      // Enable panning if (pan tool + left click) OR (middle mouse, any tool)
+      if ((tool === 'pan' && mouseEvent.button === 0) || mouseEvent.button === 1) {
+        isDragging = true;
+        lastPosX = mouseEvent.clientX;
+        lastPosY = mouseEvent.clientY;
+        lastViewportTransform = [...(canvas.viewportTransform ?? [1,0,0,1,0,0])];
+        canvas.defaultCursor = 'grabbing';
+        canvas.selection = false;
+        panMoveThrottle = false;
         e.e?.preventDefault();
         e.e?.stopPropagation();
-        // Disable canvas selection during pan to prevent object interactions
-        canvas.selection = false;
         return;
-      }
-
-      // Legacy camera controls pan (Ctrl/Cmd + click) - keeping for compatibility
-      if (cameraControls && (mouseEvent.ctrlKey || mouseEvent.metaKey) && !e.target) {
-        cameraControls.startPan(pointer.x, pointer.y);
-        canvas.defaultCursor = 'grabbing';
       }
     });
 
     canvas.on('mouse:move', (e) => {
-      const pointer = canvas.getPointer(e.e);
       const mouseEvent = e.e as MouseEvent;
-
-      // Enhanced pan functionality
-      if (panControls.state.isPanning && panControls.actions.shouldContinuePan(mouseEvent)) {
-        panControls.updatePan(pointer.x, pointer.y);
-        // Prevent default behavior and stop event propagation during pan
+      const tool = currentToolRef.current;
+      // Allow panning if pan tool is active OR middle mouse is being dragged
+      if ((tool === 'pan' && isDragging) || (isDragging && (e.e as MouseEvent).buttons & 4)) {
+        if (!panMoveThrottle) {
+          panMoveThrottle = true;
+          const dx = mouseEvent.clientX - lastPosX;
+          const dy = mouseEvent.clientY - lastPosY;
+          // Update viewportTransform (translate only)
+          const vpt = canvas.viewportTransform ?? [1,0,0,1,0,0];
+          vpt[4] = lastViewportTransform[4] + dx;
+          vpt[5] = lastViewportTransform[5] + dy;
+          canvas.setViewportTransform(vpt);
+          setTimeout(() => { panMoveThrottle = false; }, 16);
+        }
         e.e?.preventDefault();
         e.e?.stopPropagation();
         return;
@@ -640,20 +641,35 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     });
 
     canvas.on('mouse:up', (e) => {
-      const mouseEvent = e.e as MouseEvent;
-
-      // Enhanced pan functionality
-      if (panControls.state.isPanning && panControls.actions.shouldEndPan(mouseEvent)) {
-        panControls.endPan();
-        // Re-enable canvas selection after pan ends
-        const isInDrawingMode = drawingMode || collisionDrawingMode;
-        const isPanTool = currentTool === 'pan';
-        canvas.selection = !isInDrawingMode && !isPanTool;
-        // Prevent default behavior and stop event propagation
+      // End drag pan on mouse up (for either pan tool or middle mouse)
+      if (isDragging) {
+        isDragging = false;
+        canvas.defaultCursor = 'grab';
+        canvas.selection = false;
+        panMoveThrottle = false;
         e.e?.preventDefault();
         e.e?.stopPropagation();
         return;
       }
+    });
+
+    // NATIVE FABRIC.JS ZOOM (mouse wheel)
+    canvas.on('mouse:wheel', (opt) => {
+      const delta = opt.e.deltaY;
+      let zoom = canvas.getZoom();
+      zoom *= 0.999 ** delta;
+      zoom = Math.max(0.1, Math.min(zoom, 4)); // Clamp zoom between 0.1 and 4
+
+      // Zoom to mouse pointer
+      canvas.zoomToPoint(new fabric.Point(opt.e.offsetX, opt.e.offsetY), zoom);
+
+      // Notify parent of zoom change
+      if (typeof onZoomChange === "function") {
+        onZoomChange(zoom);
+      }
+
+      opt.e.preventDefault();
+      opt.e.stopPropagation();
     });
 
     // Keyboard event handling for deletion
@@ -667,14 +683,13 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       }
     };
 
-    // Add keyboard event listener
     window.addEventListener('keydown', handleKeyDown);
 
     // Cleanup function
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onSelectionChanged, onObjectModified, drawingMode, collisionDrawingMode, cameraControls, currentTool, panControls, handleObjectModified, handleObjectMoving, handleObjectScaling, handleDeleteSelectedAreas]);
+  }, [onSelectionChanged, onObjectModified, drawingMode, collisionDrawingMode, currentTool, handleObjectModified, handleObjectMoving, handleObjectScaling, handleDeleteSelectedAreas]);
 
 
 
@@ -688,70 +703,35 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
   // Update canvas selection behavior based on current tool
   useEffect(() => {
-    console.log('🔧 TOOL: Canvas tool behavior update triggered', {
-      timestamp: new Date().toISOString(),
-      currentTool,
-      drawingMode,
-      collisionDrawingMode,
-      hasCanvas: !!fabricCanvasRef.current,
-      source: 'FabricMapCanvas.toolBehaviorEffect'
-    });
-
     if (fabricCanvasRef.current) {
       const canvas = fabricCanvasRef.current;
       const isInDrawingMode = drawingMode || collisionDrawingMode;
       const isPanTool = currentTool === 'pan';
       const shouldDisableSelection = isInDrawingMode || isPanTool;
 
-      console.log('🔧 TOOL: Updating canvas behavior', {
-        timestamp: new Date().toISOString(),
-        currentTool,
-        isInDrawingMode,
-        isPanTool,
-        shouldDisableSelection,
-        canvasSelection: canvas.selection,
-        objectCount: canvas.getObjects().length
-      });
-
       canvas.selection = !shouldDisableSelection;
 
       if (isInDrawingMode) {
         canvas.defaultCursor = 'crosshair';
         canvas.hoverCursor = 'crosshair';
-        console.log('🔧 TOOL: Set drawing mode cursors (crosshair)');
+      } else if (isPanTool) {
+        canvas.defaultCursor = 'grab';
+        canvas.hoverCursor = 'grab';
       } else {
-        // Let pan controls manage cursor for all non-drawing modes
-        panControls.actions.updateCursor();
-        console.log('🔧 TOOL: Delegated cursor management to pan controls');
+        canvas.defaultCursor = 'default';
+        canvas.hoverCursor = 'move';
+        canvas.moveCursor = 'move';
       }
 
       // Disable object selection in drawing mode or pan mode
-      let objectsModified = 0;
       canvas.forEachObject((obj) => {
-        const wasSelectable = obj.selectable;
-        const wasEvented = obj.evented;
         obj.selectable = !shouldDisableSelection;
         obj.evented = !shouldDisableSelection;
-
-        if (wasSelectable !== obj.selectable || wasEvented !== obj.evented) {
-          objectsModified++;
-        }
-      });
-
-      console.log('🔧 TOOL: Canvas objects updated', {
-        timestamp: new Date().toISOString(),
-        objectsModified,
-        totalObjects: canvas.getObjects().length,
-        selectionEnabled: canvas.selection
       });
 
       canvas.renderAll();
-
-      console.log('🔧 TOOL: Canvas render completed for tool change');
-    } else {
-      console.warn('🔧 TOOL: Canvas not available for tool behavior update');
     }
-  }, [drawingMode, collisionDrawingMode, currentTool, panControls.actions]);
+  }, [drawingMode, collisionDrawingMode, currentTool]);
 
   // Handle background image changes - use a stable reference to prevent constant re-renders
   const backgroundImageUrl = useMemo(() => {
@@ -1460,29 +1440,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   }, [isElementsReady, updateLayerOrder]);
 
   // Apply camera transformations to canvas
-  useEffect(() => {
-    if (fabricCanvasRef.current && cameraControls && isInitialized) {
-      const canvas = fabricCanvasRef.current;
-      const { zoom, scrollX, scrollY } = cameraControls.cameraState;
-
-      // Apply zoom and pan transformations
-      canvas.setZoom(zoom);
-      canvas.absolutePan(new fabric.Point(-scrollX * zoom, -scrollY * zoom));
-      canvas.renderAll();
-
-      // Apply performance optimizations based on zoom level
-      optimizeCanvasRendering(canvas, zoom);
-
-      // Start/stop performance monitoring based on zoom level
-      if (performanceMonitorRef.current) {
-        if (shouldOptimizePerformance(zoom)) {
-          performanceMonitorRef.current.startMonitoring();
-        } else {
-          performanceMonitorRef.current.stopMonitoring();
-        }
-      }
-    }
-  }, [cameraControls, isInitialized]);
+  // Removed cameraControls effect. Zoom/pan is now handled by Fabric.js natively.
 
   // Update canvas configuration when drawing mode changes
   useEffect(() => {

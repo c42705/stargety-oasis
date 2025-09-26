@@ -28,7 +28,7 @@ export interface EditorState {
   isPanning: boolean;
 }
 
-export type EditorTool = 'select' | 'move' | 'resize' | 'delete' | 'pan' | 'draw-collision' | 'erase-collision';
+export type EditorTool = 'select' | 'pan' | 'draw-collision' | 'erase-collision';
 
 export type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error';
 

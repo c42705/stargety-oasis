@@ -7,6 +7,7 @@ import { useWorldDimensions } from '../../shared/useWorldDimensions';
 import { FabricMapCanvas } from './FabricMapCanvas';
 import * as fabric from 'fabric';
 import { AreaFormModal } from '../../components/AreaFormModal';
+import { useMapEditorCamera } from './hooks/useMapEditorCamera';
 import { CollisionAreaFormModal } from '../../components/CollisionAreaFormModal';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 
@@ -62,6 +63,11 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   // Fabric canvas reference for layers tab
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
 
+  // Add ref and state for main editor viewport
+  const mainRef = useRef<HTMLDivElement>(null);
+  const [viewportWidth, setViewportWidth] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(0);
+
   // Use shared map data
   const { interactiveAreas: areas, impassableAreas } = mapData;
 
@@ -75,6 +81,27 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
 
   // Get effective dimensions directly from WorldDimensionsManager (no loops)
   const effectiveDimensions = worldDimensions.effectiveDimensions;
+
+  // Setup viewport measurement effect
+  useEffect(() => {
+    function updateSize() {
+      if (mainRef.current) {
+        setViewportWidth(mainRef.current.offsetWidth);
+        setViewportHeight(mainRef.current.offsetHeight);
+      }
+    }
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
+
+  // Camera controls for pan/zoom integration (clamped to map bounds)
+  const cameraControls = useMapEditorCamera({
+    worldBounds: effectiveDimensions,
+    viewportWidth,
+    viewportHeight,
+    initialZoom: 1.0
+  });
 
   // Use extracted hooks
   const editorState = useEditorState();
@@ -402,11 +429,38 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
           editorState={editorState.editorState}
           gridConfig={gridConfig.gridConfig}
           previewMode={previewMode}
+          zoom={fabricCanvasRef.current ? Math.round(fabricCanvasRef.current.getZoom() * 100) : 100}
           onToolChange={editorState.onToolChange}
-          onZoomIn={editorState.onZoomIn}
-          onZoomOut={editorState.onZoomOut}
-          onResetZoom={editorState.onResetZoom}
-          onFitToScreen={editorState.onFitToScreen}
+          onZoomIn={() => {
+            if (fabricCanvasRef.current) {
+              let zoom = fabricCanvasRef.current.getZoom();
+              zoom = Math.min(zoom * 1.2, 4); // Max zoom x4
+              fabricCanvasRef.current.setZoom(zoom);
+              editorState.setEditorState(prev => ({ ...prev, zoom: Math.round(zoom * 100) }));
+            }
+          }}
+          onZoomOut={() => {
+            if (fabricCanvasRef.current) {
+              let zoom = fabricCanvasRef.current.getZoom();
+              zoom = Math.max(zoom / 1.2, 0.1); // Min zoom x0.1
+              fabricCanvasRef.current.setZoom(zoom);
+              editorState.setEditorState(prev => ({ ...prev, zoom: Math.round(zoom * 100) }));
+            }
+          }}
+          onResetZoom={() => {
+            if (fabricCanvasRef.current) {
+              fabricCanvasRef.current.setZoom(1.0);
+              editorState.setEditorState(prev => ({ ...prev, zoom: 100 }));
+            }
+          }}
+          onFitToScreen={() => {
+            // Optional: Implement fit-to-screen using background or map dimensions
+            // For now, reset zoom to 1.0 as a placeholder
+            if (fabricCanvasRef.current) {
+              fabricCanvasRef.current.setZoom(1.0);
+              editorState.setEditorState(prev => ({ ...prev, zoom: 100 }));
+            }
+          }}
           onToggleGrid={gridConfig.toggleGrid}
           onUndo={editorState.onUndo}
           onRedo={editorState.onRedo}
@@ -418,8 +472,8 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
 
       <div className="editor-layout">
         <main
+          ref={mainRef}
           className="editor-main"
-          onMouseMove={editorState.onMouseMove}
           style={{ position: 'relative' }}
         >
           <FabricMapCanvas
@@ -434,6 +488,12 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
             drawingAreaData={drawingMode.pendingAreaData || undefined}
             drawingCollisionAreaData={collisionDrawingMode.pendingCollisionAreaData || undefined}
             currentTool={editorState.editorState.tool}
+            onZoomChange={(zoom) => {
+              editorState.setEditorState(prev => ({
+                ...prev,
+                zoom: Math.round(zoom * 100)
+              }));
+            }}
             onSelectionChanged={(objects) => {
               console.log('Selection changed:', objects);
             }}
@@ -456,7 +516,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
               fabricCanvasRef.current = canvas;
 
               // Automatically fit map to viewport when entering edit mode (immediate, no timeout)
-              editorState.onFitToScreen(true); // Force on initial canvas ready
+              cameraControls.fitToScreen(viewportWidth, viewportHeight); // Use camera controls for fit
               console.log('🎯 EDIT MODE: Auto-applied zoom to fit on canvas ready (immediate)');
             }}
             backgroundInfoPanelVisible={backgroundInfoPanel.isPanelVisible}

@@ -27,6 +27,7 @@ interface EditorToolbarProps {
   editorState: EditorState;
   gridConfig: GridConfig;
   previewMode: boolean;
+  zoom?: number;
   onToolChange: (tool: EditorState['tool']) => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -44,6 +45,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   editorState,
   gridConfig,
   previewMode,
+  zoom,
   onToolChange,
   onZoomIn,
   onZoomOut,
@@ -64,18 +66,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     {
       label: <Tooltip title="Pan Tool (P)"><Hand size={16} /></Tooltip>,
       value: 'pan'
-    },
-    {
-      label: <Tooltip title="Move Tool (M)"><Move size={16} /></Tooltip>,
-      value: 'move'
-    },
-    {
-      label: <Tooltip title="Resize Tool (R)"><Square size={16} /></Tooltip>,
-      value: 'resize'
-    },
-    {
-      label: <Tooltip title="Delete Tool (D)"><Trash2 size={16} /></Tooltip>,
-      value: 'delete'
     }
   ];
 
@@ -160,7 +150,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             </Tooltip>
           </Space.Compact>
           <Text strong style={{ minWidth: '50px', textAlign: 'center' }}>
-            {editorState.zoom}%
+            {typeof zoom === 'number' ? zoom : editorState.zoom}%
           </Text>
         </Space>
 
