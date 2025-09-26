@@ -34,8 +34,8 @@ export const WorldZoomControls: React.FC<WorldZoomControlsProps> = ({
     zIndex: 1000,    
     borderRadius: '8px',
     padding: '8px',
-    Filter: 'blur(8px)',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
+    backdropFilter: 'blur(8px)',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.35)'
   };
 
   return (

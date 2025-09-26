@@ -11,7 +11,7 @@
  * consistent behavior and reuse of the shared camera control system.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { MapEditorCameraControls } from './useMapEditorCamera';
 
 export type PanMethod = 'none' | 'space-drag' | 'middle-mouse' | 'tool-mode';
@@ -259,11 +259,18 @@ export const usePanControls = ({
   }, [endPan, updateCursor]);
 
   // Return the complete interface
-  return {
+  // Memoize the return value to stabilize references (especially actions)
+  return useMemo(() => ({
     state,
     actions,
     startPan,
     endPan,
     updatePan
-  };
+  }), [
+    state,
+    actions,
+    startPan,
+    endPan,
+    updatePan
+  ]);
 };

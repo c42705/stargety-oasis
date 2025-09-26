@@ -321,6 +321,9 @@ class GameScene extends Phaser.Scene {
       // Apply camera settings after player is fully initialized
       this.time.delayedCall(50, () => {
         this.setDefaultZoomAndCenter();
+        // Ensure camera follows and centers on the new player sprite
+        this.enableCameraFollowing();
+        this.centerCameraOnPlayer();
         // Player init logging removed for cleaner console
       });
     } catch (error) {
@@ -336,6 +339,9 @@ class GameScene extends Phaser.Scene {
       // Apply camera settings even with default sprite
       this.time.delayedCall(50, () => {
         this.setDefaultZoomAndCenter();
+        // Ensure camera follows and centers on the new player sprite
+        this.enableCameraFollowing();
+        this.centerCameraOnPlayer();
         // Player init fallback logging removed for cleaner console
       });
     }
@@ -854,6 +860,12 @@ class GameScene extends Phaser.Scene {
 
         // Change cursor to indicate panning mode
         this.game.canvas.style.cursor = 'grabbing';
+
+        // Update React UI state to show camera follow is OFF
+        if (window && window.dispatchEvent) {
+          const evt = new CustomEvent('phaser-camera-follow-changed', { detail: false });
+          window.dispatchEvent(evt);
+        }
 
         console.log('🖱️ PANNING STARTED:', {
           method: pointer.button === 1 ? 'middle-mouse' : 'spacebar-drag',
@@ -3017,6 +3029,17 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
   const [canZoomIn, setCanZoomIn] = useState(true);
   const [canZoomOut, setCanZoomOut] = useState(true);
   const [isCameraFollowing, setIsCameraFollowing] = useState(true);
+
+  // Listen for camera follow changes from Phaser and update UI state
+  useEffect(() => {
+    const handler = (evt: any) => {
+      if (typeof evt.detail === 'boolean') {
+        setIsCameraFollowing(evt.detail);
+      }
+    };
+    window.addEventListener('phaser-camera-follow-changed', handler);
+    return () => window.removeEventListener('phaser-camera-follow-changed', handler);
+  }, []);
   // showPanHint state removed for cleaner UI
 
   // Note: Video functionality is now handled by the persistent video panel
@@ -3095,15 +3118,17 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
 
       if (newFollowState) {
         gameSceneRef.current.enableCameraFollowing();
+        gameSceneRef.current.centerCameraOnPlayer(); // recenter on player when following is enabled
       } else {
         gameSceneRef.current.disableCameraFollowing();
       }
 
       setIsCameraFollowing(newFollowState);
+      updateZoomState(); // ensure UI state matches camera state
     } else {
       console.log('❌ Game scene not found!');
     }
-  }, [isCameraFollowing]);
+  }, [isCameraFollowing, updateZoomState]);
 
 
   const handleAreaClick = useCallback((areaId: string) => {
