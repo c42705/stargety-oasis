@@ -93,7 +93,12 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   // brushShape and brushSize now handled via local state (see below)
   // brushShape = 'circle', // REMOVED - handled via setBrushShape state
   // brushSize = 32,
+// Add brushSize to destructured props
+  brushSize = 1,
 }) => {
+  // ...existing hooks and state...
+  // Default brushSize to 1 if not provided
+  // (no need for _brushSize, use brushSize directly)
   // Multi-area impassable cell painting state
   const [impassableAreas, setImpassableAreas] = useState<import('./types/editor.types').ImpassableArea[]>([]);
   const [activeAreaId, setActiveAreaId] = useState<string | undefined>(undefined);
@@ -131,6 +136,43 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   const [forceRender, setForceRender] = useState(0);
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const performanceMonitorRef = useRef<CanvasPerformanceMonitor | null>(null);
+
+  // --- Effect to update impassable paint blocks when gridSpacing changes ---
+  // This ensures all existing impassable painted rects match the selected grid size
+  useEffect(() => {
+    if (!fabricCanvasRef.current) return;
+    setImpassableAreas(prevAreas => {
+      // For each impassable area group, update rects to match grid size/position
+      return prevAreas.map(area => {
+        if (!area.group || !Array.isArray(area.cells)) return area;
+        const spacing = gridSpacing > 0 ? gridSpacing : 32;
+        // Remove all objects from the group
+        const objects = area.group.getObjects();
+        objects.forEach((obj: fabric.Object) => area.group.remove(obj));
+        area.cells.forEach(cellKey => {
+          const [gx, gy] = cellKey.split('_').map(Number);
+          const rect = new fabric.Rect({
+            left: gx * spacing,
+            top: gy * spacing,
+            width: spacing,
+            height: spacing,
+            fill: area.color || brushColor,
+            selectable: false,
+            evented: false,
+            stroke: area.border || undefined,
+            strokeWidth: area.border ? 2 : 0,
+            opacity: 1,
+          });
+          (rect as any).cellKey = cellKey;
+          area.group.add(rect);
+        });
+        return { ...area, group: area.group };
+      });
+    });
+    if (fabricCanvasRef.current) {
+      fabricCanvasRef.current.renderAll();
+    }
+  }, [gridSpacing]);
 
   // Always-fresh ref for tool
   const currentToolRef = useRef(currentTool);
@@ -172,30 +214,23 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   const handleObjectModified = useCallback(async (object: CanvasObject) => {
     if (!object.mapElementId || !object.mapElementType) return;
 
-    // Clear existing timeout
-    if (updateTimeoutRef.current) {
-      clearTimeout(updateTimeoutRef.current);
-    }
+    // Immediately update sharedMap (no debounce)
+    try {
+      const updates = {
+        x: Math.round(object.left || 0),
+        y: Math.round(object.top || 0),
+        width: Math.round((object.width || 0) * (object.scaleX || 1)),
+        height: Math.round((object.height || 0) * (object.scaleY || 1))
+      };
 
-    // Debounce updates to avoid excessive localStorage writes
-    updateTimeoutRef.current = setTimeout(async () => {
-      try {
-        const updates = {
-          x: Math.round(object.left || 0),
-          y: Math.round(object.top || 0),
-          width: Math.round((object.width || 0) * (object.scaleX || 1)),
-          height: Math.round((object.height || 0) * (object.scaleY || 1))
-        };
-
-        if (object.mapElementType === 'interactive' && object.mapElementId) {
-          await sharedMap.updateInteractiveArea(object.mapElementId, updates);
-        } else if (object.mapElementType === 'collision' && object.mapElementId) {
-          await sharedMap.updateCollisionArea(object.mapElementId, updates);
-        }
-      } catch (error) {
-        logger.error('Failed to update map element', error);
+      if (object.mapElementType === 'interactive' && object.mapElementId) {
+        await sharedMap.updateInteractiveArea(object.mapElementId, updates);
+      } else if (object.mapElementType === 'collision' && object.mapElementId) {
+        await sharedMap.updateCollisionArea(object.mapElementId, updates);
       }
-    }, 300); // 300ms debounce
+    } catch (error) {
+      logger.error('Failed to update map element', error);
+    }
   }, [sharedMap]);
 
   // Snap object to grid
@@ -1428,6 +1463,54 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     }
   }, [drawingMode]);
 
+  // --- NEW: Effect to update impassable paint blocks when gridSpacing changes ---
+  // This ensures all existing impassable painted rects match the selected grid size
+  // (Moved to top-level, not nested in any other hooks)
+  useEffect(() => {
+    if (!fabricCanvasRef.current) return;
+    setImpassableAreas(prevAreas => {
+      // For each impassable area group, update rects to match grid size/position
+      return prevAreas.map(area => {
+        // Defensive: Only operate if area.group is a valid Fabric.Group and cells is an array
+        if (
+          !area.group ||
+          !(area.group instanceof fabric.Group) ||
+          typeof area.group.getObjects !== 'function' ||
+          !Array.isArray(area.cells)
+        ) {
+          // Optionally, log invalid area/group for debugging
+          // console.warn('Skipping invalid impassable area group during grid update', area);
+          return area;
+        }
+        const spacing = gridSpacing > 0 ? gridSpacing : 32;
+        // Remove all objects from the group
+        const objects = area.group.getObjects();
+        objects.forEach(obj => area.group.remove(obj));
+        area.cells.forEach(cellKey => {
+          const [gx, gy] = cellKey.split('_').map(Number);
+          const rect = new fabric.Rect({
+            left: gx * spacing,
+            top: gy * spacing,
+            width: spacing,
+            height: spacing,
+            fill: area.color || brushColor,
+            selectable: false,
+            evented: false,
+            stroke: area.border || undefined,
+            strokeWidth: area.border ? 2 : 0,
+            opacity: 1,
+          });
+          (rect as any).cellKey = cellKey;
+          area.group.add(rect);
+        });
+        return { ...area, group: area.group };
+      });
+    });
+    if (fabricCanvasRef.current) {
+      fabricCanvasRef.current.renderAll();
+    }
+  }, [gridSpacing]);
+
   // Efficient impassable painting based on grid cells, persisted to sharedMap
   useEffect(() => {
     if (!fabricCanvasRef.current) return;
@@ -1447,6 +1530,10 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       const gy = Math.floor(y / spacing);
       return { gx, gy };
     }
+
+    // --- NEW: Effect to update impassable paint blocks when gridSpacing changes ---
+    // This ensures all existing impassable painted rects match the selected grid size
+    // [REMOVED: Duplicate, nested useEffect for gridSpacing. Only keep top-level hook.]
 
     // Mouse events for painting mode
     const handleMouseDown = (e: any) => {
@@ -1527,7 +1614,8 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     };
 
     const handleMouseMove = (e: any) => {
-      const pointer = fabricCanvasRef.current?.getPointer(e.e, true);
+      // Use proper pointer to account for zoom/pan
+      const pointer = fabricCanvasRef.current?.getPointer(e.e);
 
       if ((currentTool === 'draw-collision' || currentTool === 'erase-collision')) {
         if (pointer) {
@@ -1540,29 +1628,43 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
           // Debug: mouse move and highlight
           // Removed: Non-critical mouse:move debug log.
 
-          // Always show hover highlight
-          if (!hoverHighlightRect) {
-            hoverHighlightRect = new fabric.Rect({
-              left,
-              top,
-              width: spacing,
-              height: spacing,
-              fill: 'rgba(255, 255, 0, 0.2)', // yellow highlight
-              selectable: false,
-              evented: false,
-              stroke: '#ffd700',
-              strokeWidth: 2,
-              opacity: 1,
-            });
-            canvas.add(hoverHighlightRect);
+          // Only show yellow highlight if cell is NOT already impassable in the active area
+          // Find the active impassable area and its cells
+          const activeArea = getActiveArea();
+          const cellAlreadyImpassable =
+            activeArea && Array.isArray(activeArea.cells) && activeArea.cells.includes(cellKey);
+
+          if (!cellAlreadyImpassable) {
+            // Show yellow highlight only if cell is not already impassable
+            if (!hoverHighlightRect) {
+              hoverHighlightRect = new fabric.Rect({
+                left,
+                top,
+                width: spacing,
+                height: spacing,
+                fill: 'rgba(255, 255, 0, 0.2)', // yellow highlight
+                selectable: false,
+                evented: false,
+                stroke: '#ffd700',
+                strokeWidth: 2,
+                opacity: 1,
+              });
+              canvas.add(hoverHighlightRect);
+            } else {
+              hoverHighlightRect.set({
+                left,
+                top,
+                width: spacing,
+                height: spacing,
+                opacity: 1,
+              });
+            }
           } else {
-            hoverHighlightRect.set({
-              left,
-              top,
-              width: spacing,
-              height: spacing,
-              opacity: 1,
-            });
+            // Remove the highlight if present (cell is already impassable)
+            if (hoverHighlightRect) {
+              canvas.remove(hoverHighlightRect);
+              hoverHighlightRect = null;
+            }
           }
           canvas.renderAll();
 
@@ -1593,57 +1695,88 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     };
 
     // Paint or erase a grid cell (update paintedCells state)
+    // Paint or erase a block of grid cells (brush size support)
     function paintGridCell(cellKey: string, isDrawing: boolean) {
+      // Interpret brushSize as a pixel dimension (e.g., 8, 16, 32, 64, 128)
+      const spacing = gridSpacing > 0 ? gridSpacing : 32;
+      const [baseGx, baseGy] = cellKey.split('_').map(Number);
+      // Compute pixel position of this grid cell
+      const baseX = baseGx * spacing;
+      const baseY = baseGy * spacing;
+
+      // Calculate the pixel-aligned brush square
+      const brushPx = Math.max(1, brushSize);
+
+      // Find all grid cells that intersect the brush square
+      const gx1 = baseGx;
+      const gy1 = baseGy;
+      const gx2 = Math.floor((baseX + brushPx - 1) / spacing);
+      const gy2 = Math.floor((baseY + brushPx - 1) / spacing);
+
+      // Collect all covered cell keys
+      const blockCellKeys: string[] = [];
+      for (let gx = gx1; gx <= gx2; gx++) {
+        for (let gy = gy1; gy <= gy2; gy++) {
+          blockCellKeys.push(`${gx}_${gy}`);
+        }
+      }
+
       setImpassableAreas(prev =>
         prev.map(area => {
           if (area.id !== activeAreaId) return area;
           // Use group for deduplication and cell management
           const group = area.group;
           if (!group) return area;
-          const spacing = gridSpacing > 0 ? gridSpacing : 32;
-          // Find if cell rect already exists in group
-          const existingRect = group.getObjects('rect').find((rect: any) => rect.cellKey === cellKey);
+          let cells = new Set(area.cells);
+
           if (isDrawing) {
-            if (!existingRect) {
-              // Create rect for this cell
-              const [gx, gy] = cellKey.split('_').map(Number);
-              const rect = new fabric.Rect({
-                left: gx * spacing,
-                top: gy * spacing,
-                width: spacing,
-                height: spacing,
-                fill: area.color || brushColor,
-                selectable: false,
-                evented: false,
-                stroke: area.border || undefined,
-                strokeWidth: area.border ? 2 : 0,
-                opacity: 1,
-              });
-              (rect as any).cellKey = cellKey;
-              group.add(rect);
-              if (fabricCanvasRef.current) {
-                fabricCanvasRef.current.renderAll();
+            blockCellKeys.forEach(cell => {
+              // Only add if not already present
+              if (!cells.has(cell)) {
+                const [gx, gy] = cell.split('_').map(Number);
+                const rect = new fabric.Rect({
+                  left: gx * spacing,
+                  top: gy * spacing,
+                  width: spacing,
+                  height: spacing,
+                  fill: area.color || brushColor,
+                  selectable: false,
+                  evented: false,
+                  stroke: area.border || undefined,
+                  strokeWidth: area.border ? 2 : 0,
+                  opacity: 1,
+                });
+                (rect as any).cellKey = cell;
+                group.add(rect);
+                cells.add(cell);
               }
-              return {
-                ...area,
-                cells: Array.from(new Set([...area.cells, cellKey])),
-                group,
-              };
+            });
+            if (fabricCanvasRef.current) {
+              fabricCanvasRef.current.renderAll();
             }
+            return {
+              ...area,
+              cells: Array.from(cells),
+              group,
+            };
           } else {
-            if (existingRect) {
-              group.remove(existingRect);
-              if (fabricCanvasRef.current) {
-                fabricCanvasRef.current.renderAll();
+            // Erase mode: remove any rects in the block
+            blockCellKeys.forEach(cell => {
+              const existingRect = group.getObjects('rect').find((rect: any) => rect.cellKey === cell);
+              if (existingRect) {
+                group.remove(existingRect);
+                cells.delete(cell);
               }
-              return {
-                ...area,
-                cells: area.cells.filter(c => c !== cellKey),
-                group,
-              };
+            });
+            if (fabricCanvasRef.current) {
+              fabricCanvasRef.current.renderAll();
             }
+            return {
+              ...area,
+              cells: Array.from(cells),
+              group,
+            };
           }
-          return area;
         })
       );
       setUndoStack(stack => [
