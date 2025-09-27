@@ -74,7 +74,7 @@ export class ArchitectureTestRunner {
     // Test 3: Dimension updates
     await this.runTest(suite, 'Dimension Updates', async () => {
       const dimensions = { width: 1000, height: 800 };
-      const result = worldDimensionsManager.updateDimensions(dimensions, { source: 'test' });
+      const result = worldDimensionsManager.updateDimensions(dimensions, { source: 'editor' });
       if (!result.isValid || !result.dimensions) {
         throw new Error('Failed to update valid dimensions');
       }
@@ -87,7 +87,7 @@ export class ArchitectureTestRunner {
         callbackCalled = true;
       });
 
-      worldDimensionsManager.updateDimensions({ width: 1100, height: 850 }, { source: 'test' });
+      worldDimensionsManager.updateDimensions({ width: 1100, height: 850 }, { source: 'editor' });
       
       if (!callbackCalled) {
         throw new Error('Subscription callback not called');
@@ -114,10 +114,10 @@ export class ArchitectureTestRunner {
     // Test 1: SharedMapSystem integration
     await this.runTest(suite, 'SharedMapSystem Integration', async () => {
       const sharedMapSystem = SharedMapSystem.getInstance();
-      await sharedMapSystem.initializeMapData();
+      await sharedMapSystem.initialize();
 
       const dimensions = { width: 1200, height: 900 };
-      await sharedMapSystem.updateWorldDimensions(dimensions, 'test');
+      await sharedMapSystem.updateWorldDimensions(dimensions, 'editor');
 
       const managerDimensions = worldDimensionsManager.getEffectiveDimensions();
       if (managerDimensions.width !== dimensions.width || managerDimensions.height !== dimensions.height) {
@@ -130,7 +130,7 @@ export class ArchitectureTestRunner {
       const worldDimensions = { width: 1000, height: 800 };
       const backgroundDimensions = { width: 1200, height: 900 };
 
-      worldDimensionsManager.updateDimensions(worldDimensions, { source: 'test' });
+      worldDimensionsManager.updateDimensions(worldDimensions, { source: 'editor' });
       worldDimensionsManager.updateBackgroundDimensions(backgroundDimensions, { source: 'background' });
 
       const effectiveDimensions = worldDimensionsManager.getEffectiveDimensions();
@@ -143,7 +143,7 @@ export class ArchitectureTestRunner {
     // Test 3: Persistence
     await this.runTest(suite, 'Persistence', async () => {
       const dimensions = { width: 1300, height: 1000 };
-      worldDimensionsManager.updateDimensions(dimensions, { source: 'test' });
+      worldDimensionsManager.updateDimensions(dimensions, { source: 'editor' });
 
       const stored = localStorage.getItem('worldDimensionsState');
       if (!stored) {
@@ -179,7 +179,7 @@ export class ArchitectureTestRunner {
       for (let i = 0; i < 100; i++) {
         worldDimensionsManager.updateDimensions(
           { width: 1000 + i, height: 800 + i },
-          { source: 'performance-test' }
+          { source: 'system' }
         );
       }
       
@@ -199,7 +199,7 @@ export class ArchitectureTestRunner {
       );
 
       const startTime = performance.now();
-      worldDimensionsManager.updateDimensions({ width: 1000, height: 800 }, { source: 'test' });
+      worldDimensionsManager.updateDimensions({ width: 1000, height: 800 }, { source: 'editor' });
       const endTime = performance.now();
       
       const duration = endTime - startTime;
