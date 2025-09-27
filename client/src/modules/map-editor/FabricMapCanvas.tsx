@@ -54,6 +54,10 @@ interface FabricMapCanvasProps {
   onZoomChange?: (zoom: number) => void;
   backgroundInfoPanelVisible?: boolean;
   onBackgroundInfoPanelClose?: () => void;
+
+  // Brush painting for collision tools
+  brushShape?: 'circle' | 'square';
+  brushSize?: number;
 }
 
 interface CanvasObject extends fabric.Object {
@@ -84,8 +88,33 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   currentTool = 'select',
   onZoomChange,
   backgroundInfoPanelVisible = false,
-  onBackgroundInfoPanelClose
+  onBackgroundInfoPanelClose,
+  // brushShape and brushSize now handled via local state (see below)
+  // brushShape = 'circle', // REMOVED - handled via setBrushShape state
+  // brushSize = 32,
 }) => {
+  // Multi-area impassable cell painting state
+  const [impassableAreas, setImpassableAreas] = useState<import('./types/editor.types').ImpassableArea[]>([]);
+  const [activeAreaId, setActiveAreaId] = useState<string | undefined>(undefined);
+  const [brushShape, setBrushShape] = useState<import('./types/editor.types').BrushShape>('square');
+  const [brushColor, setBrushColor] = useState<string>('#ef4444');
+  const [brushBorder, setBrushBorder] = useState<string | undefined>(undefined);
+  const [undoStack, setUndoStack] = useState<import('./types/editor.types').ImpassableAreaAction[]>([]);
+  const [redoStack, setRedoStack] = useState<import('./types/editor.types').ImpassableAreaAction[]>([]);
+  let paintPreviewGroup: fabric.Group | null = null; // preview group for painting
+  const lastPaintedCellRef = useRef<string | null>(null);
+  // --- FIX: useRef for persistent painting state ---
+  const isPaintingRef = useRef(false);
+
+  // Helper to get/set active area object
+  const getActiveArea = () => impassableAreas.find(a => a.id === activeAreaId);
+  const updateActiveArea = (partial: Partial<import('./types/editor.types').ImpassableArea>) => {
+    setImpassableAreas(prev =>
+      prev.map(a =>
+        a.id === activeAreaId ? { ...a, ...partial } : a
+      )
+    );
+  };
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -705,16 +734,14 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   useEffect(() => {
     if (fabricCanvasRef.current) {
       const canvas = fabricCanvasRef.current;
-      const isInDrawingMode = drawingMode || collisionDrawingMode;
-      const isPanTool = currentTool === 'pan';
-      const shouldDisableSelection = isInDrawingMode || isPanTool;
+      // Only enable selection marquee for the select tool
+      const isSelectTool = currentTool === 'select';
+      canvas.selection = isSelectTool;
 
-      canvas.selection = !shouldDisableSelection;
-
-      if (isInDrawingMode) {
+      if (drawingMode || collisionDrawingMode || currentTool === 'draw-collision' || currentTool === 'erase-collision') {
         canvas.defaultCursor = 'crosshair';
         canvas.hoverCursor = 'crosshair';
-      } else if (isPanTool) {
+      } else if (currentTool === 'pan') {
         canvas.defaultCursor = 'grab';
         canvas.hoverCursor = 'grab';
       } else {
@@ -723,10 +750,19 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         canvas.moveCursor = 'move';
       }
 
-      // Disable object selection in drawing mode or pan mode
+      // Disable object selection for all except select tool
       canvas.forEachObject((obj) => {
-        obj.selectable = !shouldDisableSelection;
-        obj.evented = !shouldDisableSelection;
+        // Always lock grid and background image objects
+        const isGrid = (obj as any).isGridPattern || (obj as any).mapElementType === 'grid';
+        const isBg = (obj as any).isBackgroundImage || (obj as any).backgroundImageId === 'map-background-image' || (obj as any).mapElementType === 'background';
+        if (isGrid || isBg) {
+          obj.selectable = false;
+          obj.evented = false;
+          (obj as any).locked = true;
+        } else {
+          obj.selectable = isSelectTool;
+          obj.evented = isSelectTool;
+        }
       });
 
       canvas.renderAll();
@@ -1225,9 +1261,19 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
     const canvas = fabricCanvasRef.current;
 
-    // Remove existing grid objects
-    const gridObjects = canvas.getObjects().filter(obj => (obj as any).isGridPattern);
-    gridObjects.forEach(obj => canvas.remove(obj));
+    // Remove all existing grid objects robustly (triple check: by property, by type, by unique signature)
+    let gridObjectsRemoved = 0;
+    canvas.getObjects().forEach(obj => {
+      const isGrid =
+        (obj as any).isGridPattern ||
+        (obj as any).mapElementType === 'grid' ||
+        (obj.type === 'rect' && obj.width === width && obj.height === height && obj.selectable === false && obj.evented === false && obj.fill && obj.opacity !== undefined);
+      if (isGrid) {
+        canvas.remove(obj);
+        gridObjectsRemoved++;
+      }
+    });
+    console.log(`[renderGrid] Removed ${gridObjectsRemoved} previous grid object(s)`);
 
     // If grid is not visible or spacing is invalid, just remove and return
     if (!gridVisible || gridSpacing <= 0) {
@@ -1275,11 +1321,17 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         opacity: gridOpacity / 100,
         selectable: false,
         evented: false,
-        excludeFromExport: true
+        excludeFromExport: true,
+        id: "grid",
+        name: "Grid Pattern",
+        locked: true,
       });
 
       (gridRect as any).isGridPattern = true;
       (gridRect as any).mapElementType = 'grid';
+      (gridRect as any).locked = true;
+      (gridRect as any).id = "grid";
+      (gridRect as any).name = "Grid Pattern";
 
       // Add grid and ensure proper layer order
       fabricCanvasRef.current.add(gridRect);
@@ -1388,37 +1440,72 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     const canvas = fabricCanvasRef.current;
     
     // Remove existing collision area objects
-    const existingAreas = canvas.getObjects().filter(obj => 
+    const existingAreas = canvas.getObjects().filter(obj =>
       (obj as CanvasObject).mapElementType === 'collision'
     );
     existingAreas.forEach(obj => canvas.remove(obj));
 
-    // Add collision areas
+    // Add collision areas (rects)
     sharedMap.collisionAreas.forEach(area => {
-      const rect = new fabric.Rect({
-        left: area.x,
-        top: area.y,
-        width: area.width,
-        height: area.height,
-        fill: 'rgba(239, 68, 68, 0.3)',
-        stroke: '#ef4444',
-        strokeWidth: 2,
-        selectable: true,
-        hasControls: true,
-        hasBorders: true,
-        lockRotation: true
-      }) as CanvasObject;
+      // Special handling for impassable-paint: it's a group of cells not a rect
+      if (('type' in area && (area as any).type === 'impassable-paint') && Array.isArray((area as any).cells)) {
+        // Render all cells as a single group
+        const spacing = gridSpacing > 0 ? gridSpacing : 32;
+        const rects: fabric.Rect[] = [];
+        ((area as any).cells as string[]).forEach(cellKey => {
+          const [gx, gy] = cellKey.split('_').map(Number);
+          rects.push(new fabric.Rect({
+            left: gx * spacing,
+            top: gy * spacing,
+            width: spacing,
+            height: spacing,
+            fill: 'rgba(239,68,68,0.4)',
+            selectable: false,
+            evented: false,
+            stroke: '#ef4444',
+            strokeWidth: 0,
+            opacity: 1,
+          }));
+        });
+        const group = new fabric.Group(rects, {
+          selectable: true,
+          evented: true,
+          hasControls: true,
+          hasBorders: true,
+          lockRotation: true,
+        }) as unknown as fabric.Group;
+        (group as any).mapElementId = area.id;
+        (group as any).mapElementType = 'collision';
+        (group as any).mapElementData = area;
+        (group as any).locked = false;
+        canvas.add(group);
+      } else {
+        // Regular collision area
+        const rect = new fabric.Rect({
+          left: area.x,
+          top: area.y,
+          width: area.width,
+          height: area.height,
+          fill: 'rgba(239, 68, 68, 0.3)',
+          stroke: '#ef4444',
+          strokeWidth: 2,
+          selectable: true,
+          hasControls: true,
+          hasBorders: true,
+          lockRotation: true
+        }) as CanvasObject;
 
-      rect.mapElementId = area.id;
-      rect.mapElementType = 'collision';
-      rect.mapElementData = area;
+        rect.mapElementId = area.id;
+        rect.mapElementType = 'collision';
+        rect.mapElementData = area;
 
-      canvas.add(rect);
+        canvas.add(rect);
+      }
     });
 
     // Note: Layer order will be coordinated after all elements are loaded
     canvas.renderAll();
-  }, [sharedMap.collisionAreas]);
+  }, [sharedMap.collisionAreas, gridSpacing]);
 
   // Update canvas when map data changes - wait for background to be ready
   useEffect(() => {
@@ -1461,20 +1548,88 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     }
   }, [drawingMode]);
 
-  // Set up drawing mode event listeners
+  // Efficient impassable painting based on grid cells, persisted to sharedMap
   useEffect(() => {
     if (!fabricCanvasRef.current) return;
 
     const canvas = fabricCanvasRef.current;
 
-    // Mouse events for drawing mode
+    // --- Track painting state using ref ---
+    // let isPainting = false;
+
+    // Hover highlight state
+    let hoverHighlightRect: fabric.Rect | null = null;
+
+    // Utility to snap pointer to grid and return grid cell position
+    function getGridCell(x: number, y: number): { gx: number; gy: number } {
+      const spacing = gridSpacing > 0 ? gridSpacing : 32;
+      const gx = Math.floor(x / spacing);
+      const gy = Math.floor(y / spacing);
+      return { gx, gy };
+    }
+
+    // Mouse events for painting mode
     const handleMouseDown = (e: any) => {
-      if (drawingMode || collisionDrawingMode) {
-        // Prevent default selection behavior during drawing
+      if ((currentTool === 'draw-collision' || currentTool === 'erase-collision')) {
+        isPaintingRef.current = true;
+        // Debug: mouse down event
+        console.log('[DEBUG] mouse:down event', {
+          event: e,
+          currentTool,
+          isPainting: isPaintingRef.current,
+        });
         e.e?.preventDefault();
         e.e?.stopPropagation();
 
-        // Get pointer coordinates from the event
+        const pointer = fabricCanvasRef.current?.getPointer(e.e, true);
+        if (pointer) {
+          const { gx, gy } = getGridCell(pointer.x, pointer.y);
+          const cellKey = `${gx}_${gy}`;
+          let ensuredAreaId = activeAreaId;
+          if (!ensuredAreaId) {
+            // Auto-create new impassable area on first paint
+            const newAreaId = `impassable-${impassableAreas.length + 1}`;
+            // Create an empty Fabric.Group for this area and add to canvas
+            const areaGroup = new fabric.Group([], {
+              selectable: false,
+              evented: false,
+              hasControls: false,
+              hasBorders: false,
+              lockRotation: true
+            });
+            if (fabricCanvasRef.current) {
+              fabricCanvasRef.current.add(areaGroup);
+              fabricCanvasRef.current.renderAll();
+            }
+            const newArea: import('./types/editor.types').ImpassableArea = {
+              id: newAreaId,
+              name: `Impassable ${impassableAreas.length + 1}`,
+              type: 'impassable-paint',
+              cells: [],
+              color: brushColor,
+              border: brushBorder,
+              brushShape,
+              group: areaGroup as unknown as fabric.Group
+            };
+            setImpassableAreas(prev => [...prev, newArea]);
+            setActiveAreaId(newAreaId);
+            ensuredAreaId = newAreaId;
+            console.log('[ImpassablePaint] Auto-created new area with Fabric.Group', newArea);
+          }
+          console.log('[ImpassablePaint] mouse:down', {
+            pointer, cellKey, activeAreaId: ensuredAreaId, tool: currentTool, paintMode: currentTool === 'draw-collision' ? 'draw' : 'erase'
+          });
+          // Paint the highlighted cell immediately on mouse down
+          paintGridCell(cellKey, currentTool === 'draw-collision');
+          lastPaintedCellRef.current = cellKey;
+          renderPaintPreview();
+          // Debug: area state after paint
+          console.log('[DEBUG] after mouse:down, impassableAreas:', JSON.parse(JSON.stringify(impassableAreas)));
+        }
+      } else if (drawingMode || collisionDrawingMode) {
+        e.e?.preventDefault();
+        e.e?.stopPropagation();
+
         const pointer = e.absolutePointer || e.pointer || canvas.getPointer(e.e);
         if (pointer) {
           handleDrawingStart(new fabric.Point(pointer.x, pointer.y));
@@ -1483,20 +1638,218 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     };
 
     const handleMouseUp = () => {
+      if ((currentTool === 'draw-collision' || currentTool === 'erase-collision') && isPaintingRef.current) {
+        isPaintingRef.current = false;
+        // Debug: mouse up
+        console.log('[DEBUG] mouse:up event', { currentTool, isPainting: isPaintingRef.current });
+        removePaintPreview();
+        persistImpassableAreas();
+        // Debug: after mouse up
+        console.log('[DEBUG] after mouse:up, impassableAreas:', JSON.parse(JSON.stringify(impassableAreas)));
+      }
       if ((drawingMode || collisionDrawingMode) && isDrawing) {
         handleDrawingEnd();
       }
     };
 
     const handleMouseMove = (e: any) => {
-      if ((drawingMode || collisionDrawingMode) && isDrawing) {
-        // Get pointer coordinates from the event
-        const pointer = e.absolutePointer || e.pointer || canvas.getPointer(e.e);
+      const pointer = fabricCanvasRef.current?.getPointer(e.e, true);
+
+      if ((currentTool === 'draw-collision' || currentTool === 'erase-collision')) {
+        if (pointer) {
+          const { gx, gy } = getGridCell(pointer.x, pointer.y);
+          const cellKey = `${gx}_${gy}`;
+          const spacing = gridSpacing > 0 ? gridSpacing : 32;
+          const left = gx * spacing;
+          const top = gy * spacing;
+
+          // Debug: mouse move and highlight
+          console.log('[DEBUG] mouse:move', {
+            pointer, gx, gy, cellKey, isPainting: isPaintingRef.current, currentTool
+          });
+
+          // Always show hover highlight
+          if (!hoverHighlightRect) {
+            hoverHighlightRect = new fabric.Rect({
+              left,
+              top,
+              width: spacing,
+              height: spacing,
+              fill: 'rgba(255, 255, 0, 0.2)', // yellow highlight
+              selectable: false,
+              evented: false,
+              stroke: '#ffd700',
+              strokeWidth: 2,
+              opacity: 1,
+            });
+            canvas.add(hoverHighlightRect);
+          } else {
+            hoverHighlightRect.set({
+              left,
+              top,
+              width: spacing,
+              height: spacing,
+              opacity: 1,
+            });
+          }
+          canvas.renderAll();
+
+          // If painting, paint every highlighted cell (deduped)
+          if (isPaintingRef.current) {
+            console.log('[DEBUG] PAINTING cell under highlight', cellKey);
+            paintGridCell(cellKey, currentTool === 'draw-collision');
+            lastPaintedCellRef.current = cellKey;
+            renderPaintPreview();
+            // Debug: state after painting
+            console.log('[DEBUG] after paintGridCell', {
+              impassableAreas,
+              paintedCell: cellKey,
+            });
+          }
+        }
+      } else if ((drawingMode || collisionDrawingMode) && isDrawing) {
         if (pointer) {
           handleDrawingMove(new fabric.Point(pointer.x, pointer.y));
         }
       }
     };
+
+    // Mouse out event to remove highlight
+    const handleMouseOut = () => {
+      if (hoverHighlightRect && canvas) {
+        canvas.remove(hoverHighlightRect);
+        hoverHighlightRect = null;
+        canvas.renderAll();
+      }
+    };
+
+    // Paint or erase a grid cell (update paintedCells state)
+    function paintGridCell(cellKey: string, isDrawing: boolean) {
+      setImpassableAreas(prev =>
+        prev.map(area => {
+          if (area.id !== activeAreaId) return area;
+          // Use group for deduplication and cell management
+          const group = area.group;
+          if (!group) return area;
+          const spacing = gridSpacing > 0 ? gridSpacing : 32;
+          // Find if cell rect already exists in group
+          const existingRect = group.getObjects('rect').find((rect: any) => rect.cellKey === cellKey);
+          if (isDrawing) {
+            if (!existingRect) {
+              // Create rect for this cell
+              const [gx, gy] = cellKey.split('_').map(Number);
+              const rect = new fabric.Rect({
+                left: gx * spacing,
+                top: gy * spacing,
+                width: spacing,
+                height: spacing,
+                fill: area.color || brushColor,
+                selectable: false,
+                evented: false,
+                stroke: area.border || undefined,
+                strokeWidth: area.border ? 2 : 0,
+                opacity: 1,
+              });
+              (rect as any).cellKey = cellKey;
+              group.add(rect);
+              if (fabricCanvasRef.current) {
+                fabricCanvasRef.current.renderAll();
+              }
+              return {
+                ...area,
+                cells: Array.from(new Set([...area.cells, cellKey])),
+                group,
+              };
+            }
+          } else {
+            if (existingRect) {
+              group.remove(existingRect);
+              if (fabricCanvasRef.current) {
+                fabricCanvasRef.current.renderAll();
+              }
+              return {
+                ...area,
+                cells: area.cells.filter(c => c !== cellKey),
+                group,
+              };
+            }
+          }
+          return area;
+        })
+      );
+      setUndoStack(stack => [
+        ...stack,
+        isDrawing
+          ? { type: 'addCell', areaId: activeAreaId!, cell: cellKey }
+          : { type: 'removeCell', areaId: activeAreaId!, cell: cellKey }
+      ]);
+      setRedoStack([]); // Clear redo on new action
+    }
+
+    // Renders a live preview group for paintedCells (while painting or before save)
+    function renderPaintPreview() {
+      // Use the area group for preview feedback
+      const activeArea = getActiveArea();
+      if (!activeArea || !activeArea.group) return;
+      // For preview effect, increase opacity or change stroke temporarily
+      activeArea.group.getObjects('rect').forEach((rect: any) => {
+        rect.set({
+          opacity: 0.7,
+          stroke: '#ff9900', // preview color
+          strokeWidth: 2,
+        });
+      });
+      if (fabricCanvasRef.current) {
+        fabricCanvasRef.current.renderAll();
+      }
+    }
+
+    function removePaintPreview() {
+      const activeArea = getActiveArea();
+      if (!activeArea || !activeArea.group) return;
+      // Reset group rects to normal style
+      activeArea.group.getObjects('rect').forEach((rect: any) => {
+        rect.set({
+          opacity: 1,
+          stroke: activeArea.border || undefined,
+          strokeWidth: activeArea.border ? 2 : 0,
+        });
+      });
+      if (fabricCanvasRef.current) {
+        fabricCanvasRef.current.renderAll();
+      }
+    }
+
+    // On mouse up, persist all cells to sharedMap
+    function persistImpassableAreas() {
+      impassableAreas.forEach(area => {
+        if (area.cells.length === 0) return;
+        const areaData = {
+          id: area.id,
+          name: area.name,
+          type: 'impassable-paint',
+          cells: Array.from(area.cells),
+          color: area.color,
+          border: area.border,
+          brushShape: area.brushShape,
+          x: 0, y: 0, width: 0, height: 0 // For compatibility
+        };
+        const idx = sharedMap.collisionAreas?.findIndex(
+          a => a.id === area.id && ('type' in a && (a as any).type === 'impassable-paint')
+        ) ?? -1;
+        if (idx >= 0) {
+          sharedMap.updateCollisionArea(area.id, areaData);
+        } else {
+          sharedMap.addCollisionArea(areaData);
+        }
+    
+        // ---- DEBUG LOG: Persistence ----
+        console.log('[ImpassablePaint] persistImpassableAreas', {
+          count: impassableAreas.length,
+          areas: impassableAreas.map(a => ({ id: a.id, name: a.name, cellCount: a.cells.length }))
+        });
+      });
+    }
 
     // Add event listeners
     canvas.on('mouse:down', handleMouseDown);
@@ -1509,7 +1862,17 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       canvas.off('mouse:up', handleMouseUp);
       canvas.off('mouse:move', handleMouseMove);
     };
-  }, [drawingMode, collisionDrawingMode, isDrawing, handleDrawingStart, handleDrawingMove, handleDrawingEnd]);
+  }, [
+    drawingMode,
+    collisionDrawingMode,
+    isDrawing,
+    handleDrawingStart,
+    handleDrawingMove,
+    handleDrawingEnd,
+    currentTool,
+    gridSpacing,
+    sharedMap,
+  ]);
 
 
 
