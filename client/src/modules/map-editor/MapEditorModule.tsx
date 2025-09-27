@@ -60,6 +60,9 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   const [activeTab, setActiveTab] = useState<TabId>('areas');
   const [previewMode, setPreviewMode] = useState(false);
 
+  // Brush shape for collision painting
+  const [brushShape, setBrushShape] = useState<'circle' | 'square'>('circle');
+
   // Fabric canvas reference for layers tab
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
 
@@ -342,48 +345,51 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
             }}
             onToolChange={editorState.onToolChange}
             onZoomToObject={(object) => {
-              // Zoom to fit the selected object using unified zoom utilities
+              // Zoom and pan to fit the selected object in the viewport
               if (!fabricCanvasRef.current || !object) return;
 
               const canvas = fabricCanvasRef.current;
-              const objectBounds = object.getBoundingRect();
+              // Use the true object size/position for zoom and pan calculations
+              // Use fabric's absolute bounding rect for robust zoom-to-object
+              // getBoundingRect() returns canvas coordinates for the object, which is what we want
+              const bounds = object.getBoundingRect();
+              const objLeft = bounds.left;
+              const objTop = bounds.top;
+              const objWidth = bounds.width;
+              const objHeight = bounds.height;
 
               try {
-                // Calculate zoom to object using utility function
-                const { zoom: fitZoom, centerX, centerY } = calculateZoomToObject(
-                  objectBounds,
-                  canvas.getWidth(),
-                  canvas.getHeight(),
-                  { padding: 100 } // Use default object focus max zoom (3.1x)
-                );
+                const viewportWidth = mainRef.current?.offsetWidth || canvas.getWidth() || 1;
+                const viewportHeight = mainRef.current?.offsetHeight || canvas.getHeight() || 1;
+                // Compute fit zoom with margin (10% of viewport width and height), clamp to max 3x for usability
+                const margin = viewportWidth * 0.10;
+                const verticalMargin = viewportHeight * 0.10;
+                const zoomX = (viewportWidth - margin * 2) / objWidth;
+                const zoomY = (viewportHeight - verticalMargin * 2) / objHeight;
+                let fitZoom = Math.min(zoomX, zoomY);
+                fitZoom = Math.max(0.1, Math.min(fitZoom, 3));
 
-                // Validate zoom operation
-                const validation = validateZoomOperation(canvas, fitZoom, 'zoom to object');
-                if (!validation.isValid) {
-                  console.warn('🎯 ZOOM TO OBJECT BLOCKED:', validation.error);
-                  return;
-                }
+                // Center on the object
+                canvas.setZoom(fitZoom);
+                const vpt = canvas.viewportTransform ?? [1,0,0,1,0,0];
+                vpt[4] = viewportWidth / 2 - (objLeft + objWidth / 2) * fitZoom;
+                vpt[5] = viewportHeight / 2 - (objTop + objHeight / 2) * fitZoom;
+                canvas.setViewportTransform(vpt);
 
-                // Get viewport dimensions for centering
-                const viewportDims = getViewportDimensions(canvas.getElement().parentElement || canvas.getElement());
-
-                // Apply zoom and pan using utility function
-                applyZoomAndPan(canvas, fitZoom, centerX, centerY, viewportDims);
-
-                // Update editor state zoom
                 editorState.setEditorState(prev => ({
                   ...prev,
                   zoom: Math.round(fitZoom * 100)
                 }));
 
                 const zoomState = getZoomState(fitZoom);
-                console.log('🎯 ZOOMED TO OBJECT:', {
-                  objectBounds,
+                console.log('🎯 ZOOMED & PANNED TO OBJECT (absolute data):', {
+                  objLeft,
+                  objTop,
+                  objWidth,
+                  objHeight,
                   fitZoom,
-                  centerX,
-                  centerY,
-                  zoomPercentage: `${zoomState.percentage}%`,
-                  isExtreme: zoomState.isExtreme,
+                  zoom: Math.round(fitZoom * 100),
+                  vpt,
                   objectType: (object as any).type || 'unknown'
                 });
               } catch (error) {
@@ -449,16 +455,50 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
           }}
           onResetZoom={() => {
             if (fabricCanvasRef.current) {
-              fabricCanvasRef.current.setZoom(1.0);
+              const canvas = fabricCanvasRef.current;
+              // Set zoom to 1.0 (100%)
+              canvas.setZoom(1.0);
+              // Center the background horizontally and vertically if present
+              const viewportWidth = mainRef.current?.offsetWidth || canvas.getWidth() || 1;
+              const viewportHeight = mainRef.current?.offsetHeight || canvas.getHeight() || 1;
+              const bgObj = canvas.getObjects().find(obj =>
+                (obj as any).isBackgroundImage ||
+                (obj as any).backgroundImageId === "map-background-image"
+              );
+              const bgWidth = bgObj ? (bgObj.width || 1) * (bgObj.scaleX || 1) : canvas.getWidth() || 1;
+              const bgHeight = bgObj ? (bgObj.height || 1) * (bgObj.scaleY || 1) : canvas.getHeight() || 1;
+              const vpt = canvas.viewportTransform ?? [1,0,0,1,0,0];
+              vpt[4] = Math.max(0, (viewportWidth - bgWidth) / 2);
+              vpt[5] = Math.max(0, (viewportHeight - bgHeight) / 2);
+              canvas.setViewportTransform(vpt);
               editorState.setEditorState(prev => ({ ...prev, zoom: 100 }));
             }
           }}
           onFitToScreen={() => {
-            // Optional: Implement fit-to-screen using background or map dimensions
-            // For now, reset zoom to 1.0 as a placeholder
             if (fabricCanvasRef.current) {
-              fabricCanvasRef.current.setZoom(1.0);
-              editorState.setEditorState(prev => ({ ...prev, zoom: 100 }));
+              const canvas = fabricCanvasRef.current;
+              const viewportWidth = mainRef.current?.offsetWidth || canvas.getWidth() || 1;
+              // Find background image object
+              const bgObj = canvas.getObjects().find(obj =>
+                (obj as any).isBackgroundImage ||
+                (obj as any).backgroundImageId === "map-background-image"
+              );
+              const bgWidth = bgObj ? (bgObj.width || 1) * (bgObj.scaleX || 1) : canvas.getWidth() || 1;
+              const zoom = viewportWidth / bgWidth;
+              canvas.setZoom(zoom);
+              
+              // Center vertically
+              const viewportHeight = mainRef.current?.offsetHeight || canvas.getHeight() || 1;
+              const bgHeight = bgObj ? (bgObj.height || 1) * (bgObj.scaleY || 1) : canvas.getHeight() || 1;
+              const vpt = canvas.viewportTransform ?? [1,0,0,1,0,0];
+              vpt[4] = 0; // align left
+              vpt[5] = Math.max(0, (viewportHeight - bgHeight * zoom) / 2); // center vertically if possible
+              canvas.setViewportTransform(vpt);
+              
+              editorState.setEditorState(prev => ({
+                ...prev,
+                zoom: Math.round(zoom * 100)
+              }));
             }
           }}
           onToggleGrid={gridConfig.toggleGrid}
@@ -467,6 +507,8 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
           onTogglePreview={() => setPreviewMode(!previewMode)}
           onToggleBackgroundInfo={backgroundInfoPanel.togglePanel}
           backgroundInfoVisible={backgroundInfoPanel.isPanelVisible}
+          brushShape={brushShape}
+          onBrushShapeChange={setBrushShape}
         />
       </header>
 
@@ -488,6 +530,8 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
             drawingAreaData={drawingMode.pendingAreaData || undefined}
             drawingCollisionAreaData={collisionDrawingMode.pendingCollisionAreaData || undefined}
             currentTool={editorState.editorState.tool}
+            brushShape={brushShape}
+            brushSize={32}
             onZoomChange={(zoom) => {
               editorState.setEditorState(prev => ({
                 ...prev,
@@ -514,7 +558,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
               });
               editorState.setFabricCanvas(canvas);
               fabricCanvasRef.current = canvas;
-
+              
               // Automatically fit map to viewport when entering edit mode (immediate, no timeout)
               cameraControls.fitToScreen(viewportWidth, viewportHeight); // Use camera controls for fit
               console.log('🎯 EDIT MODE: Auto-applied zoom to fit on canvas ready (immediate)');

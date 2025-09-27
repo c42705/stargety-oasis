@@ -58,7 +58,7 @@ export const GRID_PATTERNS: GridPattern[] = [
 
 export const DEFAULT_GRID_CONFIG: GridConfig = {
   spacing: 32,
-  opacity: 30,
+  opacity: 75,
   pattern: 'pattern-32px',
   visible: true,
   snapToGrid: false

@@ -530,23 +530,44 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             />
           </Form.Item>
 
-          <Form.Item label="Grid Size">
+          <Form.Item label="Grid Pattern & Size">
             <Select
-              value={gridConfig.spacing}
-              onChange={(value) => {
-                const pattern = GRID_PATTERNS.find(p => p.size === value);
+              value={gridConfig.pattern}
+              onChange={(patternId) => {
+                const pattern = GRID_PATTERNS.find(p => p.id === patternId);
                 if (pattern) {
                   onGridConfigChange({
-                    spacing: value,
-                    pattern: pattern.id as GridConfig['pattern']
+                    pattern: pattern.id as GridConfig['pattern'],
+                    spacing: pattern.size
                   });
                 }
               }}
               style={{ width: '100%' }}
+              optionLabelProp="label"
             >
               {GRID_PATTERNS.map((pattern) => (
-                <Select.Option key={pattern.id} value={pattern.size}>
-                  {pattern.name}
+                <Select.Option
+                  key={pattern.id}
+                  value={pattern.id}
+                  label={pattern.name}
+                >
+                  <Space>
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        border: '1px solid #d9d9d9',
+                        borderRadius: 4,
+                        backgroundImage: `url(${pattern.thumbnail})`,
+                        backgroundSize: 'cover',
+                        backgroundRepeat: 'repeat',
+                        imageRendering: 'pixelated'
+                      }}
+                    />
+                    <span>
+                      {pattern.name} ({pattern.size}px)
+                    </span>
+                  </Space>
                 </Select.Option>
               ))}
             </Select>
@@ -568,35 +589,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             />
           </Form.Item>
 
-          <Form.Item label="Grid Pattern">
-            <Radio.Group
-              value={gridConfig.pattern}
-              onChange={(e) => onGridConfigChange({ pattern: e.target.value })}
-              style={{ width: '100%' }}
-            >
-              <Space direction="vertical" style={{ width: '100%' }}>
-                {GRID_PATTERNS.map((pattern) => (
-                  <Radio key={pattern.id} value={pattern.id} style={{ width: '100%' }}>
-                    <Space align="center">
-                      <div
-                        style={{
-                          width: '32px',
-                          height: '32px',
-                          border: '1px solid #d9d9d9',
-                          borderRadius: '4px',
-                          backgroundImage: `url(${pattern.thumbnail})`,
-                          backgroundSize: 'cover',
-                          backgroundRepeat: 'repeat',
-                          imageRendering: 'pixelated'
-                        }}
-                      />
-                      <span>{pattern.name}</span>
-                    </Space>
-                  </Radio>
-                ))}
-              </Space>
-            </Radio.Group>
-          </Form.Item>
+          {/* Radio group for patterns removed, handled by select above */}
         </Form>
       </Card>
 

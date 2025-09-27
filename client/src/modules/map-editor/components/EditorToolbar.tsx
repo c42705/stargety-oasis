@@ -41,7 +41,10 @@ interface EditorToolbarProps {
   backgroundInfoVisible?: boolean;
 }
 
-export const EditorToolbar: React.FC<EditorToolbarProps> = ({
+export const EditorToolbar: React.FC<EditorToolbarProps & {
+  brushShape?: 'circle' | 'square';
+  onBrushShapeChange?: (shape: 'circle' | 'square') => void;
+}> = ({
   editorState,
   gridConfig,
   previewMode,
@@ -56,7 +59,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onRedo,
   onTogglePreview,
   onToggleBackgroundInfo,
-  backgroundInfoVisible = false
+  backgroundInfoVisible = false,
+  brushShape = 'circle',
+  onBrushShapeChange,
 }) => {
   const toolOptions = [
     {

@@ -69,6 +69,11 @@ export const LayersTab: React.FC<LayersTabProps> = ({
     }
 
     const allObjects = fabricCanvas.getObjects();
+    // Filter out grid objects entirely—never show grid in the layer list
+    const filteredObjects = allObjects.filter(obj => {
+      const objAny = obj as any;
+      return !(objAny.mapElementType === 'grid' || objAny.isGridPattern || objAny.id === 'grid');
+    });
     
     // Categorize objects by type
     const backgroundObjects: LayerObject[] = [];
@@ -77,7 +82,7 @@ export const LayersTab: React.FC<LayersTabProps> = ({
     const collisionObjects: LayerObject[] = [];
     const terrainObjects: LayerObject[] = [];
 
-    allObjects.forEach((obj, index) => {
+    filteredObjects.forEach((obj, index) => {
       const objAny = obj as any;
       
       // Determine object type and create layer object
