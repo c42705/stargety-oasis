@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Space, Typography, Divider, Tooltip, Flex, Segmented } from 'antd';
+import { Button, Space, Typography, Divider, Tooltip, Flex, Segmented, Popover, Radio } from 'antd';
 import {
   MousePointer,
   Move,
@@ -39,6 +39,8 @@ interface EditorToolbarProps {
   onTogglePreview: () => void;
   onToggleBackgroundInfo?: () => void;
   backgroundInfoVisible?: boolean;
+  brushSize?: number;
+  onBrushSizeChange?: (size: number) => void;
 }
 
 export const EditorToolbar: React.FC<EditorToolbarProps & {
@@ -62,7 +64,11 @@ export const EditorToolbar: React.FC<EditorToolbarProps & {
   backgroundInfoVisible = false,
   brushShape = 'circle',
   onBrushShapeChange,
+  brushSize = 1,
+  onBrushSizeChange,
 }) => {
+  // (removed duplicate destructure of brushSize/onBrushSizeChange)
+
   const toolOptions = [
     {
       label: <Tooltip title="Select Tool (S)"><MousePointer size={16} /></Tooltip>,
@@ -73,6 +79,16 @@ export const EditorToolbar: React.FC<EditorToolbarProps & {
       value: 'pan'
     }
   ];
+
+  // Brush size options (in grid cells)
+  const brushSizeOptions = [
+    { label: '8px', value: 8 },
+    { label: '16px', value: 16 },
+    { label: '32px', value: 32 },
+    { label: '64px', value: 64 },
+    { label: '128px', value: 128 }
+  ];
+  // [REMOVED: Duplicate/erroneous toolOptions block]
 
   const collisionToolOptions = [
     {
@@ -125,6 +141,31 @@ export const EditorToolbar: React.FC<EditorToolbarProps & {
       </Flex>
 
       <Flex align="center" gap="middle">
+        {/* Brush Size Popover for collision tools */}
+        {['draw-collision', 'erase-collision'].includes(editorState.tool) && (
+          <Popover
+            placement="bottom"
+            trigger="click"
+            content={
+              <Radio.Group
+                value={brushSize}
+                onChange={e => onBrushSizeChange && onBrushSizeChange(e.target.value)}
+                style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+              >
+                {brushSizeOptions.map(opt => (
+                  <Radio.Button key={opt.value} value={opt.value} style={{ marginBottom: 4 }}>
+                    {opt.label}
+                  </Radio.Button>
+                ))}
+              </Radio.Group>
+            }
+          >
+            <Button size="small" icon={<Square size={16} />} style={{ marginRight: 8 }}>
+              Brush Size
+            </Button>
+          </Popover>
+        )}
+        <Divider type="vertical" style={{ height: '24px' }} />
         <Space size="small">
           <Text type="secondary" style={{ fontSize: '12px' }}>Zoom:</Text>
           <Space.Compact>
