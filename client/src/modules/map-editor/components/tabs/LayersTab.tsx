@@ -195,62 +195,32 @@ export const LayersTab: React.FC<LayersTabProps> = ({
 
   // Handle object selection
   const handleObjectSelect = useCallback((layerObject: LayerObject) => {
-    console.log('🔧 TOOL: Object selection initiated from LayersTab', {
-      timestamp: new Date().toISOString(),
-      objectName: layerObject.name,
-      objectType: layerObject.type,
-      objectId: layerObject.id,
-      hasFabricObject: !!layerObject.fabricObject,
-      hasCanvas: !!fabricCanvas,
-      hasOnToolChange: !!onToolChange,
-      source: 'LayersTab.handleObjectSelect'
-    });
+    // Removed: Non-critical object selection initiated log.
 
     if (!layerObject.fabricObject) {
-      console.warn('🔧 TOOL: Cannot select object - no fabric object', {
-        timestamp: new Date().toISOString(),
-        objectName: layerObject.name,
-        objectType: layerObject.type
-      });
+      // Removed: Non-critical cannot select object warning.
       return;
     }
 
     // Switch to select tool first to enable interaction
-    console.log('🔧 TOOL: Switching to select tool for object interaction', {
-      timestamp: new Date().toISOString(),
-      objectName: layerObject.name,
-      requestedTool: 'select'
-    });
+    // Removed: Non-critical switching to select tool for object interaction log.
     onToolChange?.('select');
 
     // Select the object on canvas
     if (fabricCanvas) {
-      console.log('🔧 TOOL: Setting active object on canvas', {
-        timestamp: new Date().toISOString(),
-        objectName: layerObject.name,
-        objectType: layerObject.fabricObject.type,
-        canvasObjectCount: fabricCanvas.getObjects().length
-      });
+      // Removed: Non-critical setting active object on canvas log.
       fabricCanvas.setActiveObject(layerObject.fabricObject);
       fabricCanvas.renderAll();
     } else {
-      console.warn('🔧 TOOL: Cannot set active object - no canvas available');
+      // Removed: Non-critical cannot set active object warning.
     }
 
     // Zoom to object
-    console.log('🔧 TOOL: Triggering zoom to object', {
-      timestamp: new Date().toISOString(),
-      objectName: layerObject.name,
-      hasZoomCallback: !!onZoomToObject
-    });
+    // Removed: Non-critical triggering zoom to object log.
     onZoomToObject?.(layerObject.fabricObject);
 
     // Notify parent component
-    console.log('🔧 TOOL: Notifying parent component of object selection', {
-      timestamp: new Date().toISOString(),
-      objectName: layerObject.name,
-      hasSelectCallback: !!onObjectSelect
-    });
+    // Removed: Non-critical notifying parent component of object selection log.
     onObjectSelect?.(layerObject.fabricObject);
   }, [fabricCanvas, onToolChange, onZoomToObject, onObjectSelect]);
 

@@ -11,6 +11,7 @@ import WorldZoomControls from './WorldZoomControls';
 
 import { shouldBlockBackgroundInteractions } from '../../shared/ModalStateManager';
 import './WorldModule.css';
+import { logger } from '../../shared/logger';
 
 interface WorldModuleProps {
   playerId: string;
@@ -120,7 +121,7 @@ class GameScene extends Phaser.Scene {
       // Update world bounds from map data
       this.updateWorldBoundsFromMapData();
     }).catch(error => {
-      console.error('Failed to load map data from localStorage:', error);
+      logger.error('Failed to load map data from localStorage', error);
       // Continue with empty map if loading fails
     });
 
@@ -327,7 +328,7 @@ class GameScene extends Phaser.Scene {
         // Player init logging removed for cleaner console
       });
     } catch (error) {
-      console.error('Failed to load player avatar, keeping default sprite:', error);
+      logger.error('Failed to load player avatar, keeping default sprite', error);
 
       // Still announce player joined with default sprite
       this.eventBus.publish('world:playerJoined', {
@@ -867,10 +868,7 @@ class GameScene extends Phaser.Scene {
           window.dispatchEvent(evt);
         }
 
-        console.log('🖱️ PANNING STARTED:', {
-          method: pointer.button === 1 ? 'middle-mouse' : 'spacebar-drag',
-          startPosition: { x: pointer.x, y: pointer.y }
-        });
+        // Removed: Non-critical panning started log.
       }
     });
 
@@ -902,7 +900,7 @@ class GameScene extends Phaser.Scene {
         // Update final panning offset when panning ends
         this.updatePanOffsetFromPlayer();
 
-        console.log('🖱️ PANNING ENDED - Offset from player:', this.panOffsetFromPlayer);
+        // Removed: Non-critical panning ended log.
       }
     });
 
@@ -951,12 +949,7 @@ class GameScene extends Phaser.Scene {
         }
       }
 
-      console.log('🖱️ SCROLL WHEEL ZOOM:', {
-        direction: zoomDirection,
-        currentZoom,
-        newZoom,
-        deltaY: event.deltaY
-      });
+      // Removed: Non-critical scroll wheel zoom log.
 
       // Apply zoom with smooth animation
       camera.zoomTo(newZoom, 200, 'Power2');
@@ -1014,7 +1007,7 @@ class GameScene extends Phaser.Scene {
       this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     }
 
-    console.log('🔄 PANNING STATE RESET - Camera centered on player');
+    // Removed: Non-critical panning state reset log.
   }
 
   // Constrain camera to world bounds
@@ -1051,7 +1044,7 @@ class GameScene extends Phaser.Scene {
 
   public setFollowSettings(lerpFactor: number, deadZone: number): void {
     // Native Phaser following settings are set during startFollow()
-    console.log('Follow settings updated (native Phaser handles this automatically)');
+    // Removed: Non-critical follow settings updated log.
   }
 
   public isCameraFollowingPlayer(): boolean {
@@ -1063,14 +1056,14 @@ class GameScene extends Phaser.Scene {
    * Set camera follow offset for custom positioning (simplified for native Phaser)
    */
   public setCameraFollowOffset(x: number, y: number): void {
-    console.log('Camera follow offset set (native Phaser handles this automatically):', { x, y });
+    // Removed: Non-critical camera follow offset set log.
   }
 
   /**
    * Set adaptive lerp factor range (simplified for native Phaser)
    */
   public setAdaptiveLerpRange(min: number, max: number): void {
-    console.log('Adaptive lerp range set (native Phaser handles this automatically):', { min, max });
+    // Removed: Non-critical adaptive lerp range set log.
   }
 
   /**
@@ -1078,7 +1071,7 @@ class GameScene extends Phaser.Scene {
    */
   public centerCameraOnPlayer(): void {
     if (!this.player) {
-      console.warn('🎯 CAMERA CENTERING: No player found');
+      logger.warn('CAMERA CENTERING: No player found');
       return;
     }
 
@@ -1100,12 +1093,12 @@ class GameScene extends Phaser.Scene {
       const constrainedScroll = this.constrainCameraToWorldBounds(targetScrollX, targetScrollY);
       camera.setScroll(constrainedScroll.x, constrainedScroll.y);
 
-      console.log('🎯 CAMERA CENTERED WITH PANNING OFFSET');
+      // Removed: Non-critical camera centered with panning offset log.
     } else {
       // Standard centering - native Phaser handles this
       camera.centerOn(this.player.x, this.player.y);
       this.updatePanOffsetFromPlayer();
-      console.log('🎯 CAMERA CENTERED ON PLAYER');
+      // Removed: Non-critical camera centered on player log.
     }
 
     // Verify centering accuracy at current zoom level
@@ -1125,16 +1118,7 @@ class GameScene extends Phaser.Scene {
     this.lastPlayerX = this.player.x;
     this.lastPlayerY = this.player.y;
 
-    console.log('🎯 CAMERA CENTERED ON PLAYER (Zoom-Corrected):', {
-      playerPos: { x: this.player.x, y: this.player.y },
-      cameraScroll: { x: camera.scrollX, y: camera.scrollY },
-      expectedCenter: { x: expectedCenterX, y: expectedCenterY },
-      centeringError: { x: centeringErrorX, y: centeringErrorY },
-      centeringAccurate: centeringErrorX < maxAcceptableError && centeringErrorY < maxAcceptableError,
-      zoom: camera.zoom,
-      zoomPercentage: `${Math.round(camera.zoom * 100)}%`,
-      viewportDimensions: { width: viewportWidth, height: viewportHeight }
-    });
+    // Removed: Non-critical camera centered on player (zoom-corrected) log.
 
 
   }
@@ -1144,14 +1128,7 @@ class GameScene extends Phaser.Scene {
    * All other world bounds updates should delegate to this method
    */
   private updateWorldBounds(width: number, height: number, source: string): void {
-    console.log('🌍 BOUNDS: Authoritative world bounds update', {
-      timestamp: new Date().toISOString(),
-      width,
-      height,
-      source,
-      currentWorldBounds: this.worldBounds,
-      playerPosition: this.player ? { x: this.player.x, y: this.player.y } : null
-    });
+    // Removed: Non-critical authoritative world bounds update log.
 
     const oldBounds = { ...this.worldBounds };
     const newBounds = { width, height };
@@ -1178,7 +1155,7 @@ class GameScene extends Phaser.Scene {
         const newCenterY = height / 2;
         this.player.setPosition(newCenterX, newCenterY);
 
-        console.log('🎮 PLAYER: Repositioned to new world center', {
+        logger.info('PLAYER repositioned to new world center', {
           oldPosition: { x: oldCenterX, y: oldCenterY },
           newPosition: { x: newCenterX, y: newCenterY },
           reason: 'world bounds changed significantly'
@@ -1199,28 +1176,13 @@ class GameScene extends Phaser.Scene {
     // Recalculate zoom constraints with new world bounds
     const newMinZoom = this.calculateMinZoom();
 
-    console.log('🌍 BOUNDS: Authoritative world bounds update complete', {
-      oldBounds,
-      newBounds,
-      source,
-      cameraUpdated: true,
-      playerRepositioned: this.player ? 'checked' : 'no player',
-      zoomConstraints: {
-        newMinZoom,
-        newMinZoomPercentage: `${Math.round(newMinZoom * 100)}%`,
-        maxZoom: this.maxZoom,
-        maxZoomPercentage: `${Math.round(this.maxZoom * 100)}%`
-      }
-    });
+    // Removed: Non-critical bounds update complete log.
   }
 
   // Update world bounds from background image dimensions (called by PhaserMapRenderer)
   // CRITICAL FIX: Cap world bounds to reasonable dimensions to prevent coordinate system issues
   public updateWorldBoundsFromBackgroundImage(imageWidth: number, imageHeight: number): void {
-    console.log('🌍 BOUNDS: Updating world bounds from background image (with reasonable limits)', {
-      timestamp: new Date().toISOString(),
-      originalImageSize: { width: imageWidth, height: imageHeight }
-    });
+    // Removed: Non-critical updating world bounds from background image log.
 
     // CRITICAL FIX: Cap world bounds to reasonable maximums
     // Background images can be large for detail, but world bounds should be reasonable for gameplay
@@ -1233,11 +1195,7 @@ class GameScene extends Phaser.Scene {
     const reasonableWidth = Math.max(MIN_WORLD_WIDTH, Math.min(MAX_WORLD_WIDTH, imageWidth));
     const reasonableHeight = Math.max(MIN_WORLD_HEIGHT, Math.min(MAX_WORLD_HEIGHT, imageHeight));
 
-    console.log('🌍 BOUNDS: Applying reasonable world bounds limits', {
-      original: { width: imageWidth, height: imageHeight },
-      capped: { width: reasonableWidth, height: reasonableHeight },
-      wasLimited: reasonableWidth !== imageWidth || reasonableHeight !== imageHeight
-    });
+    // Removed: Non-critical applying reasonable world bounds limits log.
 
     // Delegate to the authoritative world bounds update method with reasonable dimensions
     this.updateWorldBounds(reasonableWidth, reasonableHeight, 'backgroundImage-capped');
@@ -1250,10 +1208,7 @@ class GameScene extends Phaser.Scene {
       // Get effective dimensions from WorldDimensionsManager (authoritative)
       const effectiveDimensions = worldDimensionsManager.getEffectiveDimensions();
 
-      console.log('🌍 BOUNDS: Using WorldDimensionsManager effective dimensions', {
-        effectiveDimensions,
-        currentBounds: this.worldBounds
-      });
+      // Removed: Non-critical using WorldDimensionsManager effective dimensions log.
 
       // Update world bounds with effective dimensions
       this.updateWorldBounds(
@@ -1262,12 +1217,12 @@ class GameScene extends Phaser.Scene {
         'WorldDimensionsManager-effective'
       );
     } catch (error) {
-      console.error('🌍 BOUNDS: Failed to get dimensions from WorldDimensionsManager', error);
+      logger.error('BOUNDS: Failed to get dimensions from WorldDimensionsManager', error);
 
       // Fallback to SharedMapSystem for backward compatibility
       const mapData = this.sharedMapSystem.getMapData();
       if (mapData && mapData.worldDimensions) {
-        console.warn('🌍 BOUNDS: Falling back to SharedMapSystem dimensions');
+        logger.warn('BOUNDS: Falling back to SharedMapSystem dimensions');
         this.updateWorldBounds(
           mapData.worldDimensions.width,
           mapData.worldDimensions.height,
@@ -1281,13 +1236,7 @@ class GameScene extends Phaser.Scene {
   private setupMapDimensionListeners(): void {
     // Subscribe directly to WorldDimensionsManager for dimension changes
     const unsubscribe = worldDimensionsManager.subscribe((state: WorldDimensionsState) => {
-      console.log('🌍 WORLD MODULE: Dimension change received', {
-        timestamp: new Date().toISOString(),
-        source: state.source,
-        worldDimensions: state.worldDimensions,
-        effectiveDimensions: state.effectiveDimensions,
-        currentBounds: this.worldBounds
-      });
+      // Removed: Non-critical dimension change received log.
 
       // Check if dimensions actually changed to prevent unnecessary updates
       const currentBounds = this.worldBounds;
@@ -1296,11 +1245,7 @@ class GameScene extends Phaser.Scene {
       if (currentBounds.width !== newDimensions.width ||
           currentBounds.height !== newDimensions.height) {
 
-        console.log('🌍 WORLD MODULE: Updating world bounds from WorldDimensionsManager', {
-          previous: currentBounds,
-          new: newDimensions,
-          source: state.source
-        });
+        // Removed: Non-critical updating world bounds from WorldDimensionsManager log.
 
         // Update world bounds directly with effective dimensions
         this.updateWorldBounds(
@@ -1309,13 +1254,13 @@ class GameScene extends Phaser.Scene {
           `WorldDimensionsManager-${state.source}`
         );
       } else {
-        console.log('🌍 WORLD MODULE: Dimension change ignored (no actual change)');
+        // Removed: Non-critical dimension change ignored log.
       }
     });
 
     // Store unsubscribe function for cleanup
     this.events.once('destroy', () => {
-      console.log('🌍 WORLD MODULE: Cleaning up WorldDimensionsManager subscription');
+      // Removed: Non-critical cleaning up WorldDimensionsManager subscription log.
       unsubscribe();
     });
   }
@@ -1325,17 +1270,11 @@ class GameScene extends Phaser.Scene {
    * CRITICAL FIX: Ensures camera dimensions stay synchronized with scale manager
    */
   private setupScaleManagerSync(): void {
-    console.log('🔧 SCALE SYNC: Setting up scale manager synchronization');
+    // Removed: Non-critical setting up scale manager synchronization log.
 
     // Listen for scale manager resize events
     this.scale.on('resize', (gameSize: Phaser.Structs.Size, baseSize: Phaser.Structs.Size, displaySize: Phaser.Structs.Size, resolution: number) => {
-      console.log('🔧 SCALE SYNC: Scale manager resize event triggered', {
-        gameSize: { width: gameSize.width, height: gameSize.height },
-        baseSize: { width: baseSize.width, height: baseSize.height },
-        displaySize: { width: displaySize.width, height: displaySize.height },
-        resolution,
-        timestamp: new Date().toISOString()
-      });
+      // Removed: Non-critical scale manager resize event triggered log.
 
       // Synchronize camera dimensions with game size
       this.synchronizeCameraDimensions();
@@ -1346,7 +1285,7 @@ class GameScene extends Phaser.Scene {
       this.synchronizeCameraDimensions();
     });
 
-    console.log('🔧 SCALE SYNC: Scale manager synchronization setup complete');
+    // Removed: Non-critical scale manager synchronization setup complete log.
   }
 
   /**
@@ -1358,33 +1297,21 @@ class GameScene extends Phaser.Scene {
     const scale = this.scale;
     const gameSize = scale.gameSize;
 
-    console.log('🔧 CAMERA SYNC: Synchronizing camera dimensions', {
-      before: {
-        camera: { width: camera.width, height: camera.height },
-        game: { width: gameSize.width, height: gameSize.height },
-        match: camera.width === gameSize.width && camera.height === gameSize.height
-      }
-    });
+    // Removed: Non-critical synchronizing camera dimensions log.
 
     // Force camera to match game size exactly
     if (camera.width !== gameSize.width || camera.height !== gameSize.height) {
       // Update camera viewport size to match scale manager game size
       camera.setSize(gameSize.width, gameSize.height);
 
-      console.log('🔧 CAMERA SYNC: Camera dimensions updated', {
-        after: {
-          camera: { width: camera.width, height: camera.height },
-          game: { width: gameSize.width, height: gameSize.height },
-          match: camera.width === gameSize.width && camera.height === gameSize.height
-        }
-      });
+      // Removed: Non-critical camera dimensions updated log.
 
       // Update debug overlays if they exist
       if (this.DEBUG_CAMERA_CENTERING) {
         this.updateDebugOverlays();
       }
     } else {
-      console.log('🔧 CAMERA SYNC: Camera dimensions already synchronized');
+      // Removed: Non-critical camera dimensions already synchronized log.
     }
   }
 
@@ -1433,16 +1360,16 @@ class GameScene extends Phaser.Scene {
     // Ensure we don't go below a reasonable minimum (prevent extreme zoom out)
     const finalMinZoom = Math.max(calculatedMinZoom, this.staticMinZoom);
 
-    console.log('🔍 DYNAMIC MIN ZOOM CALCULATION:', {
-      worldBounds: this.worldBounds,
-      viewportSize: { width: gameSize.width, height: gameSize.height },
-      zoomForWidth,
-      zoomForHeight,
-      calculatedMinZoom,
-      staticMinZoom: this.staticMinZoom,
-      finalMinZoom,
-      zoomPercentage: `${Math.round(finalMinZoom * 100)}%`
-    });
+    // logger.debug('DYNAMIC MIN ZOOM CALCULATION', {
+    //   worldBounds: this.worldBounds,
+    //   viewportSize: { width: gameSize.width, height: gameSize.height },
+    //   zoomForWidth,
+    //   zoomForHeight,
+    //   calculatedMinZoom,
+    //   staticMinZoom: this.staticMinZoom,
+    //   finalMinZoom,
+    //   zoomPercentage: `${Math.round(finalMinZoom * 100)}%`
+    // });
 
     return finalMinZoom;
   }
@@ -1461,16 +1388,15 @@ class GameScene extends Phaser.Scene {
     const newZoom = Math.min(currentZoom + this.zoomStep, this.maxZoom);
 
     if (currentZoom >= this.maxZoom) {
-      console.log('🔍 ZOOM IN: Already at maximum zoom');
       return;
     }
 
-    console.log('🔍 ZOOM IN (Native Phaser):', {
-      currentZoom,
-      newZoom,
-      zoomStep: this.zoomStep,
-      maxZoom: this.maxZoom
-    });
+    // logger.debug('ZOOM IN', {
+    //   currentZoom,
+    //   newZoom,
+    //   zoomStep: this.zoomStep,
+    //   maxZoom: this.maxZoom
+    // });
 
     // Use Phaser's native camera zoom animation - following is maintained automatically
     camera.zoomTo(newZoom, 400, 'Power2');
@@ -1483,42 +1409,39 @@ class GameScene extends Phaser.Scene {
     const newZoom = Math.max(currentZoom - this.zoomStep, dynamicMinZoom);
 
     if (currentZoom <= dynamicMinZoom) {
-      console.log('🔍 ZOOM OUT: Already at minimum zoom');
       return;
     }
 
-    console.log('🔍 ZOOM OUT (Native Phaser):', {
-      currentZoom,
-      newZoom,
-      zoomStep: this.zoomStep,
-      dynamicMinZoom
-    });
+    // logger.debug('ZOOM OUT (Native Phaser):', {
+    //   currentZoom,
+    //   newZoom,
+    //   zoomStep: this.zoomStep,
+    //   dynamicMinZoom
+    // });
 
     // Use Phaser's native camera zoom animation - following is maintained automatically
     camera.zoomTo(newZoom, 400, 'Power2');
   }
 
   public resetZoom(): void {
-    console.log('🔄 RESET ZOOM: Setting zoom to 1.65 and centering on character');
 
     // Use the existing setDefaultZoomAndCenter method which sets zoom to 1.65 and centers on player
     this.setDefaultZoomAndCenter();
 
-    console.log('🔄 RESET ZOOM: Complete - zoom set to 165% and centered on character');
   }
 
   public canZoomIn(): boolean {
     const currentZoom = this.cameras.main.zoom;
     const canZoom = currentZoom < this.maxZoom;
 
-    console.log('🔍 CAN ZOOM IN:', {
-      currentZoom,
-      currentZoomPercentage: `${Math.round(currentZoom * 100)}%`,
-      maxZoom: this.maxZoom,
-      maxZoomPercentage: `${Math.round(this.maxZoom * 100)}%`,
-      canZoom,
-      reason: canZoom ? 'Can zoom in further' : 'Already at maximum zoom (165%)'
-    });
+    // logger.debug('CAN ZOOM IN', {
+    //   currentZoom,
+    //   currentZoomPercentage: `${Math.round(currentZoom * 100)}%`,
+    //   maxZoom: this.maxZoom,
+    //   maxZoomPercentage: `${Math.round(this.maxZoom * 100)}%`,
+    //   canZoom,
+    //   reason: canZoom ? 'Can zoom in further' : 'Already at maximum zoom (165%)'
+    // });
     return canZoom;
   }
 
@@ -1527,14 +1450,14 @@ class GameScene extends Phaser.Scene {
     const dynamicMinZoom = this.minZoom;
     const canZoom = currentZoom > dynamicMinZoom;
 
-    console.log('🔍 CAN ZOOM OUT:', {
-      currentZoom,
-      currentZoomPercentage: `${Math.round(currentZoom * 100)}%`,
-      dynamicMinZoom,
-      minZoomPercentage: `${Math.round(dynamicMinZoom * 100)}%`,
-      canZoom,
-      reason: canZoom ? 'Can zoom out further' : 'Map already fits viewport'
-    });
+    // logger.debug('CAN ZOOM OUT', {
+    //   currentZoom,
+    //   currentZoomPercentage: `${Math.round(currentZoom * 100)}%`,
+    //   dynamicMinZoom,
+    //   minZoomPercentage: `${Math.round(dynamicMinZoom * 100)}%`,
+    //   canZoom,
+    //   reason: canZoom ? 'Can zoom out further' : 'Map already fits viewport'
+    // });
     return canZoom;
   }
 
@@ -1545,22 +1468,20 @@ class GameScene extends Phaser.Scene {
   public setDefaultZoomAndCenter(): void {
     // Prevent multiple simultaneous calls
     if (this.isSettingDefaultZoom) {
-      console.log('🎮 SKIPPING DEFAULT ZOOM AND CENTER (already in progress)');
       return;
     }
 
     this.isSettingDefaultZoom = true;
     const camera = this.cameras.main;
 
-    console.log('🎮 SETTING DEFAULT ZOOM (Native Phaser):', {
-      defaultZoom: this.defaultZoom,
-      currentZoom: camera.zoom
-    });
+    // logger.debug('SETTING DEFAULT ZOOM', {
+    //   defaultZoom: this.defaultZoom,
+    //   currentZoom: camera.zoom
+    // });
 
     // Use Phaser's native camera zoom - following handles centering automatically
     camera.zoomTo(this.defaultZoom, 300, 'Power2', false, () => {
       this.isSettingDefaultZoom = false;
-      console.log('🎮 DEFAULT ZOOM COMPLETE');
     });
 
     // Debug overlays disabled for performance
@@ -1577,16 +1498,15 @@ class GameScene extends Phaser.Scene {
     const gameWidth = this.scale.gameSize.width;
     const gameHeight = this.scale.gameSize.height;
 
-    console.log('📐 FIT MAP TO VIEWPORT:', {
-      gameWidth,
-      gameHeight,
-      worldBounds: this.worldBounds,
-      currentZoom: camera.zoom,
-      playerExists: !!this.player
-    });
+    // logger.debug('FIT MAP TO VIEWPORT', {
+    //   gameWidth,
+    //   gameHeight,
+    //   worldBounds: this.worldBounds,
+    //   currentZoom: camera.zoom,
+    //   playerExists: !!this.player
+    // });
 
     if (gameWidth === 0 || gameHeight === 0) {
-      console.log('⚠️ FIT MAP TO VIEWPORT: Invalid game dimensions');
       return;
     }
 
@@ -1595,11 +1515,11 @@ class GameScene extends Phaser.Scene {
     const scaleY = gameHeight / this.worldBounds.height;
     const fitZoom = Math.min(scaleX, scaleY, 1);
 
-    console.log('📐 FIT MAP CALCULATIONS:', {
-      scaleX,
-      scaleY,
-      fitZoom
-    });
+    // logger.debug('FIT MAP CALCULATIONS', {
+    //   scaleX,
+    //   scaleY,
+    //   fitZoom
+    // });
 
     // Set the new zoom level
     camera.setZoom(fitZoom);
@@ -1607,21 +1527,19 @@ class GameScene extends Phaser.Scene {
     // If player exists, re-center camera on player to maintain player centering
     // Otherwise, center on world center as fallback
     if (this.player) {
-      console.log('📐 RE-CENTERING CAMERA ON PLAYER AFTER VIEWPORT RESIZE');
       this.centerCameraOnPlayer();
     } else {
-      console.log('📐 CENTERING CAMERA ON WORLD CENTER (no player)');
       const centerX = this.worldBounds.width / 2;
       const centerY = this.worldBounds.height / 2;
       camera.centerOn(centerX, centerY);
     }
 
-    console.log('📐 FIT MAP RESULT:', {
-      finalZoom: camera.zoom,
-      scrollX: camera.scrollX,
-      scrollY: camera.scrollY,
-      playerCentered: !!this.player
-    });
+    // logger.debug('FIT MAP RESULT', {
+    //   finalZoom: camera.zoom,
+    //   scrollX: camera.scrollX,
+    //   scrollY: camera.scrollY,
+    //   playerCentered: !!this.player
+    // });
 
     // Update debug overlays if enabled
     if (this.DEBUG_CAMERA_CENTERING) {
@@ -1638,16 +1556,15 @@ class GameScene extends Phaser.Scene {
     const gameWidth = this.scale.gameSize.width;
     const gameHeight = this.scale.gameSize.height;
 
-    console.log('📐 ADJUST VIEWPORT WITHOUT ZOOM RESET:', {
-      gameWidth,
-      gameHeight,
-      worldBounds: this.worldBounds,
-      currentZoom: camera.zoom,
-      playerExists: !!this.player
-    });
+    // logger.debug('ADJUST VIEWPORT WITHOUT ZOOM RESET', {
+    //   gameWidth,
+    //   gameHeight,
+    //   worldBounds: this.worldBounds,
+    //   currentZoom: camera.zoom,
+    //   playerExists: !!this.player
+    // });
 
     if (gameWidth === 0 || gameHeight === 0) {
-      console.log('⚠️ ADJUST VIEWPORT: Invalid game dimensions');
       return;
     }
 
@@ -1660,23 +1577,21 @@ class GameScene extends Phaser.Scene {
 
     // Re-center camera on player to maintain player centering with preserved zoom
     if (this.player) {
-      console.log('📐 RE-CENTERING CAMERA ON PLAYER (ZOOM PRESERVED)');
       this.centerCameraOnPlayer();
     } else {
-      console.log('📐 CENTERING CAMERA ON WORLD CENTER (ZOOM PRESERVED)');
       const centerX = this.worldBounds.width / 2;
       const centerY = this.worldBounds.height / 2;
       camera.centerOn(centerX, centerY);
     }
 
-    console.log('📐 VIEWPORT ADJUSTMENT RESULT:', {
-      preservedZoom,
-      finalZoom: camera.zoom,
-      scrollX: camera.scrollX,
-      scrollY: camera.scrollY,
-      playerCentered: !!this.player,
-      zoomWasPreserved: camera.zoom === preservedZoom
-    });
+    // logger.debug('VIEWPORT ADJUSTMENT RESULT', {
+    //   preservedZoom,
+    //   finalZoom: camera.zoom,
+    //   scrollX: camera.scrollX,
+    //   scrollY: camera.scrollY,
+    //   playerCentered: !!this.player,
+    //   zoomWasPreserved: camera.zoom === preservedZoom
+    // });
 
     // Update debug overlays if enabled
     if (this.DEBUG_CAMERA_CENTERING) {
@@ -1894,7 +1809,6 @@ class GameScene extends Phaser.Scene {
       }
     };
 
-    console.log('🔍 ENHANCED DEBUG DATA COLLECTION:', enhancedDebugData);
     return enhancedDebugData;
   }
 
@@ -2059,7 +1973,6 @@ class GameScene extends Phaser.Scene {
       allObjects: gameObjects
     };
 
-    console.log('🔍 OBJECT POSITIONING VALIDATION:', validation);
     return validation;
   }
 
@@ -2130,7 +2043,6 @@ class GameScene extends Phaser.Scene {
       }
     };
 
-    console.log('🔍 BACKGROUND IMAGE ALIGNMENT TEST:', alignment);
     return alignment;
   }
 
@@ -2172,7 +2084,6 @@ class GameScene extends Phaser.Scene {
       }
     };
 
-    console.log('🔍 CANVAS-MAP SIZE VERIFICATION:', verification);
     return verification;
   }
 
@@ -2183,7 +2094,6 @@ class GameScene extends Phaser.Scene {
     const camera = this.cameras.main;
     const scale = this.scale;
 
-    console.log(`🧪 TESTING ZOOM LEVEL: ${Math.round(zoomLevel * 100)}%`);
 
     // Set the zoom level
     camera.setZoom(zoomLevel);
@@ -2250,7 +2160,6 @@ class GameScene extends Phaser.Scene {
       worldBounds: { ...this.worldBounds }
     };
 
-    console.log(`🔍 ZOOM TEST RESULTS @ ${Math.round(zoomLevel * 100)}%:`, testResults);
 
     // Update debug overlays
     if (this.DEBUG_CAMERA_CENTERING) {
@@ -2273,7 +2182,6 @@ class GameScene extends Phaser.Scene {
     ];
     const results: any[] = [];
 
-    console.log('🧪 STARTING COMPREHENSIVE ZOOM RANGE TEST');
 
     testZoomLevels.forEach((zoomLevel, index) => {
       // Add a small delay between tests to allow for proper rendering
@@ -2292,7 +2200,6 @@ class GameScene extends Phaser.Scene {
               timestamp: new Date().toISOString()
             };
 
-            console.log('🧪 ZOOM RANGE TEST SUMMARY:', summary);
           });
         }
       });
@@ -2347,7 +2254,6 @@ class GameScene extends Phaser.Scene {
       }
     };
 
-    console.log('🔍 ZOOM CONSTRAINTS ANALYSIS:', constraints);
     return constraints;
   }
 
@@ -2433,12 +2339,10 @@ class GameScene extends Phaser.Scene {
       analysis
     };
 
-    console.log('🔍 SCALE MANAGER DIAGNOSTIC:', diagnostic);
 
     // Test if this is causing viewport calculation errors
     if (scaleData.issues.scaleStuckAt1) {
       console.warn('⚠️ SCALE ISSUE DETECTED: Scale zoom stuck at 1.000 - this could be causing viewport offset issues!');
-      console.log('💡 POTENTIAL FIX: Scale manager may need manual refresh or container size detection fix');
     }
 
     return diagnostic;
@@ -2478,7 +2382,6 @@ class GameScene extends Phaser.Scene {
   public forceScaleRefresh(): any {
     const scale = this.scale;
 
-    console.log('🔄 FORCING SCALE REFRESH...');
 
     // Get current state before refresh
     const beforeState = {
@@ -2516,7 +2419,6 @@ class GameScene extends Phaser.Scene {
           'Scale refresh had no effect - scale may be stuck'
       };
 
-      console.log('🔄 SCALE REFRESH RESULT:', result);
 
       // If scale changed, update debug overlays
       if (result.success && this.DEBUG_CAMERA_CENTERING) {
@@ -2605,7 +2507,6 @@ class GameScene extends Phaser.Scene {
       conflictAnalysis
     };
 
-    console.log('🔍 PANNING-ZOOM CONFLICT ANALYSIS:', fullAnalysis);
 
     return fullAnalysis;
   }
@@ -2693,7 +2594,6 @@ class GameScene extends Phaser.Scene {
    * Test panning-zoom interaction sequence
    */
   public testPanningZoomInteraction(): any {
-    console.log('🧪 STARTING PANNING-ZOOM INTERACTION TEST');
 
     const testSequence = [
       { action: 'baseline', description: 'Record initial state' },
@@ -2748,7 +2648,6 @@ class GameScene extends Phaser.Scene {
       }
     };
 
-    console.log('🧪 PANNING-ZOOM INTERACTION TEST RESULTS:', testSummary);
 
     return testSummary;
   }
@@ -2813,7 +2712,6 @@ class GameScene extends Phaser.Scene {
       analysis.recommendations.push('Viewport calculations appear consistent');
     }
 
-    console.log('🔍 VIEWPORT CALCULATION ANALYSIS:', analysis);
     return analysis;
   }
 
@@ -2916,7 +2814,6 @@ class GameScene extends Phaser.Scene {
       test.recommendations.push('Character centering appears accurate');
     }
 
-    console.log('🎯 CHARACTER CENTERING TEST:', test);
     return test;
   }
 
@@ -2954,7 +2851,6 @@ class GameScene extends Phaser.Scene {
     this.cleanupDebugOverlays();
     this.removeDebugControls();
 
-    console.log('🔇 DEBUG OVERLAYS DISABLED - All debug logging stopped');
   }
 
   /**
@@ -2962,7 +2858,6 @@ class GameScene extends Phaser.Scene {
    */
   public enableDebugOverlays(): void {
     // Debug overlays disabled for performance
-    console.log('🔊 DEBUG OVERLAYS DISABLED - Performance mode');
   }
 
   /**
@@ -3012,7 +2907,6 @@ class GameScene extends Phaser.Scene {
    */
   public toggleDebugOverlays(): void {
     // Debug overlays disabled for performance
-    console.log('🔧 DEBUG OVERLAYS DISABLED - Performance mode');
   }
 }
 
@@ -3047,17 +2941,14 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
 
   // Update zoom state function - defined first so it can be used in other callbacks
   const updateZoomState = useCallback(() => {
-    console.log('🔄 UPDATE ZOOM STATE');
+    // Removed: Non-critical update zoom state and zoom state update logs.
     if (gameSceneRef.current) {
       const canIn = gameSceneRef.current.canZoomIn();
       const canOut = gameSceneRef.current.canZoomOut();
       const isFollowing = gameSceneRef.current.isCameraFollowingPlayer();
-      console.log('🔄 Zoom state update:', { canIn, canOut, isFollowing });
       setCanZoomIn(canIn);
       setCanZoomOut(canOut);
       setIsCameraFollowing(isFollowing);
-    } else {
-      console.log('❌ Game scene not found in updateZoomState!');
     }
   }, []);
 
@@ -3074,7 +2965,7 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
 
       updateZoomState();
     } else {
-      console.log('❌ Game scene not found!');
+      // Removed: Non-critical game scene not found log.
     }
   }, [updateZoomState]);
 
@@ -3090,7 +2981,7 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
 
       updateZoomState();
     } else {
-      console.log('❌ Game scene not found!');
+      // Removed: Non-critical game scene not found log.
     }
   }, [updateZoomState]);
 
@@ -3106,15 +2997,15 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
 
       updateZoomState();
     } else {
-      console.log('❌ Game scene not found!');
+      // Removed: Non-critical game scene not found log.
     }
   }, [updateZoomState]);
 
   const handleToggleCameraFollow = useCallback(() => {
-    console.log('🎮 HANDLE TOGGLE CAMERA FOLLOW CLICKED');
+    // Removed: Non-critical handle toggle camera follow clicked log.
     if (gameSceneRef.current) {
       const newFollowState = !isCameraFollowing;
-      console.log('🎮 Toggling camera follow to:', newFollowState);
+      // Removed: Non-critical toggling camera follow to log.
 
       if (newFollowState) {
         gameSceneRef.current.enableCameraFollowing();
@@ -3126,7 +3017,7 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
       setIsCameraFollowing(newFollowState);
       updateZoomState(); // ensure UI state matches camera state
     } else {
-      console.log('❌ Game scene not found!');
+      // Removed: Non-critical game scene not found log.
     }
   }, [isCameraFollowing, updateZoomState]);
 
@@ -3146,7 +3037,7 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
           roomId: area.id
         });
 
-        console.log(`Area clicked: ${area.name} (${area.id})`);
+        // Removed: Non-critical area clicked log.
         // The video panel will handle the connection automatically
       }
     }
@@ -3154,24 +3045,17 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
 
   useEffect(() => {
     if (!gameRef.current || phaserGameRef.current) {
-      console.log('Skipping game creation:', {
-        hasGameRef: !!gameRef.current,
-        hasExistingGame: !!phaserGameRef.current
-      });
+      // Removed: Non-critical skipping game creation log.
       return;
     }
 
-    console.log('Creating Phaser game...');
+    // Removed: Non-critical creating Phaser game log.
 
     const gameScene = new GameScene(eventBus, user?.username || playerId, handleAreaClick);
     gameSceneRef.current = gameScene;
-    console.log('🎮 Game scene created and stored in ref:', gameScene);
+    // Removed: Non-critical game scene created and stored in ref log.
 
-    console.log('🌍 CANVAS: Creating Phaser game configuration', {
-      timestamp: new Date().toISOString(),
-      containerElement: !!gameRef.current,
-      scaleMode: 'RESIZE with CENTER_BOTH'
-    });
+    // Removed: Non-critical canvas: creating Phaser game configuration log.
 
     const config: Phaser.Types.Core.GameConfig = {
       type: Phaser.AUTO,
@@ -3190,22 +3074,13 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
 
     try {
       phaserGameRef.current = new Phaser.Game(config);
-      console.log('Phaser game created successfully:', phaserGameRef.current);
+      // Removed: Non-critical Phaser game created successfully log.
 
       // Log canvas dimensions for comparison with edit mode
       setTimeout(() => {
         const canvas = phaserGameRef.current?.canvas;
         if (canvas && gameSceneRef.current) {
-          console.log('🎮 WORLD MODE: Canvas ready', {
-            timestamp: new Date().toISOString(),
-            canvasSize: { width: canvas.width, height: canvas.height },
-            gameSize: {
-              width: phaserGameRef.current?.scale.gameSize.width,
-              height: phaserGameRef.current?.scale.gameSize.height
-            },
-            worldBounds: gameSceneRef.current.worldBounds,
-            mode: 'world'
-          });
+          // Removed: Non-critical world mode: canvas ready log.
         }
       }, 1000);
 
@@ -3277,32 +3152,11 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
       (window as any).testCharacterCentering = () => {
         return gameSceneRef.current?.testCharacterCentering();
       };
-      console.log('🔍 Boundary test function available as window.testBoundaryAlignment(zoom)');
-      console.log('🔍 Canvas-map verification available as window.verifyCanvasMapSize()');
-      console.log('🔍 Background alignment test available as window.testBackgroundAlignment()');
-      console.log('🔍 Object positioning validation available as window.validateObjectPositioning()');
-      console.log('🔍 Debug overlay validation available as window.validateDebugOverlays()');
-      console.log('🔍 Enhanced debug data collection available as window.collectEnhancedDebugData()');
-      console.log('🧪 Automated test suite available as window.runAutomatedTestSuite()');
-      console.log('🧪 Comprehensive zoom range test available as window.testZoomRange()');
-      console.log('🔍 Zoom constraints analysis available as window.showZoomConstraints()');
-      console.log('🔍 Scale manager diagnostic available as window.diagnoseScaleManager()');
-      console.log('🔄 Force scale refresh available as window.forceScaleRefresh()');
-      console.log('🔍 Panning-zoom conflict analysis available as window.analyzePanningZoomConflict()');
-      console.log('🧪 Panning-zoom interaction test available as window.testPanningZoomInteraction()');
-      console.log('🔄 Reset panning state available as window.resetPanningState()');
-      console.log('🔍 Debug logging status available as window.getDebugLoggingStatus()');
-      console.log('🔧 Set debug intervals available as window.setDebugLoggingIntervals(logMs, updateMs)');
-      console.log('🔇 Disable debug overlays available as window.disableDebugOverlays()');
-      console.log('🔊 Enable debug overlays available as window.enableDebugOverlays()');
-      console.log('🎛️ Toggle debug controls UI available as window.toggleDebugControls()');
-      console.log('📐 Analyze viewport calculations available as window.analyzeViewportCalculations()');
-      console.log('🎯 Test viewport bounds accuracy available as window.testViewportBoundsAccuracy()');
-      console.log('🎮 Test character centering available as window.testCharacterCentering()');
+      // Removed: Non-critical dev window test and debug logs.
 
       // Update zoom state after game is ready
       setTimeout(() => {
-        console.log('🎮 Initial zoom state update after game creation');
+        // Removed: Non-critical initial zoom state update after game creation log.
         updateZoomState();
       }, 500);
 
@@ -3320,7 +3174,7 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
 
           // Reduced delay from 100ms to 50ms for faster response
           resizeTimeout = setTimeout(() => {
-            console.log('🔧 RESIZE: Processing viewport adjustment after panel resize');
+            // Removed: Non-critical resize processing viewport adjustment log.
             // Use adjustViewportWithoutZoomReset to preserve zoom level during panel resizes
             gameSceneRef.current?.adjustViewportWithoutZoomReset();
             updateZoomState();
@@ -3337,11 +3191,11 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
       (phaserGameRef.current as any).resizeObserver = resizeObserver;
       (phaserGameRef.current as any).resizeTimeout = resizeTimeout;
     } catch (error) {
-      console.error('Failed to create Phaser game:', error);
+      logger.error('Failed to create Phaser game', error);
     }
 
     return () => {
-      console.log('Cleaning up Phaser game...');
+      // Removed: Non-critical cleaning up Phaser game log.
       if (phaserGameRef.current) {
         // Clean up resize observer and timeout
         const resizeObserver = (phaserGameRef.current as any).resizeObserver;

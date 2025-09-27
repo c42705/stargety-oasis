@@ -68,7 +68,7 @@ export const AreasTab: React.FC<AreasTabProps> = ({
                     type="default"
                     danger
                     icon={<DeleteOutlined />}
-                    onClick={() => { console.log('[AreasTab] Delete clicked', area); onDeleteArea(area); }}
+                    onClick={() => { /* Removed dev console.log: AreasTab delete clicked */ onDeleteArea(area); }}
                     size="small"
                     style={{ padding: 4, minWidth: 'auto' }}
                   />

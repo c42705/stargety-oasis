@@ -44,12 +44,6 @@ export class MapDataService {
    */
   static async saveMapData(data: ExtendedMapData): Promise<void> {
     try {
-      console.log('💾 SAVING MAP DATA:', {
-        version: data.version,
-        areas: data.interactiveAreas.length,
-        collisions: data.impassableAreas.length,
-        hasBackground: !!data.backgroundImage
-      });
 
       // Update metadata
       const dataToSave = {
@@ -64,7 +58,6 @@ export class MapDataService {
       // Create backup
       localStorage.setItem(STORAGE_KEYS.MAP_BACKUP, JSON.stringify(dataToSave));
 
-      console.log('✅ MAP DATA SAVED SUCCESSFULLY');
 
       // Emit save event
       this.emit('map:saved', dataToSave);
@@ -83,7 +76,6 @@ export class MapDataService {
       const storedData = localStorage.getItem(STORAGE_KEYS.MAP_DATA);
       
       if (!storedData) {
-        console.log('📁 NO EXISTING MAP DATA FOUND');
         return null;
       }
 
@@ -97,13 +89,6 @@ export class MapDataService {
       // Validate and sanitize data
       const validatedData = this.validateAndSanitizeMapData(parsedData);
 
-      console.log('📁 LOADED MAP DATA:', {
-        version: validatedData.version,
-        areas: validatedData.interactiveAreas.length,
-        collisions: validatedData.impassableAreas.length,
-        hasBackground: !!validatedData.backgroundImage,
-        lastModified: validatedData.lastModified
-      });
 
       return validatedData;
 
@@ -117,7 +102,6 @@ export class MapDataService {
    * Create default map with Zep-style background
    */
   static async createDefaultMap(): Promise<ExtendedMapData> {
-    console.log('🆕 CREATING DEFAULT MAP');
 
     const defaultMap: ExtendedMapData = {
       version: 1,
@@ -175,7 +159,6 @@ export class MapDataService {
     // Save the default map
     await this.saveMapData(defaultMap);
 
-    console.log('✅ DEFAULT MAP CREATED');
     return defaultMap;
   }
 
@@ -212,7 +195,6 @@ export class MapDataService {
    * Reset map to default state
    */
   static async resetToDefault(): Promise<ExtendedMapData> {
-    console.log('🔄 RESETTING MAP TO DEFAULT');
 
     // Clear all storage
     Object.values(STORAGE_KEYS).forEach(key => {
@@ -302,11 +284,6 @@ export class MapDataService {
           // Convert to data URL
           const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
 
-          console.log('🖼️ BACKGROUND IMAGE PROCESSED:', {
-            originalSize: file.size,
-            dimensions: { width: img.width, height: img.height },
-            dataUrlSize: dataUrl.length
-          });
 
           resolve({
             url: dataUrl,
@@ -379,7 +356,6 @@ export class MapDataService {
       }
 
       await this.saveMapData(backupData);
-      console.log('✅ RESTORED FROM BACKUP');
       return backupData;
     } catch (error) {
       console.error('❌ FAILED TO RESTORE FROM BACKUP:', error);
@@ -409,6 +385,5 @@ export class MapDataService {
     Object.values(STORAGE_KEYS).forEach(key => {
       localStorage.removeItem(key);
     });
-    console.log('🗑️ ALL MAP DATA CLEARED');
   }
 }

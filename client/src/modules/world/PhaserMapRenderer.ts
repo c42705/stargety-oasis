@@ -16,6 +16,7 @@ import Phaser from 'phaser';
 import { SharedMapSystem, SharedMapData } from '../../shared/SharedMapSystem';
 import { InteractiveArea, ImpassableArea } from '../../shared/MapDataContext';
 import { shouldBlockBackgroundInteractions } from '../../shared/ModalStateManager';
+import { logger } from '../../shared/logger';
 
 export interface PhaserMapRendererConfig {
   scene: Phaser.Scene;
@@ -75,9 +76,9 @@ export class PhaserMapRenderer {
       this.interactiveAreasGroup.setDepth(10);
       this.collisionAreasGroup.setDepth(5);
 
-      console.log('PhaserMapRenderer groups initialized successfully');
+      // Removed: Non-critical groups initialized log.
     } catch (error) {
-      console.error('Failed to initialize PhaserMapRenderer groups:', error);
+      logger.error('Failed to initialize PhaserMapRenderer groups', error);
     }
   }
 
@@ -199,14 +200,11 @@ export class PhaserMapRenderer {
       return;
     }
 
-    console.log('🖼️ RENDERING BACKGROUND (Simplified):', {
-      hasBackgroundImage: !!this.mapData.backgroundImage,
-      worldDimensions: this.mapData.worldDimensions
-    });
+    // Removed: Non-critical rendering background log.
 
     // Check if we have a background image
     if (this.mapData.backgroundImage) {
-      console.log('🖼️ RENDERING BACKGROUND IMAGE');
+      // Removed: Non-critical rendering background image log.
 
       try {
         // Create a simple texture key
@@ -235,11 +233,11 @@ export class PhaserMapRenderer {
         }
 
       } catch (error) {
-        console.error('❌ FAILED TO RENDER BACKGROUND IMAGE:', error);
+        logger.error('FAILED TO RENDER BACKGROUND IMAGE', error);
         this.renderDefaultBackground();
       }
     } else {
-      console.log('🖼️ NO BACKGROUND IMAGE, RENDERING DEFAULT');
+      // Removed: Non-critical no background image log.
       this.renderDefaultBackground();
     }
   }
@@ -267,7 +265,7 @@ export class PhaserMapRenderer {
    * Create background image with simple scaling (simplified approach)
    */
   private createSimpleBackground(textureKey: string): void {
-    console.log('🖼️ BACKGROUND: Creating simple background with textureKey:', textureKey);
+    // Removed: Non-critical background creation log.
 
     if (!this.mapData) {
       console.error('🖼️ BACKGROUND: Cannot create background - no map data');
@@ -293,14 +291,10 @@ export class PhaserMapRenderer {
       // Add to background group
       this.backgroundGroup.add(backgroundImage);
 
-      console.log('🖼️ BACKGROUND IMAGE CREATED (Simple):', {
-        world: { width: worldWidth, height: worldHeight },
-        image: { width: backgroundImage.width, height: backgroundImage.height },
-        scale: { x: scaleX, y: scaleY }
-      });
+      // Removed: Non-critical background image created log.
 
     } catch (error) {
-      console.error('❌ BACKGROUND: Error in createSimpleBackground:', error);
+      logger.error('Error in createSimpleBackground', error);
       this.renderDefaultBackground();
     }
   }
@@ -476,7 +470,7 @@ export class PhaserMapRenderer {
     this.scene.events.emit('interactiveAreaClicked', area);
     
     // TODO: Integrate with video calling system
-    console.log(`Interactive area clicked: ${area.name}`);
+    // Removed: Non-critical interactive area clicked log.
   }
 
   /**
@@ -518,9 +512,7 @@ export class PhaserMapRenderer {
     this.eventListeners = [];
 
     // Clean up texture cache (simplified)
-    console.log('🧹 CLEANUP: Destroying texture cache', {
-      cacheEntries: this.textureCache.size
-    });
+    // Removed: Non-critical destroying texture cache log.
 
     // Remove all cached textures
     this.textureCache.forEach((entry) => {
@@ -540,6 +532,6 @@ export class PhaserMapRenderer {
     this.interactiveAreaObjects.clear();
     this.collisionAreaObjects.clear();
 
-    console.log('🧹 CLEANUP: PhaserMapRenderer cleanup complete');
+    // Removed: Non-critical cleanup complete log.
   }
 }

@@ -94,22 +94,22 @@ export const useInteractiveAreaActions = () => {
   } = useMapStore();
 
   const handleAddArea = useCallback((area: InteractiveArea) => {
-    console.log('➕ ADDING INTERACTIVE AREA:', area.name);
+    
     addInteractiveArea(area);
   }, [addInteractiveArea]);
 
   const handleUpdateArea = useCallback((id: string, updates: Partial<InteractiveArea>) => {
-    console.log('✏️ UPDATING INTERACTIVE AREA:', id, updates);
+    
     updateInteractiveArea(id, updates);
   }, [updateInteractiveArea]);
 
   const handleRemoveArea = useCallback((id: string) => {
-    console.log('🗑️ REMOVING INTERACTIVE AREA:', id);
+    
     removeInteractiveArea(id);
   }, [removeInteractiveArea]);
 
   const handleSetAreas = useCallback((areas: InteractiveArea[]) => {
-    console.log('📝 SETTING INTERACTIVE AREAS:', areas.length);
+    
     setInteractiveAreas(areas);
   }, [setInteractiveAreas]);
 
@@ -133,22 +133,22 @@ export const useCollisionAreaActions = () => {
   } = useMapStore();
 
   const handleAddCollision = useCallback((area: ImpassableArea) => {
-    console.log('➕ ADDING COLLISION AREA:', area.id);
+    
     addCollisionArea(area);
   }, [addCollisionArea]);
 
   const handleUpdateCollision = useCallback((id: string, updates: Partial<ImpassableArea>) => {
-    console.log('✏️ UPDATING COLLISION AREA:', id, updates);
+    
     updateCollisionArea(id, updates);
   }, [updateCollisionArea]);
 
   const handleRemoveCollision = useCallback((id: string) => {
-    console.log('🗑️ REMOVING COLLISION AREA:', id);
+    
     removeCollisionArea(id);
   }, [removeCollisionArea]);
 
   const handleSetCollisions = useCallback((areas: ImpassableArea[]) => {
-    console.log('📝 SETTING COLLISION AREAS:', areas.length);
+    
     setCollisionAreas(areas);
   }, [setCollisionAreas]);
 
@@ -171,12 +171,12 @@ export const useMapConfiguration = () => {
   } = useMapStore();
 
   const handleSetBackground = useCallback((url: string, dimensions?: { width: number; height: number }) => {
-    console.log('🖼️ SETTING BACKGROUND IMAGE:', url, dimensions);
+    
     setBackgroundImage(url, dimensions);
   }, [setBackgroundImage]);
 
   const handleSetDimensions = useCallback((dimensions: { width: number; height: number }) => {
-    console.log('📐 SETTING WORLD DIMENSIONS:', dimensions);
+    
     setWorldDimensions(dimensions);
   }, [setWorldDimensions]);
 

@@ -103,12 +103,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps & {
             options={toolOptions}
             value={editorState.tool}
             onChange={(value) => {
-              console.log('🔧 TOOL: User clicked tool in toolbar', {
-                timestamp: new Date().toISOString(),
-                clickedTool: value,
-                currentTool: editorState.tool,
-                source: 'EditorToolbar.mainTools'
-              });
               onToolChange(value as EditorState['tool']);
             }}
             size="small"
@@ -123,13 +117,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps & {
             options={collisionToolOptions}
             value={['draw-collision', 'erase-collision'].includes(editorState.tool) ? editorState.tool : undefined}
             onChange={(value) => {
-              console.log('🔧 TOOL: User clicked collision tool in toolbar', {
-                timestamp: new Date().toISOString(),
-                clickedTool: value,
-                currentTool: editorState.tool,
-                isCollisionTool: ['draw-collision', 'erase-collision'].includes(value as string),
-                source: 'EditorToolbar.collisionTools'
-              });
               onToolChange(value as EditorState['tool']);
             }}
             size="small"

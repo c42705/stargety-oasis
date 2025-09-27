@@ -99,7 +99,6 @@ export const useSharedMapCompat = (options: UseSharedMapOptions = {}): UseShared
   const scheduleAutoSave = useCallback(() => {
     // Check if auto-save is enabled and not during initialization
     if (!autoSaveEnabled || !isDirty || isInitializing) {
-      console.log(`⏸️  Auto-save skipped: enabled=${autoSaveEnabled}, dirty=${isDirty}, initializing=${isInitializing}`);
       return;
     }
 
@@ -114,9 +113,7 @@ export const useSharedMapCompat = (options: UseSharedMapOptions = {}): UseShared
     // Schedule auto-save
     autoSaveTimeoutRef.current = setTimeout(async () => {
       try {
-        console.log('🔄 Auto-save triggered');
         await saveMap();
-        console.log('✅ Auto-save completed successfully');
       } catch (error) {
         console.error('❌ Auto-save failed:', error);
       }

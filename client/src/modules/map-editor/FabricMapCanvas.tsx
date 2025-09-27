@@ -13,6 +13,7 @@
  * - Add collaborative cursor tracking for multi-user editing
  */
 
+import { logger } from '../../shared/logger';
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import * as fabric from 'fabric';
 // import { useSharedMap } from '../../shared/useSharedMap';
@@ -141,12 +142,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
   // Log initialization state changes for debugging
   useEffect(() => {
-    console.log('🔄 CANVAS INITIALIZATION STATE:', {
-      isInitialized,
-      isBackgroundReady,
-      isElementsReady,
-      canvasExists: !!fabricCanvasRef.current
-    });
+    // Removed: Non-critical canvas initialization debug log for maintainability.
   }, [isInitialized, isBackgroundReady, isElementsReady]);
 
   // Constants
@@ -197,7 +193,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
           await sharedMap.updateCollisionArea(object.mapElementId, updates);
         }
       } catch (error) {
-        console.error('Failed to update map element:', error);
+        logger.error('Failed to update map element', error);
       }
     }, 300); // 300ms debounce
   }, [sharedMap]);
@@ -373,7 +369,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         }
       } else {
         // Show validation message for areas that are too small
-        console.warn(`Area too small: ${bounds.width}×${bounds.height}px. Minimum size is ${MIN_AREA_SIZE}×${MIN_AREA_SIZE}px`);
+        logger.warn(`Area too small: ${bounds.width}×${bounds.height}px. Minimum size is ${MIN_AREA_SIZE}×${MIN_AREA_SIZE}px`);
         canvas.renderAll();
         return;
       }
@@ -382,10 +378,10 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     // Create the area if it meets size requirements
     if (collisionDrawingMode && onCollisionAreaDrawn) {
       onCollisionAreaDrawn(bounds);
-      console.log(`Collision area created successfully (${bounds.width}×${bounds.height}px)`);
+      // Removed: Non-critical collision area creation log for maintainability.
     } else if (onAreaDrawn) {
       onAreaDrawn(bounds);
-      console.log(`Interactive area created successfully (${bounds.width}×${bounds.height}px)`);
+      // Removed: Non-critical area creation log for maintainability.
     }
 
     // Force immediate re-render of areas after creation
@@ -443,9 +439,9 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
       // Show success message
       const deletedCount = areasToDelete.length;
-      console.log(`${deletedCount} area${deletedCount > 1 ? 's' : ''} deleted successfully`);
+      // Removed: Non-critical area deletion log for maintainability.
     } catch (error) {
-      console.error('Failed to delete areas:', error);
+      logger.error('Failed to delete areas', error);
     } finally {
       setShowDeleteDialog(false);
       setAreasToDelete([]);
@@ -491,16 +487,16 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       setIsElementsReady(false);
       setIsInitialized(true);
 
-      console.log('🚀 FABRIC CANVAS INITIALIZED:', { width, height });
+      // Removed: Non-critical canvas initialization log for maintainability.
 
       // Detect and fix any dimension mismatches
       setTimeout(async () => {
         try {
           const mapSystem = SharedMapSystem.getInstance();
           await mapSystem.detectAndUpdateImageDimensions();
-          console.log('✅ DIMENSION DETECTION COMPLETED ON CANVAS INIT');
+          // Removed: Non-critical dimension detection completion log.
         } catch (error) {
-          console.warn('⚠️ DIMENSION DETECTION FAILED ON CANVAS INIT:', error);
+          logger.warn('DIMENSION DETECTION FAILED ON CANVAS INIT', error);
         }
       }, 100);
 
@@ -512,7 +508,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       if (shouldOptimizePerformance(currentZoom)) {
         optimizeCanvasRendering(canvas, currentZoom);
         performanceMonitorRef.current.startMonitoring();
-        console.log('🚀 Performance optimizations enabled for zoom level:', currentZoom);
+        // Removed: Non-critical performance optimization log.
       }
 
       // Notify parent component that canvas is ready
@@ -573,7 +569,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       canvas.renderAll();
 
       // Force background image update when dimensions change
-      console.log('🔄 CANVAS DIMENSIONS CHANGED, WILL TRIGGER BACKGROUND UPDATE');
+      // Removed: Non-critical canvas dimension change log.
       // Note: Background update will be triggered by the backgroundImageUrl dependency
     }
   }, [width, height, isInitialized]);
@@ -772,45 +768,25 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   // Handle background image changes - use a stable reference to prevent constant re-renders
   const backgroundImageUrl = useMemo(() => {
     const bgImage = sharedMap.mapData?.backgroundImage;
-    console.log('🖼️ BACKGROUND: Background image URL computed', {
-      timestamp: new Date().toISOString(),
-      hasBackgroundImage: !!bgImage,
-      backgroundImageType: bgImage ? (bgImage.startsWith('data:') ? 'data-url' : 'external-url') : 'none',
-      backgroundImageLength: bgImage?.length || 0,
-      backgroundImagePreview: bgImage ? bgImage.substring(0, 50) + '...' : 'none',
-      mapDataExists: !!sharedMap.mapData,
-      source: 'FabricMapCanvas.backgroundImageUrl.useMemo'
-    });
+    // Removed: Non-critical background image URL debug log.
     return bgImage;
   }, [sharedMap.mapData]);
 
   // Update background image with cover mode scaling (same as game world)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const updateBackgroundImage = useCallback(() => {
-    console.log('🖼️ BACKGROUND: updateBackgroundImage called', {
-      timestamp: new Date().toISOString(),
-      hasCanvas: !!fabricCanvasRef.current,
-      hasMapData: !!sharedMap.mapData,
-      backgroundImageUrl: backgroundImageUrl ? backgroundImageUrl.substring(0, 50) + '...' : 'none',
-      source: 'FabricMapCanvas.updateBackgroundImage'
-    });
+    // Removed: Non-critical update background image debug log.
 
     const canvas = fabricCanvasRef.current;
     if (!canvas || !sharedMap.mapData) {
-      console.warn('🖼️ BACKGROUND: Cannot update background - missing canvas or map data', {
-        timestamp: new Date().toISOString(),
+      logger.warn('BACKGROUND: Cannot update background - missing canvas or map data', {
         hasCanvas: !!canvas,
         hasMapData: !!sharedMap.mapData
       });
       return;
     }
 
-    console.log('🖼️ BACKGROUND: Starting background update process', {
-      timestamp: new Date().toISOString(),
-      hasBackgroundImage: !!sharedMap.mapData.backgroundImage,
-      canvasSize: { width: canvas.width, height: canvas.height },
-      canvasObjectCount: canvas.getObjects().length
-    });
+    // Removed: Non-critical starting background update process debug log.
 
     // Background info panel status is managed by parent component
 
@@ -819,48 +795,26 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       (obj as any).isBackgroundImage === true || (obj as any).backgroundImageId === 'map-background-image'
     );
     if (existingBackground) {
-      console.log('🗑️ BACKGROUND: Removing existing background image', {
-        timestamp: new Date().toISOString(),
-        existingBackgroundType: existingBackground.type,
-        existingBackgroundId: (existingBackground as any).backgroundImageId,
-        isBackgroundImage: (existingBackground as any).isBackgroundImage
-      });
+      // Removed: Non-critical removing existing background image log.
       canvas.remove(existingBackground);
       // Clear the reference since we're replacing it
       (canvas as any)._backgroundImageRef = null;
     } else {
-      console.log('🖼️ BACKGROUND: No existing background image found to remove');
+      // Removed: Non-critical no existing background image log.
     }
 
     // Add new background image if available
     if (backgroundImageUrl) {
-      console.log('🖼️ BACKGROUND: Starting Fabric.js image loading', {
-        timestamp: new Date().toISOString(),
-        backgroundImageUrl: backgroundImageUrl.substring(0, 100) + '...',
-        backgroundImageLength: backgroundImageUrl.length,
-        canvasSize: { width: canvas.width, height: canvas.height }
-      });
+      // Removed: Non-critical starting Fabric.js image loading log.
 
       // Determine if we need crossOrigin based on URL type
       const isDataUrl = backgroundImageUrl.startsWith('data:');
       const fabricOptions = isDataUrl ? {} : { crossOrigin: 'anonymous' as any };
 
-      console.log('🖼️ BACKGROUND: Fabric.js loading configuration', {
-        timestamp: new Date().toISOString(),
-        isDataUrl,
-        fabricOptions,
-        willUseCrossOrigin: !isDataUrl
-      });
+      // Removed: Non-critical Fabric.js loading configuration log.
 
       fabric.Image.fromURL(backgroundImageUrl, fabricOptions).then((img: fabric.Image) => {
-        console.log('🖼️ BACKGROUND: Fabric.js image loading completed', {
-          timestamp: new Date().toISOString(),
-          hasCanvas: !!canvas,
-          hasImage: !!img,
-          imageType: img?.type,
-          imageWidth: img?.width,
-          imageHeight: img?.height
-        });
+        // Removed: Non-critical Fabric.js image loading completed log.
 
         if (!canvas || !img) {
           console.error('❌ BACKGROUND: Failed to create fabric image from background', {
@@ -878,10 +832,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         const imageWidth = img.width!;
         const imageHeight = img.height!;
 
-        console.log('🖼️ BACKGROUND IMAGE DIMENSIONS:', {
-          canvas: { width: canvasWidth, height: canvasHeight },
-          image: { width: imageWidth, height: imageHeight }
-        });
+        // Removed: Non-critical background image dimensions log.
 
         // For the Map Editor, we want to show the image at its actual size
         // without scaling, so users can see the full detail
@@ -923,36 +874,18 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
           img.moveCursor = 'default';
         });
 
-        console.log('🖼️ BACKGROUND IMAGE CONFIGURED:', {
-          position: { left: 0, top: 0 },
-          scale: { x: 1, y: 1 },
-          size: { width: imageWidth, height: imageHeight },
-          hasBackgroundProperty: (img as any).isBackgroundImage,
-          locked: (img as any).locked,
-          selectable: img.selectable,
-          evented: img.evented
-        });
+        // Removed: Non-critical background image configured log.
 
         // Add to canvas and send to back (behind grid and other elements)
         canvas.add(img);
         canvas.sendObjectToBack(img);
 
-        console.log('🖼️ BACKGROUND IMAGE ADDED TO FABRIC CANVAS');
+        // Removed: Non-critical background image added log.
 
         // Verify the background image was added correctly
         const addedObjects = canvas.getObjects();
         const backgroundCount = addedObjects.filter(obj => (obj as any).isBackgroundImage).length;
-        console.log('🔍 IMMEDIATE BACKGROUND VERIFICATION:', {
-          totalObjects: addedObjects.length,
-          backgroundImages: backgroundCount,
-          backgroundImageVisible: backgroundCount > 0,
-          imageProperties: {
-            isBackgroundImage: (img as any).isBackgroundImage,
-            locked: (img as any).locked,
-            selectable: img.selectable,
-            evented: img.evented
-          }
-        });
+        // Removed: Non-critical background verification log.
 
         // Immediate render to ensure visibility
         canvas.renderAll();
@@ -963,24 +896,12 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
           if (bgImg) {
             canvas.sendObjectToBack(bgImg);
             canvas.renderAll();
-            console.log('🖼️ BACKGROUND IMAGE LAYER ORDER ENFORCED');
+            // Removed: Non-critical background image layer order enforced log.
 
             // Log final state
             const allObjects = canvas.getObjects();
             const bgImages = allObjects.filter(obj => (obj as any).isBackgroundImage);
-            console.log('🖼️ FINAL BACKGROUND STATE:', {
-              totalObjects: allObjects.length,
-              backgroundImages: bgImages.length,
-              backgroundImageVisible: bgImages.length > 0,
-              backgroundImagePosition: bgImages[0] ? {
-                left: bgImages[0].left,
-                top: bgImages[0].top,
-                width: bgImages[0].width,
-                height: bgImages[0].height,
-                scaleX: bgImages[0].scaleX,
-                scaleY: bgImages[0].scaleY
-              } : null
-            });
+            // Removed: Non-critical final background state log.
 
             // Mark background as ready and trigger coordinated layer order update
             setTimeout(() => {
@@ -995,21 +916,19 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         }, 100);
 
       }).catch((error: any) => {
-        console.error('❌ BACKGROUND: Failed to load background image', {
-          timestamp: new Date().toISOString(),
+        logger.error('Failed to load background image', {
           error: error.message || error,
           errorType: error.constructor?.name,
           backgroundImageUrl: backgroundImageUrl ? backgroundImageUrl.substring(0, 100) + '...' : 'none',
           backgroundImageLength: backgroundImageUrl?.length || 0,
           isDataUrl: backgroundImageUrl?.startsWith('data:') || false,
           fabricOptions,
-          canvasSize: { width: canvas.width, height: canvas.height },
-          source: 'FabricMapCanvas.updateBackgroundImage.catch'
+          canvasSize: { width: canvas.width, height: canvas.height }
         });
         // Background info panel error handled by parent
       });
     } else {
-      console.log('🖼️ NO BACKGROUND IMAGE, USING TRANSPARENT BACKGROUND');
+      // Removed: Non-critical no background image log.
       // Mark background as ready even when no image (transparent background)
       setIsBackgroundReady(true);
     }
@@ -1018,50 +937,24 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
   // Priority background loading - triggers immediately when canvas is ready
   useEffect(() => {
-    console.log('🖼️ BACKGROUND: Priority background loading effect triggered', {
-      timestamp: new Date().toISOString(),
-      hasCanvas: !!fabricCanvasRef.current,
-      isInitialized,
-      backgroundImageUrl: backgroundImageUrl ? backgroundImageUrl.substring(0, 50) + '...' : 'undefined',
-      backgroundImageDefined: backgroundImageUrl !== undefined,
-      shouldTriggerUpdate: !!(fabricCanvasRef.current && isInitialized && backgroundImageUrl !== undefined),
-      source: 'FabricMapCanvas.priorityBackgroundLoading'
-    });
+    // Removed: Non-critical priority background loading effect log.
 
     if (fabricCanvasRef.current && isInitialized && backgroundImageUrl !== undefined) {
-      console.log('🚀 BACKGROUND: Priority background loading initiated', {
-        timestamp: new Date().toISOString(),
-        canvasReady: true,
-        initialized: true,
-        backgroundImageExists: !!backgroundImageUrl
-      });
+      // Removed: Non-critical priority background loading initiated log.
       updateBackgroundImage();
     } else {
-      console.log('🖼️ BACKGROUND: Priority background loading skipped', {
-        timestamp: new Date().toISOString(),
-        hasCanvas: !!fabricCanvasRef.current,
-        isInitialized,
-        backgroundImageDefined: backgroundImageUrl !== undefined,
-        reason: !fabricCanvasRef.current ? 'no-canvas' :
-                !isInitialized ? 'not-initialized' :
-                backgroundImageUrl === undefined ? 'no-background-url' : 'unknown'
-      });
+      // Removed: Non-critical priority background loading skipped log.
     }
   }, [isInitialized, backgroundImageUrl, updateBackgroundImage]);
 
   // Listen for SharedMapSystem events to handle background image updates
   useEffect(() => {
     const handleMapChanged = (event: any) => {
-      console.log('🔄 SHARED MAP CHANGED EVENT RECEIVED:', {
-        timestamp: new Date().toISOString(),
-        hasMapData: !!event.mapData,
-        hasBackgroundImage: !!event.mapData?.backgroundImage,
-        source: event.source || 'unknown'
-      });
+      // Removed: Non-critical shared map changed event log.
 
       // Force background image update when map data changes
       if (fabricCanvasRef.current && isInitialized && event.mapData?.backgroundImage) {
-        console.log('🔄 TRIGGERING BACKGROUND UPDATE FROM MAP CHANGE');
+        // Removed: Non-critical triggering background update from map change log.
         setTimeout(() => {
           updateBackgroundImage();
         }, 100); // Small delay to ensure state is updated
@@ -1069,12 +962,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     };
 
     const handleDimensionsChanged = (event: any) => {
-      console.log('📐 DIMENSIONS CHANGED EVENT RECEIVED:', {
-        timestamp: new Date().toISOString(),
-        dimensions: event.dimensions,
-        previousDimensions: event.previousDimensions,
-        source: event.source || 'unknown'
-      });
+      // Removed: Non-critical dimensions changed event log.
 
       // Canvas dimensions will be updated via props from MapEditorModule
       // No need to manually resize here as it's handled by the width/height props
@@ -1104,7 +992,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
     // Enhanced object detection with detailed logging for background issues
     if (allObjects.length === 0 && !skipBackgroundCheck) {
-      console.warn('⚠️ NO OBJECTS FOUND ON CANVAS - POSSIBLE INITIALIZATION ISSUE');
+      logger.warn('NO OBJECTS FOUND ON CANVAS - POSSIBLE INITIALIZATION ISSUE');
     }
 
     // Enhanced background image detection with multiple fallback methods
@@ -1121,7 +1009,6 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       // Check if reference exists in canvas objects
       const refInCanvas = allObjects.find(obj => obj === bgRef);
       if (refInCanvas) {
-        console.log('🔧 BACKGROUND IMAGE FOUND BY REFERENCE - RESTORING PROPERTIES');
         (refInCanvas as any).isBackgroundImage = true;
         (refInCanvas as any).selectable = false;
         (refInCanvas as any).evented = false;
@@ -1129,7 +1016,6 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         backgroundImages.push(refInCanvas);
       } else if (!skipBackgroundCheck) {
         // Reference exists but not in canvas - re-add it
-        console.log('🔧 RESTORING COMPLETELY LOST BACKGROUND IMAGE FROM REFERENCE');
         canvas.add(bgRef);
         (bgRef as any).isBackgroundImage = true;
         (bgRef as any).selectable = false;
@@ -1149,7 +1035,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       );
 
       if (possibleBg) {
-        console.log('🔧 FOUND POTENTIAL BACKGROUND IMAGE BY POSITION - MARKING AS BACKGROUND');
+        // Removed: Non-critical found potential background image by position log.
         (possibleBg as any).isBackgroundImage = true;
         (possibleBg as any).selectable = false;
         (possibleBg as any).evented = false;
@@ -1182,17 +1068,11 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       interactiveElements.forEach(obj => canvas.bringObjectToFront(obj));
     }
 
-    console.log('🔄 LAYER ORDER UPDATED:', {
-      backgroundImages: backgroundImages.length,
-      gridObjects: gridObjects.length,
-      interactiveElements: interactiveElements.length,
-      totalObjects: allObjects.length,
-      skippedBackgroundCheck: skipBackgroundCheck
-    });
+    // Removed: Non-critical layer order updated log.
 
     // Enhanced debugging for background image issues
     if (backgroundImages.length === 0 && (canvas as any)._backgroundImageRef) {
-      console.warn('⚠️ BACKGROUND IMAGE REFERENCE EXISTS BUT NOT FOUND IN CANVAS:', {
+      logger.warn('BACKGROUND IMAGE REFERENCE EXISTS BUT NOT FOUND IN CANVAS', {
         hasReference: !!(canvas as any)._backgroundImageRef,
         totalObjects: allObjects.length,
         skipCheck: skipBackgroundCheck,
@@ -1273,7 +1153,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         gridObjectsRemoved++;
       }
     });
-    console.log(`[renderGrid] Removed ${gridObjectsRemoved} previous grid object(s)`);
+    // Removed: Non-critical grid removal debug log.
 
     // If grid is not visible or spacing is invalid, just remove and return
     if (!gridVisible || gridSpacing <= 0) {
@@ -1284,7 +1164,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     // Find the pattern configuration
     const pattern = GRID_PATTERNS.find(p => p.id === gridPattern);
     if (!pattern) {
-      console.warn('Grid pattern not found:', gridPattern);
+      logger.warn('Grid pattern not found', gridPattern);
       return;
     }
 
@@ -1345,7 +1225,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
       // Grid rendered successfully
     }).catch((error) => {
-      console.error('❌ FAILED TO LOAD GRID PATTERN:', error);
+      logger.error('FAILED TO LOAD GRID PATTERN', error);
     });
   }, [width, height, gridVisible, gridSpacing, gridPattern, gridOpacity, updateLayerOrder]);
 
@@ -1573,11 +1453,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       if ((currentTool === 'draw-collision' || currentTool === 'erase-collision')) {
         isPaintingRef.current = true;
         // Debug: mouse down event
-        console.log('[DEBUG] mouse:down event', {
-          event: e,
-          currentTool,
-          isPainting: isPaintingRef.current,
-        });
+        // Removed: Non-critical mouse:down debug event log.
         e.e?.preventDefault();
         e.e?.stopPropagation();
 
@@ -1614,17 +1490,15 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
             setImpassableAreas(prev => [...prev, newArea]);
             setActiveAreaId(newAreaId);
             ensuredAreaId = newAreaId;
-            console.log('[ImpassablePaint] Auto-created new area with Fabric.Group', newArea);
+            // Removed: Non-critical auto-created new area debug log.
           }
-          console.log('[ImpassablePaint] mouse:down', {
-            pointer, cellKey, activeAreaId: ensuredAreaId, tool: currentTool, paintMode: currentTool === 'draw-collision' ? 'draw' : 'erase'
-          });
+          // Removed: Non-critical impassable paint mouse:down debug log.
           // Paint the highlighted cell immediately on mouse down
           paintGridCell(cellKey, currentTool === 'draw-collision');
           lastPaintedCellRef.current = cellKey;
           renderPaintPreview();
           // Debug: area state after paint
-          console.log('[DEBUG] after mouse:down, impassableAreas:', JSON.parse(JSON.stringify(impassableAreas)));
+          // Removed: Non-critical after mouse:down debug log.
         }
       } else if (drawingMode || collisionDrawingMode) {
         e.e?.preventDefault();
@@ -1641,11 +1515,11 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       if ((currentTool === 'draw-collision' || currentTool === 'erase-collision') && isPaintingRef.current) {
         isPaintingRef.current = false;
         // Debug: mouse up
-        console.log('[DEBUG] mouse:up event', { currentTool, isPainting: isPaintingRef.current });
+        // Removed: Non-critical mouse:up debug event log.
         removePaintPreview();
         persistImpassableAreas();
         // Debug: after mouse up
-        console.log('[DEBUG] after mouse:up, impassableAreas:', JSON.parse(JSON.stringify(impassableAreas)));
+        // Removed: Non-critical after mouse:up debug log.
       }
       if ((drawingMode || collisionDrawingMode) && isDrawing) {
         handleDrawingEnd();
@@ -1664,9 +1538,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
           const top = gy * spacing;
 
           // Debug: mouse move and highlight
-          console.log('[DEBUG] mouse:move', {
-            pointer, gx, gy, cellKey, isPainting: isPaintingRef.current, currentTool
-          });
+          // Removed: Non-critical mouse:move debug log.
 
           // Always show hover highlight
           if (!hoverHighlightRect) {
@@ -1696,15 +1568,12 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
           // If painting, paint every highlighted cell (deduped)
           if (isPaintingRef.current) {
-            console.log('[DEBUG] PAINTING cell under highlight', cellKey);
+            // Removed: Non-critical painting cell debug log.
             paintGridCell(cellKey, currentTool === 'draw-collision');
             lastPaintedCellRef.current = cellKey;
             renderPaintPreview();
             // Debug: state after painting
-            console.log('[DEBUG] after paintGridCell', {
-              impassableAreas,
-              paintedCell: cellKey,
-            });
+            // Removed: Non-critical after paintGridCell debug log.
           }
         }
       } else if ((drawingMode || collisionDrawingMode) && isDrawing) {
@@ -1844,10 +1713,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         }
     
         // ---- DEBUG LOG: Persistence ----
-        console.log('[ImpassablePaint] persistImpassableAreas', {
-          count: impassableAreas.length,
-          areas: impassableAreas.map(a => ({ id: a.id, name: a.name, cellCount: a.cells.length }))
-        });
+        // Removed: Non-critical persistImpassableAreas debug log.
       });
     }
 

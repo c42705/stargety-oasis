@@ -169,26 +169,17 @@ export class SharedMapSystem {
       const storedData = localStorage.getItem(STORAGE_KEYS.MAP_DATA);
       if (storedData) {
         const parsedData = JSON.parse(storedData);
-        console.log('📁 LOADED EXISTING MAP DATA FROM LOCALSTORAGE:', {
-          hasBackgroundImage: !!parsedData.backgroundImage,
-          worldDimensions: parsedData.worldDimensions,
-          dataSize: storedData.length,
-          metadata: parsedData.metadata
-        });
 
         // Check if this is an old map without background image
         if (!parsedData.backgroundImage) {
-          console.log('🔄 EXISTING MAP HAS NO BACKGROUND IMAGE, CREATING NEW DEFAULT MAP WITH ZEP BACKGROUND');
           return await this.createDefaultMap();
         }
 
         // Convert date strings back to Date objects
         parsedData.lastModified = new Date(parsedData.lastModified);
         this.mapData = parsedData;
-        console.log('✅ USING EXISTING MAP WITH BACKGROUND IMAGE');
         return parsedData;
       } else {
-        console.log('🆕 NO EXISTING MAP DATA, CREATING NEW DEFAULT MAP');
         return await this.createDefaultMap();
       }
     } catch (error) {
@@ -204,7 +195,6 @@ export class SharedMapSystem {
   public async saveMapData(data?: SharedMapData, force = false): Promise<void> {
     // Prevent concurrent saves
     if (this.isSaving && !force) {
-      console.log('Save already in progress, skipping...');
       return;
     }
 
@@ -238,7 +228,6 @@ export class SharedMapSystem {
           // Try saving again after cleanup
           try {
             localStorage.setItem(STORAGE_KEYS.MAP_DATA, JSON.stringify(dataToSave));
-            console.log('✅ MAP DATA SAVED AFTER CLEANUP');
           } catch (retryError) {
             throw new Error('Storage quota exceeded - unable to save map data even after cleanup. Please use smaller background images or clear browser data.');
           }
@@ -330,7 +319,6 @@ export class SharedMapSystem {
       if (this.hasUnsavedChanges && !this.isSaving) {
         try {
           await this.saveMapData();
-          console.log('Auto-save completed successfully');
         } catch (error) {
           console.error('Auto-save failed:', error);
         }
@@ -441,14 +429,6 @@ export class SharedMapSystem {
       this.mapData.backgroundImageDimensions = backgroundUpdateResult.dimensions;
       this.mapData.worldDimensions = backgroundUpdateResult.dimensions; // Keep in sync
 
-      console.log('🎯 SHARED MAP SYSTEM: Background image synced with WorldDimensionsManager', {
-        source,
-        imageUrl: imageUrl.substring(0, 50) + '...',
-        originalDimensions: imageDimensions,
-        validatedDimensions: backgroundUpdateResult.dimensions,
-        previousDimensions,
-        scaled: backgroundUpdateResult.scaled
-      });
     } catch (error) {
       console.error('❌ SharedMapSystem: Failed to sync background with WorldDimensionsManager', error);
 
@@ -457,11 +437,6 @@ export class SharedMapSystem {
       this.mapData.backgroundImageDimensions = validatedDimensions;
       this.mapData.worldDimensions = validatedDimensions;
 
-      console.log('🎯 SHARED MAP SYSTEM: Fallback background update', {
-        source,
-        validatedDimensions,
-        previousDimensions
-      });
     }
 
     // Record change for history
@@ -538,13 +513,6 @@ export class SharedMapSystem {
       this.mapData.worldDimensions = validatedDimensions;
       this.mapData.backgroundImageDimensions = validatedDimensions;
 
-      console.log('🎯 SHARED MAP SYSTEM: Synced with WorldDimensionsManager', {
-        source,
-        originalDimensions: dimensions,
-        validatedDimensions,
-        previousDimensions,
-        scaled: updateResult.scaled
-      });
     } catch (error) {
       console.error('❌ SharedMapSystem: Failed to sync with WorldDimensionsManager', error);
 
@@ -552,11 +520,6 @@ export class SharedMapSystem {
       this.mapData.worldDimensions = dimensions;
       this.mapData.backgroundImageDimensions = dimensions;
 
-      console.log('🎯 SHARED MAP SYSTEM: Fallback direct update', {
-        source,
-        dimensions,
-        previousDimensions
-      });
     }
 
     // Record change for history
@@ -575,7 +538,6 @@ export class SharedMapSystem {
 
     // REDUCED EVENT EMISSIONS: Only emit for backward compatibility
     // WorldDimensionsManager handles the primary dimension updates
-    console.log('🔄 SharedMapSystem: Emitting legacy events for backward compatibility');
 
     // Emit general map changed event (reduced from two events to one)
     this.emit('map:changed', {
@@ -804,16 +766,9 @@ export class SharedMapSystem {
         const actualDimensions = { width: img.width, height: img.height };
         const storedDimensions = this.getEffectiveDimensions();
 
-        console.log('🔍 DIMENSION DETECTION COMPLETE:', {
-          imageUrl: targetImageUrl.substring(0, 50) + '...',
-          actualDimensions,
-          storedDimensions,
-          mismatch: actualDimensions.width !== storedDimensions.width || actualDimensions.height !== storedDimensions.height
-        });
 
         // If there's a mismatch, update to actual dimensions
         if (actualDimensions.width !== storedDimensions.width || actualDimensions.height !== storedDimensions.height) {
-          console.log('🔧 FIXING DIMENSION MISMATCH: Updating to actual image dimensions');
           await this.updateDimensionsFromBackgroundImage(targetImageUrl, actualDimensions, 'load');
         }
 
@@ -937,7 +892,6 @@ export class SharedMapSystem {
    */
   private cleanupStorage(): void {
     try {
-      console.log('🧹 CLEANING UP STORAGE DUE TO QUOTA EXCEEDED');
 
       // Clear old history entries more aggressively
       this.changeHistory = this.changeHistory.slice(-5); // Keep only last 5 changes
@@ -947,12 +901,10 @@ export class SharedMapSystem {
       keysToCheck.forEach(key => {
         const item = localStorage.getItem(key);
         if (item && item.length > 1000000) { // If item is larger than 1MB
-          console.log(`🧹 REMOVING LARGE STORAGE ITEM: ${key} (${(item.length / 1024 / 1024).toFixed(1)}MB)`);
           localStorage.removeItem(key);
         }
       });
 
-      console.log('🧹 STORAGE CLEANUP COMPLETED');
     } catch (error) {
       console.error('❌ FAILED TO CLEANUP STORAGE:', error);
     }
@@ -980,7 +932,6 @@ export class SharedMapSystem {
         // Try saving again after cleanup
         try {
           localStorage.setItem(STORAGE_KEYS.MAP_HISTORY, JSON.stringify(this.changeHistory));
-          console.log('✅ HISTORY SAVED AFTER CLEANUP');
         } catch (retryError) {
           console.error('❌ FAILED TO SAVE HISTORY EVEN AFTER CLEANUP:', retryError);
           // Clear history entirely as last resort
@@ -1036,10 +987,6 @@ export class SharedMapSystem {
       return { width, height, scaled: false };
     }
 
-    console.log('🔧 IMAGE DIMENSIONS EXCEED LIMITS, SCALING DOWN:', {
-      original: { width, height },
-      limits: { maxWidth, maxHeight }
-    });
 
     // Calculate scale factor to fit within limits while maintaining aspect ratio
     const scaleX = maxWidth / width;
@@ -1049,10 +996,6 @@ export class SharedMapSystem {
     const scaledWidth = Math.floor(width * scale);
     const scaledHeight = Math.floor(height * scale);
 
-    console.log('🔧 SCALED DIMENSIONS:', {
-      scale,
-      scaled: { width: scaledWidth, height: scaledHeight }
-    });
 
     return { width: scaledWidth, height: scaledHeight, scaled: true };
   }
@@ -1064,11 +1007,6 @@ export class SharedMapSystem {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
-        console.log('🖼️ DEFAULT BACKGROUND IMAGE LOADED (ACTUAL DIMENSIONS):', {
-          width: img.width,
-          height: img.height,
-          staticUrl: '/default-background.jpg'
-        });
 
         // Return actual dimensions without validation/scaling for default image
         // The centralized dimension system will handle validation
@@ -1093,7 +1031,6 @@ export class SharedMapSystem {
    * Create default map data using centralized dimension management
    */
   private async createDefaultMap(): Promise<SharedMapData> {
-    console.log('🗺️ CREATING DEFAULT MAP WITH CENTRALIZED DIMENSION MANAGEMENT');
 
     // Load default background image and get actual dimensions
     let backgroundImage: string | undefined;
@@ -1107,12 +1044,6 @@ export class SharedMapSystem {
       const validatedDimensions = this.validateAndScaleImageDimensions(imageData.width, imageData.height);
       effectiveDimensions = validatedDimensions;
 
-      console.log('🖼️ DEFAULT BACKGROUND PROCESSED WITH CENTRALIZED DIMENSIONS:', {
-        originalDimensions: { width: imageData.width, height: imageData.height },
-        effectiveDimensions,
-        scaled: validatedDimensions.scaled,
-        staticUrl: backgroundImage
-      });
     } catch (error) {
       console.warn('⚠️ FAILED TO LOAD DEFAULT BACKGROUND, USING FALLBACK DIMENSIONS:', error);
       // Continue with fallback dimensions
@@ -1201,7 +1132,6 @@ export class SharedMapSystem {
     };
 
     await this.saveMapData(defaultMap);
-    console.log('✅ DEFAULT MAP CREATED WITH BACKGROUND IMAGE');
     return defaultMap;
   }
 

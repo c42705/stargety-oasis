@@ -44,7 +44,6 @@ export function useMigration(options: UseMigrationOptions = {}): UseMigrationRet
         setIsMigrationNeeded(needed);
         
         if (needed && autoMigrate) {
-          console.log('🔄 MIGRATION: Auto-migration triggered');
           startMigration(migrationOptions);
         }
       } catch (err) {
@@ -68,7 +67,6 @@ export function useMigration(options: UseMigrationOptions = {}): UseMigrationRet
     setError(null);
 
     try {
-      console.log('🚀 MIGRATION: Starting migration process');
       
       const finalOptions = { ...migrationOptions, ...customOptions };
       const status = await migrationManager.performMigration(finalOptions);
@@ -77,7 +75,6 @@ export function useMigration(options: UseMigrationOptions = {}): UseMigrationRet
       setIsMigrationNeeded(false);
 
       if (status.isComplete) {
-        console.log('✅ MIGRATION: Migration completed successfully');
         onMigrationComplete?.(status);
       } else {
         const errorMessage = 'Migration completed with errors: ' + status.errors.join(', ');
@@ -105,14 +102,12 @@ export function useMigration(options: UseMigrationOptions = {}): UseMigrationRet
     setError(null);
 
     try {
-      console.log('🔄 MIGRATION: Starting rollback process');
       await migrationManager.rollbackMigration();
       
       // Reset migration status
       setMigrationStatus(null);
       setIsMigrationNeeded(true);
       
-      console.log('✅ MIGRATION: Rollback completed successfully');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Rollback failed';
       setError(errorMessage);

@@ -92,7 +92,7 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
   const handleAutoSaveToggle = () => {
     const newEnabled = !autoSaveEnabled;
     setAutoSaveEnabled(newEnabled);
-    console.log(`Auto-save ${newEnabled ? 'enabled' : 'disabled'}`);
+
   };
 
   // Get status display info

@@ -103,7 +103,6 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children, cu
         // Don't save adminMode as it's calculated based on username
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsToSave));
-      console.log('Settings saved successfully');
     } catch (error) {
       console.error('Failed to save settings to localStorage:', error);
     }

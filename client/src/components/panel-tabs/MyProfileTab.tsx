@@ -53,7 +53,6 @@ export const MyProfileTab: React.FC = () => {
   const handleSavePreferences = () => {
     // Here you would typically save to backend
     setIsEditing(false);
-    console.log('Preferences saved:', preferences);
   };
 
   const handleThemeChange = (themeType: ThemeType) => {

@@ -242,8 +242,6 @@ export const migrateLegacyAvatar = async (
 
     // This is a simplified migration - in practice, you'd want to
     // create proper frame definitions and animations
-    console.log('Legacy avatar migration not fully implemented');
-    console.log('Use Avatar Builder to create new custom characters');
 
     return { success: true };
   } catch (error) {

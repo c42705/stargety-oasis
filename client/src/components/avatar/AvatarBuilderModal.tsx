@@ -440,7 +440,6 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
           imageDimensions={builderState.spriteSheetDefinition.source.originalDimensions}
           onGridChange={setGridLayout}
           onFrameSelect={(frameIndex, frameRect) => {
-            console.log('Frame selected:', frameIndex, frameRect);
           }}
           selectedFrames={[]}
           initialGrid={gridLayout || undefined}

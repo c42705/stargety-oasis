@@ -146,19 +146,15 @@ export const createOptimizedCanvasHandlers = (
   const optimizedObjectModified = config.enableDebouncing
     ? createDebounced((e: any) => {
         // Handle object modification with debouncing
-        console.log('Object modified (debounced):', e.target);
       }, config.debounceDelay)
     : (e: any) => {
-        console.log('Object modified:', e.target);
       };
 
   const optimizedSelectionChanged = config.enableThrottling
     ? createThrottled((e: any) => {
         // Handle selection changes with throttling
-        console.log('Selection changed (throttled):', e.selected);
       }, config.throttleDelay)
     : (e: any) => {
-        console.log('Selection changed:', e.selected);
       };
 
   return {
@@ -229,11 +225,12 @@ export class CanvasPerformanceMonitor {
       optimizeCanvasRendering(this.canvas, zoom);
     } else if (this.averageFPS > 50) {
       // If FPS is good, we can relax some optimizations
-      console.log('✅ Good FPS, maintaining current optimizations', {
-        fps: this.averageFPS,
-        zoom,
-        objectCount
-      });
+      // logger.debug('Good FPS, maintaining current optimizations', {
+      //   fps: this.averageFPS,
+      //   zoom,
+      //   objectCount,
+      //   optimizations: this.currentOptimizations
+      // });
     }
   }
 

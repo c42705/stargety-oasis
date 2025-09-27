@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { logger } from '../../shared/logger';
 import { Map, Eye, Square, Shield } from 'lucide-react';
 import { useMapData, InteractiveArea } from '../../shared/MapDataContext';
 // import { useSharedMap } from '../../shared/useSharedMap';
@@ -129,11 +130,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
     if (dimensionsChanged && fabricCanvasRef.current) {
       lastDimensionsRef.current = { ...effectiveDimensions };
 
-      console.log('🎯 EDIT MODE: Applying fit-to-screen for dimension change', {
-        effectiveDimensions,
-        previousDimensions: lastDimensions,
-        source: 'WorldDimensionsManager'
-      });
+      // Removed: Non-critical fit-to-screen dimension change log.
 
       // Apply fit-to-screen immediately (no setTimeout needed)
       editorState.onFitToScreen(false);
@@ -154,7 +151,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         drawingMode.setPendingAreaData(null);
         drawingMode.setDrawingMode(false);
       } catch (error) {
-        console.error('Failed to create area:', error);
+        logger.error('Failed to create area', error);
       }
     } else {
       // Update existing area
@@ -163,7 +160,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         modalState.setShowAreaModal(false);
         modalState.setEditingArea(null);
       } catch (error) {
-        console.error('Failed to update area:', error);
+        logger.error('Failed to update area', error);
       }
     }
   }, [modalState, sharedMap, drawingMode]);
@@ -174,7 +171,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         await sharedMap.removeInteractiveArea(modalState.areaToDelete.id);
         modalState.setAreaToDelete(null);
       } catch (error) {
-        console.error('Failed to delete area:', error);
+        logger.error('Failed to delete area', error);
       }
     }
   }, [modalState, sharedMap]);
@@ -203,9 +200,9 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
       drawingMode.setPendingAreaData(null);
 
       // Force immediate re-render by triggering a state update
-      console.log('Area created, triggering immediate re-render');
+      // Removed: Non-critical area creation log.
     } catch (error) {
-      console.error('Failed to create area:', error);
+      logger.error('Failed to create area', error);
     }
   }, [drawingMode, sharedMap]);
 
@@ -213,7 +210,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   const handleSaveCollisionArea = useCallback(async (areaData: any) => {
     if (!collisionModalState.editingCollisionArea) {
       // Start drawing mode for new collision area
-      console.log('🎯 STARTING COLLISION DRAWING MODE:', areaData);
+      // Removed: Non-critical starting collision drawing mode log.
       collisionDrawingMode.setPendingCollisionAreaData(areaData);
       collisionDrawingMode.setCollisionDrawingMode(true);
       collisionModalState.setShowCollisionAreaModal(false);
@@ -224,7 +221,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         collisionModalState.setShowCollisionAreaModal(false);
         collisionModalState.setEditingCollisionArea(null);
       } catch (error) {
-        console.error('Failed to update collision area:', error);
+        logger.error('Failed to update collision area', error);
       }
     }
   }, [collisionModalState, sharedMap, collisionDrawingMode]);
@@ -235,7 +232,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         await sharedMap.removeCollisionArea(collisionModalState.collisionAreaToDelete.id);
         collisionModalState.setCollisionAreaToDelete(null);
       } catch (error) {
-        console.error('Failed to delete collision area:', error);
+        logger.error('Failed to delete collision area', error);
       }
     }
   }, [collisionModalState, sharedMap]);
@@ -261,9 +258,9 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
       collisionDrawingMode.setPendingCollisionAreaData(null);
 
       // Force immediate re-render by triggering a state update
-      console.log('Collision area created, triggering immediate re-render');
+      // Removed: Non-critical collision area creation log.
     } catch (error) {
-      console.error('Failed to create collision area:', error);
+      logger.error('Failed to create collision area', error);
     }
   }, [collisionDrawingMode, sharedMap]);
 
@@ -329,17 +326,9 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
                   canvas.setActiveObject(object);
                   canvas.renderAll();
 
-                  console.log('✅ OBJECT SELECTED FROM LAYERS:', {
-                    objectType: (object as any).type || 'unknown',
-                    objectId: (object as any).id || 'unknown',
-                    selectable: object.selectable,
-                    visible: object.visible
-                  });
+                  // Removed: Non-critical object selected from layers log.
                 } else {
-                  console.log('⚠️ OBJECT IS LOCKED AND CANNOT BE SELECTED:', {
-                    objectType: (object as any).type || 'unknown',
-                    locked: (object as any).locked
-                  });
+                  // Removed: Non-critical object locked selection log.
                 }
               }
             }}
@@ -382,18 +371,9 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
                 }));
 
                 const zoomState = getZoomState(fitZoom);
-                console.log('🎯 ZOOMED & PANNED TO OBJECT (absolute data):', {
-                  objLeft,
-                  objTop,
-                  objWidth,
-                  objHeight,
-                  fitZoom,
-                  zoom: Math.round(fitZoom * 100),
-                  vpt,
-                  objectType: (object as any).type || 'unknown'
-                });
+                // Removed: Non-critical zoomed & panned to object debug log.
               } catch (error) {
-                console.error('🎯 ZOOM TO OBJECT ERROR:', error);
+                logger.error('ZOOM TO OBJECT ERROR', error);
               }
             }}
           />
@@ -539,29 +519,22 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
               }));
             }}
             onSelectionChanged={(objects) => {
-              console.log('Selection changed:', objects);
+              // Removed: Non-critical selection changed log.
             }}
             onObjectModified={(object) => {
-              console.log('Object modified:', object);
+              // Removed: Non-critical object modified log.
             }}
             onAreaDrawn={handleAreaDrawn}
             onCollisionAreaDrawn={handleCollisionAreaDrawn}
             className="map-editor-canvas"
             onCanvasReady={(canvas) => {
-              console.log('🎨 EDIT MODE: Canvas ready with centralized dimensions', {
-                timestamp: new Date().toISOString(),
-                canvasSize: { width: canvas.width, height: canvas.height },
-                effectiveDimensions,
-                worldDimensions: mapData.worldDimensions,
-                backgroundImageDimensions: sharedMap.mapData?.backgroundImageDimensions,
-                mode: 'edit'
-              });
+              // Removed: Non-critical canvas ready debug log.
               editorState.setFabricCanvas(canvas);
               fabricCanvasRef.current = canvas;
               
               // Automatically fit map to viewport when entering edit mode (immediate, no timeout)
               cameraControls.fitToScreen(viewportWidth, viewportHeight); // Use camera controls for fit
-              console.log('🎯 EDIT MODE: Auto-applied zoom to fit on canvas ready (immediate)');
+              // Removed: Non-critical auto-applied zoom to fit log.
             }}
             backgroundInfoPanelVisible={backgroundInfoPanel.isPanelVisible}
             onBackgroundInfoPanelClose={backgroundInfoPanel.hidePanel}
@@ -647,7 +620,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
       <ConfirmationDialog
         isOpen={modalState.showDeleteConfirm}
         onClose={handleCloseModals}
-        onConfirm={() => { console.log('[MapEditorModule] Confirm delete'); handleConfirmDelete(); }}
+        onConfirm={() => { handleConfirmDelete(); }}
         title="Delete Interactive Area"
         message={`Are you sure you want to delete "${modalState.areaToDelete?.name}"?`}
         confirmText="Delete"
@@ -665,7 +638,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
       <ConfirmationDialog
         isOpen={collisionModalState.showDeleteConfirm}
         onClose={handleCloseModals}
-        onConfirm={() => { console.log('[MapEditorModule] Confirm delete collision area'); handleConfirmDeleteCollisionArea(); }}
+        onConfirm={() => { handleConfirmDeleteCollisionArea(); }}
         title="Delete Collision Area"
         message={`Are you sure you want to delete "${collisionModalState.collisionAreaToDelete?.name || 'Collision Area'}"?`}
         confirmText="Delete"

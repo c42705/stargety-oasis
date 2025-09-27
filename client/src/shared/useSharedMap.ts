@@ -113,7 +113,6 @@ export const useSharedMap = (options: UseSharedMapOptions = {}): UseSharedMapRet
 
     const handleMapSaved = (event: any) => {
       // Map saved successfully
-      console.log('Map saved:', event.mapData.version);
     };
 
     // Subscribe to events
@@ -345,9 +344,7 @@ export const useSharedMap = (options: UseSharedMapOptions = {}): UseSharedMapRet
     }
 
     try {
-      console.log('🔄 UPDATE MAP DATA CALLED:', updates);
       await mapSystemRef.current.updateMapData(updates, source);
-      console.log('✅ MAP DATA UPDATED SUCCESSFULLY');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update map data';
       console.error('❌ UPDATE MAP DATA ERROR:', err);

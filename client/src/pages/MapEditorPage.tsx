@@ -41,7 +41,6 @@ export const MapEditorPage: React.FC = () => {
           enabled={true}
           customMessage="You have unsaved map changes. Are you sure you want to leave the Map Editor?"
           onNavigationAttempt={() => {
-            console.log('User attempted to navigate away with unsaved changes');
           }}
         />
         <MapEditorModule />

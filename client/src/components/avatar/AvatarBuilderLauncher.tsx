@@ -29,7 +29,6 @@ export const AvatarBuilderLauncher: React.FC<AvatarBuilderLauncherProps> = ({
   const [modalVisible, setModalVisible] = useState(false);
 
   const handleSave = (definition: SpriteSheetDefinition) => {
-    console.log('Avatar Builder - Character saved:', definition);
     onAvatarCreated?.(definition);
     setModalVisible(false);
   };
@@ -117,7 +116,6 @@ export const QuickAvatarBuilder: React.FC<{ username?: string }> = ({ username =
       username={username}
       size="large"
       onAvatarCreated={(definition) => {
-        console.log('New avatar created:', definition.name);
       }}
     />
   );
@@ -133,7 +131,6 @@ export const AvatarBuilderCard: React.FC<{ username?: string }> = ({ username = 
       type="card"
       style={{ width: 300 }}
       onAvatarCreated={(definition) => {
-        console.log('New avatar created:', definition.name);
       }}
     />
   );
@@ -186,7 +183,6 @@ export const AvatarBuilderMenuItem: React.FC<{
         onClose={() => setModalVisible(false)}
         username={username}
         onSave={(definition) => {
-          console.log('Avatar created from menu:', definition.name);
           setModalVisible(false);
         }}
       />

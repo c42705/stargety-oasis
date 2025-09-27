@@ -62,7 +62,6 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
   // Listen for area selection events from the world
   useEffect(() => {
     const handleAreaSelected = (data: { areaId: string; areaName: string; roomId: string }) => {
-      console.log('Area selected for video:', data);
       setActiveRoom(data.roomId);
       onRoomChange?.(data.roomId);
 
@@ -182,7 +181,6 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
             title="Video Settings"
             onClick={() => {
               // TODO: Open video settings
-              console.log('Open video settings');
             }}
           />
         </div>

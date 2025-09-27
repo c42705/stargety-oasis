@@ -80,7 +80,7 @@ export const AvatarBuilderExample: React.FC = () => {
                 <div style={{ border: '1px solid #d9d9d9', borderRadius: '6px' }}>
                   <AvatarBuilderMenuItem 
                     username="demo-user"
-                    onClick={() => console.log('Menu item clicked')}
+                    onClick={() => {/* Removed dev console.log: menu item clicked */}}
                   />
                 </div>
 
@@ -114,7 +114,6 @@ export const AvatarBuilderExample: React.FC = () => {
 <QuickAvatarBuilder 
   username="player123"
   onAvatarCreated={(definition) => {
-    console.log('New avatar:', definition.name);
     // Handle the created avatar
   }}
 />`}
@@ -256,7 +255,6 @@ export const AvatarBuilderExample: React.FC = () => {
   username="player"
   onAvatarCreated={(definition) => {
     // Your custom logic here
-    console.log('Avatar created:', definition);
   }}
 />`}
                 </pre>

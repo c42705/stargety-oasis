@@ -30,7 +30,6 @@ export class ArchitectureTestRunner {
    * Run all architecture tests
    */
   public async runAllTests(): Promise<TestSuite[]> {
-    console.log('🧪 Starting World Dimensions Architecture Tests');
 
     this.results = [];
 
@@ -269,7 +268,6 @@ export class ArchitectureTestRunner {
       suite.totalPassed++;
       suite.totalDuration += duration;
       
-      console.log(`✅ ${testName} (${duration.toFixed(2)}ms)`);
     } catch (error) {
       const duration = performance.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -283,7 +281,6 @@ export class ArchitectureTestRunner {
       suite.totalFailed++;
       suite.totalDuration += duration;
       
-      console.log(`❌ ${testName} (${duration.toFixed(2)}ms): ${errorMessage}`);
     }
   }
 
@@ -291,28 +288,18 @@ export class ArchitectureTestRunner {
    * Print test summary
    */
   private printSummary(): void {
-    console.log('\n📊 Test Summary:');
     
     let totalPassed = 0;
     let totalFailed = 0;
     let totalDuration = 0;
 
     this.results.forEach(suite => {
-      console.log(`\n${suite.suiteName}:`);
-      console.log(`  ✅ Passed: ${suite.totalPassed}`);
-      console.log(`  ❌ Failed: ${suite.totalFailed}`);
-      console.log(`  ⏱️  Duration: ${suite.totalDuration.toFixed(2)}ms`);
       
       totalPassed += suite.totalPassed;
       totalFailed += suite.totalFailed;
       totalDuration += suite.totalDuration;
     });
 
-    console.log(`\n🎯 Overall Results:`);
-    console.log(`  ✅ Total Passed: ${totalPassed}`);
-    console.log(`  ❌ Total Failed: ${totalFailed}`);
-    console.log(`  ⏱️  Total Duration: ${totalDuration.toFixed(2)}ms`);
-    console.log(`  📈 Success Rate: ${((totalPassed / (totalPassed + totalFailed)) * 100).toFixed(1)}%`);
   }
 }
 

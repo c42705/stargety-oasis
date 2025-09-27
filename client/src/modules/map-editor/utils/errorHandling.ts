@@ -150,7 +150,6 @@ export class ErrorLogger {
         console.warn(message, error.details);
         break;
       case 'low':
-        console.log(message, error.details);
         break;
     }
   }

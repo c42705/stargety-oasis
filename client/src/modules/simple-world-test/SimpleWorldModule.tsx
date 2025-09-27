@@ -48,7 +48,6 @@ const SimpleWorldModule: React.FC<SimpleWorldModuleProps> = ({
     }
 
     try {
-      console.log('🎮 SimpleWorldModule: Initializing Phaser game...');
 
       // Create game scene
       const gameScene = new SimpleGameScene({
@@ -91,14 +90,12 @@ const SimpleWorldModule: React.FC<SimpleWorldModuleProps> = ({
 
       // Wait for game to be ready
       game.events.once('ready', () => {
-        console.log('🎮 SimpleWorldModule: Phaser game ready');
         setIsInitialized(true);
         setError(null);
       });
 
       // Handle game boot errors
       game.events.once('boot', () => {
-        console.log('🎮 SimpleWorldModule: Phaser game booted');
       });
 
     } catch (err) {
@@ -112,7 +109,6 @@ const SimpleWorldModule: React.FC<SimpleWorldModuleProps> = ({
    * Clean up Phaser game
    */
   const cleanupGame = useCallback(() => {
-    console.log('🧹 SimpleWorldModule: Cleaning up...');
 
     if (phaserGameRef.current) {
       try {

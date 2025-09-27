@@ -225,7 +225,6 @@ export const useEditorState = () => {
       zoom: 100
     }));
 
-    console.log('🔍 MANUAL RESET ZOOM:', { from: currentZoom, to: resetZoom });
   }, [markManualZoomOperation]);
 
   // Fit to screen functionality
@@ -235,7 +234,6 @@ export const useEditorState = () => {
 
     // Skip if manual zoom is in progress (unless forced)
     if (!force && isManualZoomInProgress()) {
-      console.log('🔍 FIT TO SCREEN SKIPPED: Manual zoom in progress');
       return;
     }
 
@@ -279,13 +277,13 @@ export const useEditorState = () => {
       }));
 
       const zoomState = getZoomState(fitZoom);
-      console.log('🔍 FIT TO SCREEN:', {
-        fitZoom,
-        worldDimensions: { width: worldWidth, height: worldHeight },
-        viewportDimensions: viewportDims,
-        zoomPercentage: `${zoomState.percentage}%`,
-        forced: force
-      });
+      // logger.debug('FIT TO SCREEN', {
+      //   fitZoom,
+      //   worldDimensions: { width: worldWidth, height: worldHeight },
+      //   viewportDimensions: viewportDims,
+      //   zoomPercentage: `${zoomState.percentage}%`,
+      //   forced: force
+      // });
     } catch (error) {
       console.error('🔍 FIT TO SCREEN ERROR:', error);
     }

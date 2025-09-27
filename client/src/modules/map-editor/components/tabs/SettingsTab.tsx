@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { logger } from '../../../../shared/logger';
 import {
   Card,
   Space,
@@ -143,7 +144,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       }
 
     } catch (error) {
-      console.error('Failed to update map size:', error);
+      logger.error('Failed to update map size', error);
       message.error('Failed to update map size');
     }
   }, [mapData.interactiveAreas, updateInteractiveAreas, sharedMap, worldDimensions]);
@@ -171,17 +172,12 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
   // Handle background image upload
   const handleImageUpload = useCallback((file: File) => {
-    console.log('🖼️ BACKGROUND IMAGE UPLOAD STARTED:', {
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.type,
-      timestamp: new Date().toISOString()
-    });
+    // Removed: Non-critical background image upload started log.
 
     // Check file size (limit to 5MB to prevent localStorage quota issues)
     const maxSizeInBytes = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSizeInBytes) {
-      console.error('❌ FILE TOO LARGE:', file.size, 'bytes');
+      logger.error('FILE TOO LARGE', { size: file.size });
       message.error(`Image file is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Please use an image smaller than 5MB.`);
       return false;
     }
@@ -199,12 +195,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
         const img = new window.Image();
         img.onload = async () => {
-          console.log('🖼️ IMAGE LOADED:', {
-            width: img.width,
-            height: img.height,
-            naturalWidth: img.naturalWidth,
-            naturalHeight: img.naturalHeight
-          });
+          // Removed: Non-critical image loaded debug log.
 
           // Calculate optimal size to keep under localStorage limits
           let targetWidth = img.width;
@@ -215,11 +206,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             const scale = Math.min(maxDimension / img.width, maxDimension / img.height);
             targetWidth = Math.floor(img.width * scale);
             targetHeight = Math.floor(img.height * scale);
-            console.log('🖼️ RESIZING IMAGE FOR STORAGE:', {
-              original: { width: img.width, height: img.height },
-              target: { width: targetWidth, height: targetHeight },
-              scale: scale
-            });
+            // Removed: Non-critical resizing image for storage log.
           }
 
           // Set canvas size and draw image
@@ -229,19 +216,19 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
           // Convert to base64 with quality optimization
           const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8); // 80% quality to reduce size
-          console.log('🖼️ OPTIMIZED IMAGE DATA URL LENGTH:', imageDataUrl.length);
+          // Removed: Non-critical optimized image data URL length log.
 
           // Check if the optimized image is still too large
           const estimatedSizeInMB = imageDataUrl.length / 1024 / 1024;
           if (estimatedSizeInMB > 3) { // Conservative limit for localStorage
-            console.error('❌ OPTIMIZED IMAGE STILL TOO LARGE:', estimatedSizeInMB, 'MB');
+            logger.error('OPTIMIZED IMAGE STILL TOO LARGE', { sizeMB: estimatedSizeInMB });
             message.error(`Image is still too large after optimization (${estimatedSizeInMB.toFixed(1)}MB). Please use a smaller image.`);
             return;
           }
 
           // Save background image to SharedMapSystem
           try {
-            console.log('🖼️ SAVING BACKGROUND IMAGE TO SHARED MAP SYSTEM');
+            // Removed: Non-critical saving background image to shared map system log.
 
             // Update background dimensions in WorldDimensionsManager first
             const backgroundDimensions = { width: img.width, height: img.height };
@@ -261,7 +248,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               backgroundImageDimensions: backgroundValidation.dimensions
             });
 
-            console.log('🖼️ BACKGROUND IMAGE SAVED TO SHARED MAP SYSTEM');
+            // Removed: Non-critical background image saved to shared map system log.
 
             // Show modal with resize options
             Modal.confirm({
@@ -286,18 +273,18 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               okText: 'Resize Map to Image',
               cancelText: 'Keep Current Size',
               onOk: async () => {
-                console.log('🖼️ USER CHOSE TO RESIZE MAP TO IMAGE');
+                // Removed: Non-critical user chose to resize map to image log.
                 await handleMapSizeChange(backgroundValidation.dimensions);
                 message.success('Map resized to match background image');
               },
               onCancel: () => {
-                console.log('🖼️ USER CHOSE TO KEEP CURRENT MAP SIZE');
+                // Removed: Non-critical user chose to keep current map size log.
                 message.info('Background image added without resizing map');
               }
             });
 
           } catch (error) {
-            console.error('❌ FAILED TO SAVE BACKGROUND IMAGE:', error);
+            logger.error('FAILED TO SAVE BACKGROUND IMAGE', error);
             if (error instanceof Error && error.message.includes('QuotaExceededError')) {
               message.error('Storage quota exceeded. Please use a smaller image or clear browser data.');
             } else {
@@ -307,14 +294,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         };
 
         img.onerror = (error) => {
-          console.error('❌ FAILED TO LOAD IMAGE:', error);
+          logger.error('FAILED TO LOAD IMAGE', error);
           message.error('Failed to load image. Please check the file format.');
         };
 
         // Read file as data URL
         const reader = new FileReader();
         reader.onload = (e) => {
-          console.log('🖼️ FILE READER LOADED');
+          // Removed: Non-critical file reader loaded log.
           const result = e.target?.result as string;
           if (result) {
             img.src = result;
@@ -322,13 +309,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         };
 
         reader.onerror = (error) => {
-          console.error('❌ FILE READER ERROR:', error);
+          logger.error('FILE READER ERROR', error);
           message.error('Failed to read image file');
         };
 
         reader.readAsDataURL(file);
       } catch (error) {
-        console.error('❌ IMAGE UPLOAD ERROR:', error);
+        logger.error('IMAGE UPLOAD ERROR', error);
         message.error('Failed to upload image');
       }
     }, 0);
@@ -349,7 +336,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
     if (confirmed) {
       try {
-        console.log('🔄 RESETTING TO DEFAULT MAP - CLEARING ALL STORAGE');
+        // Removed: Non-critical resetting to default map log.
 
         // Clear all map-related localStorage using correct keys
         localStorage.removeItem('stargety_shared_map_data');
@@ -357,7 +344,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         localStorage.removeItem('stargety_map_settings');
         localStorage.removeItem('stargety_map_history');
 
-        console.log('🔄 STORAGE CLEARED, RELOADING PAGE TO RECREATE DEFAULT MAP');
+        // Removed: Non-critical storage cleared/reloading log.
 
         // Show success message before reload
         message.success('Map reset initiated. Reloading page...');
@@ -368,7 +355,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         }, 1000);
 
       } catch (error) {
-        console.error('❌ FAILED TO RESET TO DEFAULT MAP:', error);
+        logger.error('FAILED TO RESET TO DEFAULT MAP', error);
         message.error('Failed to reset map. Please try again.');
       }
     }
@@ -379,13 +366,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       <Card title="Map Data Management" size="small">
         <MapDataManager
           onMapLoaded={() => {
-            console.log('Map loaded successfully');
+            // Removed: Non-critical map loaded successfully log.
           }}
           onMapSaved={() => {
-            console.log('Map saved successfully');
+            // Removed: Non-critical map saved successfully log.
           }}
           onError={(error) => {
-            console.error('Map operation error:', error);
+            logger.error('Map operation error', error);
           }}
         />
       </Card>

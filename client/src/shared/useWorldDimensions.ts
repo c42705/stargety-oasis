@@ -128,16 +128,11 @@ export function useWorldDimensions(options: UseWorldDimensionsOptions = {}): Use
   // Subscription callback with debouncing and shallow comparison
   const handleStateChange = useCallback((newState: WorldDimensionsState) => {
     if (enableLogging) {
-      console.log('🔄 useWorldDimensions: State change received', {
-        newState,
-        previousState: previousStateRef.current,
-      });
     }
 
     // Check if update is needed
     if (!shouldUpdate(newState, previousStateRef.current)) {
       if (enableLogging) {
-        console.log('🔄 useWorldDimensions: Update skipped (no relevant changes)');
       }
       return;
     }
@@ -155,7 +150,6 @@ export function useWorldDimensions(options: UseWorldDimensionsOptions = {}): Use
         setHasChanges(true);
         
         if (enableLogging) {
-          console.log('🔄 useWorldDimensions: State updated (debounced)', newState);
         }
       }, debounceMs);
     } else {
@@ -164,7 +158,6 @@ export function useWorldDimensions(options: UseWorldDimensionsOptions = {}): Use
       setHasChanges(true);
       
       if (enableLogging) {
-        console.log('🔄 useWorldDimensions: State updated (immediate)', newState);
       }
     }
   }, [shouldUpdate, debounceMs, enableLogging]);
@@ -172,7 +165,6 @@ export function useWorldDimensions(options: UseWorldDimensionsOptions = {}): Use
   // Subscribe to dimension changes
   useEffect(() => {
     if (enableLogging) {
-      console.log('🔄 useWorldDimensions: Setting up subscription');
     }
 
     const unsubscribe = worldDimensionsManager.subscribe(handleStateChange);
@@ -180,7 +172,6 @@ export function useWorldDimensions(options: UseWorldDimensionsOptions = {}): Use
     // Cleanup function
     return () => {
       if (enableLogging) {
-        console.log('🔄 useWorldDimensions: Cleaning up subscription');
       }
       
       if (debounceTimeoutRef.current) {

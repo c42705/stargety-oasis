@@ -37,7 +37,6 @@ export class SimplePlayerController {
     
     this.setupInput();
     
-    console.log('🎮 SimplePlayerController initialized');
   }
 
   /**
@@ -50,7 +49,6 @@ export class SimplePlayerController {
     // Create WASD keys
     this.wasdKeys = this.scene.input.keyboard!.addKeys('W,S,A,D') as { [key: string]: Phaser.Input.Keyboard.Key };
     
-    console.log('⌨️ Input setup complete');
   }
 
   /**
@@ -199,7 +197,6 @@ export class SimplePlayerController {
     const currentPos = this.getPosition();
     this.setPosition(currentPos.x, currentPos.y);
     
-    console.log('🌍 Player controller world bounds updated:', { width, height });
   }
 
   /**
@@ -244,6 +241,5 @@ export class SimplePlayerController {
     const centerY = this.config.worldBounds.height / 2;
     
     this.setPosition(centerX, centerY);
-    console.log('🎯 Player teleported to center:', { x: centerX, y: centerY });
   }
 }

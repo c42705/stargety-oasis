@@ -25,7 +25,6 @@ export class SimpleCameraController {
     // Set camera world bounds using Phaser's native method
     this.setBounds(0, 0, config.worldBounds.width, config.worldBounds.height);
 
-    console.log('📷 SimpleCameraController initialized with native Phaser methods');
   }
 
   /**
@@ -33,7 +32,6 @@ export class SimpleCameraController {
    */
   setBounds(x: number, y: number, width: number, height: number): void {
     this.camera.setBounds(x, y, width, height);
-    console.log('📷 Camera bounds set:', { x, y, width, height });
   }
 
   /**
@@ -41,7 +39,6 @@ export class SimpleCameraController {
    */
   setTarget(target: Phaser.GameObjects.Sprite): void {
     this.target = target;
-    console.log('📷 Camera target set');
   }
 
   /**
@@ -55,7 +52,6 @@ export class SimpleCameraController {
 
     // Use Phaser's native startFollow method for smooth following
     this.camera.startFollow(this.target, true, 0.1, 0.1);
-    console.log('📷 Camera following started with native Phaser method');
   }
 
   /**
@@ -63,7 +59,6 @@ export class SimpleCameraController {
    */
   stopFollowing(): void {
     this.camera.stopFollow();
-    console.log('📷 Camera following stopped');
   }
 
   /**
@@ -144,11 +139,9 @@ export class SimpleCameraController {
     this.camera.zoomTo(constrainedZoom, this.config.zoomDuration, 'Power2', false, (_, progress) => {
       if (progress === 1) {
         this.isZooming = false;
-        console.log('📷 Zoom completed to:', constrainedZoom);
       }
     });
 
-    console.log('📷 Zooming to:', constrainedZoom, 'from:', this.camera.zoom);
   }
 
   /**
@@ -157,7 +150,6 @@ export class SimpleCameraController {
   setZoom(zoom: number): void {
     const constrainedZoom = Phaser.Math.Clamp(zoom, this.config.minZoom, this.config.maxZoom);
     this.camera.setZoom(constrainedZoom);
-    console.log('📷 Zoom set to:', constrainedZoom);
   }
 
   /**
@@ -202,7 +194,6 @@ export class SimpleCameraController {
   updateWorldBounds(width: number, height: number): void {
     this.config.worldBounds = { width, height };
     this.setBounds(0, 0, width, height);
-    console.log('📷 Camera world bounds updated:', { width, height });
   }
 
   /**
@@ -212,6 +203,5 @@ export class SimpleCameraController {
     this.camera.setZoom(1);
     this.camera.centerOn(this.config.worldBounds.width / 2, this.config.worldBounds.height / 2);
     this.isZooming = false;
-    console.log('📷 Camera reset to default state');
   }
 }

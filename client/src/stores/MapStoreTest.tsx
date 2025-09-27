@@ -43,7 +43,6 @@ export const MapStoreTest: React.FC = () => {
   const handleSave = async () => {
     try {
       await saveMap();
-      console.log('✅ Test save completed');
     } catch (error) {
       console.error('❌ Test save failed:', error);
     }
@@ -52,7 +51,6 @@ export const MapStoreTest: React.FC = () => {
   const handleReset = async () => {
     try {
       await resetMap();
-      console.log('✅ Test reset completed');
     } catch (error) {
       console.error('❌ Test reset failed:', error);
     }

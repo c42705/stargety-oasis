@@ -137,10 +137,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setSavedUsername(null);
         }
 
-        console.log('Login successful:', newUser);
         return true;
       } else {
-        console.log('Login failed: Invalid credentials');
         return false;
       }
     } catch (error) {
@@ -155,7 +153,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = useCallback(() => {
     setUser(null);
     sessionStorage.removeItem(SESSION_STORAGE_KEY);
-    console.log('User logged out');
   }, []);
 
   const contextValue: AuthContextType = {

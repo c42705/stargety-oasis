@@ -28,7 +28,6 @@ export class SimpleGameScene extends Phaser.Scene {
   }
 
   preload(): void {
-    console.log('🎮 SimpleGameScene: Preloading assets...');
 
     // Load background image
     this.load.image('world-background', 'https://i.pinimg.com/736x/37/f6/34/37f63434299b0dc23afe3d486877f646.jpg');
@@ -46,7 +45,6 @@ export class SimpleGameScene extends Phaser.Scene {
   }
 
   create(): void {
-    console.log('🎮 SimpleGameScene: Initializing...');
     
     // Set camera background to transparent
     this.cameras.main.setBackgroundColor('transparent');
@@ -60,7 +58,6 @@ export class SimpleGameScene extends Phaser.Scene {
     // Initialize controllers
     this.initializeControllers();
     
-    console.log('✅ SimpleGameScene: Initialization complete');
   }
 
   /**
@@ -105,7 +102,6 @@ export class SimpleGameScene extends Phaser.Scene {
     // Set overlay depth to be above background but below everything else
     overlay.setDepth(-999);
 
-    console.log('🎨 Image background created:', { width, height });
   }
 
   /**
@@ -120,9 +116,7 @@ export class SimpleGameScene extends Phaser.Scene {
     let textureKey = 'player-fallback';
     if (this.textures.exists('terra-branford')) {
       textureKey = 'terra-branford';
-      console.log('🎮 Using Terra Branford sprite');
     } else {
-      console.log('🎮 Using fallback sprite (Terra Branford not found)');
     }
 
     // Create player sprite
@@ -136,7 +130,6 @@ export class SimpleGameScene extends Phaser.Scene {
       this.player.setTint(0x4a90e2); // Blue color
     }
 
-    console.log('👤 Player created at:', { x: initialX, y: initialY });
   }
 
   /**
@@ -178,7 +171,6 @@ export class SimpleGameScene extends Phaser.Scene {
     // Set camera target for controller reference (zoom operations)
     this.cameraController.setTarget(this.player);
 
-    console.log('🎮 Controllers initialized with native Phaser camera methods');
   }
 
   update(_time: number, delta: number): void {
@@ -231,6 +223,5 @@ export class SimpleGameScene extends Phaser.Scene {
     this.cameraController?.updateWorldBounds(width, height);
     this.playerController?.updateWorldBounds(width, height);
 
-    console.log('🌍 World bounds updated with native camera bounds:', { width, height });
   }
 }

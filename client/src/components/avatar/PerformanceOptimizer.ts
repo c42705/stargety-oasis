@@ -419,7 +419,6 @@ export const usePerformanceMonitoring = () => {
     performance.measure(name, `${name}-start`, `${name}-end`);
     
     const measure = performance.getEntriesByName(name, 'measure')[0];
-    console.log(`${name}: ${measure.duration.toFixed(2)}ms`);
   };
   
   return {

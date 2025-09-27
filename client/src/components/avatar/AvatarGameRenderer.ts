@@ -18,7 +18,6 @@ export class AvatarGameRenderer {
    */
   public setDebugMode(enabled: boolean): void {
     this.debugMode = enabled;
-    console.log(`AvatarGameRenderer debug logging ${enabled ? 'enabled' : 'disabled'}`);
   }
 
   /**
@@ -31,9 +30,7 @@ export class AvatarGameRenderer {
     const logMessage = `[${timestamp}] [AvatarRenderer:${phase}] [${username}] ${message}`;
 
     if (data !== undefined) {
-      console.log(logMessage, data);
     } else {
-      console.log(logMessage);
     }
   }
 
@@ -55,21 +52,21 @@ export class AvatarGameRenderer {
    * Log a summary of the debugging phases available
    */
   public logDebuggingInfo(): void {
-    console.log(`
-🔍 AvatarGameRenderer Debug Logging Phases:
-
-1. SpriteSheetLoading - Tracks sprite sheet URL composition and loading
-2. FrameTextureCreation - Monitors individual frame extraction from 3x3 grid
-3. AnimationCreation - Logs creation of movement animations (up/down/left/right/idle)
-4. SpriteDisplay - Tracks sprite creation and texture assignment
-5. AnimationPlayback - Monitors animation playback requests and execution
-
-Debug mode: ${this.debugMode ? 'ENABLED' : 'DISABLED'}
-Use avatarRenderer.setDebugMode(true/false) to toggle logging.
-
-Current issue: Sprites displaying as full textures instead of individual frames.
-Focus on FrameTextureCreation phase to debug sprite sheet frame division.
-    `);
+    // logger.debug(`
+    // 🔍 AvatarGameRenderer Debug Logging Phases:
+    //
+    // 1. SpriteSheetLoading - Tracks sprite sheet URL composition and loading
+    // 2. FrameTextureCreation - Monitors individual frame extraction from 3x3 grid
+    // 3. AnimationCreation - Logs creation of movement animations (up/down/left/right/idle)
+    // 4. SpriteDisplay - Tracks sprite creation and texture assignment
+    // 5. AnimationPlayback - Monitors animation playback requests and execution
+    //
+    // Debug mode: ${this.debugMode ? 'ENABLED' : 'DISABLED'}
+    // Use avatarRenderer.setDebugMode(true/false) to toggle logging.
+    //
+    // Current issue: Sprites displaying as full textures instead of individual frames.
+    // Focus on FrameTextureCreation phase to debug sprite sheet frame division.
+    // `);
   }
 
   constructor(scene: Phaser.Scene) {
@@ -286,7 +283,6 @@ Focus on FrameTextureCreation phase to debug sprite sheet frame division.
       const frameTextures = this.createDefaultFrameTextures(username);
       if (frameTextures.length > 0) {
         this.createMovementAnimations(username, frameTextures);
-        console.log(`Default Terra Branford sprite sheet created for ${username}`);
         return frameTextures[1]; // Return idle frame
       }
 
@@ -763,7 +759,6 @@ Focus on FrameTextureCreation phase to debug sprite sheet frame division.
    */
   public async updatePlayerAvatar(username: string, _config?: AvatarConfig): Promise<void> {
     try {
-      console.log(`Updating avatar for ${username}`);
 
       // Validate scene is still active
       if (!this.scene?.textures?.game) {
@@ -779,7 +774,6 @@ Focus on FrameTextureCreation phase to debug sprite sheet frame division.
         const sprite = this.avatarSprites.get(username);
         if (sprite) {
           sprite.setTexture(newTextureKey);
-          console.log(`Avatar sprite updated for ${username}`);
         }
       }
     } catch (error) {

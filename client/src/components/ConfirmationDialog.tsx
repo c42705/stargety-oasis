@@ -44,7 +44,6 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
         }
       };
 
-      console.log('[ConfirmationDialog] open', { title, message, type });
       // Build content with optional undo warning
       const finalContent = (() => {
         if (content) return content;
@@ -74,12 +73,10 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
         cancelText,
         okType: type === 'danger' ? 'danger' : 'primary',
         onOk: () => {
-          console.log('[ConfirmationDialog] confirmed');
           onConfirm();
           onClose();
         },
         onCancel: () => {
-          console.log('[ConfirmationDialog] cancelled');
           onClose();
         },
         centered: true,

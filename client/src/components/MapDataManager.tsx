@@ -153,7 +153,6 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
       await navigator.clipboard.writeText(mapData);
       
       // TODO: Show success toast
-      console.log('Map data copied to clipboard');
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to copy to clipboard';

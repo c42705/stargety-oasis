@@ -74,7 +74,6 @@ export const usePanControls = ({
   // Update cursor based on current state
   const updateCursor = useCallback(() => {
     if (!canvasElement) {
-      console.log('🎯 PAN CURSOR: No canvas element available');
       return;
     }
 
@@ -93,14 +92,14 @@ export const usePanControls = ({
                   'default';
     }
 
-    console.log('🎯 PAN CURSOR: Setting cursor', {
-      currentTool,
-      isPanning,
-      canPanWithSpace,
-      canPanWithTool,
-      newCursor,
-      elementType: canvasElement.tagName
-    });
+    // logger.debug('PAN CURSOR: Setting cursor', {
+    //   currentTool,
+    //   isPanning,
+    //   canPanWithSpace,
+    //   canPanWithTool,
+    //   newCursor,
+    //   elementType: canvasElement.tagName
+    // });
 
     canvasElement.style.cursor = newCursor;
   }, [canvasElement, isPanning, canPanWithSpace, canPanWithTool, currentTool]);

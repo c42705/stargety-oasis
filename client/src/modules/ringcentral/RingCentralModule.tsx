@@ -1,3 +1,4 @@
+import { logger } from '../../shared/logger';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useEventBus } from '../../shared/EventBusContext';
 import { RingCentralService } from './RingCentralService';
@@ -83,7 +84,7 @@ export const RingCentralModule: React.FC<RingCentralModuleProps> = ({
     try {
       const user = await serviceRef.current.login(loginCredentials);
       setIsLoggedIn(true);
-      console.log('RingCentral login successful:', user);
+      logger.info('RingCentral login successful', { user });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

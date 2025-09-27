@@ -60,7 +60,6 @@ export class MigrationManager {
     const { enableLogging = true, validateData = true, preserveHistory = true } = options;
 
     if (enableLogging) {
-      console.log('🔄 MIGRATION: Starting architectural migration to WorldDimensionsManager');
     }
 
     try {
@@ -92,7 +91,6 @@ export class MigrationManager {
       this.migrationStatus.endTime = new Date();
 
       if (enableLogging) {
-        console.log('✅ MIGRATION: Architectural migration completed successfully', this.migrationStatus);
       }
 
     } catch (error) {
@@ -116,7 +114,6 @@ export class MigrationManager {
       if (existingData) {
         const backupKey = `mapData_backup_${Date.now()}`;
         localStorage.setItem(backupKey, existingData);
-        console.log('💾 MIGRATION: Backed up existing data to', backupKey);
       }
     } catch (error) {
       throw new Error(`Failed to backup existing data: ${error}`);
@@ -141,10 +138,6 @@ export class MigrationManager {
           throw new Error('Failed to initialize WorldDimensionsManager: ' + initResult.errors.join(', '));
         }
 
-        console.log('🔄 MIGRATION: WorldDimensionsManager initialized with existing data', {
-          worldDimensions: mapData.worldDimensions,
-          effectiveDimensions: initResult.dimensions
-        });
       }
     } catch (error) {
       throw new Error(`Failed to initialize WorldDimensionsManager: ${error}`);
@@ -173,7 +166,6 @@ export class MigrationManager {
         await this.sharedMapSystem.updateWorldDimensions(managerDimensions, 'migration');
       }
 
-      console.log('✅ MIGRATION: SharedMapSystem integration verified');
     } catch (error) {
       throw new Error(`Failed to migrate SharedMapSystem: ${error}`);
     }
@@ -199,11 +191,6 @@ export class MigrationManager {
         throw new Error('WorldDimensionsManager state validation failed');
       }
 
-      console.log('✅ MIGRATION: Data consistency validation passed', {
-        sharedMapDimensions,
-        managerDimensions,
-        stateValid: true
-      });
     } catch (error) {
       throw new Error(`Data consistency validation failed: ${error}`);
     }
@@ -216,7 +203,6 @@ export class MigrationManager {
     try {
       // This is a placeholder for future cleanup of legacy event listeners
       // Currently, we maintain backward compatibility by keeping some events
-      console.log('🧹 MIGRATION: Legacy event listener cleanup (placeholder)');
     } catch (error) {
       throw new Error(`Failed to cleanup legacy event listeners: ${error}`);
     }
@@ -269,7 +255,6 @@ export class MigrationManager {
         const backupData = localStorage.getItem(latestBackup);
         if (backupData) {
           localStorage.setItem('mapData', backupData);
-          console.log('🔄 MIGRATION: Rollback completed using backup', latestBackup);
         }
       }
     } catch (error) {

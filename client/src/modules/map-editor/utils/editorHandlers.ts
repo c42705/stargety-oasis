@@ -30,10 +30,10 @@ export const handleToolChange = (
     return { ...prev, tool };
   });
 
-  console.log('🔧 TOOL: Tool change completed', {
-    timestamp: new Date().toISOString(),
-    activeTool: tool
-  });
+  // logger.debug('TOOL: Tool change completed', {
+  //   timestamp: new Date().toISOString(),
+  //   activeTool: tool
+  // });
 };
 
 /**
@@ -87,7 +87,6 @@ export const handleMouseMove = (
  */
 export const handleUndo = (): void => {
   // TODO: Implement undo functionality
-  console.log('Undo action');
 };
 
 /**
@@ -95,7 +94,6 @@ export const handleUndo = (): void => {
  */
 export const handleRedo = (): void => {
   // TODO: Implement redo functionality
-  console.log('Redo action');
 };
 
 /**

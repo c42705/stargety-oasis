@@ -171,12 +171,10 @@ export const PeopleTab: React.FC = () => {
   const totalCount = mockTeamMembers.length;
 
   const handleCallMember = (memberId: string) => {
-    console.log('Calling member:', memberId);
     // TODO: Integrate with video calling system
   };
 
   const handleMemberAction = (memberId: string, action: string) => {
-    console.log('Member action:', action, 'for member:', memberId);
     // TODO: Implement member actions
   };
 

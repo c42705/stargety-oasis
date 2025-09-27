@@ -31,11 +31,6 @@ export const SplitLayoutComponent: React.FC<SplitLayoutComponentProps> = ({
 
       // Log resize for debugging (only occasionally to avoid spam)
       if (Math.random() < 0.1) {
-        console.log('🔧 SPLITTER: Right panel resize', {
-          originalSize: sizes[0],
-          clampedSize: newSize,
-          timestamp: new Date().toISOString()
-        });
       }
     }
   }, []);

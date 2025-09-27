@@ -118,7 +118,6 @@ export class MapEditorLogger {
         console.error(message, entry.data);
         break;
       case 'performance':
-        console.log(`⚡ ${message}`, entry.data);
         break;
     }
   }
