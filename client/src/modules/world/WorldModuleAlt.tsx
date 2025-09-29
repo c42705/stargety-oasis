@@ -1,8 +1,19 @@
+/**
+ * WorldModuleAlt.tsx
+ *
+ * Clean, minimal Phaser + React integration for a viewport-filling world module.
+ * - Uses Phaser.Scale.RESIZE to always fill the map area within the splitter panel.
+ * - Camera and zoom controls are robust, simple, and always visible in the map area.
+ * - Layout and code are stripped of legacy hacks, global CSS, and unused state.
+ * - Well-commented for clarity and easy extension by other developers.
+ */
+
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import Phaser from 'phaser';
 import WorldZoomControls from './WorldZoomControls';
 import { SharedMapSystem } from '../../shared/SharedMapSystem';
 
+// Animation frame mapping for the 3x7 sprite sheet
 const ANIMATION_FRAMES = {
   idle: [0, 1, 2],
   left: [3, 4, 5],
@@ -13,11 +24,18 @@ const ANIMATION_FRAMES = {
   attack: [18, 19, 20],
 };
 
+// Camera/zoom constants for clear configuration
+const DEFAULT_ZOOM = 1.65;
+const ZOOM_STEP = 0.25;
+const MAX_ZOOM = 2;
+const MIN_ZOOM = 0.25;
+
 interface WorldModuleAltProps {
   playerId: string;
   className?: string;
 }
 
+// Main Phaser scene: Handles sprite, movement, animation, and camera logic.
 class ExampleScene extends Phaser.Scene {
   public static instance: ExampleScene | null = null;
   public cody!: Phaser.GameObjects.Sprite;
@@ -30,11 +48,6 @@ class ExampleScene extends Phaser.Scene {
   public worldWidth: number;
   public worldHeight: number;
   public isPerformingAction: boolean = false;
-
-  public maxZoom: number = 2;
-  public staticMinZoom: number = 0.25;
-  public zoomStep: number = 0.25;
-  public defaultZoom: number = 1.65;
   private isSettingDefaultZoom = false;
 
   constructor(config: { backgroundImageUrl: string; worldWidth: number; worldHeight: number }) {
@@ -54,6 +67,7 @@ class ExampleScene extends Phaser.Scene {
   create() {
     ExampleScene.instance = this;
 
+    // Draw static map background (fills world)
     if (this.backgroundImageUrl) {
       const bg = this.add.image(0, 0, 'mapbg');
       bg.setOrigin(0, 0);
@@ -61,25 +75,24 @@ class ExampleScene extends Phaser.Scene {
       bg.setDepth(-1000);
     }
 
+    // Define animations for each movement/action
     Object.entries(ANIMATION_FRAMES).forEach(([key, frames]) => {
-      let repeat = 0;
-      if (
-        key === 'idle' ||
-        key === 'left' ||
-        key === 'right' ||
-        key === 'up' ||
-        key === 'down'
-      ) {
-        repeat = -1;
-      }
       this.anims.create({
         key,
         frames: this.anims.generateFrameNumbers('cody', { frames }),
         frameRate: key === 'idle' ? 6 : 8,
-        repeat,
+        repeat:
+          key === 'idle' ||
+          key === 'left' ||
+          key === 'right' ||
+          key === 'up' ||
+          key === 'down'
+            ? -1
+            : 0,
       });
     });
 
+    // Center character, scale up for visibility
     this.cody = this.add.sprite(this.worldWidth / 2, this.worldHeight / 2, 'cody', 0);
     this.cody.setDisplaySize(64, 64);
     this.cody.setOrigin(0.5, 0.5);
@@ -89,14 +102,17 @@ class ExampleScene extends Phaser.Scene {
     this.currentAnim = 'idle';
     this.currentText = this.add.text(48, 40, 'Anim: idle', { color: '#00ff00', fontSize: '18px' }).setDepth(100);
 
+    // Setup keyboard controls
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.xKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.X);
 
+    // Camera setup for viewport-filling
     this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
     this.cameras.main.startFollow(this.cody, true, 0.1, 0.1);
     this.setDefaultZoomAndCenter();
 
+    // After jump/attack, revert to idle
     this.cody.on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
       if (this.isPerformingAction) {
         this.cody.play('idle');
@@ -106,12 +122,14 @@ class ExampleScene extends Phaser.Scene {
       }
     });
 
+    // Adjust zoom on resize to maintain minimum zoom/fill
     this.scale.on('resize', () => {
       this.fitMapToViewport();
     });
   }
 
   update() {
+    // Handle jump/attack actions via keyboard, block movement during action
     if (!this.isPerformingAction) {
       if (this.spaceKey.isDown) {
         this.playAction('jump');
@@ -123,6 +141,7 @@ class ExampleScene extends Phaser.Scene {
       }
     }
 
+    // Movement: arrow keys trigger correct animation
     if (!this.isPerformingAction) {
       const speed = 250;
       let moved = false;
@@ -174,11 +193,12 @@ class ExampleScene extends Phaser.Scene {
     this.isPerformingAction = true;
   }
 
+  // Camera/zoom logic for viewport-filling config
   calculateMinZoom(): number {
     const scale = this.scale;
     const gameSize = scale.gameSize;
     const zoomForHeight = gameSize.height / this.worldHeight;
-    return Math.max(zoomForHeight, this.staticMinZoom);
+    return Math.max(zoomForHeight, MIN_ZOOM);
   }
 
   get minZoom(): number {
@@ -188,8 +208,8 @@ class ExampleScene extends Phaser.Scene {
   zoomIn() {
     const camera = this.cameras.main;
     const currentZoom = camera.zoom;
-    const newZoom = Math.min(currentZoom + this.zoomStep, this.maxZoom);
-    if (currentZoom >= this.maxZoom) return;
+    const newZoom = Math.min(currentZoom + ZOOM_STEP, MAX_ZOOM);
+    if (currentZoom >= MAX_ZOOM) return;
     camera.setZoom(newZoom);
     this.enableCameraFollowAndCenter();
   }
@@ -198,7 +218,7 @@ class ExampleScene extends Phaser.Scene {
     const camera = this.cameras.main;
     const currentZoom = camera.zoom;
     const dynamicMinZoom = this.minZoom;
-    const newZoom = Math.max(currentZoom - this.zoomStep, dynamicMinZoom);
+    const newZoom = Math.max(currentZoom - ZOOM_STEP, dynamicMinZoom);
     if (currentZoom <= dynamicMinZoom) return;
     camera.setZoom(newZoom);
     this.enableCameraFollowAndCenter();
@@ -213,7 +233,7 @@ class ExampleScene extends Phaser.Scene {
     if (this.isSettingDefaultZoom) return;
     this.isSettingDefaultZoom = true;
     const camera = this.cameras.main;
-    camera.setZoom(this.defaultZoom);
+    camera.setZoom(DEFAULT_ZOOM);
     camera.centerOn(this.cody.x, this.cody.y);
     setTimeout(() => {
       this.isSettingDefaultZoom = false;
@@ -246,14 +266,17 @@ class ExampleScene extends Phaser.Scene {
   }
 }
 
+// Main React wrapper: Handles layout, state, and Phaser integration.
 export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, className = '' }) => {
   const gameRef = useRef<HTMLDivElement>(null);
   const phaserGameRef = useRef<Phaser.Game | null>(null);
 
+  // State for zoom/camera controls UI
   const [canZoomIn, setCanZoomIn] = useState(true);
   const [canZoomOut, setCanZoomOut] = useState(true);
   const [isCameraFollowing, setIsCameraFollowing] = useState(true);
 
+  // State for map config (async load)
   const [mapReady, setMapReady] = useState(false);
   const [mapConfig, setMapConfig] = useState<{ backgroundImageUrl: string; worldWidth: number; worldHeight: number }>({
     backgroundImageUrl: '',
@@ -261,17 +284,18 @@ export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, classN
     worldHeight: 600,
   });
 
-  // Sync camera state immediately on zoom change, with force update on resize
+  // Sync camera state for UI controls
   const syncCameraState = useCallback(() => {
     const scene = ExampleScene.instance;
     if (scene && scene.cameras && scene.cameras.main) {
       const cam = scene.cameras.main;
-      setCanZoomIn(cam.zoom < scene.maxZoom);
+      setCanZoomIn(cam.zoom < MAX_ZOOM);
       setCanZoomOut(cam.zoom > scene.minZoom);
       setIsCameraFollowing(scene.isCameraFollowing());
     }
   }, []);
 
+  // Load map data on mount
   useEffect(() => {
     let mounted = true;
     SharedMapSystem.getInstance()
@@ -293,6 +317,7 @@ export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, classN
     };
   }, []);
 
+  // Zoom/camera controls handlers
   const handleZoomIn = useCallback(() => {
     const scene = ExampleScene.instance;
     if (scene) {
@@ -329,6 +354,7 @@ export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, classN
     }
   }, [syncCameraState]);
 
+  // Phaser game instantiation, teardown, and state polling
   useEffect(() => {
     if (!mapReady || !gameRef.current || phaserGameRef.current) return;
 
@@ -362,6 +388,7 @@ export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, classN
     };
   }, [mapReady, mapConfig, syncCameraState]);
 
+  // Layout: world-module > world-container > game-canvas + controls (controls are absolutely positioned in map panel)
   return (
     <div
       className={`world-module ${className}`}
