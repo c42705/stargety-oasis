@@ -3,7 +3,6 @@ import Phaser from 'phaser';
 import WorldZoomControls from './WorldZoomControls';
 import { SharedMapSystem } from '../../shared/SharedMapSystem';
 
-// Animation frame mapping for our 3x7 sprite:
 const ANIMATION_FRAMES = {
   idle: [0, 1, 2],
   left: [3, 4, 5],
@@ -30,7 +29,13 @@ class ExampleScene extends Phaser.Scene {
   public backgroundImageUrl: string = '';
   public worldWidth: number;
   public worldHeight: number;
-  public isPerformingAction: boolean = false; // Track if jump/attack is active
+  public isPerformingAction: boolean = false;
+
+  public maxZoom: number = 2;
+  public staticMinZoom: number = 0.25;
+  public zoomStep: number = 0.25;
+  public defaultZoom: number = 1.65;
+  private isSettingDefaultZoom = false;
 
   constructor(config: { backgroundImageUrl: string; worldWidth: number; worldHeight: number }) {
     super({ key: 'ExampleScene' });
@@ -56,7 +61,6 @@ class ExampleScene extends Phaser.Scene {
       bg.setDepth(-1000);
     }
 
-    // Animations: movement and idle repeat forever, jump/attack play once
     Object.entries(ANIMATION_FRAMES).forEach(([key, frames]) => {
       let repeat = 0;
       if (
@@ -91,8 +95,8 @@ class ExampleScene extends Phaser.Scene {
 
     this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
     this.cameras.main.startFollow(this.cody, true, 0.1, 0.1);
+    this.setDefaultZoomAndCenter();
 
-    // Listen for jump/attack animation complete to revert to idle
     this.cody.on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
       if (this.isPerformingAction) {
         this.cody.play('idle');
@@ -101,10 +105,13 @@ class ExampleScene extends Phaser.Scene {
         this.isPerformingAction = false;
       }
     });
+
+    this.scale.on('resize', () => {
+      this.fitMapToViewport();
+    });
   }
 
   update() {
-    // Handle jump/attack via isDown (prevents missed events)
     if (!this.isPerformingAction) {
       if (this.spaceKey.isDown) {
         this.playAction('jump');
@@ -116,7 +123,6 @@ class ExampleScene extends Phaser.Scene {
       }
     }
 
-    // Only do movement animation if not doing jump/attack
     if (!this.isPerformingAction) {
       const speed = 250;
       let moved = false;
@@ -168,19 +174,53 @@ class ExampleScene extends Phaser.Scene {
     this.isPerformingAction = true;
   }
 
+  calculateMinZoom(): number {
+    const scale = this.scale;
+    const gameSize = scale.gameSize;
+    const zoomForHeight = gameSize.height / this.worldHeight;
+    return Math.max(zoomForHeight, this.staticMinZoom);
+  }
+
+  get minZoom(): number {
+    return this.calculateMinZoom();
+  }
+
   zoomIn() {
-    const cam = this.cameras.main;
-    cam.zoom = Math.min(cam.zoom + 0.25, 2);
+    const camera = this.cameras.main;
+    const currentZoom = camera.zoom;
+    const newZoom = Math.min(currentZoom + this.zoomStep, this.maxZoom);
+    if (currentZoom >= this.maxZoom) return;
+    camera.setZoom(newZoom);
+    this.enableCameraFollowAndCenter();
   }
+
   zoomOut() {
-    const cam = this.cameras.main;
-    cam.zoom = Math.max(cam.zoom - 0.25, 0.5);
+    const camera = this.cameras.main;
+    const currentZoom = camera.zoom;
+    const dynamicMinZoom = this.minZoom;
+    const newZoom = Math.max(currentZoom - this.zoomStep, dynamicMinZoom);
+    if (currentZoom <= dynamicMinZoom) return;
+    camera.setZoom(newZoom);
+    this.enableCameraFollowAndCenter();
   }
+
   resetZoom() {
-    const cam = this.cameras.main;
-    cam.zoom = 1;
-    cam.centerOn(this.cody.x, this.cody.y);
+    this.setDefaultZoomAndCenter();
+    this.enableCameraFollowAndCenter();
   }
+
+  setDefaultZoomAndCenter() {
+    if (this.isSettingDefaultZoom) return;
+    this.isSettingDefaultZoom = true;
+    const camera = this.cameras.main;
+    camera.setZoom(this.defaultZoom);
+    camera.centerOn(this.cody.x, this.cody.y);
+    setTimeout(() => {
+      this.isSettingDefaultZoom = false;
+      this.enableCameraFollowAndCenter();
+    }, 400);
+  }
+
   enableCameraFollow() {
     this.cameras.main.startFollow(this.cody, true, 0.1, 0.1);
   }
@@ -189,6 +229,20 @@ class ExampleScene extends Phaser.Scene {
   }
   isCameraFollowing() {
     return (this.cameras.main as any)._follow !== null;
+  }
+
+  enableCameraFollowAndCenter() {
+    this.enableCameraFollow();
+    this.cameras.main.centerOn(this.cody.x, this.cody.y);
+  }
+
+  fitMapToViewport() {
+    const camera = this.cameras.main;
+    const dynamicMinZoom = this.minZoom;
+    if (camera.zoom < dynamicMinZoom) {
+      camera.setZoom(dynamicMinZoom);
+    }
+    camera.centerOn(this.cody.x, this.cody.y);
   }
 }
 
@@ -206,6 +260,17 @@ export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, classN
     worldWidth: 800,
     worldHeight: 600,
   });
+
+  // Sync camera state immediately on zoom change, with force update on resize
+  const syncCameraState = useCallback(() => {
+    const scene = ExampleScene.instance;
+    if (scene && scene.cameras && scene.cameras.main) {
+      const cam = scene.cameras.main;
+      setCanZoomIn(cam.zoom < scene.maxZoom);
+      setCanZoomOut(cam.zoom > scene.minZoom);
+      setIsCameraFollowing(scene.isCameraFollowing());
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -226,16 +291,6 @@ export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, classN
     return () => {
       mounted = false;
     };
-  }, []);
-
-  const syncCameraState = useCallback(() => {
-    const scene = ExampleScene.instance;
-    if (scene && scene.cameras && scene.cameras.main) {
-      const cam = scene.cameras.main;
-      setCanZoomIn(cam.zoom < 2);
-      setCanZoomOut(cam.zoom > 0.5);
-      setIsCameraFollowing(scene.isCameraFollowing());
-    }
   }, []);
 
   const handleZoomIn = useCallback(() => {
@@ -279,23 +334,23 @@ export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, classN
 
     const config: Phaser.Types.Core.GameConfig = {
       type: Phaser.AUTO,
-      width: mapConfig.worldWidth,
-      height: mapConfig.worldHeight,
+      width: '100%',
+      height: '100%',
       parent: gameRef.current,
       backgroundColor: 'black',
       scene: new ExampleScene(mapConfig),
       pixelArt: true,
       scale: {
-        mode: Phaser.Scale.FIT,
+        mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH,
-        width: mapConfig.worldWidth,
-        height: mapConfig.worldHeight,
+        width: '100%',
+        height: '100%',
       },
     };
 
     phaserGameRef.current = new Phaser.Game(config);
 
-    const poll = setInterval(syncCameraState, 300);
+    const poll = setInterval(syncCameraState, 200);
 
     return () => {
       clearInterval(poll);
@@ -308,17 +363,53 @@ export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, classN
   }, [mapReady, mapConfig, syncCameraState]);
 
   return (
-    <div className={`world-module-alt ${className}`} style={{ height: '100%', width: '100%', position: 'relative' }}>
-      <div ref={gameRef} style={{ height: '100%', width: '100%' }} />
-      <WorldZoomControls
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onResetZoom={handleResetZoom}
-        onToggleCameraFollow={handleToggleCameraFollow}
-        canZoomIn={canZoomIn}
-        canZoomOut={canZoomOut}
-        isCameraFollowing={isCameraFollowing}
-      />
+    <div
+      className={`world-module ${className}`}
+      style={{
+        height: '100%',
+        width: '100%',
+        margin: 0,
+        padding: 0,
+        boxSizing: 'border-box',
+        position: 'relative',
+      }}
+    >
+      <div
+        className="world-container"
+        style={{
+          height: '100%',
+          width: '100%',
+          position: 'relative',
+          margin: 0,
+          padding: 0,
+          boxSizing: 'border-box',
+          overflow: 'visible',
+        }}
+      >
+        <div
+          ref={gameRef}
+          className="game-canvas"
+          style={{
+            height: '100%',
+            width: '100%',
+            margin: 0,
+            padding: 0,
+            boxSizing: 'border-box',
+            display: 'block',
+            position: 'relative',
+          }}
+        />
+        <WorldZoomControls
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onResetZoom={handleResetZoom}
+          onToggleCameraFollow={handleToggleCameraFollow}
+          canZoomIn={canZoomIn}
+          canZoomOut={canZoomOut}
+          isCameraFollowing={isCameraFollowing}
+          className="world-zoom-controls-fixed"
+        />
+      </div>
     </div>
   );
 };
