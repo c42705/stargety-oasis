@@ -93,8 +93,15 @@ class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    // Load Terra Branford sprite as default player sprite from public folder
-    this.load.image('terra-branford', 'terra-branford.gif');
+    // Ensure we never have a stale texture for the player-sheet key!
+    if (this.textures.exists('player-sheet')) {
+      this.textures.remove('player-sheet');
+    }
+    // Load custom player sprite sheet as default player sprite
+    this.load.spritesheet('player-sheet', 'assets/test frame.png', {
+      frameWidth: 32,
+      frameHeight: 32,
+    });
 
     // Create simple colored rectangle as ultimate fallback
     this.add.graphics()
@@ -139,18 +146,80 @@ class GameScene extends Phaser.Scene {
     // Set up camera bounds and initial zoom
     this.cameras.main.setBounds(0, 0, this.worldBounds.width, this.worldBounds.height);
 
-    // Create default player sprite immediately using Terra Branford, then load avatar asynchronously
-    const defaultTexture = this.textures.exists('terra-branford') ? 'terra-branford' : 'player-fallback';
+    // Create animations for player sprite sheet
+    // Explicit frame mapping for each animation row (3 frames per row)
+    // idle: 0,1,2 | left: 3,4,5 | right: 6,7,8 | up: 9,10,11 | down: 12,13,14 | jump: 15,16,17 | attack: 18,19,20
+    this.anims.create({
+      key: 'player_idle',
+      frames: this.anims.generateFrameNumbers('player-sheet', { frames: [0, 1, 2] }),
+      frameRate: 8,
+      repeat: -1
+    });
+    this.anims.create({
+      key: 'player_left',
+      frames: this.anims.generateFrameNumbers('player-sheet', { frames: [3, 4, 5] }),
+      frameRate: 8,
+      repeat: -1
+    });
+    this.anims.create({
+      key: 'player_right',
+      frames: this.anims.generateFrameNumbers('player-sheet', { frames: [6, 7, 8] }),
+      frameRate: 8,
+      repeat: -1
+    });
+    this.anims.create({
+      key: 'player_up',
+      frames: this.anims.generateFrameNumbers('player-sheet', { frames: [9, 10, 11] }),
+      frameRate: 8,
+      repeat: -1
+    });
+    this.anims.create({
+      key: 'player_down',
+      frames: this.anims.generateFrameNumbers('player-sheet', { frames: [12, 13, 14] }),
+      frameRate: 8,
+      repeat: -1
+    });
+    this.anims.create({
+      key: 'player_jump',
+      frames: this.anims.generateFrameNumbers('player-sheet', { frames: [15, 16, 17] }),
+      frameRate: 8,
+      repeat: 0
+    });
+    this.anims.create({
+      key: 'player_attack',
+      frames: this.anims.generateFrameNumbers('player-sheet', { frames: [18, 19, 20] }),
+      frameRate: 8,
+      repeat: 0
+    });
+
+    // Debug: Add animation cycle on click (Phaser-inspired)
+    const animKeys = [
+      'player_idle',
+      'player_left',
+      'player_right',
+      'player_up',
+      'player_down',
+      'player_jump',
+      'player_attack'
+    ];
+    let animIndex = 0;
+    this.input.on('pointerdown', () => {
+      animIndex = (animIndex + 1) % animKeys.length;
+      this.player.anims.play(animKeys[animIndex], true);
+      this.add.text(this.player.x + 34, this.player.y - 34, 'Anim: ' + animKeys[animIndex], { color: '#0f0', fontSize: '14px' }).setDepth(100).setScrollFactor(0).setAlpha(0.6).setOrigin(0, 0.5);
+    });
 
     // Calculate initial player position based on world bounds (center of world)
     const initialX = this.worldBounds.width / 2;
     const initialY = this.worldBounds.height / 2;
 
-    this.player = this.add.sprite(initialX, initialY, defaultTexture);
-    this.player.setDisplaySize(64, 64); // Larger size for better visibility
+    // Create player from sprite sheet and play idle animation
+    this.player = this.add.sprite(initialX, initialY, 'player-sheet', 0);
+    this.player.setDisplaySize(32, 32); // Use native sprite frame size for crisp animation
     this.player.setOrigin(0.5, 0.5); // Ensure sprite is centered on its position
     this.player.setDepth(10);
     this.originalY = this.player.y;
+    this.player.anims.play('player_idle');
 
     // Initialize native Phaser camera following
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
@@ -266,6 +335,26 @@ class GameScene extends Phaser.Scene {
   }
 
   async initializePlayer() {
+    // If the base avatar is the sprite sheet character, use only Phaser native methods and suppress AvatarGameRenderer logic.
+    const baseConfig = (window as any).LATEST_SELECTED_AVATAR_BASE_SRC || null;
+    if (baseConfig === '/assets/test frame.png') {
+      // Suppress all AvatarGameRenderer and avatar builder logic.
+      // Only announce the player and setup camera.
+      this.eventBus.publish('world:playerJoined', {
+        playerId: this.playerId,
+        x: this.player.x,
+        y: this.player.y,
+      });
+      this.time.delayedCall(50, () => {
+        this.setDefaultZoomAndCenter();
+        this.enableCameraFollowing();
+        this.centerCameraOnPlayer();
+      });
+      return;
+    }
+    // --- Default AvatarRenderer logic ---
+    // DEPRECATED: ComposeAvatar/AvatarBuilder logic will be removed in favor of Phaser native only.
+    // REMOVE this block once all avatars are sprite sheet based.
     try {
       // Try to load player avatar sprite sheet for animations
       let spriteSheetKey = null;
