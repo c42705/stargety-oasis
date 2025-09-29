@@ -25,9 +25,9 @@ const ANIMATION_FRAMES = {
 };
 
 // Camera/zoom constants for clear configuration
-const DEFAULT_ZOOM = 1.65;
+const DEFAULT_ZOOM = 2;
 const ZOOM_STEP = 0.25;
-const MAX_ZOOM = 2;
+const MAX_ZOOM = 2.5;
 const MIN_ZOOM = 0.25;
 
 interface WorldModuleAltProps {
