@@ -1,8 +1,56 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, Tabs, Checkbox, Button, Row, Col, Space, Typography } from "antd";
 import { AnimationMapping, FrameDefinition } from "./AvatarBuilderTypes";
 
 const { Text } = Typography;
+
+// Custom hook for frame preview thumbnails (typed)
+function useFramePreviewCache(frames: FrameDefinition[], imageData: string) {
+  const [previewCache, setPreviewCache] = useState<{ [id: string]: string | null }>({});
+  const requested = useRef<{ [id: string]: boolean }>({});
+
+  useEffect(() => {
+    setPreviewCache({});
+    requested.current = {};
+  }, [imageData, frames]);
+
+  function getFramePreview(frame: FrameDefinition): string | undefined {
+    if (!frame?.sourceRect || !imageData) return undefined;
+    const cacheKey = frame.id;
+    if (previewCache[cacheKey]) return previewCache[cacheKey] || undefined;
+    if (requested.current[cacheKey]) return undefined; // Already processing
+
+    requested.current[cacheKey] = true;
+    const img = new window.Image();
+    img.src = imageData;
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = frame.sourceRect.width;
+      canvas.height = frame.sourceRect.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(
+        img,
+        frame.sourceRect.x,
+        frame.sourceRect.y,
+        frame.sourceRect.width,
+        frame.sourceRect.height,
+        0,
+        0,
+        frame.sourceRect.width,
+        frame.sourceRect.height
+      );
+      const url = canvas.toDataURL();
+      setPreviewCache((prev: {[id: string]: string | null}) => ({ ...prev, [cacheKey]: url }));
+    };
+    img.onerror = () => {
+      setPreviewCache((prev: {[id: string]: string | null}) => ({ ...prev, [cacheKey]: null }));
+    };
+    return undefined;
+  }
+
+  return getFramePreview;
+}
 
 interface AnimationEditorPanelProps {
   frames: FrameDefinition[];
@@ -25,43 +73,14 @@ const AnimationEditorPanel: React.FC<AnimationEditorPanelProps> = ({
 
   useEffect(() => {
     setSelectedFrameIds(selectedAnim?.sequence.frameIds || []);
-  }, [selectedAnimId, animations]);
+  }, [selectedAnimId, animations, selectedAnim?.sequence.frameIds]);
 
-  function getFramePreview(frame: FrameDefinition): string | undefined {
-    if (!frame.sourceRect || !imageData) return undefined;
-    const cacheKey = `${frame.id}`;
-    if ((window as any).__framePreviewCache === undefined) {
-      (window as any).__framePreviewCache = {};
-    }
-    const cache = (window as any).__framePreviewCache;
-    if (cache[cacheKey]) return cache[cacheKey];
-    const img = new window.Image();
-    img.src = imageData;
-    const canvas = document.createElement("canvas");
-    canvas.width = frame.sourceRect.width;
-    canvas.height = frame.sourceRect.height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return undefined;
-    ctx.drawImage(
-      img,
-      frame.sourceRect.x,
-      frame.sourceRect.y,
-      frame.sourceRect.width,
-      frame.sourceRect.height,
-      0,
-      0,
-      frame.sourceRect.width,
-      frame.sourceRect.height
-    );
-    const url = canvas.toDataURL();
-    cache[cacheKey] = url;
-    return url;
-  }
+  const getFramePreview = useFramePreviewCache(frames, imageData);
 
   const handleToggleFrame = (frameId: string) => {
-    let next;
+    let next: string[];
     if (selectedFrameIds.includes(frameId)) {
-      next = selectedFrameIds.filter((id) => id !== frameId);
+      next = selectedFrameIds.filter((id: string) => id !== frameId);
     } else {
       next = [...selectedFrameIds, frameId];
     }
@@ -103,7 +122,10 @@ const AnimationEditorPanel: React.FC<AnimationEditorPanelProps> = ({
                 onChange={() => handleToggleFrame(frame.id)}
               />
               <img
-                src={getFramePreview(frame)}
+                src={
+                  getFramePreview(frame) ||
+                  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48'><rect width='100%' height='100%' fill='%23eee'/></svg>"
+                }
                 alt={frame.name}
                 style={{
                   width: 48,
