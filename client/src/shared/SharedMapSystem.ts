@@ -208,6 +208,21 @@ export class SharedMapSystem {
         throw new Error('No map data to save');
       }
 
+      // 💾 SAVE OPERATION - Log polygon positions BEFORE saving
+      const polygonAreas = dataToSave.impassableAreas?.filter((area: any) => area.type === 'impassable-polygon') || [];
+      console.info('💾 SAVING - BEFORE', {
+        totalImpassableAreas: dataToSave.impassableAreas?.length || 0,
+        polygonCount: polygonAreas.length,
+        polygons: polygonAreas.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          pointsCount: p.points?.length || 0,
+          firstPoint: p.points?.[0],
+          lastPoint: p.points?.[p.points?.length - 1]
+        })),
+        timestamp: new Date().toISOString()
+      });
+
       // Validate data before saving
       if (!this.validateMapData(dataToSave)) {
         throw new Error('Invalid map data structure - save aborted');
@@ -219,7 +234,20 @@ export class SharedMapSystem {
 
       // Save to localStorage with error handling and cleanup
       try {
-        localStorage.setItem(STORAGE_KEYS.MAP_DATA, JSON.stringify(dataToSave));
+        const jsonString = JSON.stringify(dataToSave);
+        localStorage.setItem(STORAGE_KEYS.MAP_DATA, jsonString);
+
+        // 💾 SAVE OPERATION - Log what was written to localStorage
+        console.info('💾 SAVED TO LOCALSTORAGE', {
+          dataSize: jsonString.length,
+          polygonCount: polygonAreas.length,
+          polygons: polygonAreas.map((p: any) => ({
+            id: p.id,
+            pointsCount: p.points?.length || 0,
+            firstPoint: p.points?.[0]
+          })),
+          timestamp: new Date().toISOString()
+        });
       } catch (storageError) {
         if (storageError instanceof Error && storageError.name === 'QuotaExceededError') {
           console.warn('⚠️ STORAGE QUOTA EXCEEDED DURING MAP SAVE, ATTEMPTING CLEANUP');

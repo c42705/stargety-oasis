@@ -418,30 +418,63 @@ export class PhaserMapRenderer {
     // Remove existing object if it exists
     this.removeCollisionArea(area.id);
 
-    // Create visual representation (semi-transparent red)
-    const rect = this.scene.add.rectangle(
-      area.x + area.width / 2,
-      area.y + area.height / 2,
-      area.width,
-      area.height,
-      0xff0000,
-      this.debugMode ? 0.3 : 0.1
-    );
+    let visualObject: Phaser.GameObjects.GameObject;
 
-    rect.setStrokeStyle(2, 0xff0000, this.debugMode ? 0.8 : 0.3);
+    // Check if this is a polygon type
+    if (area.type === 'impassable-polygon' && area.points && area.points.length > 0) {
+      // Create polygon graphics
+      const graphics = this.scene.add.graphics();
 
-    // Add metadata
-    (rect as any).mapElementId = area.id;
-    (rect as any).mapElementType = 'collision';
-    (rect as any).mapElementData = area;
+      // Set fill and stroke styles
+      graphics.fillStyle(0xff0000, this.debugMode ? 0.3 : 0.1);
+      graphics.lineStyle(2, 0xff0000, this.debugMode ? 0.8 : 0.3);
 
-    // Add physics if enabled
-    if (this.enablePhysics && this.scene.physics) {
-      this.scene.physics.add.existing(rect, true); // true = static body
+      // Begin path and draw polygon
+      graphics.beginPath();
+      graphics.moveTo(area.points[0].x, area.points[0].y);
+      for (let i = 1; i < area.points.length; i++) {
+        graphics.lineTo(area.points[i].x, area.points[i].y);
+      }
+      graphics.closePath();
+
+      // Fill and stroke the polygon
+      graphics.fillPath();
+      graphics.strokePath();
+
+      // Add metadata
+      (graphics as any).mapElementId = area.id;
+      (graphics as any).mapElementType = 'collision';
+      (graphics as any).mapElementData = area;
+
+      visualObject = graphics;
+    } else {
+      // Create rectangular visual representation (default behavior)
+      const rect = this.scene.add.rectangle(
+        area.x + area.width / 2,
+        area.y + area.height / 2,
+        area.width,
+        area.height,
+        0xff0000,
+        this.debugMode ? 0.3 : 0.1
+      );
+
+      rect.setStrokeStyle(2, 0xff0000, this.debugMode ? 0.8 : 0.3);
+
+      // Add metadata
+      (rect as any).mapElementId = area.id;
+      (rect as any).mapElementType = 'collision';
+      (rect as any).mapElementData = area;
+
+      // Add physics if enabled
+      if (this.enablePhysics && this.scene.physics) {
+        this.scene.physics.add.existing(rect, true); // true = static body
+      }
+
+      visualObject = rect;
     }
 
-    this.collisionAreasGroup.add(rect);
-    this.collisionAreaObjects.set(area.id, rect);
+    this.collisionAreasGroup.add(visualObject);
+    this.collisionAreaObjects.set(area.id, visualObject);
   }
 
   /**

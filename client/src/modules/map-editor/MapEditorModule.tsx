@@ -61,10 +61,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   const [activeTab, setActiveTab] = useState<TabId>('areas');
   const [previewMode, setPreviewMode] = useState(false);
 
-  // Brush shape for collision painting
-  const [brushShape, setBrushShape] = useState<'circle' | 'square'>('circle');
-  // Brush size for collision painting (in grid cells, e.g., 1 = 1x1, 2 = 2x2, etc.)
-  const [brushSize, setBrushSize] = useState<number>(1);
+  // Paint functionality removed - only polygon collision areas are supported
 
   // Fabric canvas reference for layers tab
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
@@ -489,10 +486,6 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
           onTogglePreview={() => setPreviewMode(!previewMode)}
           onToggleBackgroundInfo={backgroundInfoPanel.togglePanel}
           backgroundInfoVisible={backgroundInfoPanel.isPanelVisible}
-          brushShape={brushShape}
-          onBrushShapeChange={setBrushShape}
-          brushSize={brushSize}
-          onBrushSizeChange={setBrushSize}
         />
       </header>
 
@@ -514,8 +507,6 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
             drawingAreaData={drawingMode.pendingAreaData || undefined}
             drawingCollisionAreaData={collisionDrawingMode.pendingCollisionAreaData || undefined}
             currentTool={editorState.editorState.tool}
-            brushShape={brushShape}
-            brushSize={brushSize}
             onZoomChange={(zoom) => {
               editorState.setEditorState(prev => ({
                 ...prev,

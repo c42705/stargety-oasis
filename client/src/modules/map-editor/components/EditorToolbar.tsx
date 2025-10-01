@@ -16,7 +16,8 @@ import {
   Eye,
   Hand,
   RotateCcw,
-  Info
+  Info,
+  Pentagon
 } from 'lucide-react';
 import { EditorState, GridConfig } from '../types/editor.types';
 import { SaveStatusIndicator } from '../../../components/SaveStatusIndicator';
@@ -39,14 +40,9 @@ interface EditorToolbarProps {
   onTogglePreview: () => void;
   onToggleBackgroundInfo?: () => void;
   backgroundInfoVisible?: boolean;
-  brushSize?: number;
-  onBrushSizeChange?: (size: number) => void;
 }
 
-export const EditorToolbar: React.FC<EditorToolbarProps & {
-  brushShape?: 'circle' | 'square';
-  onBrushShapeChange?: (shape: 'circle' | 'square') => void;
-}> = ({
+export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   editorState,
   gridConfig,
   previewMode,
@@ -62,12 +58,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps & {
   onTogglePreview,
   onToggleBackgroundInfo,
   backgroundInfoVisible = false,
-  brushShape = 'circle',
-  onBrushShapeChange,
-  brushSize = 1,
-  onBrushSizeChange,
 }) => {
-  // (removed duplicate destructure of brushSize/onBrushSizeChange)
 
   const toolOptions = [
     {
@@ -80,24 +71,11 @@ export const EditorToolbar: React.FC<EditorToolbarProps & {
     }
   ];
 
-  // Brush size options (in grid cells)
-  const brushSizeOptions = [
-    { label: '8px', value: 8 },
-    { label: '16px', value: 16 },
-    { label: '32px', value: 32 },
-    { label: '64px', value: 64 },
-    { label: '128px', value: 128 }
-  ];
-  // [REMOVED: Duplicate/erroneous toolOptions block]
-
+  // Paint functionality removed - only polygon collision areas are supported
   const collisionToolOptions = [
     {
-      label: <Tooltip title="Draw Impassable Area"><Shield size={16} /></Tooltip>,
-      value: 'draw-collision'
-    },
-    {
-      label: <Tooltip title="Erase Impassable Area"><Eraser size={16} /></Tooltip>,
-      value: 'erase-collision'
+      label: <Tooltip title="Draw Polygon Collision"><Pentagon size={16} /></Tooltip>,
+      value: 'draw-polygon'
     }
   ];
 
@@ -131,7 +109,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps & {
           <Text type="secondary" style={{ fontSize: '12px' }}>Collision:</Text>
           <Segmented
             options={collisionToolOptions}
-            value={['draw-collision', 'erase-collision'].includes(editorState.tool) ? editorState.tool : undefined}
+            value={editorState.tool === 'draw-polygon' ? editorState.tool : undefined}
             onChange={(value) => {
               onToolChange(value as EditorState['tool']);
             }}
@@ -141,30 +119,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps & {
       </Flex>
 
       <Flex align="center" gap="middle">
-        {/* Brush Size Popover for collision tools */}
-        {['draw-collision', 'erase-collision'].includes(editorState.tool) && (
-          <Popover
-            placement="bottom"
-            trigger="click"
-            content={
-              <Radio.Group
-                value={brushSize}
-                onChange={e => onBrushSizeChange && onBrushSizeChange(e.target.value)}
-                style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
-              >
-                {brushSizeOptions.map(opt => (
-                  <Radio.Button key={opt.value} value={opt.value} style={{ marginBottom: 4 }}>
-                    {opt.label}
-                  </Radio.Button>
-                ))}
-              </Radio.Group>
-            }
-          >
-            <Button size="small" icon={<Square size={16} />} style={{ marginRight: 8 }}>
-              Brush Size
-            </Button>
-          </Popover>
-        )}
+        {/* Paint brush controls removed - only polygon collision supported */}
         <Divider type="vertical" style={{ height: '24px' }} />
         <Space size="small">
           <Text type="secondary" style={{ fontSize: '12px' }}>Zoom:</Text>

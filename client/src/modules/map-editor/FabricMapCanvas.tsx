@@ -50,15 +50,11 @@ interface FabricMapCanvasProps {
   className?: string;
   // cameraControls removed
   onCanvasReady?: (canvas: fabric.Canvas) => void;
-  currentTool?: 'select' | 'pan' | 'draw-collision' | 'erase-collision';
+  currentTool?: 'select' | 'pan' | 'draw-polygon';
   /** Called whenever zoom changes (e.g. wheel, button, fit) */
   onZoomChange?: (zoom: number) => void;
   backgroundInfoPanelVisible?: boolean;
   onBackgroundInfoPanelClose?: () => void;
-
-  // Brush painting for collision tools
-  brushShape?: 'circle' | 'square';
-  brushSize?: number;
 }
 
 interface CanvasObject extends fabric.Object {
@@ -90,37 +86,26 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   onZoomChange,
   backgroundInfoPanelVisible = false,
   onBackgroundInfoPanelClose,
-  // brushShape and brushSize now handled via local state (see below)
-  // brushShape = 'circle', // REMOVED - handled via setBrushShape state
-  // brushSize = 32,
-// Add brushSize to destructured props
-  brushSize = 1,
 }) => {
   // ...existing hooks and state...
-  // Default brushSize to 1 if not provided
-  // (no need for _brushSize, use brushSize directly)
-  // Multi-area impassable cell painting state
-  const [impassableAreas, setImpassableAreas] = useState<import('./types/editor.types').ImpassableArea[]>([]);
-  const [activeAreaId, setActiveAreaId] = useState<string | undefined>(undefined);
-  const [brushShape, setBrushShape] = useState<import('./types/editor.types').BrushShape>('square');
-  const [brushColor, setBrushColor] = useState<string>('#ef4444');
-  const [brushBorder, setBrushBorder] = useState<string | undefined>(undefined);
-  const [undoStack, setUndoStack] = useState<import('./types/editor.types').ImpassableAreaAction[]>([]);
-  const [redoStack, setRedoStack] = useState<import('./types/editor.types').ImpassableAreaAction[]>([]);
-  let paintPreviewGroup: fabric.Group | null = null; // preview group for painting
-  const lastPaintedCellRef = useRef<string | null>(null);
-  // --- FIX: useRef for persistent painting state ---
-  const isPaintingRef = useRef(false);
+  // Impassable areas state (polygons only - paint functionality removed)
+  const [impassableAreas, setImpassableAreas] = useState<ImpassableArea[]>([]);
 
-  // Helper to get/set active area object
-  const getActiveArea = () => impassableAreas.find(a => a.id === activeAreaId);
-  const updateActiveArea = (partial: Partial<import('./types/editor.types').ImpassableArea>) => {
-    setImpassableAreas(prev =>
-      prev.map(a =>
-        a.id === activeAreaId ? { ...a, ...partial } : a
-      )
-    );
-  };
+  // Polygon drawing state
+  const [polygonDrawingState, setPolygonDrawingState] = useState<{
+    isDrawing: boolean;
+    points: { x: number; y: number }[];
+    vertexCircles: fabric.Circle[];
+  }>({
+    isDrawing: false,
+    points: [],
+    vertexCircles: []
+  });
+
+  // Use refs for preview elements to avoid stale closures and re-render issues
+  const polygonPreviewLineRef = useRef<fabric.Line | null>(null);
+  const polygonPreviewPolygonRef = useRef<fabric.Polygon | null>(null);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -137,42 +122,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const performanceMonitorRef = useRef<CanvasPerformanceMonitor | null>(null);
 
-  // --- Effect to update impassable paint blocks when gridSpacing changes ---
-  // This ensures all existing impassable painted rects match the selected grid size
-  useEffect(() => {
-    if (!fabricCanvasRef.current) return;
-    setImpassableAreas(prevAreas => {
-      // For each impassable area group, update rects to match grid size/position
-      return prevAreas.map(area => {
-        if (!area.group || !Array.isArray(area.cells)) return area;
-        const spacing = gridSpacing > 0 ? gridSpacing : 32;
-        // Remove all objects from the group
-        const objects = area.group.getObjects();
-        objects.forEach((obj: fabric.Object) => area.group.remove(obj));
-        area.cells.forEach(cellKey => {
-          const [gx, gy] = cellKey.split('_').map(Number);
-          const rect = new fabric.Rect({
-            left: gx * spacing,
-            top: gy * spacing,
-            width: spacing,
-            height: spacing,
-            fill: area.color || brushColor,
-            selectable: false,
-            evented: false,
-            stroke: area.border || undefined,
-            strokeWidth: area.border ? 2 : 0,
-            opacity: 1,
-          });
-          (rect as any).cellKey = cellKey;
-          area.group.add(rect);
-        });
-        return { ...area, group: area.group };
-      });
-    });
-    if (fabricCanvasRef.current) {
-      fabricCanvasRef.current.renderAll();
-    }
-  }, [gridSpacing]);
+  // Paint functionality removed - only polygon collision areas are supported
 
   // Always-fresh ref for tool
   const currentToolRef = useRef(currentTool);
@@ -216,17 +166,106 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
     // Immediately update sharedMap (no debounce)
     try {
-      const updates = {
-        x: Math.round(object.left || 0),
-        y: Math.round(object.top || 0),
-        width: Math.round((object.width || 0) * (object.scaleX || 1)),
-        height: Math.round((object.height || 0) * (object.scaleY || 1))
-      };
+      // Check if this is a polygon collision area
+      const mapData = object.mapElementData as any;
+      const isPolygon = mapData?.type === 'impassable-polygon';
 
-      if (object.mapElementType === 'interactive' && object.mapElementId) {
-        await sharedMap.updateInteractiveArea(object.mapElementId, updates);
-      } else if (object.mapElementType === 'collision' && object.mapElementId) {
-        await sharedMap.updateCollisionArea(object.mapElementId, updates);
+      if (isPolygon && object.type === 'polygon') {
+        // For polygons, extract the ABSOLUTE transformed points
+        const polygon = object as fabric.Polygon;
+
+        // DEBUG: Log polygon state before transformation
+        logger.info('🔍 POLYGON MODIFY START', {
+          id: object.mapElementId,
+          left: polygon.left,
+          top: polygon.top,
+          scaleX: polygon.scaleX,
+          scaleY: polygon.scaleY,
+          angle: polygon.angle,
+          pointsCount: polygon.points?.length,
+          firstPoint: polygon.points?.[0]
+        });
+
+        // Get the transformation matrix to convert local points to world coordinates
+        const matrix = polygon.calcTransformMatrix();
+
+        // DEBUG: Log transformation matrix
+        logger.info('🔍 TRANSFORMATION MATRIX', {
+          id: object.mapElementId,
+          matrix: [matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5]]
+        });
+
+        // Transform each point using the matrix
+        const points = polygon.points?.map((point, index) => {
+          // Apply transformation matrix to get absolute coordinates
+          const transformedPoint = fabric.util.transformPoint(
+            { x: point.x, y: point.y },
+            matrix
+          );
+
+          // DEBUG: Log first and last point transformation
+          if (index === 0 || index === polygon.points!.length - 1) {
+            logger.info('🔍 POINT TRANSFORMATION', {
+              id: object.mapElementId,
+              index,
+              original: { x: point.x, y: point.y },
+              transformed: { x: transformedPoint.x, y: transformedPoint.y },
+              rounded: { x: Math.round(transformedPoint.x), y: Math.round(transformedPoint.y) }
+            });
+          }
+
+          return {
+            x: Math.round(transformedPoint.x),
+            y: Math.round(transformedPoint.y)
+          };
+        }) || [];
+
+        const updates: Partial<ImpassableArea> = {
+          type: 'impassable-polygon',
+          points,
+          x: 0, // Compatibility fields
+          y: 0,
+          width: 0,
+          height: 0
+        };
+
+        if (object.mapElementType === 'collision' && object.mapElementId) {
+          // DEBUG: Log before update
+          logger.info('🔍 UPDATING COLLISION AREA', {
+            id: object.mapElementId,
+            pointsCount: points.length,
+            firstPoint: points[0],
+            lastPoint: points[points.length - 1]
+          });
+
+          await sharedMap.updateCollisionArea(object.mapElementId, updates);
+
+          // Update the mapElementData to reflect new points
+          // Create a new object instead of mutating (mapElementData may be immutable)
+          if (object.mapElementData && 'type' in object.mapElementData) {
+            const areaData = object.mapElementData as any;
+            object.mapElementData = {
+              ...areaData,
+              points
+            } as any;
+          }
+
+          logger.info('✅ Polygon updated', { id: object.mapElementId, pointCount: points.length });
+        }
+      } else {
+        // For rectangles and other shapes, use standard x/y/width/height
+        const updates = {
+          x: Math.round(object.left || 0),
+          y: Math.round(object.top || 0),
+          width: Math.round((object.width || 0) * (object.scaleX || 1)),
+          height: Math.round((object.height || 0) * (object.scaleY || 1))
+        };
+
+        if (object.mapElementType === 'interactive' && object.mapElementId) {
+          await sharedMap.updateInteractiveArea(object.mapElementId, updates);
+        } else if (object.mapElementType === 'collision' && object.mapElementId) {
+          await sharedMap.updateCollisionArea(object.mapElementId, updates);
+        }
       }
     } catch (error) {
       logger.error('Failed to update map element', error);
@@ -426,6 +465,260 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
     canvas.renderAll();
   }, [isDrawing, startPoint, drawingRect, drawingText, onAreaDrawn, onCollisionAreaDrawn, collisionDrawingMode, MIN_AREA_SIZE]);
+
+  // Polygon drawing handlers
+  const snapPointToGrid = useCallback((point: { x: number; y: number }): { x: number; y: number } => {
+    if (!gridVisible || gridSpacing <= 0) {
+      return point;
+    }
+    return {
+      x: Math.round(point.x / gridSpacing) * gridSpacing,
+      y: Math.round(point.y / gridSpacing) * gridSpacing
+    };
+  }, [gridVisible, gridSpacing]);
+
+  const addPolygonVertex = useCallback((point: { x: number; y: number }) => {
+    if (!fabricCanvasRef.current) return;
+    const canvas = fabricCanvasRef.current;
+
+    // Snap to grid if enabled
+    const snappedPoint = snapPointToGrid(point);
+
+    // Add vertex circle
+    const circle = new fabric.Circle({
+      left: snappedPoint.x - 4,
+      top: snappedPoint.y - 4,
+      radius: 4,
+      fill: '#ef4444',
+      stroke: '#fff',
+      strokeWidth: 2,
+      selectable: false,
+      evented: false,
+      originX: 'center',
+      originY: 'center'
+    });
+    canvas.add(circle);
+
+    setPolygonDrawingState(prev => ({
+      ...prev,
+      isDrawing: true,
+      points: [...prev.points, snappedPoint],
+      vertexCircles: [...prev.vertexCircles, circle]
+    }));
+
+    canvas.renderAll();
+  }, [fabricCanvasRef, snapPointToGrid]);
+
+  const updatePolygonPreview = useCallback((mousePoint: { x: number; y: number }) => {
+    if (!fabricCanvasRef.current || polygonDrawingState.points.length === 0) return;
+    const canvas = fabricCanvasRef.current;
+
+    // Remove old preview line using ref
+    if (polygonPreviewLineRef.current) {
+      canvas.remove(polygonPreviewLineRef.current);
+      polygonPreviewLineRef.current = null;
+    }
+
+    // Remove old preview polygon using ref
+    if (polygonPreviewPolygonRef.current) {
+      canvas.remove(polygonPreviewPolygonRef.current);
+      polygonPreviewPolygonRef.current = null;
+    }
+
+    const lastPoint = polygonDrawingState.points[polygonDrawingState.points.length - 1];
+    const snappedMouse = snapPointToGrid(mousePoint);
+
+    // Create preview line from last point to mouse
+    const previewLine = new fabric.Line(
+      [lastPoint.x, lastPoint.y, snappedMouse.x, snappedMouse.y],
+      {
+        stroke: '#ef4444',
+        strokeWidth: 2,
+        strokeDashArray: [5, 5],
+        selectable: false,
+        evented: false
+      }
+    );
+    canvas.add(previewLine);
+    polygonPreviewLineRef.current = previewLine;
+
+    // If we have at least 2 points, show preview polygon
+    if (polygonDrawingState.points.length >= 2) {
+      const previewPoints = [...polygonDrawingState.points, snappedMouse];
+      const previewPolygon = new fabric.Polygon(previewPoints, {
+        fill: 'rgba(239, 68, 68, 0.3)',
+        stroke: '#ef4444',
+        strokeWidth: 2,
+        selectable: false,
+        evented: false,
+        opacity: 0.5
+      });
+      canvas.add(previewPolygon);
+      polygonPreviewPolygonRef.current = previewPolygon;
+    }
+
+    canvas.renderAll();
+  }, [fabricCanvasRef, polygonDrawingState.points, snapPointToGrid]);
+
+  const completePolygon = useCallback(() => {
+    if (!fabricCanvasRef.current || polygonDrawingState.points.length < 3) {
+      logger.warn('Polygon must have at least 3 points');
+      return;
+    }
+
+    const canvas = fabricCanvasRef.current;
+
+    // Clean up preview elements using refs
+    if (polygonPreviewLineRef.current) {
+      canvas.remove(polygonPreviewLineRef.current);
+      polygonPreviewLineRef.current = null;
+    }
+    if (polygonPreviewPolygonRef.current) {
+      canvas.remove(polygonPreviewPolygonRef.current);
+      polygonPreviewPolygonRef.current = null;
+    }
+    polygonDrawingState.vertexCircles.forEach(circle => canvas.remove(circle));
+
+    // Create final polygon (selectable when select tool is active)
+    // Points are in absolute world coordinates, but Fabric.js will automatically
+    // convert them to relative coordinates and set left/top based on bounding box
+    const polygon = new fabric.Polygon(polygonDrawingState.points, {
+      fill: 'rgba(239, 68, 68, 0.3)',
+      stroke: '#ef4444',
+      strokeWidth: 2,
+      selectable: true,
+      hasControls: true,
+      hasBorders: true,
+      lockRotation: true,
+      objectCaching: false // Disable caching for better transformation handling
+    });
+
+    // Generate unique ID for the polygon
+    const polygonId = `impassable-polygon-${Date.now()}`;
+    const polygonName = `Impassable Polygon ${impassableAreas.filter(a => a.type === 'impassable-polygon').length + 1}`;
+
+    // Calculate bounding box for logging
+    const xs = polygonDrawingState.points.map(p => p.x);
+    const ys = polygonDrawingState.points.map(p => p.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...xs);
+    const maxY = Math.max(...ys);
+    const boundingBox = {
+      left: minX,
+      top: minY,
+      width: maxX - minX,
+      height: maxY - minY
+    };
+
+    // 🆕 POLYGON CREATED - Log final position after creation
+    logger.info('🆕 POLYGON CREATED', {
+      id: polygonId,
+      name: polygonName,
+      pointsCount: polygonDrawingState.points.length,
+      points: polygonDrawingState.points,
+      boundingBox,
+      fabricPosition: {
+        left: polygon.left,
+        top: polygon.top,
+        width: polygon.width,
+        height: polygon.height
+      },
+      timestamp: new Date().toISOString()
+    });
+
+    // Store polygon data with proper bounding box
+    const polygonData: ImpassableArea = {
+      id: polygonId,
+      name: polygonName,
+      type: 'impassable-polygon',
+      points: polygonDrawingState.points,
+      color: '#ef4444',
+      // Use calculated bounding box for collision detection
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY
+    };
+
+    // Add metadata to fabric object
+    (polygon as any).mapElementId = polygonId;
+    (polygon as any).mapElementType = 'collision';
+    (polygon as any).mapElementData = polygonData;
+
+    canvas.add(polygon);
+    canvas.renderAll();
+
+    // Add to impassable areas state
+    setImpassableAreas(prev => [...prev, polygonData]);
+
+    // Persist to shared map with real bounding box
+    sharedMap.addCollisionArea({
+      id: polygonId,
+      name: polygonName,
+      type: 'impassable-polygon',
+      points: polygonDrawingState.points,
+      color: '#ef4444',
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY
+    });
+
+    // Reset polygon drawing state
+    setPolygonDrawingState({
+      isDrawing: false,
+      points: [],
+      vertexCircles: []
+    });
+
+    logger.info('Polygon collision area created', { id: polygonId, points: polygonDrawingState.points.length });
+  }, [fabricCanvasRef, polygonDrawingState, impassableAreas, sharedMap]);
+
+  const cancelPolygonDrawing = useCallback(() => {
+    if (!fabricCanvasRef.current) return;
+    const canvas = fabricCanvasRef.current;
+
+    // Clean up all preview elements using refs
+    if (polygonPreviewLineRef.current) {
+      canvas.remove(polygonPreviewLineRef.current);
+      polygonPreviewLineRef.current = null;
+    }
+    if (polygonPreviewPolygonRef.current) {
+      canvas.remove(polygonPreviewPolygonRef.current);
+      polygonPreviewPolygonRef.current = null;
+    }
+    polygonDrawingState.vertexCircles.forEach(circle => canvas.remove(circle));
+
+    // Reset state
+    setPolygonDrawingState({
+      isDrawing: false,
+      points: [],
+      vertexCircles: []
+    });
+
+    canvas.renderAll();
+  }, [fabricCanvasRef, polygonDrawingState]);
+
+  // Reset polygon drawing when switching away from polygon tool
+  useEffect(() => {
+    if (currentTool !== 'draw-polygon' && polygonDrawingState.isDrawing) {
+      cancelPolygonDrawing();
+    }
+  }, [currentTool, polygonDrawingState.isDrawing, cancelPolygonDrawing]);
+
+  // Handle Escape key to cancel polygon drawing
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && currentTool === 'draw-polygon' && polygonDrawingState.isDrawing) {
+        e.preventDefault();
+        cancelPolygonDrawing();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentTool, polygonDrawingState.isDrawing, cancelPolygonDrawing]);
 
   // Handle deletion of selected areas
   const handleDeleteSelectedAreas = useCallback((selectedObjects: fabric.Object[]) => {
@@ -630,15 +923,68 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     canvas.on('object:modified', async (e) => {
       const object = e.target as CanvasObject;
       if (object && object.mapElementId && object.mapElementType) {
+        // Log drag end
+        if (dragStartPosition) {
+          const delta = {
+            x: (object.left || 0) - dragStartPosition.left,
+            y: (object.top || 0) - dragStartPosition.top
+          };
+          logger.info('🔄 DRAG END', {
+            id: object.mapElementId,
+            position: { left: object.left, top: object.top },
+            delta,
+            duration: Date.now() - dragStartPosition.timestamp,
+            timestamp: new Date().toISOString()
+          });
+          dragStartPosition = null; // Reset for next drag
+        }
+
         await handleObjectModified(object);
       }
       onObjectModified?.(object);
     });
 
     // Object movement events
+    let dragStartPosition: { left: number; top: number; timestamp: number } | null = null;
+    let lastDragLogTime = 0;
+
     canvas.on('object:moving', (e) => {
       const object = e.target as CanvasObject;
       if (object) {
+        // Log drag start (first movement)
+        if (!dragStartPosition && object.mapElementId) {
+          dragStartPosition = {
+            left: object.left || 0,
+            top: object.top || 0,
+            timestamp: Date.now()
+          };
+          logger.info('🔄 DRAG START', {
+            id: object.mapElementId,
+            type: object.type,
+            position: { left: object.left, top: object.top },
+            scale: { x: object.scaleX, y: object.scaleY },
+            angle: object.angle,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        // Log during drag (throttled to every 100ms)
+        const now = Date.now();
+        if (object.mapElementId && now - lastDragLogTime > 100) {
+          lastDragLogTime = now;
+          const delta = dragStartPosition ? {
+            x: (object.left || 0) - dragStartPosition.left,
+            y: (object.top || 0) - dragStartPosition.top
+          } : { x: 0, y: 0 };
+
+          logger.info('🔄 DRAGGING', {
+            id: object.mapElementId,
+            position: { left: object.left, top: object.top },
+            delta,
+            timestamp: new Date().toISOString()
+          });
+        }
+
         handleObjectMoving(object);
       }
     });
@@ -769,7 +1115,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       const isSelectTool = currentTool === 'select';
       canvas.selection = isSelectTool;
 
-      if (drawingMode || collisionDrawingMode || currentTool === 'draw-collision' || currentTool === 'erase-collision') {
+      if (drawingMode || collisionDrawingMode || currentTool === 'draw-polygon') {
         canvas.defaultCursor = 'crosshair';
         canvas.hoverCursor = 'crosshair';
       } else if (currentTool === 'pan') {
@@ -1352,48 +1698,255 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   const renderCollisionAreas = useCallback(() => {
     if (!fabricCanvasRef.current || !sharedMap.collisionAreas) return;
 
+    // DEBUG: Log render start
+    logger.info('🎨 RENDER COLLISION AREAS START', {
+      areasCount: sharedMap.collisionAreas.length,
+      polygonAreas: sharedMap.collisionAreas.filter((a: any) => a.type === 'impassable-polygon').length
+    });
+
     const canvas = fabricCanvasRef.current;
-    
-    // Remove existing collision area objects
+
+    // Get existing collision area objects
     const existingAreas = canvas.getObjects().filter(obj =>
       (obj as CanvasObject).mapElementType === 'collision'
     );
-    existingAreas.forEach(obj => canvas.remove(obj));
 
-    // Add collision areas (rects)
+    // Create a map of existing objects by ID for efficient lookup
+    const existingAreasMap = new Map<string, fabric.Object>();
+    existingAreas.forEach(obj => {
+      const id = (obj as CanvasObject).mapElementId;
+      if (id) {
+        existingAreasMap.set(id, obj);
+      }
+    });
+
+    // Track which IDs we've processed
+    const processedIds = new Set<string>();
+
+    // Process collision areas - update existing or create new
     sharedMap.collisionAreas.forEach(area => {
-      // Special handling for impassable-paint: it's a group of cells not a rect
-      if (('type' in area && (area as any).type === 'impassable-paint') && Array.isArray((area as any).cells)) {
-        // Render all cells as a single group
-        const spacing = gridSpacing > 0 ? gridSpacing : 32;
-        const rects: fabric.Rect[] = [];
-        ((area as any).cells as string[]).forEach(cellKey => {
-          const [gx, gy] = cellKey.split('_').map(Number);
-          rects.push(new fabric.Rect({
-            left: gx * spacing,
-            top: gy * spacing,
-            width: spacing,
-            height: spacing,
-            fill: 'rgba(239,68,68,0.4)',
-            selectable: false,
-            evented: false,
-            stroke: '#ef4444',
-            strokeWidth: 0,
-            opacity: 1,
-          }));
+      processedIds.add(area.id);
+
+      // Check if this area already exists on canvas
+      const existingObj = existingAreasMap.get(area.id);
+
+      // DEBUG: Log area processing
+      if ('type' in area && (area as any).type === 'impassable-polygon') {
+        logger.info('🎨 PROCESSING POLYGON AREA', {
+          id: area.id,
+          name: area.name,
+          hasExisting: !!existingObj,
+          hasPoints: !!(area as any).points,
+          pointsCount: (area as any).points?.length
         });
-        const group = new fabric.Group(rects, {
+      }
+
+      // For polygons, update points if object exists
+      if (existingObj && 'type' in area && (area as any).type === 'impassable-polygon' && (area as any).points) {
+        const polygon = existingObj as fabric.Polygon;
+        const absolutePoints = (area as any).points;
+
+        // Capture position BEFORE smart update for flash/jump detection
+        const positionBefore = {
+          left: polygon.left,
+          top: polygon.top,
+          scaleX: polygon.scaleX,
+          scaleY: polygon.scaleY,
+          angle: polygon.angle
+        };
+        const timestampBefore = Date.now();
+
+        // ⚡ FLASH DETECTION - Log position before smart update
+        logger.info('⚡ BEFORE SMART UPDATE', {
+          id: area.id,
+          position: positionBefore,
+          timestamp: new Date().toISOString()
+        });
+
+        // DEBUG: Log smart update start
+        logger.info('🔄 SMART UPDATE START', {
+          id: area.id,
+          existingLeft: polygon.left,
+          existingTop: polygon.top,
+          absolutePointsCount: absolutePoints.length,
+          firstAbsolutePoint: absolutePoints[0]
+        });
+
+        // Convert absolute points to relative points
+        const minX = Math.min(...absolutePoints.map((p: any) => p.x));
+        const minY = Math.min(...absolutePoints.map((p: any) => p.y));
+        const relativePoints = absolutePoints.map((p: any) => ({
+          x: p.x - minX,
+          y: p.y - minY
+        }));
+
+        // DEBUG: Log coordinate conversion
+        logger.info('🔄 COORDINATE CONVERSION', {
+          id: area.id,
+          minX,
+          minY,
+          firstRelativePoint: relativePoints[0],
+          lastRelativePoint: relativePoints[relativePoints.length - 1]
+        });
+
+        // Update polygon with relative points and correct position
+        polygon.set({
+          points: relativePoints,
+          left: minX,
+          top: minY,
+          scaleX: 1,
+          scaleY: 1,
+          angle: 0
+        });
+
+        const timestampAfterSet = Date.now();
+
+        // ⚡ FLASH DETECTION - Log position after polygon.set()
+        logger.info('⚡ AFTER SET', {
+          id: area.id,
+          position: { left: polygon.left, top: polygon.top, scaleX: polygon.scaleX, scaleY: polygon.scaleY },
+          duration: timestampAfterSet - timestampBefore,
+          timestamp: new Date().toISOString()
+        });
+
+        // DEBUG: Log after set
+        logger.info('🔄 AFTER SET', {
+          id: area.id,
+          left: polygon.left,
+          top: polygon.top,
+          scaleX: polygon.scaleX,
+          scaleY: polygon.scaleY
+        });
+
+        polygon.setCoords(); // Recalculate bounding box
+
+        const timestampAfterSetCoords = Date.now();
+
+        // ⚡ FLASH DETECTION - Log position after polygon.setCoords()
+        logger.info('⚡ AFTER SETCOORDS', {
+          id: area.id,
+          position: { left: polygon.left, top: polygon.top },
+          duration: timestampAfterSetCoords - timestampAfterSet,
+          timestamp: new Date().toISOString()
+        });
+
+        // DEBUG: Log after setCoords
+        logger.info('🔄 AFTER SETCOORDS', {
+          id: area.id,
+          left: polygon.left,
+          top: polygon.top,
+          aCoords: polygon.aCoords ? {
+            tl: polygon.aCoords.tl,
+            br: polygon.aCoords.br
+          } : null
+        });
+
+        // ⚠️ POSITION JUMP DETECTION - Check if position changed unexpectedly
+        const positionAfter = {
+          left: polygon.left,
+          top: polygon.top,
+          scaleX: polygon.scaleX,
+          scaleY: polygon.scaleY,
+          angle: polygon.angle
+        };
+
+        const positionDiff = {
+          left: (positionAfter.left || 0) - (positionBefore.left || 0),
+          top: (positionAfter.top || 0) - (positionBefore.top || 0),
+          scaleX: (positionAfter.scaleX || 1) - (positionBefore.scaleX || 1),
+          scaleY: (positionAfter.scaleY || 1) - (positionBefore.scaleY || 1),
+          angle: (positionAfter.angle || 0) - (positionBefore.angle || 0)
+        };
+
+        // Log if position changed (jump detected)
+        if (Math.abs(positionDiff.left) > 0.1 || Math.abs(positionDiff.top) > 0.1) {
+          logger.warn('⚠️ POSITION JUMP DETECTED', {
+            id: area.id,
+            before: positionBefore,
+            after: positionAfter,
+            diff: positionDiff,
+            source: 'smart-update',
+            timestamp: new Date().toISOString()
+          });
+
+          // Also log to console with expanded values for easy reading
+          console.warn(`⚠️ POSITION JUMP DETECTED - Polygon: ${area.id}`);
+          console.warn(`  BEFORE: left=${positionBefore.left}, top=${positionBefore.top}`);
+          console.warn(`  AFTER:  left=${positionAfter.left}, top=${positionAfter.top}`);
+          console.warn(`  DRIFT:  Δleft=${positionDiff.left.toFixed(2)}, Δtop=${positionDiff.top.toFixed(2)}`);
+          console.warn(`  This polygon was NOT the one being dragged - it jumped during smart update!`);
+        }
+
+        (polygon as any).mapElementData = area; // Update metadata
+        canvas.renderAll();
+
+        logger.info('✅ SMART UPDATE COMPLETE', { id: area.id });
+        return; // Skip recreation
+      }
+
+      // If object exists and is not a polygon, or if it's a different type, remove it
+      if (existingObj) {
+        canvas.remove(existingObj);
+      }
+
+      // Check if this is a polygon collision area
+      if ('type' in area && (area as any).type === 'impassable-polygon' && (area as any).points) {
+        // Polygon collision area - points are in absolute world coordinates
+        // We need to convert them to relative coordinates for Fabric.js
+        const polygonArea = area as any;
+        const absolutePoints = polygonArea.points;
+
+        // 🔃 RELOAD - Log polygon loaded from storage
+        logger.info('🔃 LOADED FROM STORAGE', {
+          id: area.id,
+          name: area.name,
+          pointsCount: absolutePoints.length,
+          firstPoint: absolutePoints[0],
+          lastPoint: absolutePoints[absolutePoints.length - 1],
+          timestamp: new Date().toISOString()
+        });
+
+        // Calculate bounding box of absolute points
+        const minX = Math.min(...absolutePoints.map((p: any) => p.x));
+        const minY = Math.min(...absolutePoints.map((p: any) => p.y));
+
+        // Convert absolute points to relative points (relative to top-left of bounding box)
+        const relativePoints = absolutePoints.map((p: any) => ({
+          x: p.x - minX,
+          y: p.y - minY
+        }));
+
+        const polygon = new fabric.Polygon(relativePoints, {
+          fill: 'rgba(239, 68, 68, 0.3)',
+          stroke: '#ef4444',
+          strokeWidth: 2,
           selectable: true,
-          evented: true,
           hasControls: true,
           hasBorders: true,
           lockRotation: true,
-        }) as unknown as fabric.Group;
-        (group as any).mapElementId = area.id;
-        (group as any).mapElementType = 'collision';
-        (group as any).mapElementData = area;
-        (group as any).locked = false;
-        canvas.add(group);
+          left: minX, // Position at the bounding box location
+          top: minY,
+          objectCaching: false // Disable caching for better transformation handling
+        }) as CanvasObject;
+
+        polygon.mapElementId = area.id;
+        polygon.mapElementType = 'collision';
+        polygon.mapElementData = area;
+
+        canvas.add(polygon);
+
+        // 🔃 RELOAD - Log polygon rendered on canvas
+        logger.info('🔃 RENDERED ON CANVAS', {
+          id: area.id,
+          position: { left: polygon.left, top: polygon.top },
+          fabricPosition: {
+            left: polygon.left,
+            top: polygon.top,
+            width: polygon.width,
+            height: polygon.height
+          },
+          timestamp: new Date().toISOString()
+        });
       } else {
         // Regular collision area
         const rect = new fabric.Rect({
@@ -1415,6 +1968,13 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         rect.mapElementData = area;
 
         canvas.add(rect);
+      }
+    });
+
+    // Remove objects that no longer exist in the data
+    existingAreasMap.forEach((obj, id) => {
+      if (!processedIds.has(id)) {
+        canvas.remove(obj);
       }
     });
 
@@ -1448,7 +2008,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   useEffect(() => {
     if (fabricCanvasRef.current) {
       const canvas = fabricCanvasRef.current;
-      if (drawingMode) {
+      if (drawingMode || currentTool === 'draw-polygon') {
         canvas.selection = false; // Disable selection during drawing
         canvas.defaultCursor = 'crosshair';
         canvas.hoverCursor = 'crosshair';
@@ -1461,133 +2021,35 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       }
       canvas.renderAll();
     }
-  }, [drawingMode]);
+  }, [drawingMode, currentTool]);
 
   // --- NEW: Effect to update impassable paint blocks when gridSpacing changes ---
   // This ensures all existing impassable painted rects match the selected grid size
   // (Moved to top-level, not nested in any other hooks)
-  useEffect(() => {
-    if (!fabricCanvasRef.current) return;
-    setImpassableAreas(prevAreas => {
-      // For each impassable area group, update rects to match grid size/position
-      return prevAreas.map(area => {
-        // Defensive: Only operate if area.group is a valid Fabric.Group and cells is an array
-        if (
-          !area.group ||
-          !(area.group instanceof fabric.Group) ||
-          typeof area.group.getObjects !== 'function' ||
-          !Array.isArray(area.cells)
-        ) {
-          // Optionally, log invalid area/group for debugging
-          // console.warn('Skipping invalid impassable area group during grid update', area);
-          return area;
-        }
-        const spacing = gridSpacing > 0 ? gridSpacing : 32;
-        // Remove all objects from the group
-        const objects = area.group.getObjects();
-        objects.forEach(obj => area.group.remove(obj));
-        area.cells.forEach(cellKey => {
-          const [gx, gy] = cellKey.split('_').map(Number);
-          const rect = new fabric.Rect({
-            left: gx * spacing,
-            top: gy * spacing,
-            width: spacing,
-            height: spacing,
-            fill: area.color || brushColor,
-            selectable: false,
-            evented: false,
-            stroke: area.border || undefined,
-            strokeWidth: area.border ? 2 : 0,
-            opacity: 1,
-          });
-          (rect as any).cellKey = cellKey;
-          area.group.add(rect);
-        });
-        return { ...area, group: area.group };
-      });
-    });
-    if (fabricCanvasRef.current) {
-      fabricCanvasRef.current.renderAll();
-    }
-  }, [gridSpacing]);
+  // Paint grid spacing update removed - only polygon collision areas are supported
 
-  // Efficient impassable painting based on grid cells, persisted to sharedMap
+  // Mouse event handlers for polygon drawing and rectangular area drawing
   useEffect(() => {
     if (!fabricCanvasRef.current) return;
 
     const canvas = fabricCanvasRef.current;
 
-    // --- Track painting state using ref ---
-    // let isPainting = false;
-
-    // Hover highlight state
-    let hoverHighlightRect: fabric.Rect | null = null;
-
-    // Utility to snap pointer to grid and return grid cell position
-    function getGridCell(x: number, y: number): { gx: number; gy: number } {
-      const spacing = gridSpacing > 0 ? gridSpacing : 32;
-      const gx = Math.floor(x / spacing);
-      const gy = Math.floor(y / spacing);
-      return { gx, gy };
-    }
-
-    // --- NEW: Effect to update impassable paint blocks when gridSpacing changes ---
-    // This ensures all existing impassable painted rects match the selected grid size
-    // [REMOVED: Duplicate, nested useEffect for gridSpacing. Only keep top-level hook.]
-
-    // Mouse events for painting mode
+    // Mouse events for polygon drawing and rectangular area drawing
     const handleMouseDown = (e: any) => {
-      if ((currentTool === 'draw-collision' || currentTool === 'erase-collision')) {
-        isPaintingRef.current = true;
-        // Debug: mouse down event
-        // Removed: Non-critical mouse:down debug event log.
+      // Handle polygon drawing tool
+      if (currentTool === 'draw-polygon') {
         e.e?.preventDefault();
         e.e?.stopPropagation();
 
         const pointer = fabricCanvasRef.current?.getPointer(e.e, true);
         if (pointer) {
-          const { gx, gy } = getGridCell(pointer.x, pointer.y);
-          const cellKey = `${gx}_${gy}`;
-          let ensuredAreaId = activeAreaId;
-          if (!ensuredAreaId) {
-            // Auto-create new impassable area on first paint
-            const newAreaId = `impassable-${impassableAreas.length + 1}`;
-            // Create an empty Fabric.Group for this area and add to canvas
-            const areaGroup = new fabric.Group([], {
-              selectable: false,
-              evented: false,
-              hasControls: false,
-              hasBorders: false,
-              lockRotation: true
-            });
-            if (fabricCanvasRef.current) {
-              fabricCanvasRef.current.add(areaGroup);
-              fabricCanvasRef.current.renderAll();
-            }
-            const newArea: import('./types/editor.types').ImpassableArea = {
-              id: newAreaId,
-              name: `Impassable ${impassableAreas.length + 1}`,
-              type: 'impassable-paint',
-              cells: [],
-              color: brushColor,
-              border: brushBorder,
-              brushShape,
-              group: areaGroup as unknown as fabric.Group
-            };
-            setImpassableAreas(prev => [...prev, newArea]);
-            setActiveAreaId(newAreaId);
-            ensuredAreaId = newAreaId;
-            // Removed: Non-critical auto-created new area debug log.
-          }
-          // Removed: Non-critical impassable paint mouse:down debug log.
-          // Paint the highlighted cell immediately on mouse down
-          paintGridCell(cellKey, currentTool === 'draw-collision');
-          lastPaintedCellRef.current = cellKey;
-          renderPaintPreview();
-          // Debug: area state after paint
-          // Removed: Non-critical after mouse:down debug log.
+          addPolygonVertex(pointer);
         }
-      } else if (drawingMode || collisionDrawingMode) {
+        return;
+      }
+
+      // Handle rectangular area drawing (interactive/collision)
+      if (drawingMode || collisionDrawingMode) {
         e.e?.preventDefault();
         e.e?.stopPropagation();
 
@@ -1599,15 +2061,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     };
 
     const handleMouseUp = () => {
-      if ((currentTool === 'draw-collision' || currentTool === 'erase-collision') && isPaintingRef.current) {
-        isPaintingRef.current = false;
-        // Debug: mouse up
-        // Removed: Non-critical mouse:up debug event log.
-        removePaintPreview();
-        persistImpassableAreas();
-        // Debug: after mouse up
-        // Removed: Non-critical after mouse:up debug log.
-      }
+      // Handle rectangular area drawing completion
       if ((drawingMode || collisionDrawingMode) && isDrawing) {
         handleDrawingEnd();
       }
@@ -1617,249 +2071,43 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       // Use proper pointer to account for zoom/pan
       const pointer = fabricCanvasRef.current?.getPointer(e.e);
 
-      if ((currentTool === 'draw-collision' || currentTool === 'erase-collision')) {
-        if (pointer) {
-          const { gx, gy } = getGridCell(pointer.x, pointer.y);
-          const cellKey = `${gx}_${gy}`;
-          const spacing = gridSpacing > 0 ? gridSpacing : 32;
-          const left = gx * spacing;
-          const top = gy * spacing;
+      // Handle polygon drawing preview
+      if (currentTool === 'draw-polygon' && pointer && polygonDrawingState.isDrawing) {
+        updatePolygonPreview(pointer);
+        return;
+      }
 
-          // Debug: mouse move and highlight
-          // Removed: Non-critical mouse:move debug log.
-
-          // Only show yellow highlight if cell is NOT already impassable in the active area
-          // Find the active impassable area and its cells
-          const activeArea = getActiveArea();
-          const cellAlreadyImpassable =
-            activeArea && Array.isArray(activeArea.cells) && activeArea.cells.includes(cellKey);
-
-          if (!cellAlreadyImpassable) {
-            // Show yellow highlight only if cell is not already impassable
-            if (!hoverHighlightRect) {
-              hoverHighlightRect = new fabric.Rect({
-                left,
-                top,
-                width: spacing,
-                height: spacing,
-                fill: 'rgba(255, 255, 0, 0.2)', // yellow highlight
-                selectable: false,
-                evented: false,
-                stroke: '#ffd700',
-                strokeWidth: 2,
-                opacity: 1,
-              });
-              canvas.add(hoverHighlightRect);
-            } else {
-              hoverHighlightRect.set({
-                left,
-                top,
-                width: spacing,
-                height: spacing,
-                opacity: 1,
-              });
-            }
-          } else {
-            // Remove the highlight if present (cell is already impassable)
-            if (hoverHighlightRect) {
-              canvas.remove(hoverHighlightRect);
-              hoverHighlightRect = null;
-            }
-          }
-          canvas.renderAll();
-
-          // If painting, paint every highlighted cell (deduped)
-          if (isPaintingRef.current) {
-            // Removed: Non-critical painting cell debug log.
-            paintGridCell(cellKey, currentTool === 'draw-collision');
-            lastPaintedCellRef.current = cellKey;
-            renderPaintPreview();
-            // Debug: state after painting
-            // Removed: Non-critical after paintGridCell debug log.
-          }
-        }
-      } else if ((drawingMode || collisionDrawingMode) && isDrawing) {
+      // Handle rectangular area drawing
+      if ((drawingMode || collisionDrawingMode) && isDrawing) {
         if (pointer) {
           handleDrawingMove(new fabric.Point(pointer.x, pointer.y));
         }
       }
     };
 
-    // Mouse out event to remove highlight
-    const handleMouseOut = () => {
-      if (hoverHighlightRect && canvas) {
-        canvas.remove(hoverHighlightRect);
-        hoverHighlightRect = null;
-        canvas.renderAll();
+    // Paint functions removed - only polygon collision areas are supported
+
+    // Handle double-click for polygon completion
+    const handleDoubleClick = (e: any) => {
+      if (currentTool === 'draw-polygon' && polygonDrawingState.isDrawing) {
+        e.e?.preventDefault();
+        e.e?.stopPropagation();
+        completePolygon();
       }
     };
-
-    // Paint or erase a grid cell (update paintedCells state)
-    // Paint or erase a block of grid cells (brush size support)
-    function paintGridCell(cellKey: string, isDrawing: boolean) {
-      // Interpret brushSize as a pixel dimension (e.g., 8, 16, 32, 64, 128)
-      const spacing = gridSpacing > 0 ? gridSpacing : 32;
-      const [baseGx, baseGy] = cellKey.split('_').map(Number);
-      // Compute pixel position of this grid cell
-      const baseX = baseGx * spacing;
-      const baseY = baseGy * spacing;
-
-      // Calculate the pixel-aligned brush square
-      const brushPx = Math.max(1, brushSize);
-
-      // Find all grid cells that intersect the brush square
-      const gx1 = baseGx;
-      const gy1 = baseGy;
-      const gx2 = Math.floor((baseX + brushPx - 1) / spacing);
-      const gy2 = Math.floor((baseY + brushPx - 1) / spacing);
-
-      // Collect all covered cell keys
-      const blockCellKeys: string[] = [];
-      for (let gx = gx1; gx <= gx2; gx++) {
-        for (let gy = gy1; gy <= gy2; gy++) {
-          blockCellKeys.push(`${gx}_${gy}`);
-        }
-      }
-
-      setImpassableAreas(prev =>
-        prev.map(area => {
-          if (area.id !== activeAreaId) return area;
-          // Use group for deduplication and cell management
-          const group = area.group;
-          if (!group) return area;
-          let cells = new Set(area.cells);
-
-          if (isDrawing) {
-            blockCellKeys.forEach(cell => {
-              // Only add if not already present
-              if (!cells.has(cell)) {
-                const [gx, gy] = cell.split('_').map(Number);
-                const rect = new fabric.Rect({
-                  left: gx * spacing,
-                  top: gy * spacing,
-                  width: spacing,
-                  height: spacing,
-                  fill: area.color || brushColor,
-                  selectable: false,
-                  evented: false,
-                  stroke: area.border || undefined,
-                  strokeWidth: area.border ? 2 : 0,
-                  opacity: 1,
-                });
-                (rect as any).cellKey = cell;
-                group.add(rect);
-                cells.add(cell);
-              }
-            });
-            if (fabricCanvasRef.current) {
-              fabricCanvasRef.current.renderAll();
-            }
-            return {
-              ...area,
-              cells: Array.from(cells),
-              group,
-            };
-          } else {
-            // Erase mode: remove any rects in the block
-            blockCellKeys.forEach(cell => {
-              const existingRect = group.getObjects('rect').find((rect: any) => rect.cellKey === cell);
-              if (existingRect) {
-                group.remove(existingRect);
-                cells.delete(cell);
-              }
-            });
-            if (fabricCanvasRef.current) {
-              fabricCanvasRef.current.renderAll();
-            }
-            return {
-              ...area,
-              cells: Array.from(cells),
-              group,
-            };
-          }
-        })
-      );
-      setUndoStack(stack => [
-        ...stack,
-        isDrawing
-          ? { type: 'addCell', areaId: activeAreaId!, cell: cellKey }
-          : { type: 'removeCell', areaId: activeAreaId!, cell: cellKey }
-      ]);
-      setRedoStack([]); // Clear redo on new action
-    }
-
-    // Renders a live preview group for paintedCells (while painting or before save)
-    function renderPaintPreview() {
-      // Use the area group for preview feedback
-      const activeArea = getActiveArea();
-      if (!activeArea || !activeArea.group) return;
-      // For preview effect, increase opacity or change stroke temporarily
-      activeArea.group.getObjects('rect').forEach((rect: any) => {
-        rect.set({
-          opacity: 0.7,
-          stroke: '#ff9900', // preview color
-          strokeWidth: 2,
-        });
-      });
-      if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.renderAll();
-      }
-    }
-
-    function removePaintPreview() {
-      const activeArea = getActiveArea();
-      if (!activeArea || !activeArea.group) return;
-      // Reset group rects to normal style
-      activeArea.group.getObjects('rect').forEach((rect: any) => {
-        rect.set({
-          opacity: 1,
-          stroke: activeArea.border || undefined,
-          strokeWidth: activeArea.border ? 2 : 0,
-        });
-      });
-      if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.renderAll();
-      }
-    }
-
-    // On mouse up, persist all cells to sharedMap
-    function persistImpassableAreas() {
-      impassableAreas.forEach(area => {
-        if (area.cells.length === 0) return;
-        const areaData = {
-          id: area.id,
-          name: area.name,
-          type: 'impassable-paint',
-          cells: Array.from(area.cells),
-          color: area.color,
-          border: area.border,
-          brushShape: area.brushShape,
-          x: 0, y: 0, width: 0, height: 0 // For compatibility
-        };
-        const idx = sharedMap.collisionAreas?.findIndex(
-          a => a.id === area.id && ('type' in a && (a as any).type === 'impassable-paint')
-        ) ?? -1;
-        if (idx >= 0) {
-          sharedMap.updateCollisionArea(area.id, areaData);
-        } else {
-          sharedMap.addCollisionArea(areaData);
-        }
-    
-        // ---- DEBUG LOG: Persistence ----
-        // Removed: Non-critical persistImpassableAreas debug log.
-      });
-    }
 
     // Add event listeners
     canvas.on('mouse:down', handleMouseDown);
     canvas.on('mouse:up', handleMouseUp);
     canvas.on('mouse:move', handleMouseMove);
+    canvas.on('mouse:dblclick', handleDoubleClick);
 
     // Cleanup function
     return () => {
       canvas.off('mouse:down', handleMouseDown);
       canvas.off('mouse:up', handleMouseUp);
       canvas.off('mouse:move', handleMouseMove);
+      canvas.off('mouse:dblclick', handleDoubleClick);
     };
   }, [
     drawingMode,
@@ -1871,6 +2119,10 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     currentTool,
     gridSpacing,
     sharedMap,
+    polygonDrawingState,
+    addPolygonVertex,
+    updatePolygonPreview,
+    completePolygon,
   ]);
 
 

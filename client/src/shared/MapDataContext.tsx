@@ -22,6 +22,11 @@ export interface ImpassableArea {
   width: number;
   height: number;
   name?: string;
+
+  // Extended properties for polygon support
+  type?: 'rectangle' | 'impassable-polygon';
+  points?: { x: number; y: number }[];
+  color?: string;
 }
 
 export interface MapData {

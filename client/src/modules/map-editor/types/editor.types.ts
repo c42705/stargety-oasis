@@ -28,7 +28,7 @@ export interface EditorState {
   isPanning: boolean;
 }
 
-export type EditorTool = 'select' | 'pan' | 'draw-collision' | 'erase-collision';
+export type EditorTool = 'select' | 'pan' | 'draw-polygon';
 
 export type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error';
 
@@ -64,32 +64,4 @@ export interface AreaBounds {
   height: number;
 }
 
-export type BrushShape = 'square' | 'circle';
-
-export interface ImpassableArea {
-  id: string;
-  name: string;
-  type: 'impassable-paint';
-  cells: string[]; // Each cell is "gx_gy" format
-  color?: string;
-  border?: string;
-  brushShape?: BrushShape;
-  group?: any; // Runtime reference to Fabric.Group (type workaround)
-}
-
-export interface ImpassableAreaEditState {
-  areas: ImpassableArea[];
-  activeAreaId?: string;
-  undoStack: ImpassableAreaAction[];
-  redoStack: ImpassableAreaAction[];
-}
-
-export type ImpassableAreaAction =
-  | { type: 'addCell'; areaId: string; cell: string }
-  | { type: 'removeCell'; areaId: string; cell: string }
-  | { type: 'createArea'; area: ImpassableArea }
-  | { type: 'deleteArea'; areaId: string }
-  | { type: 'setBrush'; areaId: string; brushShape: BrushShape }
-  | { type: 'setColor'; areaId: string; color: string }
-  | { type: 'setBorder'; areaId: string; border: string }
-  | { type: 'selectArea'; areaId: string };
+// ImpassableArea interface removed - now using the unified interface from MapDataContext.tsx
