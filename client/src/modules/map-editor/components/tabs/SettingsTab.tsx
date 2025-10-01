@@ -14,8 +14,7 @@ import {
   Tooltip,
   message,
   Upload,
-  Modal,
-  Radio
+  Modal
 } from 'antd';
 import { UploadOutlined, InfoCircleOutlined, ExpandOutlined } from '@ant-design/icons';
 import { GridConfig } from '../../types/editor.types';
@@ -24,7 +23,6 @@ import { MapDataManager } from '../../../../components/MapDataManager';
 import { useMapData } from '../../../../shared/MapDataContext';
 import { useSharedMap } from '../../../../shared/useSharedMap';
 import { useWorldDimensions } from '../../../../shared/useWorldDimensions';
-
 
 const { Option } = Select;
 
@@ -360,6 +358,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       }
     }
   }, []);
+
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       {/* Map Data Management */}
@@ -517,7 +516,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             />
           </Form.Item>
 
-          <Form.Item label="Grid Pattern & Size">
+          <Form.Item label={`Grid Pattern & Size`}>
             <Select
               value={gridConfig.pattern}
               onChange={(patternId) => {
@@ -575,8 +574,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               }}
             />
           </Form.Item>
-
-          {/* Radio group for patterns removed, handled by select above */}
         </Form>
       </Card>
 

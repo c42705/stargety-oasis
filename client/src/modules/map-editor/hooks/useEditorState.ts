@@ -202,7 +202,7 @@ export const useEditorState = () => {
     const canvas = fabricCanvasRef.current;
     if (!canvas) return;
 
-    const currentZoom = canvas.getZoom();
+    // Removed unused currentZoom variable (was only used for validation/logging)
     const resetZoom = 1.0;
 
     // Validate zoom operation
@@ -276,14 +276,7 @@ export const useEditorState = () => {
         zoom: Math.round(fitZoom * 100)
       }));
 
-      const zoomState = getZoomState(fitZoom);
-      // logger.debug('FIT TO SCREEN', {
-      //   fitZoom,
-      //   worldDimensions: { width: worldWidth, height: worldHeight },
-      //   viewportDimensions: viewportDims,
-      //   zoomPercentage: `${zoomState.percentage}%`,
-      //   forced: force
-      // });
+      // Removed unused zoomState variable and related commented-out logging
     } catch (error) {
       console.error('🔍 FIT TO SCREEN ERROR:', error);
     }
