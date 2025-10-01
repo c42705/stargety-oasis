@@ -8,6 +8,7 @@ import type { UploadProps } from 'antd';
 import { GridOverlayComponent } from './GridOverlayComponent';
 import { FrameSelectionTools } from './FrameSelectionTools';
 import { FramePreviewSystem } from './FramePreviewSystem';
+import AnimationEditorPanel from './AnimationEditorPanel';
 import { SpriteSheetProcessor } from './SpriteSheetProcessor';
 import { FrameDetectionAlgorithms } from './FrameDetectionAlgorithms';
 import { 
@@ -491,13 +492,33 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
     {
       title: 'Preview',
       content: builderState.spriteSheetDefinition.frames && builderState.spriteSheetDefinition.source && (
-        <FramePreviewSystem
-          frames={builderState.spriteSheetDefinition.frames}
-          selectedFrameIds={selectedFrameIds}
-          animations={builderState.spriteSheetDefinition.animations || []}
-          imageData={builderState.spriteSheetDefinition.source.imageData}
-          onFrameSelect={(frameId) => setSelectedFrameIds([frameId])}
-        />
+        <>
+          <AnimationEditorPanel
+            frames={builderState.spriteSheetDefinition.frames}
+            animations={builderState.spriteSheetDefinition.animations || []}
+            imageData={builderState.spriteSheetDefinition.source.imageData}
+            onUpdateAnimation={(animId: string, frameIds: string[]) => {
+              setBuilderState(prev => ({
+                ...prev,
+                spriteSheetDefinition: {
+                  ...prev.spriteSheetDefinition,
+                  animations: (prev.spriteSheetDefinition.animations || []).map(anim =>
+                    anim.id === animId
+                      ? { ...anim, sequence: { ...anim.sequence, frameIds } }
+                      : anim
+                  ),
+                },
+              }));
+            }}
+          />
+          <FramePreviewSystem
+            frames={builderState.spriteSheetDefinition.frames}
+            selectedFrameIds={selectedFrameIds}
+            animations={builderState.spriteSheetDefinition.animations || []}
+            imageData={builderState.spriteSheetDefinition.source.imageData}
+            onFrameSelect={(frameId) => setSelectedFrameIds([frameId])}
+          />
+        </>
       )
     }
   ];

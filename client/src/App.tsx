@@ -329,6 +329,11 @@ const App: React.FC = () => {
           )
         }
       />
+      {/* Avatar Builder Dedicated Route */}
+      <Route
+        path="/avatar-builder"
+        element={<QuickAvatarBuilder />}
+      />
     </Routes>
   );
 };
