@@ -611,12 +611,14 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       height: maxY - minY
     };
 
-    // 🆕 POLYGON CREATED - Log final position after creation
-    logger.info('🆕 POLYGON CREATED', {
+    // 🆕 [Polygon Save] Log polygon creation with full data structure
+    logger.info('🆕 [Polygon Save] POLYGON CREATED IN EDITOR', {
+      timestamp: new Date().toISOString(),
       id: polygonId,
       name: polygonName,
+      type: 'impassable-polygon',
       pointsCount: polygonDrawingState.points.length,
-      points: polygonDrawingState.points,
+      allPoints: polygonDrawingState.points,
       boundingBox,
       fabricPosition: {
         left: polygon.left,
@@ -624,7 +626,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         width: polygon.width,
         height: polygon.height
       },
-      timestamp: new Date().toISOString()
+      color: '#ef4444'
     });
 
     // Store polygon data with proper bounding box
@@ -1996,14 +1998,21 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         const polygonArea = area as any;
         const absolutePoints = polygonArea.points;
 
-        // 🔃 RELOAD - Log polygon loaded from storage
-        logger.info('🔃 LOADED FROM STORAGE', {
+        // 🔃 [Polygon Load] Log polygon loaded from storage and being reconstructed in editor
+        logger.info('🔃 [Polygon Load] RECONSTRUCTING IN EDITOR', {
+          timestamp: new Date().toISOString(),
           id: area.id,
           name: area.name,
+          type: polygonArea.type,
           pointsCount: absolutePoints.length,
-          firstPoint: absolutePoints[0],
-          lastPoint: absolutePoints[absolutePoints.length - 1],
-          timestamp: new Date().toISOString()
+          allPoints: absolutePoints,
+          boundingBox: {
+            x: polygonArea.x,
+            y: polygonArea.y,
+            width: polygonArea.width,
+            height: polygonArea.height
+          },
+          color: polygonArea.color
         });
 
         // Calculate bounding box of absolute points
@@ -2035,17 +2044,32 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
         canvas.add(polygon);
 
-        // 🔃 RELOAD - Log polygon rendered on canvas
-        logger.info('🔃 RENDERED ON CANVAS', {
+        // 🔃 [Polygon Load] Log polygon fully reconstructed and rendered on canvas
+        logger.info('🔃 [Polygon Load] FULLY RECONSTRUCTED ON CANVAS', {
+          timestamp: new Date().toISOString(),
           id: area.id,
-          position: { left: polygon.left, top: polygon.top },
-          fabricPosition: {
+          name: area.name,
+          fabricObject: {
             left: polygon.left,
             top: polygon.top,
             width: polygon.width,
-            height: polygon.height
+            height: polygon.height,
+            pointsCount: (polygon as any).points?.length || 0
           },
-          timestamp: new Date().toISOString()
+          originalData: {
+            pointsCount: absolutePoints.length,
+            allPoints: absolutePoints,
+            boundingBox: {
+              x: polygonArea.x,
+              y: polygonArea.y,
+              width: polygonArea.width,
+              height: polygonArea.height
+            }
+          },
+          dataIntegrityCheck: {
+            pointsCountMatch: ((polygon as any).points?.length || 0) === absolutePoints.length,
+            positionMatch: polygon.left === minX && polygon.top === minY
+          }
         });
       } else {
         // Regular collision area
@@ -2141,7 +2165,9 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
         e.e?.preventDefault();
         e.e?.stopPropagation();
 
-        const pointer = fabricCanvasRef.current?.getPointer(e.e, true);
+        // Get pointer in world coordinates (accounting for zoom/pan)
+        // DO NOT pass 'true' as second parameter - we want viewport transform applied
+        const pointer = fabricCanvasRef.current?.getPointer(e.e);
         if (pointer) {
           addPolygonVertex(pointer);
         }

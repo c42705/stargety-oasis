@@ -316,6 +316,19 @@ export class PhaserMapRenderer {
   private renderCollisionAreas(): void {
     if (!this.mapData) return;
 
+    // 🔍 DEBUG: Log all collision areas being rendered
+    console.log('🎨 [WorldMap] Rendering collision areas:', {
+      totalAreas: this.mapData.impassableAreas.length,
+      areas: this.mapData.impassableAreas.map(area => ({
+        id: area.id,
+        name: area.name,
+        type: area.type,
+        hasPoints: !!area.points,
+        pointsCount: area.points?.length || 0,
+        boundingBox: { x: area.x, y: area.y, width: area.width, height: area.height }
+      }))
+    });
+
     this.mapData.impassableAreas.forEach(area => {
       this.addCollisionArea(area);
     });
@@ -422,12 +435,24 @@ export class PhaserMapRenderer {
 
     // Check if this is a polygon type
     if (area.type === 'impassable-polygon' && area.points && area.points.length > 0) {
+      // 🔍 DEBUG: Log polygon rendering
+      console.log('🎨 [WorldMap] Rendering POLYGON collision area:', {
+        id: area.id,
+        name: area.name,
+        type: area.type,
+        pointsCount: area.points.length,
+        points: area.points,
+        boundingBox: { x: area.x, y: area.y, width: area.width, height: area.height },
+        debugMode: this.debugMode
+      });
+
       // Create polygon graphics
       const graphics = this.scene.add.graphics();
 
-      // Set fill and stroke styles
-      graphics.fillStyle(0xff0000, this.debugMode ? 0.3 : 0.1);
-      graphics.lineStyle(2, 0xff0000, this.debugMode ? 0.8 : 0.3);
+      // Set fill and stroke styles - HIGH opacity for testing visibility
+      // TODO: Reduce opacity to 0.3 after confirming polygons are visible
+      graphics.fillStyle(0xff0000, 0.6);  // 60% opacity - very visible
+      graphics.lineStyle(4, 0xff0000, 0.9);  // Thick red border - very visible
 
       // Begin path and draw polygon
       graphics.beginPath();
@@ -441,12 +466,24 @@ export class PhaserMapRenderer {
       graphics.fillPath();
       graphics.strokePath();
 
+      // 🔧 FIX: Set depth to ensure polygon is visible above background
+      // Background is at depth -1000, so depth 100 ensures visibility
+      graphics.setDepth(100);
+
       // Add metadata
       (graphics as any).mapElementId = area.id;
       (graphics as any).mapElementType = 'collision';
       (graphics as any).mapElementData = area;
 
       visualObject = graphics;
+
+      console.log('✅ [WorldMap] Polygon graphics created and added to scene', {
+        id: area.id,
+        depth: graphics.depth,
+        firstPoint: area.points[0],
+        visible: graphics.visible,
+        alpha: graphics.alpha
+      });
     } else {
       // Create rectangular visual representation (default behavior)
       const rect = this.scene.add.rectangle(
@@ -459,6 +496,9 @@ export class PhaserMapRenderer {
       );
 
       rect.setStrokeStyle(2, 0xff0000, this.debugMode ? 0.8 : 0.3);
+
+      // Set depth to ensure rectangle is visible above background
+      rect.setDepth(100);
 
       // Add metadata
       (rect as any).mapElementId = area.id;

@@ -60,6 +60,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   backgroundInfoVisible = false,
 }) => {
 
+  // Unified tool options - all tools in one Segmented control
   const toolOptions = [
     {
       label: <Tooltip title="Select Tool (S)"><MousePointer size={16} /></Tooltip>,
@@ -68,11 +69,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     {
       label: <Tooltip title="Pan Tool (P)"><Hand size={16} /></Tooltip>,
       value: 'pan'
-    }
-  ];
-
-  // Paint functionality removed - only polygon collision areas are supported
-  const collisionToolOptions = [
+    },
     {
       label: <Tooltip title="Draw Polygon Collision"><Pentagon size={16} /></Tooltip>,
       value: 'draw-polygon'
@@ -96,20 +93,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           <Segmented
             options={toolOptions}
             value={editorState.tool}
-            onChange={(value) => {
-              onToolChange(value as EditorState['tool']);
-            }}
-            size="small"
-          />
-        </Space>
-
-        <Divider type="vertical" style={{ height: '24px' }} />
-
-        <Space size="small">
-          <Text type="secondary" style={{ fontSize: '12px' }}>Collision:</Text>
-          <Segmented
-            options={collisionToolOptions}
-            value={editorState.tool === 'draw-polygon' ? editorState.tool : undefined}
             onChange={(value) => {
               onToolChange(value as EditorState['tool']);
             }}

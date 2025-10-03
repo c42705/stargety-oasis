@@ -12,6 +12,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import Phaser from 'phaser';
 import WorldZoomControls from './WorldZoomControls';
 import { SharedMapSystem } from '../../shared/SharedMapSystem';
+import { PhaserMapRenderer } from './PhaserMapRenderer';
 
 // Animation frame mapping for the 3x7 sprite sheet
 const ANIMATION_FRAMES = {
@@ -49,6 +50,7 @@ class ExampleScene extends Phaser.Scene {
   public worldHeight: number;
   public isPerformingAction: boolean = false;
   private isSettingDefaultZoom = false;
+  private mapRenderer!: PhaserMapRenderer;
 
   constructor(config: { backgroundImageUrl: string; worldWidth: number; worldHeight: number }) {
     super({ key: 'ExampleScene' });
@@ -67,13 +69,20 @@ class ExampleScene extends Phaser.Scene {
   create() {
     ExampleScene.instance = this;
 
-    // Draw static map background (fills world)
-    if (this.backgroundImageUrl) {
-      const bg = this.add.image(0, 0, 'mapbg');
-      bg.setOrigin(0, 0);
-      bg.setDisplaySize(this.worldWidth, this.worldHeight);
-      bg.setDepth(-1000);
-    }
+    // Initialize map renderer to load collision areas and interactive areas
+    this.mapRenderer = new PhaserMapRenderer({
+      scene: this,
+      enablePhysics: false,
+      enableInteractions: true,
+      debugMode: false
+    });
+
+    // Initialize and render map (includes background, collision areas, interactive areas)
+    this.mapRenderer.initialize().then(() => {
+      console.log('✅ [WorldModuleAlt] Map renderer initialized successfully');
+    }).catch(error => {
+      console.error('❌ [WorldModuleAlt] Failed to initialize map renderer:', error);
+    });
 
     // Define animations for each movement/action
     Object.entries(ANIMATION_FRAMES).forEach(([key, frames]) => {

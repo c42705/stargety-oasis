@@ -168,6 +168,13 @@ export class SharedMapSystem {
     try {
       const storedData = localStorage.getItem(STORAGE_KEYS.MAP_DATA);
       if (storedData) {
+        // 📥 [Polygon Load] Log raw data retrieved from localStorage
+        console.info('📥 [Polygon Load] RAW DATA FROM LOCALSTORAGE', {
+          timestamp: new Date().toISOString(),
+          dataSize: storedData.length,
+          storageKey: STORAGE_KEYS.MAP_DATA
+        });
+
         const parsedData = JSON.parse(storedData);
 
         // Check if this is an old map without background image
@@ -175,9 +182,84 @@ export class SharedMapSystem {
           return await this.createDefaultMap();
         }
 
+        // 📥 [Polygon Load] Log deserialized polygon data
+        const polygonAreas = parsedData.impassableAreas?.filter((area: any) => area.type === 'impassable-polygon') || [];
+        console.info('📥 [Polygon Load] DESERIALIZED POLYGON DATA', {
+          timestamp: new Date().toISOString(),
+          totalImpassableAreas: parsedData.impassableAreas?.length || 0,
+          polygonCount: polygonAreas.length,
+          polygons: polygonAreas.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            type: p.type,
+            pointsCount: p.points?.length || 0,
+            allPoints: p.points,
+            boundingBox: {
+              x: p.x,
+              y: p.y,
+              width: p.width,
+              height: p.height
+            },
+            color: p.color
+          }))
+        });
+
+        // 🔧 FIX: Recalculate invalid bounding boxes for polygons
+        // This fixes polygons created with older code that didn't save bounding box correctly
+        let fixedPolygonCount = 0;
+        if (parsedData.impassableAreas) {
+          parsedData.impassableAreas = parsedData.impassableAreas.map((area: any) => {
+            if (area.type === 'impassable-polygon' && area.points && area.points.length > 0) {
+              // Check if bounding box is invalid (0 or missing)
+              if (!area.width || !area.height || area.width === 0 || area.height === 0) {
+                // Calculate correct bounding box from points
+                const xs = area.points.map((p: any) => p.x);
+                const ys = area.points.map((p: any) => p.y);
+                const minX = Math.min(...xs);
+                const minY = Math.min(...ys);
+                const maxX = Math.max(...xs);
+                const maxY = Math.max(...ys);
+
+                console.warn('⚠️ [Polygon Load] Invalid bounding box detected, recalculating...', {
+                  id: area.id,
+                  oldBoundingBox: { x: area.x, y: area.y, width: area.width, height: area.height },
+                  newBoundingBox: { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+                });
+
+                fixedPolygonCount++;
+
+                // Return new object with corrected bounding box
+                return {
+                  ...area,
+                  x: minX,
+                  y: minY,
+                  width: maxX - minX,
+                  height: maxY - minY
+                };
+              }
+            }
+            return area;
+          });
+        }
+
+        if (fixedPolygonCount > 0) {
+          console.info(`✅ [Polygon Load] Fixed ${fixedPolygonCount} polygon(s) with invalid bounding boxes`);
+          // Save the corrected data back to localStorage
+          localStorage.setItem(STORAGE_KEYS.MAP_DATA, JSON.stringify(parsedData));
+        }
+
         // Convert date strings back to Date objects
         parsedData.lastModified = new Date(parsedData.lastModified);
         this.mapData = parsedData;
+
+        // 📥 [Polygon Load] Log final state after reconstruction
+        console.info('📥 [Polygon Load] FINAL STATE AFTER RECONSTRUCTION', {
+          timestamp: new Date().toISOString(),
+          polygonCount: polygonAreas.length,
+          mapDataVersion: parsedData.version,
+          lastModified: parsedData.lastModified
+        });
+
         return parsedData;
       } else {
         return await this.createDefaultMap();
@@ -208,19 +290,26 @@ export class SharedMapSystem {
         throw new Error('No map data to save');
       }
 
-      // 💾 SAVE OPERATION - Log polygon positions BEFORE saving
+      // 💾 [Polygon Save] Log polygon data structure BEFORE serialization
       const polygonAreas = dataToSave.impassableAreas?.filter((area: any) => area.type === 'impassable-polygon') || [];
-      console.info('💾 SAVING - BEFORE', {
+      console.info('💾 [Polygon Save] BEFORE SERIALIZATION', {
+        timestamp: new Date().toISOString(),
         totalImpassableAreas: dataToSave.impassableAreas?.length || 0,
         polygonCount: polygonAreas.length,
         polygons: polygonAreas.map((p: any) => ({
           id: p.id,
           name: p.name,
+          type: p.type,
           pointsCount: p.points?.length || 0,
-          firstPoint: p.points?.[0],
-          lastPoint: p.points?.[p.points?.length - 1]
-        })),
-        timestamp: new Date().toISOString()
+          allPoints: p.points,
+          boundingBox: {
+            x: p.x,
+            y: p.y,
+            width: p.width,
+            height: p.height
+          },
+          color: p.color
+        }))
       });
 
       // Validate data before saving
@@ -237,16 +326,31 @@ export class SharedMapSystem {
         const jsonString = JSON.stringify(dataToSave);
         localStorage.setItem(STORAGE_KEYS.MAP_DATA, jsonString);
 
-        // 💾 SAVE OPERATION - Log what was written to localStorage
-        console.info('💾 SAVED TO LOCALSTORAGE', {
+        // 💾 [Polygon Save] Log serialized data written to localStorage
+        const serializedPolygons = JSON.parse(jsonString).impassableAreas?.filter((area: any) => area.type === 'impassable-polygon') || [];
+        console.info('💾 [Polygon Save] AFTER SERIALIZATION - WRITTEN TO LOCALSTORAGE', {
+          timestamp: new Date().toISOString(),
           dataSize: jsonString.length,
-          polygonCount: polygonAreas.length,
-          polygons: polygonAreas.map((p: any) => ({
+          storageKey: STORAGE_KEYS.MAP_DATA,
+          polygonCount: serializedPolygons.length,
+          polygons: serializedPolygons.map((p: any) => ({
             id: p.id,
+            name: p.name,
+            type: p.type,
             pointsCount: p.points?.length || 0,
-            firstPoint: p.points?.[0]
+            allPoints: p.points,
+            boundingBox: {
+              x: p.x,
+              y: p.y,
+              width: p.width,
+              height: p.height
+            }
           })),
-          timestamp: new Date().toISOString()
+          dataIntegrityCheck: {
+            originalPolygonCount: polygonAreas.length,
+            serializedPolygonCount: serializedPolygons.length,
+            countsMatch: polygonAreas.length === serializedPolygons.length
+          }
         });
       } catch (storageError) {
         if (storageError instanceof Error && storageError.name === 'QuotaExceededError') {

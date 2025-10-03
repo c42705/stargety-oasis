@@ -920,6 +920,24 @@ class GameScene extends Phaser.Scene {
     const playerTop = y - playerSize / 2;
     const playerBottom = y + playerSize / 2;
 
+    // 🔍 DEBUG: Log collision check (increased frequency for debugging)
+    if (Math.random() < 0.05) { // Log 5% of checks (increased from 1%)
+      console.log('🔍 [Collision] Checking impassable areas:', {
+        totalAreas: mapData.impassableAreas.length,
+        polygonAreas: mapData.impassableAreas.filter(a => a.type === 'impassable-polygon').length,
+        rectangleAreas: mapData.impassableAreas.filter(a => a.type !== 'impassable-polygon').length,
+        playerPos: { x, y },
+        playerBounds: { left: playerLeft, right: playerRight, top: playerTop, bottom: playerBottom },
+        polygonDetails: mapData.impassableAreas
+          .filter(a => a.type === 'impassable-polygon')
+          .map(a => ({
+            id: a.id,
+            boundingBox: { x: a.x, y: a.y, width: a.width, height: a.height },
+            pointsCount: a.points?.length || 0
+          }))
+      });
+    }
+
     // Check collision with each impassable area
     for (const area of mapData.impassableAreas) {
       // Check if this is a polygon type
@@ -936,6 +954,11 @@ class GameScene extends Phaser.Scene {
             playerBottom > areaTop) {
           // Bounding boxes overlap, now do precise polygon collision check
           if (this.checkPolygonCollision(area.points, playerLeft, playerRight, playerTop, playerBottom)) {
+            console.log('🚫 [Collision] POLYGON collision detected!', {
+              areaId: area.id,
+              areaName: area.name,
+              playerPos: { x, y }
+            });
             return true;
           }
         }
