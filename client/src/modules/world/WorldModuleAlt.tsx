@@ -156,6 +156,10 @@ class ExampleScene extends Phaser.Scene {
       let moved = false;
       let direction: string = 'idle';
 
+      // Store previous position for collision detection
+      const prevX = this.cody.x;
+      const prevY = this.cody.y;
+
       if (this.cursors.left.isDown) {
         this.cody.x -= speed * this.game.loop.delta / 1000;
         direction = 'left';
@@ -176,6 +180,16 @@ class ExampleScene extends Phaser.Scene {
         this.cody.y += speed * this.game.loop.delta / 1000;
         direction = 'down';
         moved = true;
+      }
+
+      // Check collision after movement
+      if (moved) {
+        const playerSize = 64; // Match the display size
+        if (this.checkCollisionWithImpassableAreas(this.cody.x, this.cody.y, playerSize)) {
+          // Collision detected, revert to previous position
+          this.cody.x = prevX;
+          this.cody.y = prevY;
+        }
       }
 
       if (moved) {
@@ -272,6 +286,133 @@ class ExampleScene extends Phaser.Scene {
       camera.setZoom(dynamicMinZoom);
     }
     camera.centerOn(this.cody.x, this.cody.y);
+  }
+
+  /**
+   * Check if a point is inside a polygon using ray casting algorithm
+   */
+  private isPointInPolygon(point: { x: number; y: number }, polygon: { x: number; y: number }[]): boolean {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i].x;
+      const yi = polygon[i].y;
+      const xj = polygon[j].x;
+      const yj = polygon[j].y;
+
+      const intersect = ((yi > point.y) !== (yj > point.y)) &&
+        (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  /**
+   * Check if player bounding box collides with a polygon
+   */
+  private checkPolygonCollision(
+    polygon: { x: number; y: number }[],
+    playerLeft: number,
+    playerRight: number,
+    playerTop: number,
+    playerBottom: number
+  ): boolean {
+    // Check if any corner of the player bounding box is inside the polygon
+    const corners = [
+      { x: playerLeft, y: playerTop },
+      { x: playerRight, y: playerTop },
+      { x: playerLeft, y: playerBottom },
+      { x: playerRight, y: playerBottom }
+    ];
+
+    for (const corner of corners) {
+      if (this.isPointInPolygon(corner, polygon)) {
+        return true;
+      }
+    }
+
+    // Also check if player center is inside polygon
+    const centerX = (playerLeft + playerRight) / 2;
+    const centerY = (playerTop + playerBottom) / 2;
+    if (this.isPointInPolygon({ x: centerX, y: centerY }, polygon)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if player position would collide with any impassable areas
+   */
+  private checkCollisionWithImpassableAreas(x: number, y: number, playerSize: number): boolean {
+    const mapData = this.mapRenderer?.getMapData();
+    if (!mapData || !mapData.impassableAreas) {
+      return false; // No collision data available
+    }
+
+    // Player bounding box (centered on player position)
+    const playerLeft = x - playerSize / 2;
+    const playerRight = x + playerSize / 2;
+    const playerTop = y - playerSize / 2;
+    const playerBottom = y + playerSize / 2;
+
+    // 🔍 DEBUG: Log collision check occasionally
+    if (Math.random() < 0.05) { // Log 5% of checks
+      console.log('🔍 [Collision] Checking impassable areas:', {
+        totalAreas: mapData.impassableAreas.length,
+        polygonAreas: mapData.impassableAreas.filter(a => a.type === 'impassable-polygon').length,
+        playerPos: { x, y },
+        playerBounds: { left: playerLeft, right: playerRight, top: playerTop, bottom: playerBottom }
+      });
+    }
+
+    // Check collision with each impassable area
+    for (const area of mapData.impassableAreas) {
+      // Check if this is a polygon type
+      if (area.type === 'impassable-polygon' && area.points && area.points.length > 0) {
+        // First: Quick AABB check using bounding box
+        const areaLeft = area.x;
+        const areaRight = area.x + area.width;
+        const areaTop = area.y;
+        const areaBottom = area.y + area.height;
+
+        if (playerLeft < areaRight &&
+            playerRight > areaLeft &&
+            playerTop < areaBottom &&
+            playerBottom > areaTop) {
+          // Bounding boxes overlap, now do precise polygon collision check
+          if (this.checkPolygonCollision(area.points, playerLeft, playerRight, playerTop, playerBottom)) {
+            console.log('🚫 [Collision] POLYGON collision detected!', {
+              areaId: area.id,
+              areaName: area.name,
+              playerPos: { x, y }
+            });
+            return true;
+          }
+        }
+      } else {
+        // Regular rectangular collision (default behavior)
+        const areaLeft = area.x;
+        const areaRight = area.x + area.width;
+        const areaTop = area.y;
+        const areaBottom = area.y + area.height;
+
+        // Check for overlap using AABB collision detection
+        if (playerLeft < areaRight &&
+            playerRight > areaLeft &&
+            playerTop < areaBottom &&
+            playerBottom > areaTop) {
+          // Collision detected
+          console.log('🚫 [Collision] RECTANGLE collision detected!', {
+            areaId: area.id,
+            areaName: area.name,
+            playerPos: { x, y }
+          });
+          return true;
+        }
+      }
+    }
+
+    return false; // No collision
   }
 }
 

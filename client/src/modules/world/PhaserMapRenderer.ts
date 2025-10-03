@@ -83,6 +83,13 @@ export class PhaserMapRenderer {
   }
 
   /**
+   * Get current map data for collision detection
+   */
+  public getMapData(): SharedMapData | null {
+    return this.mapData;
+  }
+
+  /**
    * Set up event listeners for map data changes
    */
   private setupEventListeners(): void {
@@ -449,10 +456,8 @@ export class PhaserMapRenderer {
       // Create polygon graphics
       const graphics = this.scene.add.graphics();
 
-      // Set fill and stroke styles - HIGH opacity for testing visibility
-      // TODO: Reduce opacity to 0.3 after confirming polygons are visible
-      graphics.fillStyle(0xff0000, 0.6);  // 60% opacity - very visible
-      graphics.lineStyle(4, 0xff0000, 0.9);  // Thick red border - very visible
+      graphics.fillStyle(0xff0000, 0.3);  
+      graphics.lineStyle(4, 0xff0000, 0.6); 
 
       // Begin path and draw polygon
       graphics.beginPath();
