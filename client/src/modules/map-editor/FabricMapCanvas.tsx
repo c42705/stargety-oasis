@@ -939,6 +939,16 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
           dragStartPosition = null; // Reset for next drag
         }
 
+        // 🛡️ DRIFT PREVENTION: Unlock polygon after drag completes
+        if (object.mapElementType === 'collision' && draggingPolygonIdRef.current === object.mapElementId) {
+          logger.info('🔓 UNLOCK POLYGON', {
+            id: object.mapElementId,
+            reason: 'Drag completed - allowing smart update',
+            timestamp: new Date().toISOString()
+          });
+          draggingPolygonIdRef.current = null;
+        }
+
         await handleObjectModified(object);
       }
       onObjectModified?.(object);
@@ -958,6 +968,17 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
             top: object.top || 0,
             timestamp: Date.now()
           };
+
+          // 🛡️ DRIFT PREVENTION: Track which polygon is being dragged
+          if (object.mapElementType === 'collision') {
+            draggingPolygonIdRef.current = object.mapElementId;
+            logger.info('🔒 LOCK POLYGON', {
+              id: object.mapElementId,
+              reason: 'Drag started - preventing smart update',
+              timestamp: new Date().toISOString()
+            });
+          }
+
           logger.info('🔄 DRAG START', {
             id: object.mapElementId,
             type: object.type,
@@ -1694,6 +1715,38 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     canvas.renderAll();
   }, [sharedMap.interactiveAreas]);
 
+  // Track currently dragging polygon to prevent drift
+  const draggingPolygonIdRef = useRef<string | null>(null);
+
+  // Helper function to check if polygon points have changed
+  const polygonPointsChanged = (existingPolygon: fabric.Polygon, newPoints: { x: number; y: number }[]): boolean => {
+    // Calculate the CURRENT absolute points from the Fabric polygon's transformation
+    // This is the source of truth, not the stale mapElementData
+    const matrix = existingPolygon.calcTransformMatrix();
+    const currentAbsolutePoints = existingPolygon.points?.map((point) => {
+      const transformedPoint = fabric.util.transformPoint(
+        { x: point.x, y: point.y },
+        matrix
+      );
+      return {
+        x: Math.round(transformedPoint.x),
+        y: Math.round(transformedPoint.y)
+      };
+    }) || [];
+
+    if (currentAbsolutePoints.length !== newPoints.length) return true;
+
+    // Check if any point coordinates differ
+    for (let i = 0; i < currentAbsolutePoints.length; i++) {
+      if (Math.abs(currentAbsolutePoints[i].x - newPoints[i].x) > 0.01 ||
+          Math.abs(currentAbsolutePoints[i].y - newPoints[i].y) > 0.01) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
   // Render collision areas
   const renderCollisionAreas = useCallback(() => {
     if (!fabricCanvasRef.current || !sharedMap.collisionAreas) return;
@@ -1701,7 +1754,8 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     // DEBUG: Log render start
     logger.info('🎨 RENDER COLLISION AREAS START', {
       areasCount: sharedMap.collisionAreas.length,
-      polygonAreas: sharedMap.collisionAreas.filter((a: any) => a.type === 'impassable-polygon').length
+      polygonAreas: sharedMap.collisionAreas.filter((a: any) => a.type === 'impassable-polygon').length,
+      draggingPolygonId: draggingPolygonIdRef.current
     });
 
     const canvas = fabricCanvasRef.current;
@@ -1745,6 +1799,52 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       if (existingObj && 'type' in area && (area as any).type === 'impassable-polygon' && (area as any).points) {
         const polygon = existingObj as fabric.Polygon;
         const absolutePoints = (area as any).points;
+
+        // 🛡️ DRIFT PREVENTION: Skip smart update if this polygon is currently being dragged
+        if (draggingPolygonIdRef.current === area.id) {
+          logger.info('⏭️ SKIP SMART UPDATE', {
+            id: area.id,
+            reason: 'Currently being dragged',
+            timestamp: new Date().toISOString()
+          });
+          return; // Don't update the polygon that's being dragged
+        }
+
+        // 🛡️ DIRTY CHECKING: Skip update if points haven't changed
+        const pointsChanged = polygonPointsChanged(polygon, absolutePoints);
+        if (!pointsChanged) {
+          logger.info('⏭️ SKIP SMART UPDATE', {
+            id: area.id,
+            reason: 'Points unchanged (calculated from current Fabric transformation)',
+            timestamp: new Date().toISOString()
+          });
+          return; // Don't update if data is identical
+        } else {
+          // Calculate current absolute points for logging
+          const matrix = polygon.calcTransformMatrix();
+          const currentAbsolutePoints = polygon.points?.map((point) => {
+            const transformedPoint = fabric.util.transformPoint(
+              { x: point.x, y: point.y },
+              matrix
+            );
+            return {
+              x: Math.round(transformedPoint.x),
+              y: Math.round(transformedPoint.y)
+            };
+          }) || [];
+
+          logger.warn('🔄 POINTS CHANGED DETECTED', {
+            id: area.id,
+            currentPointsCount: currentAbsolutePoints.length,
+            storagePointsCount: absolutePoints.length,
+            currentFirstPoint: currentAbsolutePoints[0],
+            storageFirstPoint: absolutePoints[0],
+            currentLastPoint: currentAbsolutePoints[currentAbsolutePoints.length - 1],
+            storageLastPoint: absolutePoints[absolutePoints.length - 1],
+            reason: 'Current Fabric transformation differs from storage',
+            timestamp: new Date().toISOString()
+          });
+        }
 
         // Capture position BEFORE smart update for flash/jump detection
         const positionBefore = {
