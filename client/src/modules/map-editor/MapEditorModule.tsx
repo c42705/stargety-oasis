@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { logger } from '../../shared/logger';
-import { Map, Eye, Square, Shield } from 'lucide-react';
+import { Eye, Square, Shield } from 'lucide-react';
 import { useMapData, InteractiveArea } from '../../shared/MapDataContext';
-// import { useSharedMap } from '../../shared/useSharedMap';
 import { useSharedMapCompat as useSharedMap } from '../../stores/useSharedMapCompat';
 import { useWorldDimensions } from '../../shared/useWorldDimensions';
 import { FabricMapCanvas } from './FabricMapCanvas';
@@ -11,8 +10,6 @@ import { AreaFormModal } from '../../components/AreaFormModal';
 import { useMapEditorCamera } from './hooks/useMapEditorCamera';
 import { CollisionAreaFormModal } from '../../components/CollisionAreaFormModal';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
-
-// Import extracted components
 import { EditorToolbar } from './components/EditorToolbar';
 import { EditorStatusBar } from './components/EditorStatusBar';
 import { AreasTab } from './components/tabs/AreasTab';
@@ -21,8 +18,6 @@ import { AssetsTab } from './components/tabs/AssetsTab';
 import { LayersTab } from './components/tabs/LayersTab';
 import { CollisionTab } from './components/tabs/CollisionTab';
 import { SettingsTab } from './components/tabs/SettingsTab';
-
-// Import extracted hooks
 import { useEditorState } from './hooks/useEditorState';
 import { useGridConfig } from './hooks/useGridConfig';
 import { useModalState } from './hooks/useModalState';
@@ -36,11 +31,7 @@ import { MapEditorModuleProps, TabId, GridConfig } from './types/editor.types';
 import { EDITOR_TABS, KEYBOARD_SHORTCUTS } from './constants/editorConstants';
 
 // Import zoom utilities
-import {
-  calculateZoomToObject,
-  getViewportDimensions,
-  applyZoomAndPan,
-  validateZoomOperation,
+import {  
   getZoomState
 } from './utils/zoomUtils';
 
@@ -404,12 +395,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
 
   return (
     <div className={`map-editor-module ${className}`}>
-      <header className="editor-header">
-        <div className="editor-title">
-          <Map size={24} className="editor-icon" />
-          <h1>Map Editor</h1>
-          <span className="editor-subtitle">Stargety Oasis World Designer</span>
-        </div>
+      <header className="editor-header">        
         <EditorToolbar
           editorState={editorState.editorState}
           gridConfig={gridConfig.gridConfig}

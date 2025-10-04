@@ -247,7 +247,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             });
 
             // Removed: Non-critical background image saved to shared map system log.
-
             // Show modal with resize options
             Modal.confirm({
               title: 'Background Image Detected',
@@ -362,19 +361,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       {/* Map Data Management */}
-      <Card title="Map Data Management" size="small">
-        <MapDataManager
-          onMapLoaded={() => {
-            // Removed: Non-critical map loaded successfully log.
-          }}
-          onMapSaved={() => {
-            // Removed: Non-critical map saved successfully log.
-          }}
+      
+        <MapDataManager       
           onError={(error) => {
             logger.error('Map operation error', error);
           }}
         />
-      </Card>
+      
 
       {/* Map Size Settings */}
       <Card
@@ -389,35 +382,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         size="small"
       >
         <Form layout="vertical">
-          {/* Current Map Size Display */}
-          <Form.Item>
-            <div style={{
-              background: 'var(--color-bg-secondary)',
-              padding: '12px',
-              borderRadius: '6px',
-              border: '1px solid var(--color-border-light)'
-            }}>
-              <Row gutter={16} align="middle">
-                <Col span={12}>
-                  <div>
-                    <strong>Current Size:</strong>
-                    <div style={{ fontSize: '18px', color: 'var(--color-accent)' }}>
-                      {mapData.worldDimensions.width} × {mapData.worldDimensions.height} px
-                    </div>
-                  </div>
-                </Col>
-                <Col span={12}>
-                  <div>
-                    <strong>Aspect Ratio:</strong>
-                    <div style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
-                      {(mapData.worldDimensions.width / mapData.worldDimensions.height).toFixed(2)}:1
-                    </div>
-                  </div>
-                </Col>
-              </Row>
-            </div>
-          </Form.Item>
-
+     
           {/* Preset Selection */}
           <Form.Item label="Size Presets">
             <Select
@@ -494,7 +459,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 type="default"
                 danger
               >
-                Reset to Default Map
+                Reset
               </Button>
             </Space>
             <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
@@ -572,20 +537,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 75: '75%',
                 100: '100%'
               }}
-            />
-          </Form.Item>
-        </Form>
-      </Card>
-
-      {/* Editor Settings */}
-      <Card title="Editor Settings" size="small">
-        <Form layout="vertical">
-          <Form.Item label="Preview Mode">
-            <Switch
-              checked={previewMode}
-              onChange={onPreviewModeChange}
-              checkedChildren="ON"
-              unCheckedChildren="OFF"
             />
           </Form.Item>
         </Form>

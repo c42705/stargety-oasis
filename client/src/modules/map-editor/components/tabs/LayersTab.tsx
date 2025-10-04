@@ -341,8 +341,8 @@ export const LayersTab: React.FC<LayersTabProps> = ({
       key: group.key,
       children: group.objects.map(obj => ({
         title: (
-          <Space size="small" style={{ width: '100%', justifyContent: 'space-between' }}>
-            <Space size="small" style={{ flex: 1, minWidth: 0 }}>
+          <Space size="small" style={{ width: '100%', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <Space size="small" style={{ flex: 1, minWidth: 0, gap: 0, flexDirection: 'column', alignItems: 'flex-start' }}>
               <Text
                 style={{ fontSize: '12px', cursor: 'pointer' }}
                 ellipsis={{ tooltip: obj.name }}

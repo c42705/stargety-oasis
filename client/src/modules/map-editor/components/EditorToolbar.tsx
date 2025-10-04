@@ -1,26 +1,22 @@
 import React from 'react';
-import { Button, Space, Typography, Divider, Tooltip, Flex, Segmented, Popover, Radio } from 'antd';
+import { Button, Space, Typography, Divider, Tooltip, Flex, Segmented, } from 'antd';
 import {
   MousePointer,
-  Move,
-  Square,
-  ZoomIn,
+    ZoomIn,
   ZoomOut,
   Maximize,
   Undo,
   Redo,
   Grid3X3,
-  Shield,
-  Eraser,
-  Trash2,
-  Eye,
+    Eye,
   Hand,
   RotateCcw,
   Info,
-  Pentagon
+  Pentagon  
 } from 'lucide-react';
 import { EditorState, GridConfig } from '../types/editor.types';
 import { SaveStatusIndicator } from '../../../components/SaveStatusIndicator';
+
 
 const { Text } = Typography;
 
@@ -81,9 +77,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       justify="space-between"
       align="center"
       style={{
-        padding: '8px 16px',
+        
         backgroundColor: 'var(--color-bg-secondary)',
-        borderBottom: '1px solid var(--color-border-light)',
+        
         gap: '16px'
       }}
     >
@@ -102,7 +98,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       </Flex>
 
       <Flex align="center" gap="middle">
-        {/* Paint brush controls removed - only polygon collision supported */}
+        
         <Divider type="vertical" style={{ height: '24px' }} />
         <Space size="small">
           <Text type="secondary" style={{ fontSize: '12px' }}>Zoom:</Text>
@@ -181,6 +177,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               />
             </Tooltip>
           )}
+          <Button icon={<Info size={16} type='primary' />}>Return to world map</Button>          
         </Space>
       </Flex>
     </Flex>

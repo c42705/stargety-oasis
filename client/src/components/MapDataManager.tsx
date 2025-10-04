@@ -14,9 +14,8 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { App, Alert, Button, Card, Descriptions, Space, Typography, Upload } from 'antd';
-import { UploadOutlined, SaveOutlined, DownloadOutlined, InboxOutlined, CopyOutlined, UndoOutlined } from '@ant-design/icons';
-// import { useSharedMap } from '../shared/useSharedMap';
+import { App, Alert, Button, Card, Space, Typography, Upload } from 'antd';
+import { UploadOutlined, DownloadOutlined, InboxOutlined, CopyOutlined, UndoOutlined } from '@ant-design/icons';
 import { useSharedMapCompat as useSharedMap } from '../stores/useSharedMapCompat';
 import { SharedMapSystem } from '../shared/SharedMapSystem';
 
@@ -188,20 +187,8 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
   const { message } = App.useApp();
 
   return (
-    <Card size="small" className={className} title={<Typography.Title level={4} style={{ margin: 0 }}>Map Data Management</Typography.Title>}>
-      {mapStats && (
-        <Descriptions size="small" column={3} style={{ marginBottom: 16 }}>
-          <Descriptions.Item label="Version">{mapStats.version}</Descriptions.Item>
-          <Descriptions.Item label="Areas">{mapStats.interactiveAreasCount}</Descriptions.Item>
-          <Descriptions.Item label="Collisions">{mapStats.collisionAreasCount}</Descriptions.Item>
-        </Descriptions>
-      )}
-
-      <Card size="small" type="inner" title="File Operations" style={{ marginBottom: 16 }}>
-        <Space wrap>
-          <Button type="primary" icon={<SaveOutlined />} loading={isSaving} disabled={sharedMap.isLoading} onClick={handleSaveMap}>
-            Save Map
-          </Button>
+    <Card size="small" className={className} title="Map Data Management">      
+<Space wrap style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
           <Button icon={<DownloadOutlined />} loading={isExporting} disabled={sharedMap.isLoading} onClick={handleExportMap}>
             Export Map
           </Button>
@@ -210,8 +197,15 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
               Import Map
             </Button>
           </Upload>
-        </Space>
-      </Card>
+          <Button danger icon={<UndoOutlined />} loading={isRestoring} disabled={sharedMap.isLoading} onClick={handleRestoreBackup}>
+            Restore Backup
+          </Button>
+          <Typography.Text type="secondary">
+            Restores the last automatically saved backup. This will overwrite current changes.
+          </Typography.Text>
+      </Space>
+          
+      
 
       <Card size="small" type="inner" title="Clipboard Operations" style={{ marginBottom: 16 }}>
         <Space wrap>
@@ -227,28 +221,8 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
         </Space>
       </Card>
 
-      <Card size="small" type="inner" title="Backup & Recovery" style={{ marginBottom: 16 }}>
-        <Space direction="vertical" style={{ width: '100%' }}>
-          <Button danger icon={<UndoOutlined />} loading={isRestoring} disabled={sharedMap.isLoading} onClick={handleRestoreBackup}>
-            Restore Backup
-          </Button>
-          <Typography.Text type="secondary">
-            Restores the last automatically saved backup. This will overwrite current changes.
-          </Typography.Text>
-        </Space>
-      </Card>
 
-      {mapStats && (
-        <Card size="small" type="inner" title="Map Information" style={{ marginBottom: 16 }}>
-          <Descriptions size="small" column={2}>
-            <Descriptions.Item label="Last Modified">{mapStats.lastModified.toLocaleString()}</Descriptions.Item>
-            <Descriptions.Item label="Interactive Areas">{mapStats.interactiveAreasCount}</Descriptions.Item>
-            <Descriptions.Item label="Collision Areas">{mapStats.collisionAreasCount}</Descriptions.Item>
-            <Descriptions.Item label="Total Elements">{mapStats.totalElements}</Descriptions.Item>
-            <Descriptions.Item label="Layers">{mapStats.layersCount}</Descriptions.Item>
-          </Descriptions>
-        </Card>
-      )}
+  
 
       {sharedMap.error && (
         <Alert
@@ -262,17 +236,6 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
         />
       )}
 
-
-
-      <Card size="small" type="inner" title="Future Enhancements">
-        <ul style={{ marginBottom: 0 }}>
-          <li>Cloud storage integration for map sharing</li>
-          <li>Map versioning and diff visualization</li>
-          <li>Collaborative editing with conflict resolution</li>
-          <li>Map templates and preset library</li>
-          <li>Database migration for persistent storage</li>
-        </ul>
-      </Card>
     </Card>
   );
 };
