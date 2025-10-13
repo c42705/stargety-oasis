@@ -119,7 +119,6 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [areasToDelete, setAreasToDelete] = useState<{ id: string; name: string }[]>([]);
   const [forceRender, setForceRender] = useState(0);
-  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const performanceMonitorRef = useRef<CanvasPerformanceMonitor | null>(null);
 
   // Paint functionality removed - only polygon collision areas are supported
@@ -291,7 +290,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   }, [gridVisible, gridSpacing, snapToGrid]);
 
   // Handle real-time object scaling (immediate visual feedback only)
-  const handleObjectScaling = useCallback((object: CanvasObject) => {
+  const handleObjectScaling = useCallback(() => {
     // Note: Aspect ratio maintenance can be implemented here if needed
     // For now, we just provide visual feedback without triggering callbacks
 
@@ -767,8 +766,6 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       canvas.discardActiveObject();
       canvas.renderAll();
 
-      // Show success message
-      const deletedCount = areasToDelete.length;
       // Removed: Non-critical area deletion log for maintainability.
     } catch (error) {
       logger.error('Failed to delete areas', error);
@@ -1013,11 +1010,8 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     });
 
     // Object scaling events
-    canvas.on('object:scaling', (e) => {
-      const object = e.target as CanvasObject;
-      if (object) {
-        handleObjectScaling(object);
-      }
+    canvas.on('object:scaling', () => {
+      handleObjectScaling();
     });
 
     // --- NATIVE FABRIC.JS PAN/ZOOM IMPLEMENTATION ---
@@ -1230,12 +1224,6 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
           return;
         }
 
-        // Get canvas and image dimensions
-        const canvasWidth = canvas.width!;
-        const canvasHeight = canvas.height!;
-        const imageWidth = img.width!;
-        const imageHeight = img.height!;
-
         // Removed: Non-critical background image dimensions log.
 
         // For the Map Editor, we want to show the image at its actual size
@@ -1286,9 +1274,6 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
         // Removed: Non-critical background image added log.
 
-        // Verify the background image was added correctly
-        const addedObjects = canvas.getObjects();
-        const backgroundCount = addedObjects.filter(obj => (obj as any).isBackgroundImage).length;
         // Removed: Non-critical background verification log.
 
         // Immediate render to ensure visibility
@@ -1302,9 +1287,6 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
             canvas.renderAll();
             // Removed: Non-critical background image layer order enforced log.
 
-            // Log final state
-            const allObjects = canvas.getObjects();
-            const bgImages = allObjects.filter(obj => (obj as any).isBackgroundImage);
             // Removed: Non-critical final background state log.
 
             // Mark background as ready and trigger coordinated layer order update
@@ -1365,7 +1347,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
       }
     };
 
-    const handleDimensionsChanged = (event: any) => {
+    const handleDimensionsChanged = () => {
       // Removed: Non-critical dimensions changed event log.
 
       // Canvas dimensions will be updated via props from MapEditorModule

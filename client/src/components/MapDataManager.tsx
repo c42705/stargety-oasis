@@ -29,14 +29,12 @@ interface MapDataManagerProps {
 export const MapDataManager: React.FC<MapDataManagerProps> = ({
   className = '',
   onMapLoaded,
-  onMapSaved,
   onError
 }) => {
   const sharedMap = useSharedMap({ source: 'editor' });
 
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
 
   /**
@@ -106,23 +104,6 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
    * Trigger file input click
    */
 
-
-  /**
-   * Save current map data
-   */
-  const handleSaveMap = useCallback(async () => {
-    try {
-      setIsSaving(true);
-      await sharedMap.saveMap();
-      onMapSaved?.();
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to save map';
-      onError?.(errorMessage);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [sharedMap, onMapSaved, onError]);
-
   /**
    * Restore from backup
    */
@@ -178,11 +159,6 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
       setIsImporting(false);
     }
   }, [sharedMap, onMapLoaded, onError]);
-
-  /**
-   * Get map statistics
-   */
-  const mapStats = sharedMap.getMapStatistics();
 
   const { message } = App.useApp();
 

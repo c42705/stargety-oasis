@@ -31,9 +31,7 @@ import { MapEditorModuleProps, TabId, GridConfig } from './types/editor.types';
 import { EDITOR_TABS, KEYBOARD_SHORTCUTS } from './constants/editorConstants';
 
 // Import zoom utilities
-import {  
-  getZoomState
-} from './utils/zoomUtils';
+// (Currently no zoom utilities needed in this module)
 
 
 
@@ -360,7 +358,6 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
                   zoom: Math.round(fitZoom * 100)
                 }));
 
-                const zoomState = getZoomState(fitZoom);
                 // Removed: Non-critical zoomed & panned to object debug log.
               } catch (error) {
                 logger.error('ZOOM TO OBJECT ERROR', error);
@@ -499,10 +496,10 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
                 zoom: Math.round(zoom * 100)
               }));
             }}
-            onSelectionChanged={(objects) => {
+            onSelectionChanged={() => {
               // Removed: Non-critical selection changed log.
             }}
-            onObjectModified={(object) => {
+            onObjectModified={() => {
               // Removed: Non-critical object modified log.
             }}
             onAreaDrawn={handleAreaDrawn}
