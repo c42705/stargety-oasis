@@ -30,6 +30,17 @@ import {
   CanvasPerformanceMonitor,
   shouldOptimizePerformance
 } from './utils/performanceUtils';
+import {
+  createVertexHandles,
+  createEdgeHandles,
+  updatePolygonFromHandles,
+  removeEditHandles,
+  insertVertex,
+  deleteVertex,
+  updateEdgeHandles,
+  PolygonEditHandles
+} from './utils/polygonEditUtils';
+import { usePolygonEditMode } from './hooks/usePolygonEditMode';
 import './FabricMapCanvas.css';
 
 interface FabricMapCanvasProps {
@@ -105,6 +116,10 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   // Use refs for preview elements to avoid stale closures and re-render issues
   const polygonPreviewLineRef = useRef<fabric.Line | null>(null);
   const polygonPreviewPolygonRef = useRef<fabric.Polygon | null>(null);
+
+  // Polygon edit mode state
+  const polygonEditMode = usePolygonEditMode();
+  const editHandlesRef = useRef<PolygonEditHandles>({ vertexHandles: [], edgeHandles: [] });
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
@@ -708,18 +723,73 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     }
   }, [currentTool, polygonDrawingState.isDrawing, cancelPolygonDrawing]);
 
-  // Handle Escape key to cancel polygon drawing
+  // Polygon edit mode functions
+  const enterPolygonEditMode = useCallback((polygon: fabric.Polygon) => {
+    if (!fabricCanvasRef.current) return;
+    const canvas = fabricCanvasRef.current;
+
+    const polygonId = (polygon as any).mapElementId;
+    if (!polygonId) return;
+
+    polygonEditMode.startEditing(polygonId);
+    polygon.selectable = false;
+    polygon.evented = false;
+
+    const vertexHandles = createVertexHandles(polygon, canvas);
+    const edgeHandles = createEdgeHandles(polygon, canvas);
+
+    editHandlesRef.current = { vertexHandles, edgeHandles };
+    polygonEditMode.setVertexHandles(vertexHandles);
+    polygonEditMode.setEdgeHandles(edgeHandles);
+
+    canvas.renderAll();
+  }, [fabricCanvasRef, polygonEditMode]);
+
+  const exitPolygonEditMode = useCallback(() => {
+    if (!fabricCanvasRef.current) return;
+    const canvas = fabricCanvasRef.current;
+
+    // Remove handles
+    removeEditHandles(editHandlesRef.current, canvas);
+
+    // Re-enable polygon selection
+    const polygonId = polygonEditMode.editState.editingPolygonId;
+    if (polygonId) {
+      const polygon = canvas.getObjects().find(obj =>
+        (obj as any).mapElementId === polygonId
+      ) as fabric.Polygon;
+
+      if (polygon) {
+        polygon.selectable = true;
+        polygon.evented = true;
+
+        // Update polygon in shared map
+        handleObjectModified(polygon as any);
+      }
+    }
+
+    polygonEditMode.stopEditing();
+    editHandlesRef.current = { vertexHandles: [], edgeHandles: [] };
+    canvas.renderAll();
+  }, [fabricCanvasRef, polygonEditMode, handleObjectModified]);
+
+  // Handle Escape key to cancel polygon drawing and exit edit mode
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && currentTool === 'draw-polygon' && polygonDrawingState.isDrawing) {
-        e.preventDefault();
-        cancelPolygonDrawing();
+      if (e.key === 'Escape') {
+        if (currentTool === 'draw-polygon' && polygonDrawingState.isDrawing) {
+          e.preventDefault();
+          cancelPolygonDrawing();
+        } else if (polygonEditMode.editState.isEditing) {
+          e.preventDefault();
+          exitPolygonEditMode();
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentTool, polygonDrawingState.isDrawing, cancelPolygonDrawing]);
+  }, [currentTool, polygonDrawingState.isDrawing, cancelPolygonDrawing, polygonEditMode.editState.isEditing, exitPolygonEditMode]);
 
   // Handle deletion of selected areas
   const handleDeleteSelectedAreas = useCallback((selectedObjects: fabric.Object[]) => {
@@ -921,6 +991,22 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     // Object modification events
     canvas.on('object:modified', async (e) => {
       const object = e.target as CanvasObject;
+
+      // Handle vertex handle modification (drag complete)
+      if ((object as any).isVertexHandle && polygonEditMode.editState.isEditing) {
+        const polygonId = (object as any).polygonId;
+        const polygon = canvas.getObjects().find(obj =>
+          (obj as any).mapElementId === polygonId
+        ) as fabric.Polygon;
+
+        if (polygon) {
+          updatePolygonFromHandles(polygon, editHandlesRef.current.vertexHandles, canvas);
+          updateEdgeHandles(editHandlesRef.current.vertexHandles, editHandlesRef.current.edgeHandles);
+          canvas.renderAll();
+        }
+        return;
+      }
+
       if (object && object.mapElementId && object.mapElementType) {
         // Log drag end
         if (dragStartPosition) {
@@ -960,6 +1046,14 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     canvas.on('object:moving', (e) => {
       const object = e.target as CanvasObject;
       if (object) {
+        // Handle vertex handle dragging in edit mode
+        if ((object as any).isVertexHandle && polygonEditMode.editState.isEditing) {
+          // Update edge handles when vertex is moved
+          updateEdgeHandles(editHandlesRef.current.vertexHandles, editHandlesRef.current.edgeHandles);
+          canvas.renderAll();
+          return;
+        }
+
         // Log drag start (first movement)
         if (!dragStartPosition && object.mapElementId) {
           dragStartPosition = {
@@ -1112,7 +1206,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onSelectionChanged, onObjectModified, drawingMode, collisionDrawingMode, currentTool, handleObjectModified, handleObjectMoving, handleObjectScaling, handleDeleteSelectedAreas]);
+  }, [onSelectionChanged, onObjectModified, drawingMode, collisionDrawingMode, currentTool, handleObjectModified, handleObjectMoving, handleObjectScaling, handleDeleteSelectedAreas, polygonEditMode.editState.isEditing]);
 
 
 
@@ -2195,12 +2289,77 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
 
     // Paint functions removed - only polygon collision areas are supported
 
-    // Handle double-click for polygon completion
+    // Handle double-click for polygon completion and edit mode
     const handleDoubleClick = (e: any) => {
+      // Handle polygon drawing completion
       if (currentTool === 'draw-polygon' && polygonDrawingState.isDrawing) {
         e.e?.preventDefault();
         e.e?.stopPropagation();
         completePolygon();
+        return;
+      }
+
+      // Handle polygon edit mode interactions
+      const target = e.target;
+
+      // Double-click vertex handle to delete vertex
+      if ((target as any)?.isVertexHandle && polygonEditMode.editState.isEditing) {
+        e.e?.preventDefault();
+        e.e?.stopPropagation();
+
+        const vertexIndex = (target as any).vertexIndex;
+        const polygonId = (target as any).polygonId;
+        const polygon = canvas.getObjects().find(obj =>
+          (obj as any).mapElementId === polygonId
+        ) as fabric.Polygon;
+
+        if (polygon && deleteVertex(polygon, vertexIndex, canvas)) {
+          // Recreate handles with updated vertex count
+          exitPolygonEditMode();
+          enterPolygonEditMode(polygon);
+        }
+        return;
+      }
+
+      // Double-click edge handle to insert vertex
+      if ((target as any)?.isEdgeHandle && polygonEditMode.editState.isEditing) {
+        e.e?.preventDefault();
+        e.e?.stopPropagation();
+
+        const edgeIndex = (target as any).edgeIndex;
+        const polygonId = (target as any).polygonId;
+        const polygon = canvas.getObjects().find(obj =>
+          (obj as any).mapElementId === polygonId
+        ) as fabric.Polygon;
+
+        if (polygon) {
+          const position = { x: target.left || 0, y: target.top || 0 };
+          insertVertex(polygon, edgeIndex, position, canvas);
+
+          // Recreate handles with new vertex
+          exitPolygonEditMode();
+          enterPolygonEditMode(polygon);
+        }
+        return;
+      }
+
+      // Double-click polygon to enter edit mode (only with select tool)
+      if (currentTool === 'select' && target?.type === 'polygon' && !polygonEditMode.editState.isEditing) {
+        e.e?.preventDefault();
+        e.e?.stopPropagation();
+
+        const polygon = target as fabric.Polygon;
+        if ((polygon as any).mapElementType === 'collision') {
+          enterPolygonEditMode(polygon);
+        }
+        return;
+      }
+
+      // Double-click outside to exit edit mode
+      if (polygonEditMode.editState.isEditing && !target) {
+        e.e?.preventDefault();
+        e.e?.stopPropagation();
+        exitPolygonEditMode();
       }
     };
 
@@ -2231,6 +2390,9 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     addPolygonVertex,
     updatePolygonPreview,
     completePolygon,
+    polygonEditMode.editState.isEditing,
+    enterPolygonEditMode,
+    exitPolygonEditMode,
   ]);
 
 
