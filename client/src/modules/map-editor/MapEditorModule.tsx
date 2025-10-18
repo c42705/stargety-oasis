@@ -12,10 +12,10 @@ import { CollisionAreaFormModal } from '../../components/CollisionAreaFormModal'
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 import { EditorToolbar } from './components/EditorToolbar';
 import { EditorStatusBar } from './components/EditorStatusBar';
+import { LayersPanel } from './components/LayersPanel';
 import { AreasTab } from './components/tabs/AreasTab';
 import { TerrainTab } from './components/tabs/TerrainTab';
 import { AssetsTab } from './components/tabs/AssetsTab';
-import { LayersTab } from './components/tabs/LayersTab';
 import { CollisionTab } from './components/tabs/CollisionTab';
 import { SettingsTab } from './components/tabs/SettingsTab';
 import { useEditorState } from './hooks/useEditorState';
@@ -300,71 +300,6 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         return <TerrainTab />;
       case 'assets':
         return <AssetsTab />;
-      case 'layers':
-        return (
-          <LayersTab
-            fabricCanvas={fabricCanvasRef.current}
-            onObjectSelect={(object) => {
-              // Handle object selection - ensure object is properly selected after zoom
-              if (fabricCanvasRef.current && object) {
-                const canvas = fabricCanvasRef.current;
-
-                // Make sure the object is selectable (not locked)
-                if (object.selectable !== false) {
-                  canvas.setActiveObject(object);
-                  canvas.renderAll();
-
-                  // Removed: Non-critical object selected from layers log.
-                } else {
-                  // Removed: Non-critical object locked selection log.
-                }
-              }
-            }}
-            onToolChange={editorState.onToolChange}
-            onZoomToObject={(object) => {
-              // Zoom and pan to fit the selected object in the viewport
-              if (!fabricCanvasRef.current || !object) return;
-
-              const canvas = fabricCanvasRef.current;
-              // Use the true object size/position for zoom and pan calculations
-              // Use fabric's absolute bounding rect for robust zoom-to-object
-              // getBoundingRect() returns canvas coordinates for the object, which is what we want
-              const bounds = object.getBoundingRect();
-              const objLeft = bounds.left;
-              const objTop = bounds.top;
-              const objWidth = bounds.width;
-              const objHeight = bounds.height;
-
-              try {
-                const viewportWidth = mainRef.current?.offsetWidth || canvas.getWidth() || 1;
-                const viewportHeight = mainRef.current?.offsetHeight || canvas.getHeight() || 1;
-                // Compute fit zoom with margin (10% of viewport width and height), clamp to max 3x for usability
-                const margin = viewportWidth * 0.10;
-                const verticalMargin = viewportHeight * 0.10;
-                const zoomX = (viewportWidth - margin * 2) / objWidth;
-                const zoomY = (viewportHeight - verticalMargin * 2) / objHeight;
-                let fitZoom = Math.min(zoomX, zoomY);
-                fitZoom = Math.max(0.1, Math.min(fitZoom, 3));
-
-                // Center on the object
-                canvas.setZoom(fitZoom);
-                const vpt = canvas.viewportTransform ?? [1,0,0,1,0,0];
-                vpt[4] = viewportWidth / 2 - (objLeft + objWidth / 2) * fitZoom;
-                vpt[5] = viewportHeight / 2 - (objTop + objHeight / 2) * fitZoom;
-                canvas.setViewportTransform(vpt);
-
-                editorState.setEditorState(prev => ({
-                  ...prev,
-                  zoom: Math.round(fitZoom * 100)
-                }));
-
-                // Removed: Non-critical zoomed & panned to object debug log.
-              } catch (error) {
-                logger.error('ZOOM TO OBJECT ERROR', error);
-              }
-            }}
-          />
-        );
       case 'collision':
         return (
           <CollisionTab
@@ -473,6 +408,70 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
       </header>
 
       <div className="editor-layout">
+        <LayersPanel
+          fabricCanvas={fabricCanvasRef.current}
+          onObjectSelect={(object) => {
+            // Handle object selection - ensure object is properly selected after zoom
+            if (fabricCanvasRef.current && object) {
+              const canvas = fabricCanvasRef.current;
+
+              // Make sure the object is selectable (not locked)
+              if (object.selectable !== false) {
+                canvas.setActiveObject(object);
+                canvas.renderAll();
+              }
+            }
+          }}
+          onToolChange={editorState.onToolChange}
+          onZoomToObject={(object) => {
+            // Zoom and pan to fit the selected object in the viewport
+            if (!fabricCanvasRef.current || !object) return;
+
+            const canvas = fabricCanvasRef.current;
+            const bounds = object.getBoundingRect();
+            const objLeft = bounds.left;
+            const objTop = bounds.top;
+            const objWidth = bounds.width;
+            const objHeight = bounds.height;
+
+            try {
+              const viewportWidth = mainRef.current?.offsetWidth || canvas.getWidth() || 1;
+              const viewportHeight = mainRef.current?.offsetHeight || canvas.getHeight() || 1;
+              const margin = viewportWidth * 0.10;
+              const verticalMargin = viewportHeight * 0.10;
+              const zoomX = (viewportWidth - margin * 2) / objWidth;
+              const zoomY = (viewportHeight - verticalMargin * 2) / objHeight;
+              let fitZoom = Math.min(zoomX, zoomY);
+              fitZoom = Math.max(0.1, Math.min(fitZoom, 3));
+
+              canvas.setZoom(fitZoom);
+              const vpt = canvas.viewportTransform ?? [1,0,0,1,0,0];
+              vpt[4] = viewportWidth / 2 - (objLeft + objWidth / 2) * fitZoom;
+              vpt[5] = viewportHeight / 2 - (objTop + objHeight / 2) * fitZoom;
+              canvas.setViewportTransform(vpt);
+
+              editorState.setEditorState(prev => ({
+                ...prev,
+                zoom: Math.round(fitZoom * 100)
+              }));
+            } catch (error) {
+              logger.error('ZOOM TO OBJECT ERROR', error);
+            }
+          }}
+          onEditInteractiveArea={(areaId) => {
+            const area = areas.find(a => a.id === areaId);
+            if (area) {
+              modalState.handleEditArea(area);
+            }
+          }}
+          onEditCollisionArea={(areaId) => {
+            const area = impassableAreas.find(a => a.id === areaId);
+            if (area) {
+              collisionModalState.handleEditCollisionArea(area);
+            }
+          }}
+        />
+
         <main
           ref={mainRef}
           className="editor-main"
