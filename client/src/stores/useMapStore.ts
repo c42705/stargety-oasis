@@ -1,4 +1,4 @@
-// Redux facade for previous Zustand useMapStore API
+// Redux-based useMapStore API
 // Keeps import sites stable while internally using Redux (RTK)
 
 import { useMapStoreCompat } from '../redux-compat/useMapStoreCompat';

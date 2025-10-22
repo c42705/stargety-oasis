@@ -42,7 +42,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   className = ''
 }) => {
   const { mapData } = useMapData();
-  // Auto-save is now controlled entirely by the Zustand store
+  // Auto-save is now controlled entirely by the Redux store
   const sharedMap = useSharedMap({
     source: 'editor'
     // Note: autoSave parameter removed - controlled by store toggle only

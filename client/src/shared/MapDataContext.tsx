@@ -133,7 +133,7 @@ const defaultMapData: MapData = {
 
 export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Use the shared map system instead of local state
-  // Auto-save is now controlled by the Zustand store configuration
+  // Auto-save is now controlled by the Redux store configuration
   const sharedMap = useSharedMap({ source: 'editor' });
   const [mapData, setMapData] = useState<MapData>(defaultMapData);
 

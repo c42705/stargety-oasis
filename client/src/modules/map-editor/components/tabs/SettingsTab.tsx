@@ -55,7 +55,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   onPreviewModeChange
 }) => {
   const { mapData, updateInteractiveAreas } = useMapData();
-  // Auto-save is now controlled by the Zustand store configuration
+  // Auto-save is now controlled by the Redux store configuration
   const sharedMap = useSharedMap({ source: 'editor' });
   const worldDimensions = useWorldDimensions();
   const [customMapSize, setCustomMapSize] = useState({

@@ -1,9 +1,8 @@
 /**
  * Shared Map Compatibility Hook
  * 
- * This hook provides the exact same interface as useSharedMap but uses the new
- * Zustand store underneath. This allows for gradual migration of components
- * without breaking existing functionality.
+ * This hook provides the exact same interface as the legacy useSharedMap but uses Redux
+ * underneath. This allows for gradual migration of components without breaking existing functionality.
  * 
  * Usage: Simply replace `import { useSharedMap }` with `import { useSharedMapCompat as useSharedMap }`
  */
@@ -253,7 +252,7 @@ export const useSharedMapCompat = (options: UseSharedMapOptions = {}): UseShared
  * Hook specifically for the Map Editor with enhanced functionality
  */
 export const useMapEditorStore = () => {
-  // Auto-save is now controlled by the Zustand store configuration
+  // Auto-save is now controlled by the Redux store configuration
   const compatHook = useSharedMapCompat({ source: 'editor' });
   const { isDirty, markDirty, markClean } = useMapStore();
 

@@ -44,7 +44,7 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
 
   const [isManualSaving, setIsManualSaving] = useState(false);
 
-  // Get state from Zustand store
+  // Get state from Redux store
   const {
     isLoading,
     isDirty,
@@ -80,7 +80,7 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
 
     try {
       setIsManualSaving(true);
-      await saveMap(); // Use Zustand store save
+      await saveMap(); // Use Redux store save
     } catch (error) {
       console.error('Manual save failed:', error);
     } finally {
