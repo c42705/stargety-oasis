@@ -3,6 +3,7 @@ import { Modal, Form, Input, Button, Typography, Radio, Space } from 'antd';
 import { SaveOutlined } from '@ant-design/icons';
 import { Shield, Square, Pentagon } from 'lucide-react';
 import { ImpassableArea } from '../shared/MapDataContext';
+import { logger } from '../shared/logger';
 const { Text } = Typography;
 
 interface CollisionAreaFormModalProps {
@@ -42,13 +43,26 @@ export const CollisionAreaFormModal: React.FC<CollisionAreaFormModalProps> = ({
     }
   }, [isOpen, editingArea, form]);
 
+  /**
+   * handleSubmit - builds areaData for collision drawing
+   * Ensures areaData includes:
+   *   - type: 'impassable-polygon' for polygons, 'rectangle' for rectangles
+   *   - color: default RGBA for impassable polygons
+   *   - name: only if provided
+   * This will be propagated to the drawing handler via parent as drawingCollisionAreaData.
+   */
   const handleSubmit = async (values: FormData) => {
     setIsSubmitting(true);
     try {
+      // Step 1: Construct areaData with all required properties for impassable polygon
       const areaData: Partial<ImpassableArea> & { drawingMode?: 'rectangle' | 'polygon' } = {
-        name: values.name.trim() || undefined,
-        drawingMode: values.drawingMode
+        name: values.name && values.name.trim() ? values.name.trim() : undefined,
+        drawingMode: values.drawingMode,
+        type: values.drawingMode === 'polygon' ? 'impassable-polygon' : 'rectangle',
+        color: 'rgba(128,0,0,0.65)',
       };
+
+      logger.info('📝 [CollisionAreaFormModal] handleSubmit called', { values, areaData });
 
       await onSave(areaData);
       form.resetFields();

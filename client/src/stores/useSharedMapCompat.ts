@@ -153,6 +153,9 @@ export const useSharedMapCompat = (options: UseSharedMapOptions = {}): UseShared
   }, [removeInteractiveArea, markDirty]);
 
   const handleAddCollisionArea = useCallback(async (area: ImpassableArea) => {
+    // Diagnostic log: impassable polygon persisted to store
+    const { logger } = require('../shared/logger');
+    logger.info('🛑 [useSharedMapCompat] addCollisionArea called', { area });
     addCollisionArea(area);
     markDirty();
   }, [addCollisionArea, markDirty]);

@@ -195,6 +195,11 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   }, [drawingMode, sharedMap]);
 
   // Collision area handlers
+  /**
+   * handleSaveCollisionArea - receives areaData from modal and pushes it to drawing handler
+   * Expects areaData to have: type, color, and optionally name (set in modal).
+   * This is set as pendingCollisionAreaData for downstream polygon drawing.
+   */
   const handleSaveCollisionArea = useCallback(async (areaData: any) => {
     if (!collisionModalState.editingCollisionArea) {
       // Start drawing mode for new collision area
@@ -203,6 +208,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
       // Remove drawingMode from areaData before storing
       const { drawingMode: _, ...areaDataWithoutMode } = areaData;
 
+      // Step 2: Pass areaData (with type, color, name) to canvas
       collisionDrawingMode.setPendingCollisionAreaData(areaDataWithoutMode);
 
       if (drawingMode === 'polygon') {

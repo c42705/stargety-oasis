@@ -17,6 +17,7 @@ import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 import { BackgroundInfoPanel } from './components/BackgroundInfoPanel';
 import { PolygonEditHandles } from './utils/polygonEditUtils';
 import { usePolygonEditMode } from './hooks/usePolygonEditMode';
+import { logger } from '../../shared/logger';
 
 // Import all custom hooks
 import { usePolygonDrawing } from './hooks/usePolygonDrawing';
@@ -123,9 +124,16 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     gridVisible,
     gridSpacing,
     impassableAreas: sharedMap.collisionAreas,
-    onAddCollisionArea: sharedMap.addCollisionArea,
+    onAddCollisionArea: (area) => {
+      // Diagnostic log: impassable polygon creation attempt
+      logger.info('📐 [FabricMapCanvas] Polygon creation handler called', { area });
+      return sharedMap.addCollisionArea(area);
+    },
     onUpdateImpassableAreas: () => {}, // Not needed in this context
-    pendingCollisionAreaData: drawingCollisionAreaData
+    pendingCollisionAreaData: (() => {
+      logger.info('🕵️ [FabricMapCanvas] drawingCollisionAreaData when drawing mode starts', { drawingCollisionAreaData });
+      return drawingCollisionAreaData;
+    })()
   });
 
   // ===== RECTANGLE DRAWING HOOK =====
