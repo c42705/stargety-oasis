@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { Button, Tooltip } from 'antd';
-import { ChevronLeft, ChevronRight, Layers } from 'lucide-react';
+import { Layout, Button, Tooltip, Flex, Typography, Divider, theme } from 'antd';
+import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons';
+import { Layers } from 'lucide-react';
 import { LayersTab } from './tabs/LayersTab';
 import * as fabric from 'fabric';
 import { EditorTool } from '../types/editor.types';
-import './LayersPanel.css';
+
+const { Sider } = Layout;
+const { Text } = Typography;
 
 interface LayersPanelProps {
   fabricCanvas?: fabric.Canvas | null;
@@ -24,31 +27,64 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
   onEditCollisionArea
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
-
-  const toggleCollapse = () => {
-    setIsCollapsed(!isCollapsed);
-  };
+  const { token } = theme.useToken();
 
   return (
-    <div className={`layers-panel ${isCollapsed ? 'collapsed' : ''}`}>
-      <div className="layers-panel-header">
-        <div className="layers-panel-title">
-          <Layers size={16} />
-          {!isCollapsed && <span>Layers</span>}
-        </div>
+    <Sider
+      collapsible
+      collapsed={isCollapsed}
+      onCollapse={setIsCollapsed}
+      trigger={null}
+      width={300}
+      collapsedWidth={48}
+      style={{
+        overflow: 'hidden',
+        transition: 'all 0.3s ease',
+        borderRight: `1px solid ${token.colorBorder}`
+      }}
+    >
+      {/* Header with collapse button */}
+      <Flex
+        justify="space-between"
+        align="center"
+        style={{
+          padding: token.paddingSM,
+          minHeight: 48,
+          borderBottom: `1px solid ${token.colorBorderSecondary}`
+        }}
+      >
+        <Flex gap="small" align="center">          
+          {!isCollapsed && (
+            <>
+              <Layers size={16} style={{ color: token.colorPrimary }} />
+              <Text strong style={{ fontSize: token.fontSizeSM }}>
+                Layers
+              </Text>
+            </>
+          )}
+        </Flex>
         <Tooltip title={isCollapsed ? 'Expand Layers Panel' : 'Collapse Layers Panel'}>
           <Button
             type="text"
             size="small"
-            icon={isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-            onClick={toggleCollapse}
-            className="collapse-button"
+            icon={isCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            onClick={() => setIsCollapsed(!isCollapsed)}
           />
         </Tooltip>
-      </div>
+      </Flex>
 
+      <Divider style={{ margin: 0 }} />
+
+      {/* Content */}
       {!isCollapsed && (
-        <div className="layers-panel-content">
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            padding: token.paddingXS
+          }}
+        >
           <LayersTab
             fabricCanvas={fabricCanvas}
             onObjectSelect={onObjectSelect}
@@ -59,7 +95,7 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
           />
         </div>
       )}
-    </div>
+    </Sider>
   );
 };
 

@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Input, Button, Typography } from 'antd';
+import { Modal, Form, Input, Button, Typography, Radio, Space } from 'antd';
 import { SaveOutlined } from '@ant-design/icons';
-import { Shield } from 'lucide-react';
+import { Shield, Square, Pentagon } from 'lucide-react';
 import { ImpassableArea } from '../shared/MapDataContext';
 const { Text } = Typography;
 
 interface CollisionAreaFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (areaData: Partial<ImpassableArea>) => void;
+  onSave: (areaData: Partial<ImpassableArea> & { drawingMode?: 'rectangle' | 'polygon' }) => void;
   editingArea?: ImpassableArea | null;
   title?: string;
 }
 
 interface FormData {
   name: string;
+  drawingMode: 'rectangle' | 'polygon';
 }
 
 export const CollisionAreaFormModal: React.FC<CollisionAreaFormModalProps> = ({
@@ -32,7 +33,8 @@ export const CollisionAreaFormModal: React.FC<CollisionAreaFormModalProps> = ({
     if (isOpen) {
       if (editingArea) {
         form.setFieldsValue({
-          name: editingArea.name || ''
+          name: editingArea.name || '',
+          drawingMode: 'polygon' // Default to polygon for existing areas
         });
       } else {
         form.resetFields();
@@ -43,8 +45,9 @@ export const CollisionAreaFormModal: React.FC<CollisionAreaFormModalProps> = ({
   const handleSubmit = async (values: FormData) => {
     setIsSubmitting(true);
     try {
-      const areaData: Partial<ImpassableArea> = {
-        name: values.name.trim() || undefined
+      const areaData: Partial<ImpassableArea> & { drawingMode?: 'rectangle' | 'polygon' } = {
+        name: values.name.trim() || undefined,
+        drawingMode: values.drawingMode
       };
 
       await onSave(areaData);
@@ -87,32 +90,66 @@ export const CollisionAreaFormModal: React.FC<CollisionAreaFormModalProps> = ({
         layout="vertical"
         onFinish={handleSubmit}
         initialValues={{
-          name: ''
+          name: '',
+          drawingMode: 'polygon'
         }}
       >
+        <Form.Item
+          label="Drawing Mode"
+          name="drawingMode"
+          help="Choose how you want to draw the collision area"
+          rules={[{ required: true, message: 'Please select a drawing mode' }]}
+        >
+          <Radio.Group>
+            <Space direction="vertical">
+              <Radio value="polygon">
+                <Space>
+                  <Pentagon size={16} />
+                  <span><strong>Polygon</strong> - Click to add vertices, double-click to complete</span>
+                </Space>
+              </Radio>
+              <Radio value="rectangle">
+                <Space>
+                  <Square size={16} />
+                  <span><strong>Rectangle</strong> - Click and drag to create a rectangular area</span>
+                </Space>
+              </Radio>
+            </Space>
+          </Radio.Group>
+        </Form.Item>
+
         <Form.Item
           label="Area Name (Optional)"
           name="name"
           help="Give this collision area a descriptive name for easier identification"
         >
-          <Input 
-            placeholder="e.g., Wall, Building, Obstacle" 
+          <Input
+            placeholder="e.g., Wall, Building, Obstacle"
             maxLength={50}
           />
         </Form.Item>
 
-        <div style={{ 
-          background: '#fff7e6', 
-          border: '1px solid #ffd591', 
-          borderRadius: 6, 
-          padding: 12, 
-          marginBottom: 16 
-        }}>
-          <Text style={{ fontSize: 12, color: '#d46b08' }}>
-            <strong>Next Step:</strong> After clicking "Create Area", you'll enter drawing mode where you can 
-            click and drag on the canvas to define the collision area boundaries.
-          </Text>
-        </div>
+        <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => prevValues.drawingMode !== currentValues.drawingMode}>
+          {({ getFieldValue }) => {
+            const drawingMode = getFieldValue('drawingMode');
+            return (
+              <div style={{
+                background: '#fff7e6',
+                border: '1px solid #ffd591',
+                borderRadius: 6,
+                padding: 12,
+                marginBottom: 16
+              }}>
+                <Text style={{ fontSize: 12, color: '#d46b08' }}>
+                  <strong>Next Step:</strong> After clicking "Create Area", you'll enter drawing mode where you can{' '}
+                  {drawingMode === 'polygon'
+                    ? 'click to add vertices and double-click to complete the polygon.'
+                    : 'click and drag on the canvas to define the rectangular collision area.'}
+                </Text>
+              </div>
+            );
+          }}
+        </Form.Item>
 
         <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
           <Button 

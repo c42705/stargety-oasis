@@ -63,8 +63,8 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
     }
   };
 
-  // Quick login with test account
-  const handleQuickLogin = (testAccount: typeof testAccounts[0]) => {
+  // Quick login with test account - auto-submit for faster loading
+  const handleQuickLogin = async (testAccount: typeof testAccounts[0]) => {
     form.setFieldsValue({
       username: testAccount.username,
       password: testAccount.password,
@@ -72,6 +72,14 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
       rememberMe: rememberUsername
     });
     setLoginError('');
+
+    // Automatically submit the form for faster loading
+    try {
+      await form.validateFields();
+      form.submit();
+    } catch (error) {
+      console.error('Form validation failed:', error);
+    }
   };
 
   return (

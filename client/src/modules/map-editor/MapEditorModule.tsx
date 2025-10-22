@@ -198,9 +198,21 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   const handleSaveCollisionArea = useCallback(async (areaData: any) => {
     if (!collisionModalState.editingCollisionArea) {
       // Start drawing mode for new collision area
-      // Removed: Non-critical starting collision drawing mode log.
-      collisionDrawingMode.setPendingCollisionAreaData(areaData);
-      collisionDrawingMode.setCollisionDrawingMode(true);
+      const drawingMode = areaData.drawingMode || 'polygon'; // Default to polygon
+
+      // Remove drawingMode from areaData before storing
+      const { drawingMode: _, ...areaDataWithoutMode } = areaData;
+
+      collisionDrawingMode.setPendingCollisionAreaData(areaDataWithoutMode);
+
+      if (drawingMode === 'polygon') {
+        // Use polygon drawing tool
+        editorState.setEditorState(prev => ({ ...prev, tool: 'draw-polygon' }));
+      } else {
+        // Use rectangle drawing mode
+        collisionDrawingMode.setCollisionDrawingMode(true);
+      }
+
       collisionModalState.setShowCollisionAreaModal(false);
     } else {
       // Update existing collision area
@@ -212,7 +224,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         logger.error('Failed to update collision area', error);
       }
     }
-  }, [collisionModalState, sharedMap, collisionDrawingMode]);
+  }, [collisionModalState, sharedMap, collisionDrawingMode, editorState]);
 
   const handleConfirmDeleteCollisionArea = useCallback(async () => {
     if (collisionModalState.collisionAreaToDelete) {

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Space, Typography, Divider, Tooltip, Flex, Segmented, } from 'antd';
 import {
   MousePointer,
@@ -12,7 +13,7 @@ import {
   Hand,
   RotateCcw,
   Info,
-  Pentagon  
+  Pentagon
 } from 'lucide-react';
 import { EditorState, GridConfig } from '../types/editor.types';
 import { SaveStatusIndicator } from '../../../components/SaveStatusIndicator';
@@ -55,6 +56,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onToggleBackgroundInfo,
   backgroundInfoVisible = false,
 }) => {
+  const navigate = useNavigate();
 
   // Unified tool options - all tools in one Segmented control
   const toolOptions = [
@@ -177,7 +179,14 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               />
             </Tooltip>
           )}
-          <Button icon={<Info size={16} type='primary' />}>Return to world map</Button>          
+          <Tooltip title="Return to World Map">
+            <Button
+              icon={<RotateCcw size={16} />}
+              onClick={() => navigate('/')}
+            >
+              Return to world map
+            </Button>
+          </Tooltip>
         </Space>
       </Flex>
     </Flex>

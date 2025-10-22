@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { Tree, Card, Typography, Space, Button, Tooltip, Badge } from 'antd';
+import { Tree, Typography, Space, Button, Tooltip, Badge } from 'antd';
 import {
   EyeOutlined,
   EyeInvisibleOutlined,
@@ -13,13 +13,12 @@ import {
   Grid as GridIcon,
   Square,
   Shield,
-  TreePine,
-  Layers as LayersIcon
+  TreePine
 } from 'lucide-react';
 import * as fabric from 'fabric';
 import { EditorTool } from '../../types/editor.types';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 interface LayerObject {
   id: string;
@@ -417,17 +416,7 @@ export const LayersTab: React.FC<LayersTabProps> = ({
   ]);
 
   return (
-    <Card
-      title={
-        <Space size="small">
-          <LayersIcon size={16} />
-          <Title level={5} style={{ margin: 0 }}>
-            Layer Explorer
-          </Title>
-        </Space>
-      }
-      styles={{ body: { padding: '12px' } }}
-    >
+    <div style={{ padding: '4px 0' }}>
       {treeData.length > 0 ? (
         <Tree
           treeData={treeData}
@@ -439,10 +428,12 @@ export const LayersTab: React.FC<LayersTabProps> = ({
           style={{ fontSize: '12px' }}
         />
       ) : (
-        <Text type="secondary" style={{ fontSize: '12px' }}>
-          No objects found on canvas
-        </Text>
+        <div style={{ padding: '16px', textAlign: 'center' }}>
+          <Text type="secondary" style={{ fontSize: '12px' }}>
+            No objects found on canvas
+          </Text>
+        </div>
       )}
-    </Card>
+    </div>
   );
 };
