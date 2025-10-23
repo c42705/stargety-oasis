@@ -12,7 +12,8 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import * as fabric from 'fabric';
-import { useSharedMapCompat as useSharedMap } from '../../stores/useSharedMapCompat';
+import { useMapStore } from '../../stores/useMapStore';
+import { useMapStoreInit } from '../../stores/useMapStoreInit';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 import { BackgroundInfoPanel } from './components/BackgroundInfoPanel';
 import { PolygonEditHandles } from './utils/polygonEditUtils';
@@ -72,8 +73,42 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   const [isElementsReady, setIsElementsReady] = useState(false);
   const [forceRender, setForceRender] = useState(0);
 
-  // Get shared map data
-  const sharedMap = useSharedMap();
+  // Initialize the map store
+  useMapStoreInit({ autoLoad: true, source: 'editor' });
+  
+  // Get map store state and actions
+  const {
+    mapData,
+    addInteractiveArea,
+    updateInteractiveArea,
+    removeInteractiveArea,
+    addCollisionArea,
+    updateCollisionArea,
+    removeCollisionArea,
+    markDirty
+  } = useMapStore();
+
+  // Create async wrappers for compatibility with existing hooks
+  const handleUpdateInteractiveArea = async (id: string, updates: any) => {
+    updateInteractiveArea(id, updates);
+    markDirty();
+  };
+
+  const handleUpdateCollisionArea = async (id: string, updates: any) => {
+    updateCollisionArea(id, updates);
+    markDirty();
+  };
+
+  const handleRemoveInteractiveArea = async (id: string) => {
+    removeInteractiveArea(id);
+    markDirty();
+  };
+
+  const handleAddCollisionArea = async (area: any) => {
+    addCollisionArea(area);
+    markDirty();
+    return area;
+  };
 
   // ===== POLYGON EDIT MODE =====
   const polygonEditMode = usePolygonEditMode();
@@ -86,7 +121,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   // ===== BACKGROUND IMAGE HOOK =====
   const { backgroundImageUrl, updateBackgroundImage } = useBackgroundImage({
     canvasRef: fabricCanvasRef,
-    mapData: sharedMap.mapData,
+    mapData: mapData,
     isInitialized,
     updateLayerOrder,
     setIsBackgroundReady
@@ -96,8 +131,8 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   const { handleObjectModified, handleObjectMoving, handleObjectScaling } = useObjectHandlers({
     gridVisible,
     gridSpacing,
-    onUpdateInteractiveArea: sharedMap.updateInteractiveArea,
-    onUpdateCollisionArea: sharedMap.updateCollisionArea
+    onUpdateInteractiveArea: handleUpdateInteractiveArea,
+    onUpdateCollisionArea: handleUpdateCollisionArea
   });
 
   // ===== AREA DELETION HOOK =====
@@ -108,7 +143,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     handleCancelDeletion
   } = useAreaDeletion({
     canvas: fabricCanvasRef.current,
-    onRemoveInteractiveArea: sharedMap.removeInteractiveArea
+    onRemoveInteractiveArea: handleRemoveInteractiveArea
   });
 
   // ===== POLYGON DRAWING HOOK =====
@@ -123,11 +158,11 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
     canvas: fabricCanvasRef.current,
     gridVisible,
     gridSpacing,
-    impassableAreas: sharedMap.collisionAreas,
+    impassableAreas: mapData?.impassableAreas || [],
     onAddCollisionArea: (area) => {
       // Diagnostic log: impassable polygon creation attempt
       logger.info('📐 [FabricMapCanvas] Polygon creation handler called', { area });
-      return sharedMap.addCollisionArea(area);
+      return handleAddCollisionArea(area);
     },
     onUpdateImpassableAreas: () => {}, // Not needed in this context
     pendingCollisionAreaData: (() => {
@@ -169,7 +204,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   // ===== COLLISION RENDERER HOOK =====
   const { renderCollisionAreas } = useCollisionRenderer({
     canvas: fabricCanvasRef.current,
-    collisionAreas: sharedMap.collisionAreas,
+    collisionAreas: mapData?.impassableAreas || [],
     gridSpacing,
     draggingPolygonIdRef
   });
@@ -177,7 +212,7 @@ export const FabricMapCanvas: React.FC<FabricMapCanvasProps> = ({
   // ===== INTERACTIVE RENDERER HOOK =====
   const { renderInteractiveAreas } = useInteractiveRenderer({
     canvas: fabricCanvasRef.current,
-    interactiveAreas: sharedMap.interactiveAreas
+    interactiveAreas: mapData?.interactiveAreas || []
   });
 
   // ===== CANVAS EVENTS HOOK =====

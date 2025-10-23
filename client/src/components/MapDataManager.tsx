@@ -16,7 +16,8 @@
 import React, { useState, useCallback } from 'react';
 import { App, Alert, Button, Card, Space, Typography, Upload } from 'antd';
 import { UploadOutlined, DownloadOutlined, InboxOutlined, CopyOutlined, UndoOutlined } from '@ant-design/icons';
-import { useSharedMapCompat as useSharedMap } from '../stores/useSharedMapCompat';
+import { useMapStore } from '../stores/useMapStore';
+import { useMapStoreInit } from '../stores/useMapStoreInit';
 import { SharedMapSystem } from '../shared/SharedMapSystem';
 
 interface MapDataManagerProps {
@@ -31,7 +32,17 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
   onMapLoaded,
   onError
 }) => {
-  const sharedMap = useSharedMap({ source: 'editor' });
+  // Initialize the map store
+  useMapStoreInit({ autoLoad: true, source: 'editor' });
+  
+  // Get store state and actions
+  const {
+    isLoading,
+    error,
+    exportMap,
+    importMap,
+    clearError
+  } = useMapStore();
 
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -44,7 +55,7 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
     try {
       setIsExporting(true);
       
-      const mapData = sharedMap.exportMap();
+      const mapData = exportMap();
       const blob = new Blob([mapData], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       
@@ -65,7 +76,7 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
     } finally {
       setIsExporting(false);
     }
-  }, [sharedMap, onError]);
+  }, [exportMap, onError]);
 
   /**
    * Import map data from JSON file
@@ -75,7 +86,7 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
       setIsImporting(true);
       
       const text = await file.text();
-      await sharedMap.importMap(text);
+      await importMap(text);
       
       onMapLoaded?.();
       
@@ -85,7 +96,7 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
     } finally {
       setIsImporting(false);
     }
-  }, [sharedMap, onMapLoaded, onError]);
+  }, [importMap, onMapLoaded, onError]);
 
   /**
    * Handle file input change
@@ -129,7 +140,7 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
    */
   const handleCopyToClipboard = useCallback(async () => {
     try {
-      const mapData = sharedMap.exportMap();
+      const mapData = exportMap();
       await navigator.clipboard.writeText(mapData);
       
       // TODO: Show success toast
@@ -138,7 +149,7 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
       const errorMessage = error instanceof Error ? error.message : 'Failed to copy to clipboard';
       onError?.(errorMessage);
     }
-  }, [sharedMap, onError]);
+  }, [exportMap, onError]);
 
   /**
    * Paste map data from clipboard
@@ -148,7 +159,7 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
       setIsImporting(true);
       
       const text = await navigator.clipboard.readText();
-      await sharedMap.importMap(text);
+      await importMap(text);
       
       onMapLoaded?.();
       
@@ -158,22 +169,22 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
     } finally {
       setIsImporting(false);
     }
-  }, [sharedMap, onMapLoaded, onError]);
+  }, [importMap, onMapLoaded, onError]);
 
   const { message } = App.useApp();
 
   return (
     <Card size="small" className={className} title="Map Data Management">      
 <Space wrap style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-          <Button icon={<DownloadOutlined />} loading={isExporting} disabled={sharedMap.isLoading} onClick={handleExportMap}>
+          <Button icon={<DownloadOutlined />} loading={isExporting} disabled={isLoading} onClick={handleExportMap}>
             Export Map
           </Button>
           <Upload {...uploadProps}>
-            <Button icon={<UploadOutlined />} loading={isImporting} disabled={sharedMap.isLoading}>
+            <Button icon={<UploadOutlined />} loading={isImporting} disabled={isLoading}>
               Import Map
             </Button>
           </Upload>
-          <Button danger icon={<UndoOutlined />} loading={isRestoring} disabled={sharedMap.isLoading} onClick={handleRestoreBackup}>
+          <Button danger icon={<UndoOutlined />} loading={isRestoring} disabled={isLoading} onClick={handleRestoreBackup}>
             Restore Backup
           </Button>
           <Typography.Text type="secondary">
@@ -185,13 +196,13 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
 
       <Card size="small" type="inner" title="Clipboard Operations" style={{ marginBottom: 16 }}>
         <Space wrap>
-          <Button icon={<CopyOutlined />} disabled={sharedMap.isLoading} onClick={async () => {
+          <Button icon={<CopyOutlined />} disabled={isLoading} onClick={async () => {
             await handleCopyToClipboard();
             message.success('Map data copied to clipboard');
           }}>
             Copy to Clipboard
           </Button>
-          <Button icon={<InboxOutlined />} loading={isImporting} disabled={sharedMap.isLoading} onClick={handlePasteFromClipboard}>
+          <Button icon={<InboxOutlined />} loading={isImporting} disabled={isLoading} onClick={handlePasteFromClipboard}>
             Paste from Clipboard
           </Button>
         </Space>
@@ -200,14 +211,14 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
 
   
 
-      {sharedMap.error && (
+      {error && (
         <Alert
           type="error"
           showIcon
           message="Map Error"
-          description={sharedMap.error}
+          description={error}
           closable
-          onClose={sharedMap.clearError}
+          onClose={clearError}
           style={{ marginBottom: 16 }}
         />
       )}

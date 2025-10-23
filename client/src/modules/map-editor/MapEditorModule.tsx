@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { logger } from '../../shared/logger';
 import { Eye, Square, Shield } from 'lucide-react';
 import { useMapData, InteractiveArea } from '../../shared/MapDataContext';
-import { useSharedMapCompat as useSharedMap } from '../../stores/useSharedMapCompat';
+import { useMapStore } from '../../stores/useMapStore';
+import { useMapStoreInit } from '../../stores/useMapStoreInit';
 import { useWorldDimensions } from '../../shared/useWorldDimensions';
 import { FabricMapCanvas } from './FabricMapCanvas';
 import * as fabric from 'fabric';
@@ -42,11 +43,52 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
   className = ''
 }) => {
   const { mapData } = useMapData();
-  // Auto-save is now controlled entirely by the Redux store
-  const sharedMap = useSharedMap({
-    source: 'editor'
-    // Note: autoSave parameter removed - controlled by store toggle only
-  });
+  
+  // Initialize the map store
+  useMapStoreInit({ autoLoad: true, source: 'editor' });
+  
+  // Get map store state and actions
+  const {
+    addInteractiveArea,
+    updateInteractiveArea,
+    removeInteractiveArea,
+    addCollisionArea,
+    updateCollisionArea,
+    removeCollisionArea,
+    markDirty
+  } = useMapStore();
+
+  // Create async wrappers for compatibility with existing handlers
+  const handleAddInteractiveArea = useCallback(async (area: any) => {
+    addInteractiveArea(area);
+    markDirty();
+  }, [addInteractiveArea, markDirty]);
+
+  const handleUpdateInteractiveArea = useCallback(async (id: string, updates: any) => {
+    updateInteractiveArea(id, updates);
+    markDirty();
+  }, [updateInteractiveArea, markDirty]);
+
+  const handleRemoveInteractiveArea = useCallback(async (id: string) => {
+    removeInteractiveArea(id);
+    markDirty();
+  }, [removeInteractiveArea, markDirty]);
+
+  const handleAddCollisionArea = useCallback(async (area: any) => {
+    addCollisionArea(area);
+    markDirty();
+  }, [addCollisionArea, markDirty]);
+
+  const handleUpdateCollisionArea = useCallback(async (id: string, updates: any) => {
+    updateCollisionArea(id, updates);
+    markDirty();
+  }, [updateCollisionArea, markDirty]);
+
+  const handleRemoveCollisionArea = useCallback(async (id: string) => {
+    removeCollisionArea(id);
+    markDirty();
+  }, [removeCollisionArea, markDirty]);
+
   const [activeTab, setActiveTab] = useState<TabId>('areas');
   const [previewMode, setPreviewMode] = useState(false);
 
@@ -134,7 +176,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
           id: `area_${Date.now()}`,
           ...areaData
         };
-        await sharedMap.addInteractiveArea(newArea);
+        await handleAddInteractiveArea(newArea);
         modalState.setShowAreaModal(false);
         drawingMode.setPendingAreaData(null);
         drawingMode.setDrawingMode(false);
@@ -144,25 +186,25 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
     } else {
       // Update existing area
       try {
-        await sharedMap.updateInteractiveArea(modalState.editingArea.id, areaData);
+        await handleUpdateInteractiveArea(modalState.editingArea.id, areaData);
         modalState.setShowAreaModal(false);
         modalState.setEditingArea(null);
       } catch (error) {
         logger.error('Failed to update area', error);
       }
     }
-  }, [modalState, sharedMap, drawingMode]);
+  }, [modalState, handleAddInteractiveArea, handleUpdateInteractiveArea, drawingMode]);
 
   const handleConfirmDelete = useCallback(async () => {
     if (modalState.areaToDelete) {
       try {
-        await sharedMap.removeInteractiveArea(modalState.areaToDelete.id);
+        await handleRemoveInteractiveArea(modalState.areaToDelete.id);
         modalState.setAreaToDelete(null);
       } catch (error) {
         logger.error('Failed to delete area', error);
       }
     }
-  }, [modalState, sharedMap]);
+  }, [modalState, handleRemoveInteractiveArea]);
 
   const handleAreaDrawn = useCallback(async (bounds: { x: number; y: number; width: number; height: number }) => {
     if (!drawingMode.pendingAreaData) return;
@@ -181,7 +223,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         description: drawingMode.pendingAreaData.description || ''
       };
 
-      await sharedMap.addInteractiveArea(newArea);
+      await handleAddInteractiveArea(newArea);
 
       // Exit drawing mode
       drawingMode.setDrawingMode(false);
@@ -192,7 +234,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
     } catch (error) {
       logger.error('Failed to create area', error);
     }
-  }, [drawingMode, sharedMap]);
+  }, [drawingMode, handleAddInteractiveArea]);
 
   // Collision area handlers
   /**
@@ -223,25 +265,25 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
     } else {
       // Update existing collision area
       try {
-        await sharedMap.updateCollisionArea(collisionModalState.editingCollisionArea.id, areaData);
+        await handleUpdateCollisionArea(collisionModalState.editingCollisionArea.id, areaData);
         collisionModalState.setShowCollisionAreaModal(false);
         collisionModalState.setEditingCollisionArea(null);
       } catch (error) {
         logger.error('Failed to update collision area', error);
       }
     }
-  }, [collisionModalState, sharedMap, collisionDrawingMode, editorState]);
+  }, [collisionModalState, handleUpdateCollisionArea, collisionDrawingMode, editorState]);
 
   const handleConfirmDeleteCollisionArea = useCallback(async () => {
     if (collisionModalState.collisionAreaToDelete) {
       try {
-        await sharedMap.removeCollisionArea(collisionModalState.collisionAreaToDelete.id);
+        await handleRemoveCollisionArea(collisionModalState.collisionAreaToDelete.id);
         collisionModalState.setCollisionAreaToDelete(null);
       } catch (error) {
         logger.error('Failed to delete collision area', error);
       }
     }
-  }, [collisionModalState, sharedMap]);
+  }, [collisionModalState, handleRemoveCollisionArea]);
 
   const handleCollisionAreaDrawn = useCallback(async (bounds: { x: number; y: number; width: number; height: number }) => {
     if (!collisionDrawingMode.pendingCollisionAreaData) return;
@@ -257,7 +299,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
         ...collisionDrawingMode.pendingCollisionAreaData
       };
 
-      await sharedMap.addCollisionArea(newArea);
+      await handleAddCollisionArea(newArea);
 
       // Exit drawing mode
       collisionDrawingMode.setCollisionDrawingMode(false);
@@ -268,7 +310,7 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
     } catch (error) {
       logger.error('Failed to create collision area', error);
     }
-  }, [collisionDrawingMode, sharedMap]);
+  }, [collisionDrawingMode, handleAddCollisionArea]);
 
   // Modal close handler that combines drawing mode exit
   const handleCloseModals = useCallback(() => {
