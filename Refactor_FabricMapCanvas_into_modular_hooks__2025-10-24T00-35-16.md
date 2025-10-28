@@ -26,3 +26,36 @@
 
 **Goal:**
 Separate concerns so the toolbar focuses on actions (save button + settings), while the footer displays status information (last saved timestamp and relative time).
+
+**draw polygon draw isnights:**
+GitHub Copilot
+
+Main changes applied (summary):
+
+1. Polygon creation refactor:
+   - Switched from absolute point list directly into Fabric polygon to relative points with left/top anchoring.
+   - Stored absolute points in persisted data.
+   - Added justCreated flag to skip first smart update (prevent drift/jump).
+
+2. Collision renderer adjustments:
+   - Removed gridSpacing from options.
+   - Rewrote polygonPointsChanged to compare reconstructed absolute points (relative + left/top) to stored absolute points.
+   - Added first-pass smart update skip for newly created polygons.
+
+3. Removed unused updater:
+   - Dropped onUpdateImpassableAreas prop from polygon drawing hook to avoid TypeScript error and redundant state changes.
+
+4. Event listener lifecycle:
+   - Split canvas initialization (one-time) from dynamic event listener binding.
+   - Added rebind effect for listeners when tool or drawing callbacks change to prevent stale closures.
+
+5. Infinite loop prevention:
+   - Stabilized setupCanvasEventListeners reference via ref.
+   - Limited initialization effect to run once.
+
+6. Polygon edit mode effect cleanup:
+   - Captured handles snapshot at effect start and reused in cleanup to satisfy lint rules.
+   - Narrowed dependencies to isEditing and editingPolygonId.
+
+7. Selection and cursor behavior:
+   - Ensured canvas.selection disabled when drawing polygon or rectangle.
