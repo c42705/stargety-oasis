@@ -1,6 +1,31 @@
 # Fabric.js to React Konva Migration Plan
 
+## ⚠️ UPDATED APPROACH: POC-First Strategy
+
+**Status:** POC Development Phase
+**POC URL:** `/map-editor-poc`
+**Timeline:** 4 weeks POC + 1 week evaluation = 5 weeks to decision point
+**Risk Level:** LOW (isolated POC approach)
+
 ## Executive Summary
+After critical review, the migration approach has been updated to a **POC-first strategy**. Instead of directly migrating the production editor, we will build a **completely isolated proof-of-concept** at `/map-editor-poc` to validate React Konva's suitability before committing to full migration.
+
+### Why POC-First?
+1. **Validate Assumptions:** Test React Konva with all core features before commitment
+2. **Realistic Timeline:** Get accurate estimate of full migration effort
+3. **Low Risk:** Isolated from production code, easy to abandon if unsuitable
+4. **Learning Opportunity:** Team learns Konva without production pressure
+5. **Clear Decision Point:** Objective go/no-go criteria at Week 5
+
+### POC Objectives
+- Build standalone Konva editor with ALL 15 core features
+- Achieve feature parity with existing Fabric.js editor
+- Meet performance benchmarks (60 FPS @ 100 shapes, 30+ FPS @ 500 shapes)
+- Validate polygon vertex editing complexity
+- Test state management patterns
+- Prove maintainability and code quality
+
+### Original Executive Summary (For Reference)
 React Konva is recommended to replace Fabric.js to align the canvas editor with React’s declarative model, improve maintainability, and enable finer performance control (layer caching, controlled rerenders, batched updates). Migration should proceed **incrementally**, maintaining Fabric as a safety net until quantified parity (features + performance + stability) is achieved.
 
 ---
@@ -168,18 +193,80 @@ Alert thresholds trigger rollback consideration.
 
 ---
 
-## Updated Next Steps
-1. Install Konva + React Konva; scaffold read-only `<KonvaMapCanvas>`.
-2. Define `ShapeModel` interfaces + factories; implement serialization & diff utilities.
-3. Implement CanvasAdapter (minimal render + registry).
-4. Render existing map state in Konva side-by-side for visual parity check.
-5. Add selection logic + highlight layer.
-6. Port rectangle tool + basic undo/redo.
-7. Port polygon tool with vertex anchors.
-8. Migrate grid (cached) + collision areas (performance tested).
-9. Add parity test suite (Fabric vs Konva).
-10. Establish performance benchmarks & optimize.
-11. Execute Go/No-Go evaluation; if passed, remove Fabric code.
+## Updated Next Steps (POC-First Approach)
+
+### Phase 1: POC Development (Weeks 1-4)
+**Location:** `/map-editor-poc` route
+**Goal:** Build isolated Konva editor with all core features
+
+#### Week 1: Foundation
+1. ✅ Install Konva + React Konva dependencies
+2. ✅ Create POC module structure (`client/src/modules/map-editor-poc/`)
+3. ✅ Create POC page and route (`/map-editor-poc`)
+4. ✅ Implement types, constants, and utilities
+5. ✅ Build basic Stage/Layer setup with zoom
+6. ✅ Implement pan controls (middle mouse + pan tool)
+7. ✅ Create coordinate transform utilities
+8. ✅ Implement rectangle drawing with grid snapping
+
+#### Week 2: Drawing & Selection
+1. ✅ Implement polygon drawing workflow
+2. ✅ Add selection system (single + multi-select)
+3. ✅ Create polygon vertex editing with handles
+4. ✅ Test all drawing tools at various zoom levels
+
+#### Week 3: Transform & History
+1. ✅ Implement move (drag) functionality
+2. ✅ Add resize with Konva.Transformer
+3. ✅ Build undo/redo system with state serialization
+4. ✅ Implement duplicate and delete functionality
+
+#### Week 4: Polish & Testing
+1. ✅ Add layer management (grid → collision → interactive → selection)
+2. ✅ Implement background image support
+3. ✅ Performance testing (100, 500, 1000 shapes)
+4. ✅ Side-by-side comparison with Fabric.js editor
+5. ✅ Document findings and create evaluation report
+
+### Phase 2: Evaluation (Week 5)
+1. Complete [POC Evaluation Checklist](./konva-poc-evaluation-checklist.md)
+2. Test all 15 functional criteria
+3. Measure all 6 performance benchmarks
+4. Verify all 5 quality checks
+5. Assess all 4 code quality standards
+6. Generate comprehensive evaluation report
+7. Team review and decision meeting
+
+### Phase 3: Decision Point (End of Week 5)
+**Decision Criteria:**
+- ✅ All criteria met → **PROCEED** to Phase 4 (gradual integration)
+- ⚠️ 1-2 gaps → **INVESTIGATE** (1-2 weeks to fix, then re-evaluate)
+- ❌ 3+ gaps → **ABANDON** (stay with Fabric.js, document lessons learned)
+
+### Phase 4: Integration (If Approved, Weeks 6-18)
+1. Implement feature flag: `USE_KONVA_EDITOR`
+2. Refactor POC code for production integration
+3. Add both editors to `/map-editor` route with toggle
+4. Gradual rollout: 10% → 25% → 50% → 100%
+5. Monitor metrics: errors, performance, user feedback
+6. Remove Fabric.js only after 100% confidence
+
+### Current Status
+- [x] Critical review completed
+- [x] POC strategy approved
+- [x] POC module structure created
+- [x] POC route added (`/map-editor-poc`)
+- [x] Dependencies installed (konva, react-konva, uuid)
+- [x] Types, constants, and utilities implemented
+- [x] Basic component scaffolded
+- [ ] Week 1 development in progress
+- [ ] Evaluation pending
+- [ ] Decision pending
+
+### Access the POC
+- **URL:** `/map-editor-poc`
+- **Requirements:** Admin user authentication
+- **Status:** Foundation phase - basic structure ready for hook implementation
 
 ---
 

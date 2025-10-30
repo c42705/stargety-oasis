@@ -24,6 +24,7 @@ import { MyProfileTab } from './components/panel-tabs/MyProfileTab';
 
 import { MapSyncStatus } from './components/MapSyncStatus';
 import { MapEditorPage } from './pages/MapEditorPage';
+import { MapEditorPOCPage } from './pages/MapEditorPOCPage';
 import ConsolidatedSettings from './components/settings/ConsolidatedSettings';
 
 import './App.css';
@@ -312,6 +313,18 @@ const App: React.FC = () => {
         element={
           isAuthenticated ? (
             <MapEditorPage />
+          ) : (
+            <LoginModule />
+          )
+        }
+      />
+
+      {/* Map Editor POC Route - Konva proof-of-concept */}
+      <Route
+        path="/map-editor-poc"
+        element={
+          isAuthenticated ? (
+            <MapEditorPOCPage />
           ) : (
             <LoginModule />
           )
