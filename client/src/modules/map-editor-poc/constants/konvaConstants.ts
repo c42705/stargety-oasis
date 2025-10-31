@@ -50,3 +50,10 @@ export const POC_STYLES: Record<string, POCShapeStyle> = {
   },
 };
 
+// Selection style
+export const POC_SELECTION_STYLE = {
+  stroke: '#00aaff',
+  strokeWidth: 3,
+  dash: [5, 5],
+} as const;
+

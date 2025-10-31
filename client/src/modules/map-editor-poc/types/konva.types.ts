@@ -30,11 +30,19 @@ export interface POCRectGeometry {
   y: number;
   width: number;
   height: number;
+  rotation?: number; // in degrees
+  scaleX?: number;
+  scaleY?: number;
 }
 
 export interface POCPolygonGeometry {
   type: 'polygon';
   points: number[]; // [x1, y1, x2, y2, ...]
+  x?: number; // position for transformation
+  y?: number; // position for transformation
+  rotation?: number; // in degrees
+  scaleX?: number;
+  scaleY?: number;
 }
 
 export type POCGeometry = POCRectGeometry | POCPolygonGeometry;
