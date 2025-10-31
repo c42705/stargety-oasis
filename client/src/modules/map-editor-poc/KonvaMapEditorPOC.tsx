@@ -22,7 +22,6 @@ import {
   POC_VIEWPORT_DEFAULTS,
   POC_GRID_DEFAULTS,
   POC_STYLES,
-  POC_SELECTION_STYLE,
 } from './constants/konvaConstants';
 import { useKonvaZoom } from './hooks/useKonvaZoom';
 import { useKonvaPan } from './hooks/useKonvaPan';
@@ -78,6 +77,7 @@ export const KonvaMapEditorPOC: React.FC = () => {
     enabled: currentTool === 'select',
     selectedIds,
     onSelectionChange: setSelectedIds,
+    shapes,
   });
 
   const polygonDrawing = useKonvaPolygonDrawing({
@@ -243,6 +243,7 @@ export const KonvaMapEditorPOC: React.FC = () => {
           stroke={grid.color}
           strokeWidth={1}
           opacity={grid.opacity}
+          listening={false}
         />
       );
     }
@@ -256,6 +257,7 @@ export const KonvaMapEditorPOC: React.FC = () => {
           stroke={grid.color}
           strokeWidth={1}
           opacity={grid.opacity}
+          listening={false}
         />
       );
     }
@@ -372,15 +374,18 @@ export const KonvaMapEditorPOC: React.FC = () => {
               polygonDrawing.handleDoubleClick();
             }}
             onMouseDown={(e) => {
+              selection.handleMouseDown(e);
               pan.handleMouseDown(e);
               rectDrawing.handleMouseDown(e);
             }}
             onMouseMove={(e) => {
+              selection.handleMouseMove(e);
               pan.handleMouseMove(e);
               rectDrawing.handleMouseMove(e);
               polygonDrawing.handleMouseMove(e);
             }}
             onMouseUp={() => {
+              selection.handleMouseUp();
               pan.handleMouseUp();
               rectDrawing.handleMouseUp();
             }}
@@ -393,6 +398,7 @@ export const KonvaMapEditorPOC: React.FC = () => {
                 width={POC_CANVAS.WIDTH}
                 height={POC_CANVAS.HEIGHT}
                 fill={POC_CANVAS.BACKGROUND}
+                listening={false}
               />
             </Layer>
 
@@ -414,9 +420,9 @@ export const KonvaMapEditorPOC: React.FC = () => {
                       isSelected={isSelected}
                       onSelect={() => selection.handleShapeClick(shape.id, { cancelBubble: true, evt: { ctrlKey: false, metaKey: false } })}
                       onChange={(newAttrs) => handleShapeChange(shape.id, newAttrs)}
-                      selectionStroke={POC_SELECTION_STYLE.stroke}
-                      selectionStrokeWidth={POC_SELECTION_STYLE.strokeWidth}
-                      selectionDash={[...POC_SELECTION_STYLE.dash]}
+                      selectionStroke={shape.style.stroke}
+                      selectionStrokeWidth={shape.style.strokeWidth}
+                      selectionDash={undefined}
                     />
                   );
                 } else if (shape.geometry.type === 'polygon') {
@@ -427,9 +433,9 @@ export const KonvaMapEditorPOC: React.FC = () => {
                       isSelected={isSelected}
                       onSelect={() => selection.handleShapeClick(shape.id, { cancelBubble: true, evt: { ctrlKey: false, metaKey: false } })}
                       onChange={(newAttrs) => handleShapeChange(shape.id, newAttrs)}
-                      selectionStroke={POC_SELECTION_STYLE.stroke}
-                      selectionStrokeWidth={POC_SELECTION_STYLE.strokeWidth}
-                      selectionDash={[...POC_SELECTION_STYLE.dash]}
+                      selectionStroke={shape.style.stroke}
+                      selectionStrokeWidth={shape.style.strokeWidth}
+                      selectionDash={undefined}
                     />
                   );
                 }
@@ -456,6 +462,7 @@ export const KonvaMapEditorPOC: React.FC = () => {
                     strokeWidth={2}
                     opacity={0.5}
                     dash={[5, 5]}
+                    listening={false}
                   />
                 );
               })()}
@@ -475,6 +482,7 @@ export const KonvaMapEditorPOC: React.FC = () => {
                       strokeWidth={2}
                       dash={[5, 5]}
                       opacity={0.7}
+                      listening={false}
                     />
                     {/* Vertex markers */}
                     {polygonDrawing.vertices.map((vertex, index) => {
@@ -490,10 +498,29 @@ export const KonvaMapEditorPOC: React.FC = () => {
                           fill={shouldHighlight ? '#00aaff' : POC_STYLES[currentCategory].stroke}
                           stroke="#ffffff"
                           strokeWidth={shouldHighlight ? 2 : 1}
+                          listening={false}
                         />
                       );
                     })}
                   </>
+                );
+              })()}
+
+              {/* Selection rectangle preview */}
+              {selection.isDrawingSelection && selection.selectionRect && (() => {
+                const rect = selection.selectionRect;
+                return (
+                  <Rect
+                    x={rect.x}
+                    y={rect.y}
+                    width={rect.width}
+                    height={rect.height}
+                    fill="rgba(0, 162, 255, 0.1)"
+                    stroke="#00a2ff"
+                    strokeWidth={1}
+                    dash={[4, 4]}
+                    listening={false}
+                  />
                 );
               })()}
             </Layer>

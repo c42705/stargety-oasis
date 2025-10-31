@@ -15,7 +15,7 @@ interface TransformableShapeProps {
   onChange: (newAttrs: Partial<POCShape['geometry']>) => void;
   selectionStroke: string;
   selectionStrokeWidth: number;
-  selectionDash: number[];
+  selectionDash?: number[];
 }
 
 export const TransformableRect: React.FC<TransformableShapeProps> = ({
