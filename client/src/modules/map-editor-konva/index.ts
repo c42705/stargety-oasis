@@ -34,6 +34,8 @@ export { RectangleDrawingPreview } from './components/RectangleDrawingPreview';
 export { TransformableRect, TransformablePolygon, TransformerComponent } from './components/TransformableShape';
 export { SelectionRect } from './components/SelectionRect';
 export { KonvaPerformanceBenchmark } from './components/KonvaPerformanceBenchmark';
+export { MapEditorSelector } from './components/MapEditorSelector';
+export { EditorComparison } from './components/EditorComparison';
 // export { PolygonEditor } from './components/PolygonEditor';
 
 // Types
@@ -41,6 +43,9 @@ export type * from './types';
 
 // Constants
 export * from './constants/konvaConstants';
+
+// Config
+export * from './config/featureFlags';
 
 // Utilities
 export * from './utils/coordinateTransform';
