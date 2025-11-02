@@ -7,10 +7,11 @@
  * @module map-editor-konva
  */
 
-// Main component (will be created in Phase 1)
-// export { KonvaMapCanvas } from './components/KonvaMapCanvas';
+// Main component
+export { KonvaMapCanvas } from './components/KonvaMapCanvas';
 
-// Hooks (will be exported as they are created)
+// Hooks
+export * from './hooks/useKonvaLayers';
 // export { useKonvaZoom } from './hooks/useKonvaZoom';
 // export { useKonvaPan } from './hooks/useKonvaPan';
 // export { useKonvaPolygonDrawing } from './hooks/useKonvaPolygonDrawing';
@@ -19,7 +20,6 @@
 // export { useKonvaHistory } from './hooks/useKonvaHistory';
 // export { useKonvaGrid } from './hooks/useKonvaGrid';
 // export { useKonvaBackground } from './hooks/useKonvaBackground';
-// export { useKonvaLayers } from './hooks/useKonvaLayers';
 
 // Components (will be exported as they are created)
 // export { TransformableShape } from './components/TransformableShape';
@@ -32,10 +32,12 @@ export type * from './types';
 // Constants
 export * from './constants/konvaConstants';
 
-// Utilities (will be exported as they are created)
-// export * from './utils/coordinateTransform';
-// export * from './utils/shapeFactories';
-// export * from './utils/validation';
+// Utilities
+export * from './utils/coordinateTransform';
+export * from './utils/shapeFactories';
+export * from './utils/validation';
+export * from './utils/mapDataAdapter';
+export * from './utils/sharedMapAdapter';
 
 // Temporary export to prevent empty module error
 export const MAP_EDITOR_KONVA_VERSION = '0.1.0-alpha';
