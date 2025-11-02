@@ -16,12 +16,15 @@ export { useKonvaZoom } from './hooks/useKonvaZoom';
 export { useKonvaPan } from './hooks/useKonvaPan';
 export { useKonvaGrid } from './hooks/useKonvaGrid';
 export { useKonvaBackground } from './hooks/useKonvaBackground';
-// export { useKonvaPolygonDrawing } from './hooks/useKonvaPolygonDrawing';
+export { useKonvaPolygonDrawing } from './hooks/useKonvaPolygonDrawing';
+export { useKonvaRectDrawing } from './hooks/useKonvaRectDrawing';
 // export { useKonvaSelection } from './hooks/useKonvaSelection';
 // export { useKonvaTransform } from './hooks/useKonvaTransform';
 // export { useKonvaHistory } from './hooks/useKonvaHistory';
 
-// Components (will be exported as they are created)
+// Components
+export { PolygonDrawingPreview } from './components/PolygonDrawingPreview';
+export { RectangleDrawingPreview } from './components/RectangleDrawingPreview';
 // export { TransformableShape } from './components/TransformableShape';
 // export { PolygonEditor } from './components/PolygonEditor';
 // export { SelectionRect } from './components/SelectionRect';

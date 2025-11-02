@@ -7,6 +7,80 @@ and this project follows the migration phases outlined in the migration plan.
 
 ## [Unreleased]
 
+### Phase 3: Drawing Tools (Weeks 5-7)
+
+#### [0.3.0-alpha] - 2025-11-02
+
+##### Added
+- ✅ Implemented `useKonvaPolygonDrawing` hook for polygon drawing
+  - Click-to-add-vertex workflow
+  - Preview lines connecting vertices
+  - Origin hover detection for closing polygon
+  - Click on origin to close polygon (min 3 vertices)
+  - Double-click to complete polygon
+  - Grid snapping support
+  - Polygon validation (min/max vertices, self-intersection)
+  - Keyboard shortcuts (Enter, Escape, Backspace)
+  - Vertex count tracking
+  - Can complete status
+- ✅ Implemented `useKonvaRectDrawing` hook for rectangle drawing
+  - Click-and-drag workflow
+  - Preview rectangle during drawing
+  - Grid snapping support
+  - Minimum size validation
+  - Rectangle validation
+- ✅ Created `PolygonDrawingPreview` component
+  - Renders vertices as circles
+  - Shows preview lines
+  - Highlights origin when hovering
+  - Origin hover indicator
+  - Category-based styling
+- ✅ Created `RectangleDrawingPreview` component
+  - Renders preview rectangle
+  - Dashed stroke for preview
+  - Category-based styling
+- ✅ Created `KonvaPhase3Test` component
+  - Comprehensive test of all Phase 3 features
+  - Tool selection (select, polygon, rectangle, pan)
+  - Category selection (collision, interactive)
+  - Grid controls (visibility, snap to grid)
+  - Drawing info display (shapes count, vertices, can complete)
+  - Validation error display
+  - Keyboard shortcuts reference
+  - Shape rendering (polygons and rectangles)
+  - Drawing preview integration
+- ✅ Grid snapping for polygons and rectangles
+- ✅ Drawing validation with error feedback
+- ✅ Keyboard shortcuts for drawing
+  - Enter - Complete polygon
+  - Escape - Cancel drawing
+  - Backspace - Remove last vertex
+  - Double-click - Complete polygon
+  - Click origin - Close polygon
+- ✅ Drawing preview layer with proper z-index
+- ✅ Drawing cancellation (Escape key)
+- ✅ Tested polygon drawing at various zoom levels
+- ✅ Tested rectangle drawing at various zoom levels
+- ✅ Tested grid snapping functionality
+- ✅ Tested drawing tools integration
+
+##### Technical Details
+- All hooks use TypeScript with proper type definitions
+- Hooks follow React best practices (useCallback, useState, useEffect)
+- Drawing preview components are pure and optimized
+- Validation uses existing validation utilities
+- Grid snapping uses grid hook's snapToGrid function
+- Coordinate transformation uses existing utilities
+- All features tested and integrated in KonvaPhase3Test component
+
+##### Notes
+- Phase 3 drawing tools complete
+- All 11 Phase 3 tasks completed
+- Zero TypeScript errors
+- Ready for Phase 4: Selection & Manipulation
+
+---
+
 ### Phase 2: Core Canvas Features (Weeks 3-4)
 
 #### [0.2.0-alpha] - 2025-11-02
@@ -385,7 +459,7 @@ and this project follows the migration phases outlined in the migration plan.
 - **v0.1.0-alpha**: Module structure created ✅
 - **v0.1.12-alpha**: Foundation complete (types, utils, basic canvas) ✅
 - **v0.2.0-alpha**: Core canvas features complete ✅
-- **v0.3.0-beta**: Drawing tools complete
+- **v0.3.0-alpha**: Drawing tools complete ✅
 - **v0.4.0-beta**: Selection & manipulation complete
 - **v0.5.0-beta**: State management complete
 - **v0.6.0-beta**: Advanced features complete
@@ -396,18 +470,18 @@ and this project follows the migration phases outlined in the migration plan.
 
 ## Migration Progress
 
-### Overall Progress: 2/8 Phases Complete
+### Overall Progress: 3/8 Phases Complete
 
 - [x] **Phase 1**: Foundation & Infrastructure (12/12 tasks complete) ✅
 - [x] **Phase 2**: Core Canvas Features (11/11 tasks complete) ✅
-- [ ] **Phase 3**: Drawing Tools (0/11 tasks)
+- [x] **Phase 3**: Drawing Tools (11/11 tasks complete) ✅
 - [ ] **Phase 4**: Selection & Manipulation (0/11 tasks)
 - [ ] **Phase 5**: State Management & Persistence (0/12 tasks)
 - [ ] **Phase 6**: Advanced Features (0/11 tasks)
 - [ ] **Phase 7**: Testing & Validation (0/15 tasks)
 - [ ] **Phase 8**: Integration & Rollout (0/16 tasks)
 
-**Total Progress**: 23/99 tasks (23%)
+**Total Progress**: 34/99 tasks (34%)
 
 ---
 
