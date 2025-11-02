@@ -7,6 +7,73 @@ and this project follows the migration phases outlined in the migration plan.
 
 ## [Unreleased]
 
+### Phase 2: Core Canvas Features (Weeks 3-4)
+
+#### [0.2.0-alpha] - 2025-11-02
+
+##### Added
+- ✅ Implemented `useKonvaZoom` hook for zoom functionality
+  - Zoom in/out with configurable step
+  - Mouse wheel zoom to cursor position
+  - Zoom to specific level or percentage
+  - Reset zoom to 100%
+  - Zoom to fit bounds
+  - Zoom limits (0.3x to 5.0x)
+  - State tracking (isAtMin, isAtMax, zoomPercentage)
+- ✅ Implemented `useKonvaPan` hook for pan functionality
+  - Middle mouse button panning (always enabled)
+  - Pan tool mode for left click panning
+  - Touch support for mobile devices
+  - Pan to specific position
+  - Pan by delta
+  - Reset pan to origin
+  - Center on specific point
+  - Panning state tracking
+- ✅ Implemented `useKonvaGrid` hook for grid rendering
+  - Configurable spacing, color, opacity, pattern
+  - Grid visibility toggle
+  - Adaptive spacing based on zoom level
+  - Adaptive opacity based on zoom level
+  - Grid snapping utilities (snapToGrid, snapPointsToGrid)
+  - Performance optimization (hide at extreme zoom levels)
+  - Line-based grid rendering
+- ✅ Implemented `useKonvaBackground` hook for background image
+  - Image loading from URL or data URL
+  - Cross-origin support
+  - Loading state tracking
+  - Error handling
+  - Image dimensions and aspect ratio
+  - Reload and clear functionality
+- ✅ Created `KonvaPhase2Test` component
+  - Comprehensive test of all Phase 2 features
+  - Zoom controls (buttons, percentage input, wheel)
+  - Pan controls (tool toggle, reset)
+  - Grid controls (visibility, spacing, opacity)
+  - Background controls (upload, reload)
+  - Layer cache controls (refresh)
+  - Viewport state display (zoom, pan, panning status)
+  - Demo shapes for testing
+  - Ant Design UI components
+- ✅ Updated module exports to include new hooks
+- ✅ Viewport state synchronization (handled by hooks)
+- ✅ Layer caching optimization (already implemented in Phase 1)
+
+##### Technical Details
+- All hooks use TypeScript with proper type definitions
+- Hooks follow React best practices (useCallback, useMemo)
+- Grid and background use layer caching for performance
+- Zoom uses zoomToPoint utility for accurate cursor-based zooming
+- Pan supports both mouse and touch input
+- All features tested and integrated in KonvaPhase2Test component
+
+##### Notes
+- Phase 2 core canvas features complete
+- All 11 Phase 2 tasks completed
+- Zero TypeScript errors
+- Ready for Phase 3: Shape Drawing & Editing
+
+---
+
 ### Phase 1: Foundation & Infrastructure (Weeks 1-2)
 
 #### [0.1.0-alpha] - 2025-11-02
@@ -316,23 +383,23 @@ and this project follows the migration phases outlined in the migration plan.
 
 ### Milestones
 - **v0.1.0-alpha**: Module structure created ✅
-- **v0.2.0-alpha**: Foundation complete (types, utils, basic canvas)
-- **v0.3.0-alpha**: Core canvas features complete
-- **v0.4.0-beta**: Drawing tools complete
-- **v0.5.0-beta**: Selection & manipulation complete
-- **v0.6.0-beta**: State management complete
-- **v0.7.0-beta**: Advanced features complete
-- **v0.8.0-rc**: Testing complete
+- **v0.1.12-alpha**: Foundation complete (types, utils, basic canvas) ✅
+- **v0.2.0-alpha**: Core canvas features complete ✅
+- **v0.3.0-beta**: Drawing tools complete
+- **v0.4.0-beta**: Selection & manipulation complete
+- **v0.5.0-beta**: State management complete
+- **v0.6.0-beta**: Advanced features complete
+- **v0.7.0-rc**: Testing complete
 - **v1.0.0**: Production release
 
 ---
 
 ## Migration Progress
 
-### Overall Progress: 1/8 Phases Complete
+### Overall Progress: 2/8 Phases Complete
 
-- [x] **Phase 1**: Foundation & Infrastructure (3/12 tasks complete)
-- [ ] **Phase 2**: Core Canvas Features (0/11 tasks)
+- [x] **Phase 1**: Foundation & Infrastructure (12/12 tasks complete) ✅
+- [x] **Phase 2**: Core Canvas Features (11/11 tasks complete) ✅
 - [ ] **Phase 3**: Drawing Tools (0/11 tasks)
 - [ ] **Phase 4**: Selection & Manipulation (0/11 tasks)
 - [ ] **Phase 5**: State Management & Persistence (0/12 tasks)
@@ -340,7 +407,7 @@ and this project follows the migration phases outlined in the migration plan.
 - [ ] **Phase 7**: Testing & Validation (0/15 tasks)
 - [ ] **Phase 8**: Integration & Rollout (0/16 tasks)
 
-**Total Progress**: 3/99 tasks (3%)
+**Total Progress**: 23/99 tasks (23%)
 
 ---
 

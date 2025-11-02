@@ -12,14 +12,14 @@ export { KonvaMapCanvas } from './components/KonvaMapCanvas';
 
 // Hooks
 export * from './hooks/useKonvaLayers';
-// export { useKonvaZoom } from './hooks/useKonvaZoom';
-// export { useKonvaPan } from './hooks/useKonvaPan';
+export { useKonvaZoom } from './hooks/useKonvaZoom';
+export { useKonvaPan } from './hooks/useKonvaPan';
+export { useKonvaGrid } from './hooks/useKonvaGrid';
+export { useKonvaBackground } from './hooks/useKonvaBackground';
 // export { useKonvaPolygonDrawing } from './hooks/useKonvaPolygonDrawing';
 // export { useKonvaSelection } from './hooks/useKonvaSelection';
 // export { useKonvaTransform } from './hooks/useKonvaTransform';
 // export { useKonvaHistory } from './hooks/useKonvaHistory';
-// export { useKonvaGrid } from './hooks/useKonvaGrid';
-// export { useKonvaBackground } from './hooks/useKonvaBackground';
 
 // Components (will be exported as they are created)
 // export { TransformableShape } from './components/TransformableShape';
