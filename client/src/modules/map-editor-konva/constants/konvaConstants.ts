@@ -422,6 +422,24 @@ export const COLORS = {
 } as const;
 
 // ============================================================================
+// PERSISTENCE CONFIGURATION
+// ============================================================================
+
+/**
+ * State persistence configuration
+ */
+export const PERSISTENCE = {
+  /** LocalStorage key for editor state */
+  STORAGE_KEY: 'konva-editor-state',
+  /** Auto-save delay in milliseconds */
+  AUTO_SAVE_DELAY: 2000,
+  /** Maximum data size in bytes (5MB) */
+  MAX_SIZE: 5 * 1024 * 1024,
+  /** Data version for migration */
+  VERSION: 1,
+} as const;
+
+// ============================================================================
 // STORAGE
 // ============================================================================
 
@@ -438,5 +456,7 @@ export const STORAGE_KEYS = {
   GRID_PREFS: 'konva-grid-prefs',
   /** Tool preferences */
   TOOL_PREFS: 'konva-tool-prefs',
+  /** History data */
+  HISTORY: 'konva-history',
 } as const;
 

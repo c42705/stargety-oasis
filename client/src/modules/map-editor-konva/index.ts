@@ -20,7 +20,9 @@ export { useKonvaPolygonDrawing } from './hooks/useKonvaPolygonDrawing';
 export { useKonvaRectDrawing } from './hooks/useKonvaRectDrawing';
 export { useKonvaSelection } from './hooks/useKonvaSelection';
 export { useKonvaTransform } from './hooks/useKonvaTransform';
-// export { useKonvaHistory } from './hooks/useKonvaHistory';
+export { useKonvaHistory } from './hooks/useKonvaHistory';
+export { useKonvaPersistence } from './hooks/useKonvaPersistence';
+export { useKonvaSharedMap } from './hooks/useKonvaSharedMap';
 
 // Components
 export { PolygonDrawingPreview } from './components/PolygonDrawingPreview';
