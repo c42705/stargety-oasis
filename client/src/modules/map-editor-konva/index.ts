@@ -18,16 +18,16 @@ export { useKonvaGrid } from './hooks/useKonvaGrid';
 export { useKonvaBackground } from './hooks/useKonvaBackground';
 export { useKonvaPolygonDrawing } from './hooks/useKonvaPolygonDrawing';
 export { useKonvaRectDrawing } from './hooks/useKonvaRectDrawing';
-// export { useKonvaSelection } from './hooks/useKonvaSelection';
-// export { useKonvaTransform } from './hooks/useKonvaTransform';
+export { useKonvaSelection } from './hooks/useKonvaSelection';
+export { useKonvaTransform } from './hooks/useKonvaTransform';
 // export { useKonvaHistory } from './hooks/useKonvaHistory';
 
 // Components
 export { PolygonDrawingPreview } from './components/PolygonDrawingPreview';
 export { RectangleDrawingPreview } from './components/RectangleDrawingPreview';
-// export { TransformableShape } from './components/TransformableShape';
+export { TransformableRect, TransformablePolygon, TransformerComponent } from './components/TransformableShape';
+export { SelectionRect } from './components/SelectionRect';
 // export { PolygonEditor } from './components/PolygonEditor';
-// export { SelectionRect } from './components/SelectionRect';
 
 // Types
 export type * from './types';

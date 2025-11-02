@@ -7,6 +7,85 @@ and this project follows the migration phases outlined in the migration plan.
 
 ## [Unreleased]
 
+### Phase 4: Selection & Manipulation (Weeks 8-9)
+
+#### [0.4.0-alpha] - 2025-11-02
+
+##### Added
+- ✅ Implemented `useKonvaSelection` hook for shape selection
+  - Single-click selection
+  - Ctrl+Click multi-select (toggle)
+  - Drag-to-select rectangle
+  - Selection state management
+  - Selection queries (isSelected, selectedCount, hasSelection)
+  - Select all / clear selection actions
+  - Intersection detection for drag-to-select
+- ✅ Implemented `useKonvaTransform` hook for shape transformation
+  - Drag-to-move functionality
+  - Transform end handling for resize
+  - Rectangle resize with scale normalization
+  - Polygon resize with point scaling
+  - Minimum size constraints
+- ✅ Created `SelectionRect` component
+  - Visual feedback for drag-to-select
+  - Dashed rectangle preview
+  - Normalized rectangle rendering (handles negative width/height)
+- ✅ Created `TransformableShape` components
+  - `TransformableRect` - Rectangle with drag and resize
+  - `TransformablePolygon` - Polygon with drag and resize
+  - `TransformerComponent` - Konva Transformer wrapper
+  - Selection highlighting (stroke, dash)
+  - Draggable when selected
+  - Transform callbacks
+- ✅ Created `KonvaPhase4Test` component
+  - Comprehensive test of all Phase 4 features
+  - Shape selection (single, multi, drag-to-select)
+  - Drag to move shapes
+  - Resize with Transformer handles
+  - Delete selected shapes
+  - Duplicate selected shapes
+  - Select all / clear selection
+  - Keyboard shortcuts (Delete, Ctrl+D, Ctrl+A)
+  - Selection info display
+  - Demo shapes (rectangle and polygon)
+- ✅ Selection visual feedback
+  - Highlighted stroke for selected shapes
+  - Dashed stroke pattern
+  - Selection rectangle during drag-to-select
+  - Transformer handles for resize
+- ✅ Delete functionality
+  - Delete key to remove selected shapes
+  - Clears selection after delete
+- ✅ Duplicate functionality
+  - Ctrl+D to duplicate selected shapes
+  - Offset duplicates by 20px
+  - Maintains shape properties
+- ✅ Keyboard shortcuts for manipulation
+  - Delete - Delete selected shapes
+  - Ctrl+D - Duplicate selected shapes
+  - Ctrl+A - Select all shapes
+  - Click - Select single shape
+  - Ctrl+Click - Multi-select (toggle)
+- ✅ Tested selection at various zoom levels
+- ✅ Tested transformation at various zoom levels
+- ✅ Tested selection and manipulation integration
+
+##### Technical Details
+- All hooks use TypeScript with proper type definitions
+- Selection uses coordinate transformation for accurate hit detection
+- Transform hook normalizes scale to width/height for rectangles
+- Transformer component uses Konva's built-in Transformer
+- All features tested and integrated in KonvaPhase4Test component
+- Keyboard shortcuts with proper event handling and cleanup
+
+##### Notes
+- Phase 4 selection and manipulation complete
+- All 11 Phase 4 tasks completed
+- Zero TypeScript errors
+- Ready for Phase 5: State Management & Persistence
+
+---
+
 ### Phase 3: Drawing Tools (Weeks 5-7)
 
 #### [0.3.0-alpha] - 2025-11-02
@@ -460,7 +539,7 @@ and this project follows the migration phases outlined in the migration plan.
 - **v0.1.12-alpha**: Foundation complete (types, utils, basic canvas) ✅
 - **v0.2.0-alpha**: Core canvas features complete ✅
 - **v0.3.0-alpha**: Drawing tools complete ✅
-- **v0.4.0-beta**: Selection & manipulation complete
+- **v0.4.0-alpha**: Selection & manipulation complete ✅
 - **v0.5.0-beta**: State management complete
 - **v0.6.0-beta**: Advanced features complete
 - **v0.7.0-rc**: Testing complete
@@ -470,18 +549,18 @@ and this project follows the migration phases outlined in the migration plan.
 
 ## Migration Progress
 
-### Overall Progress: 3/8 Phases Complete
+### Overall Progress: 4/8 Phases Complete
 
 - [x] **Phase 1**: Foundation & Infrastructure (12/12 tasks complete) ✅
 - [x] **Phase 2**: Core Canvas Features (11/11 tasks complete) ✅
 - [x] **Phase 3**: Drawing Tools (11/11 tasks complete) ✅
-- [ ] **Phase 4**: Selection & Manipulation (0/11 tasks)
+- [x] **Phase 4**: Selection & Manipulation (11/11 tasks complete) ✅
 - [ ] **Phase 5**: State Management & Persistence (0/12 tasks)
 - [ ] **Phase 6**: Advanced Features (0/11 tasks)
 - [ ] **Phase 7**: Testing & Validation (0/15 tasks)
 - [ ] **Phase 8**: Integration & Rollout (0/16 tasks)
 
-**Total Progress**: 34/99 tasks (34%)
+**Total Progress**: 45/99 tasks (45%)
 
 ---
 
