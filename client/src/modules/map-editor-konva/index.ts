@@ -33,6 +33,7 @@ export { PolygonDrawingPreview } from './components/PolygonDrawingPreview';
 export { RectangleDrawingPreview } from './components/RectangleDrawingPreview';
 export { TransformableRect, TransformablePolygon, TransformerComponent } from './components/TransformableShape';
 export { SelectionRect } from './components/SelectionRect';
+export { KonvaPerformanceBenchmark } from './components/KonvaPerformanceBenchmark';
 // export { PolygonEditor } from './components/PolygonEditor';
 
 // Types
