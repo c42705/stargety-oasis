@@ -55,10 +55,37 @@ and this project follows the migration phases outlined in the migration plan.
 - Backward compatibility with existing MapDataContext types maintained
 - Type guards provide runtime safety for geometry type checking
 
+#### [0.1.2-alpha] - 2025-11-02
+
+##### Added
+- ✅ Created comprehensive constants file (`constants/konvaConstants.ts`)
+  - Canvas configuration (dimensions, background, limits)
+  - Zoom configuration (min: 0.3x, max: 5.0x, supports 3.1x+ requirement)
+  - Grid configuration (spacing options, patterns, opacity)
+  - Viewport defaults
+  - Shape styles (collision, interactive, selection, hover)
+  - Polygon drawing configuration (vertices, close threshold, preview styles)
+  - Rectangle drawing configuration (minimum sizes, preview styles)
+  - Vertex editing configuration (handle styles, minimum distances)
+  - Selection configuration (rectangle styles, drag threshold)
+  - History configuration (max size, debounce)
+  - Layer configuration (names, z-index values)
+  - Performance settings (caching, optimization flags, limits)
+  - Keyboard shortcuts (tools, actions, view, drawing)
+  - Validation thresholds (area limits, coordinate limits)
+  - Color palette (area types, UI elements)
+  - Storage keys (localStorage keys with TODO for database migration)
+
+##### Notes
+- All constants are strongly typed with `as const` for literal types
+- Configuration values based on POC and existing Fabric.js editor
+- Supports zoom range 0.3x to 5.0x (exceeds 3.1x+ requirement)
+- Performance limits: warning at 500 shapes, limit at 1000 shapes
+- All magic numbers eliminated - centralized configuration
+
 ---
 
 ### Phase 1 (Remaining Tasks)
-- [ ] Create constants file with configuration
 - [ ] Build coordinate transformation utilities
 - [ ] Create shape factory utilities
 - [ ] Create validation utilities
@@ -142,7 +169,7 @@ and this project follows the migration phases outlined in the migration plan.
 
 ### Overall Progress: 1/8 Phases Complete
 
-- [x] **Phase 1**: Foundation & Infrastructure (2/12 tasks complete)
+- [x] **Phase 1**: Foundation & Infrastructure (3/12 tasks complete)
 - [ ] **Phase 2**: Core Canvas Features (0/11 tasks)
 - [ ] **Phase 3**: Drawing Tools (0/11 tasks)
 - [ ] **Phase 4**: Selection & Manipulation (0/11 tasks)
@@ -151,7 +178,7 @@ and this project follows the migration phases outlined in the migration plan.
 - [ ] **Phase 7**: Testing & Validation (0/15 tasks)
 - [ ] **Phase 8**: Integration & Rollout (0/16 tasks)
 
-**Total Progress**: 2/99 tasks (2%)
+**Total Progress**: 3/99 tasks (3%)
 
 ---
 

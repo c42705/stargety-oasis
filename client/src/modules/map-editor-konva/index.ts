@@ -29,8 +29,8 @@
 // Types
 export type * from './types';
 
-// Constants (will be exported as they are created)
-// export * from './constants/konvaConstants';
+// Constants
+export * from './constants/konvaConstants';
 
 // Utilities (will be exported as they are created)
 // export * from './utils/coordinateTransform';
