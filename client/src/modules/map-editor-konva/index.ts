@@ -23,6 +23,10 @@ export { useKonvaTransform } from './hooks/useKonvaTransform';
 export { useKonvaHistory } from './hooks/useKonvaHistory';
 export { useKonvaPersistence } from './hooks/useKonvaPersistence';
 export { useKonvaSharedMap } from './hooks/useKonvaSharedMap';
+export { useKonvaKeyboardShortcuts } from './hooks/useKonvaKeyboardShortcuts';
+export { useKonvaPreviewMode } from './hooks/useKonvaPreviewMode';
+export { useKonvaPerformance } from './hooks/useKonvaPerformance';
+export { useKonvaAccessibility } from './hooks/useKonvaAccessibility';
 
 // Components
 export { PolygonDrawingPreview } from './components/PolygonDrawingPreview';

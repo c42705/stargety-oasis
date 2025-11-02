@@ -339,6 +339,16 @@ export const PERFORMANCE = {
   MAX_SHAPES_WARNING: 500,
   /** Maximum shapes before performance degradation */
   MAX_SHAPES_LIMIT: 1000,
+  /** Target FPS */
+  FPS_TARGET: 60,
+  /** FPS warning threshold */
+  FPS_WARNING: 30,
+  /** Shape count warning threshold */
+  SHAPE_WARNING: 500,
+  /** Shape count limit */
+  SHAPE_LIMIT: 1000,
+  /** Enable performance monitoring by default */
+  MONITORING_ENABLED: true,
 } as const;
 
 // ============================================================================
