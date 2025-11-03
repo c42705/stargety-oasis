@@ -4,21 +4,12 @@
  * Centralized keyboard shortcut management for all editor actions.
  */
 
-import { useEffect, useCallback } from 'react';
-import type { UseKonvaKeyboardShortcutsParams, UseKonvaKeyboardShortcutsReturn } from '../types';
-
-/**
- * Keyboard shortcut definition
- */
-export interface KeyboardShortcut {
-  key: string;
-  ctrl?: boolean;
-  shift?: boolean;
-  alt?: boolean;
-  description: string;
-  action: () => void;
-  enabled?: boolean;
-}
+import { useEffect, useCallback, useState } from 'react';
+import type {
+  UseKonvaKeyboardShortcutsParams,
+  UseKonvaKeyboardShortcutsReturn,
+  KeyboardShortcut
+} from '../types';
 
 /**
  * Hook for centralized keyboard shortcut management
@@ -41,9 +32,26 @@ export function useKonvaKeyboardShortcuts(
   params: UseKonvaKeyboardShortcutsParams
 ): UseKonvaKeyboardShortcutsReturn {
   const {
-    enabled = true,
-    shortcuts = [],
+    enabled: enabledParam = true,
+    shortcuts: shortcutsParam = [],
   } = params;
+
+  const [registeredShortcuts, setRegisteredShortcuts] = useState<KeyboardShortcut[]>(shortcutsParam);
+
+  /**
+   * Parse key combination string (e.g., 'ctrl+z', 'delete', 'escape')
+   */
+  const parseKeyCombination = (key: string) => {
+    const parts = key.toLowerCase().split('+');
+    const modifiers = {
+      ctrl: parts.includes('ctrl'),
+      shift: parts.includes('shift'),
+      alt: parts.includes('alt'),
+      meta: parts.includes('meta'),
+    };
+    const mainKey = parts[parts.length - 1];
+    return { modifiers, mainKey };
+  };
 
   /**
    * Check if a keyboard event matches a shortcut
@@ -53,13 +61,15 @@ export function useKonvaKeyboardShortcuts(
       // Check if shortcut is enabled
       if (shortcut.enabled === false) return false;
 
+      const { modifiers, mainKey } = parseKeyCombination(shortcut.key);
+
       // Check key
-      if (event.key.toLowerCase() !== shortcut.key.toLowerCase()) return false;
+      if (event.key.toLowerCase() !== mainKey) return false;
 
       // Check modifiers
-      const ctrlMatch = shortcut.ctrl ? (event.ctrlKey || event.metaKey) : !(event.ctrlKey || event.metaKey);
-      const shiftMatch = shortcut.shift ? event.shiftKey : !event.shiftKey;
-      const altMatch = shortcut.alt ? event.altKey : !event.altKey;
+      const ctrlMatch = modifiers.ctrl ? (event.ctrlKey || event.metaKey) : !(event.ctrlKey || event.metaKey);
+      const shiftMatch = modifiers.shift ? event.shiftKey : !event.shiftKey;
+      const altMatch = modifiers.alt ? event.altKey : !event.altKey;
 
       return ctrlMatch && shiftMatch && altMatch;
     },
@@ -71,33 +81,47 @@ export function useKonvaKeyboardShortcuts(
    */
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      if (!enabled) return;
+      if (!enabledParam) return;
 
       // Find matching shortcut
-      const matchingShortcut = shortcuts.find((shortcut) =>
+      const matchingShortcut = registeredShortcuts.find((shortcut) =>
         matchesShortcut(event, shortcut)
       );
 
       if (matchingShortcut) {
         event.preventDefault();
-        matchingShortcut.action();
+        matchingShortcut.handler(event);
       }
     },
-    [enabled, shortcuts, matchesShortcut]
+    [enabledParam, registeredShortcuts, matchesShortcut]
   );
+
+  /**
+   * Register a new shortcut
+   */
+  const registerShortcut = useCallback((shortcut: KeyboardShortcut) => {
+    setRegisteredShortcuts((prev) => [...prev, shortcut]);
+  }, []);
+
+  /**
+   * Unregister a shortcut by key
+   */
+  const unregisterShortcut = useCallback((key: string) => {
+    setRegisteredShortcuts((prev) => prev.filter((s) => s.key !== key));
+  }, []);
+
+  /**
+   * Get all registered shortcuts
+   */
+  const getShortcuts = useCallback(() => {
+    return registeredShortcuts;
+  }, [registeredShortcuts]);
 
   /**
    * Get shortcut description for display
    */
   const getShortcutDisplay = useCallback((shortcut: KeyboardShortcut): string => {
-    const parts: string[] = [];
-
-    if (shortcut.ctrl) parts.push('Ctrl');
-    if (shortcut.shift) parts.push('Shift');
-    if (shortcut.alt) parts.push('Alt');
-    parts.push(shortcut.key.toUpperCase());
-
-    return parts.join('+');
+    return shortcut.key.toUpperCase().replace('+', ' + ');
   }, []);
 
   /**
@@ -112,19 +136,16 @@ export function useKonvaKeyboardShortcuts(
       'Other': [],
     };
 
-    shortcuts.forEach((shortcut) => {
+    registeredShortcuts.forEach((shortcut) => {
       // Categorize based on description
-      if (shortcut.description.toLowerCase().includes('undo') || 
-          shortcut.description.toLowerCase().includes('redo')) {
+      const desc = shortcut.description?.toLowerCase() || '';
+      if (desc.includes('undo') || desc.includes('redo')) {
         categories['History'].push(shortcut);
-      } else if (shortcut.description.toLowerCase().includes('select')) {
+      } else if (desc.includes('select')) {
         categories['Selection'].push(shortcut);
-      } else if (shortcut.description.toLowerCase().includes('tool') ||
-                 shortcut.description.toLowerCase().includes('pan') ||
-                 shortcut.description.toLowerCase().includes('draw')) {
+      } else if (desc.includes('tool') || desc.includes('pan') || desc.includes('draw')) {
         categories['Tools'].push(shortcut);
-      } else if (shortcut.description.toLowerCase().includes('zoom') ||
-                 shortcut.description.toLowerCase().includes('grid')) {
+      } else if (desc.includes('zoom') || desc.includes('grid')) {
         categories['View'].push(shortcut);
       } else {
         categories['Other'].push(shortcut);
@@ -132,31 +153,34 @@ export function useKonvaKeyboardShortcuts(
     });
 
     return categories;
-  }, [shortcuts]);
+  }, [registeredShortcuts]);
 
   // ==========================================================================
   // SETUP EVENT LISTENERS
   // ==========================================================================
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabledParam) return;
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [enabled, handleKeyDown]);
+  }, [enabledParam, handleKeyDown]);
 
   // ==========================================================================
   // RETURN
   // ==========================================================================
 
   return {
-    // Utilities
+    // Methods
+    registerShortcut,
+    unregisterShortcut,
+    getShortcuts,
     getShortcutDisplay,
     getShortcutsByCategory,
 
     // State
-    shortcuts,
-    enabled,
+    shortcuts: registeredShortcuts,
+    enabled: enabledParam,
   };
 }
 

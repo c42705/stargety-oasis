@@ -41,7 +41,7 @@ export const PolygonDrawingPreview: React.FC<PolygonDrawingPreviewProps> = ({
   category,
 }) => {
   // Get style for category
-  const style = SHAPE_STYLES[category] || SHAPE_STYLES.collision;
+  const style = category === 'collision' ? SHAPE_STYLES.COLLISION_DEFAULT : SHAPE_STYLES.INTERACTIVE_DEFAULT;
 
   return (
     <>
@@ -49,10 +49,10 @@ export const PolygonDrawingPreview: React.FC<PolygonDrawingPreviewProps> = ({
       {previewLines && previewLines.length > 0 && (
         <Line
           points={previewLines}
-          stroke={POLYGON_DRAWING.PREVIEW_STROKE}
-          strokeWidth={POLYGON_DRAWING.PREVIEW_STROKE_WIDTH}
-          dash={POLYGON_DRAWING.PREVIEW_DASH}
-          opacity={POLYGON_DRAWING.PREVIEW_OPACITY}
+          stroke={POLYGON_DRAWING.PREVIEW_LINE_COLOR}
+          strokeWidth={POLYGON_DRAWING.PREVIEW_LINE_WIDTH}
+          dash={POLYGON_DRAWING.PREVIEW_LINE_DASH}
+          opacity={0.7}
           listening={false}
         />
       )}
@@ -69,19 +69,19 @@ export const PolygonDrawingPreview: React.FC<PolygonDrawingPreviewProps> = ({
             y={vertex.y}
             radius={
               isHovered
-                ? POLYGON_DRAWING.VERTEX_RADIUS_HOVER
+                ? POLYGON_DRAWING.VERTEX_RADIUS * 1.5
                 : POLYGON_DRAWING.VERTEX_RADIUS
             }
             fill={
               isHovered
-                ? POLYGON_DRAWING.VERTEX_FILL_HOVER
+                ? '#ffff00'
                 : isOrigin
-                ? POLYGON_DRAWING.VERTEX_FILL_ORIGIN
+                ? POLYGON_DRAWING.ORIGIN_VERTEX_FILL
                 : POLYGON_DRAWING.VERTEX_FILL
             }
             stroke={
               isHovered
-                ? POLYGON_DRAWING.VERTEX_STROKE_HOVER
+                ? '#ffaa00'
                 : POLYGON_DRAWING.VERTEX_STROKE
             }
             strokeWidth={POLYGON_DRAWING.VERTEX_STROKE_WIDTH}

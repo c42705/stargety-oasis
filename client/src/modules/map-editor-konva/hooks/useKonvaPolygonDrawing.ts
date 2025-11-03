@@ -7,10 +7,6 @@
 
 import { useCallback, useState, useEffect } from 'react';
 import type {
-  Viewport,
-  GridConfig,
-  Shape,
-  ShapeCategory,
   UseKonvaPolygonDrawingParams,
   UseKonvaPolygonDrawingReturn,
 } from '../types';
@@ -22,7 +18,7 @@ import { POLYGON_DRAWING } from '../constants/konvaConstants';
 /**
  * Internal drawing state
  */
-interface PolygonDrawingState {
+interface InternalDrawingState {
   isDrawing: boolean;
   vertices: Array<{ x: number; y: number }>;
   previewPoint: { x: number; y: number } | null;
@@ -68,7 +64,7 @@ export function useKonvaPolygonDrawing(
   } = params;
 
   // Drawing state
-  const [drawingState, setDrawingState] = useState<PolygonDrawingState>({
+  const [drawingState, setDrawingState] = useState<InternalDrawingState>({
     isDrawing: false,
     vertices: [],
     previewPoint: null,
@@ -84,12 +80,12 @@ export function useKonvaPolygonDrawing(
    */
   const snapPoint = useCallback(
     (point: { x: number; y: number }): { x: number; y: number } => {
-      if (!gridConfig?.snapToGrid || !snapToGridFn) {
+      if (!snapToGridFn) {
         return point;
       }
       return snapToGridFn(point.x, point.y);
     },
-    [gridConfig?.snapToGrid, snapToGridFn]
+    [snapToGridFn]
   );
 
   // ==========================================================================
@@ -158,7 +154,7 @@ export function useKonvaPolygonDrawing(
     }
 
     // Create shape
-    onShapeCreate(shape);
+    onShapeCreate?.(shape);
 
     // Reset state
     setDrawingState({
@@ -327,6 +323,10 @@ export function useKonvaPolygonDrawing(
 
   return {
     // State
+    state: {
+      ...drawingState,
+      minVertices: params.minVertices || POLYGON_DRAWING.MIN_VERTICES,
+    } as any, // Type assertion to match PolygonDrawingState
     isDrawing: drawingState.isDrawing,
     vertices: drawingState.vertices,
     previewPoint: drawingState.previewPoint,
@@ -341,10 +341,10 @@ export function useKonvaPolygonDrawing(
     handleClick,
     handleMouseMove,
     handleDoubleClick,
+    handleEscape: cancelDrawing,
 
     // Actions
-    completePolygon,
-    cancelDrawing,
+    cancel: cancelDrawing,
     removeLastVertex,
   };
 }

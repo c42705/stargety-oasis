@@ -73,7 +73,7 @@ export const MapEditorSelector: React.FC<MapEditorSelectorProps> = ({
 
       {/* Render selected editor */}
       {useKonva ? (
-        <KonvaMapCanvas mapData={mapData} {...otherProps} />
+        <KonvaMapCanvas {...otherProps} />
       ) : (
         <div>
           {/* TODO: Render Fabric.js editor */}

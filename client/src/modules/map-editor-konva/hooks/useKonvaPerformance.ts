@@ -13,6 +13,8 @@ import { PERFORMANCE } from '../constants/konvaConstants';
  */
 export interface PerformanceMetrics {
   fps: number;
+  avgFps: number;
+  frameTime: number;
   shapeCount: number;
   renderTime: number;
   memoryUsage?: number;
@@ -56,6 +58,8 @@ export function useKonvaPerformance(
   // State
   const [metrics, setMetrics] = useState<PerformanceMetrics>({
     fps: 60,
+    avgFps: 60,
+    frameTime: 16.67,
     shapeCount: 0,
     renderTime: 0,
   });
@@ -113,9 +117,9 @@ export function useKonvaPerformance(
 
     setMetrics((prev) => ({
       ...prev,
-      shapeCount: shapes.length,
+      shapeCount: shapes?.length || 0,
     }));
-  }, [enabled, shapes.length]);
+  }, [enabled, shapes?.length]);
 
   // ==========================================================================
   // PERFORMANCE WARNINGS
@@ -125,18 +129,19 @@ export function useKonvaPerformance(
     if (!enabled) return;
 
     const newWarnings: PerformanceWarning[] = [];
+    const shapeCount = shapes?.length || 0;
 
     // Shape count warnings
-    if (shapes.length >= PERFORMANCE.SHAPE_LIMIT) {
+    if (shapeCount >= PERFORMANCE.SHAPE_LIMIT) {
       newWarnings.push({
         type: 'shape_count',
-        message: `Shape limit reached (${shapes.length}/${PERFORMANCE.SHAPE_LIMIT}). Performance may be degraded.`,
+        message: `Shape limit reached (${shapeCount}/${PERFORMANCE.SHAPE_LIMIT}). Performance may be degraded.`,
         severity: 'high',
       });
-    } else if (shapes.length >= PERFORMANCE.SHAPE_WARNING) {
+    } else if (shapeCount >= PERFORMANCE.SHAPE_WARNING) {
       newWarnings.push({
         type: 'shape_count',
-        message: `High shape count (${shapes.length}). Consider optimizing.`,
+        message: `High shape count (${shapeCount}). Consider optimizing.`,
         severity: 'medium',
       });
     }
@@ -157,7 +162,7 @@ export function useKonvaPerformance(
     }
 
     setWarnings(newWarnings);
-  }, [enabled, shapes.length, metrics.fps]);
+  }, [enabled, shapes?.length, metrics.fps]);
 
   // ==========================================================================
   // UTILITIES
@@ -169,35 +174,37 @@ export function useKonvaPerformance(
   const isPerformanceGood = useCallback((): boolean => {
     return (
       metrics.fps >= PERFORMANCE.FPS_TARGET &&
-      shapes.length < PERFORMANCE.SHAPE_WARNING
+      (shapes?.length || 0) < PERFORMANCE.SHAPE_WARNING
     );
-  }, [metrics.fps, shapes.length]);
+  }, [metrics.fps, shapes?.length]);
 
   /**
    * Reset metrics
    */
-  const resetMetrics = useCallback(() => {
+  const reset = useCallback(() => {
     setMetrics({
       fps: 60,
-      shapeCount: shapes.length,
+      avgFps: 60,
+      frameTime: 0,
+      shapeCount: shapes?.length || 0,
       renderTime: 0,
     });
     setWarnings([]);
     frameCountRef.current = 0;
     lastTimeRef.current = performance.now();
-  }, [shapes.length]);
+  }, [shapes?.length]);
 
   /**
-   * Start render timing
+   * Start monitoring (alias for startRenderTiming)
    */
-  const startRenderTiming = useCallback(() => {
+  const startMonitoring = useCallback(() => {
     renderStartRef.current = performance.now();
   }, []);
 
   /**
-   * End render timing
+   * Stop monitoring (alias for endRenderTiming)
    */
-  const endRenderTiming = useCallback(() => {
+  const stopMonitoring = useCallback(() => {
     const renderTime = performance.now() - renderStartRef.current;
     setMetrics((prev) => ({
       ...prev,
@@ -210,18 +217,20 @@ export function useKonvaPerformance(
   // ==========================================================================
 
   return {
-    // Metrics
-    metrics,
+    // Direct metrics (as per type definition)
+    fps: metrics.fps,
+    avgFps: metrics.avgFps,
+    frameTime: metrics.frameTime,
     warnings,
+    metrics,
 
     // State
     isPerformanceGood: isPerformanceGood(),
-    hasWarnings: warnings.length > 0,
 
     // Actions
-    resetMetrics,
-    startRenderTiming,
-    endRenderTiming,
+    reset,
+    startMonitoring,
+    stopMonitoring,
   };
 }
 

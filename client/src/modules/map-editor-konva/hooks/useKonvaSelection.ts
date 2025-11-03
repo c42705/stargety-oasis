@@ -237,7 +237,7 @@ export function useKonvaSelection(
         const dx = Math.abs(pos.x - selectionStart.x);
         const dy = Math.abs(pos.y - selectionStart.y);
 
-        if (dx > SELECTION.DRAG_THRESHOLD || dy > SELECTION.DRAG_THRESHOLD) {
+        if (dx > SELECTION.MIN_DRAG_DISTANCE || dy > SELECTION.MIN_DRAG_DISTANCE) {
           // Start drawing the selection rectangle
           setIsDrawingSelection(true);
           setSelectionRect({

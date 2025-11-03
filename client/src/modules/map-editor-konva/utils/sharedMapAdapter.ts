@@ -378,3 +378,47 @@ export function setupSharedMapListeners(
   };
 }
 
+// ============================================================================
+// CONVERSION UTILITIES
+// ============================================================================
+
+/**
+ * Convert SharedMap data to Konva shapes
+ * @param sharedMap - SharedMap instance or map data
+ * @returns Array of Konva shapes
+ */
+export function sharedMapToKonvaShapes(sharedMap: any): Shape[] {
+  // If sharedMap is a SharedMapSystem instance, get the map data
+  const mapData = sharedMap?.getMapData ? sharedMap.getMapData() : sharedMap;
+
+  if (!mapData) {
+    return [];
+  }
+
+  // Use the mapDataAdapter to convert
+  return mapDataToShapes(
+    mapData.interactiveAreas || [],
+    mapData.impassableAreas || []
+  );
+}
+
+/**
+ * Convert Konva shapes to SharedMap format
+ * @param shapes - Array of Konva shapes
+ * @param worldDimensions - Optional world dimensions (defaults to 800x600)
+ * @returns Map data compatible with SharedMap
+ */
+export function konvaShapesToSharedMap(
+  shapes: Shape[],
+  worldDimensions: { width: number; height: number } = { width: 800, height: 600 }
+): MapData {
+  // Use the mapDataAdapter to convert
+  const { interactiveAreas, impassableAreas } = shapesToMapData(shapes);
+
+  return {
+    interactiveAreas,
+    impassableAreas,
+    worldDimensions,
+  };
+}
+

@@ -37,7 +37,8 @@ export const KonvaPhase3Test: React.FC = () => {
   // ==========================================================================
 
   const [viewport, setViewport] = useState<Viewport>(VIEWPORT_DEFAULTS);
-  const [gridConfig, setGridConfig] = useState<GridConfig>({ ...GRID_DEFAULTS, snapToGrid: true });
+  const [gridConfig, setGridConfig] = useState<GridConfig>({ ...GRID_DEFAULTS });
+  const [snapToGridEnabled, setSnapToGridEnabled] = useState(true);
   const [currentTool, setCurrentTool] = useState<EditorTool>('select');
   const [currentCategory, setCurrentCategory] = useState<ShapeCategory>('collision');
   const [shapes, setShapes] = useState<Shape[]>([]);
@@ -63,8 +64,8 @@ export const KonvaPhase3Test: React.FC = () => {
   // Grid hook
   const { gridLines, shouldRenderGrid, snapToGrid } = useKonvaGrid({
     config: gridConfig,
-    canvasWidth: CANVAS.WIDTH,
-    canvasHeight: CANVAS.HEIGHT,
+    canvasWidth: CANVAS.DEFAULT_WIDTH,
+    canvasHeight: CANVAS.DEFAULT_HEIGHT,
     viewport,
   });
 
@@ -74,26 +75,45 @@ export const KonvaPhase3Test: React.FC = () => {
     category: currentCategory,
     viewport,
     gridConfig,
-    snapToGrid,
+    snapToGrid: snapToGridEnabled ? snapToGrid : undefined,
     onShapeCreate: (shape) => {
       setShapes((prev) => [...prev, shape]);
       setValidationErrors([]);
     },
-    onValidationError: (errors) => setValidationErrors(errors),
+    onValidationError: (errors) => setValidationErrors(Array.isArray(errors) ? errors : [errors]),
   });
 
   // Rectangle drawing hook
   const rectDrawing = useKonvaRectDrawing({
-    enabled: currentTool === 'rectangle',
+    enabled: currentTool === 'rect',
     category: currentCategory,
     viewport,
-    gridConfig,
-    snapToGrid,
-    onShapeCreate: (shape) => {
+    snapToGrid: snapToGridEnabled ? snapToGrid : undefined,
+    onRectangleComplete: (bounds) => {
+      // Create a shape from the bounds
+      const shape: Shape = {
+        id: `rect-${Date.now()}`,
+        category: currentCategory,
+        geometry: {
+          type: 'rectangle',
+          x: bounds.x,
+          y: bounds.y,
+          width: bounds.width,
+          height: bounds.height,
+        },
+        style: {
+          fill: currentCategory === 'collision' ? 'rgba(255, 0, 0, 0.3)' : 'rgba(0, 255, 0, 0.3)',
+          stroke: currentCategory === 'collision' ? '#ff0000' : '#00ff00',
+          strokeWidth: 2,
+          opacity: 0.7,
+        },
+        metadata: {
+          name: `Rectangle ${shapes.length + 1}`,
+        },
+      };
       setShapes((prev) => [...prev, shape]);
       setValidationErrors([]);
     },
-    onValidationError: (errors) => setValidationErrors(errors),
   });
 
   // Layer management
@@ -116,7 +136,7 @@ export const KonvaPhase3Test: React.FC = () => {
     (e: any) => {
       if (currentTool === 'polygon') {
         polygonDrawing.handleMouseMove(e);
-      } else if (currentTool === 'rectangle') {
+      } else if (currentTool === 'rect') {
         rectDrawing.handleMouseMove(e);
       } else if (currentTool === 'pan') {
         handlePanMouseMove(e);
@@ -127,7 +147,7 @@ export const KonvaPhase3Test: React.FC = () => {
 
   const handleCanvasMouseDown = useCallback(
     (e: any) => {
-      if (currentTool === 'rectangle') {
+      if (currentTool === 'rect') {
         rectDrawing.handleMouseDown(e);
       } else if (currentTool === 'pan') {
         handlePanMouseDown(e);
@@ -138,7 +158,7 @@ export const KonvaPhase3Test: React.FC = () => {
 
   const handleCanvasMouseUp = useCallback(
     (e: any) => {
-      if (currentTool === 'rectangle') {
+      if (currentTool === 'rect') {
         rectDrawing.handleMouseUp();
       } else if (currentTool === 'pan') {
         handlePanMouseUp();
@@ -154,9 +174,9 @@ export const KonvaPhase3Test: React.FC = () => {
 
   const handleCancelDrawing = useCallback(() => {
     if (currentTool === 'polygon') {
-      polygonDrawing.cancelDrawing();
-    } else if (currentTool === 'rectangle') {
-      rectDrawing.cancelDrawing();
+      polygonDrawing.cancel();
+    } else if (currentTool === 'rect') {
+      rectDrawing.cancel();
     }
     setValidationErrors([]);
   }, [currentTool, polygonDrawing, rectDrawing]);
@@ -237,7 +257,7 @@ export const KonvaPhase3Test: React.FC = () => {
                 onDblClick={polygonDrawing.handleDoubleClick}
               >
                 {/* Grid Layer */}
-                <Layer ref={layerRefs.gridLayer.ref}>
+                <Layer ref={layerRefs.gridLayer}>
                   {shouldRenderGrid && gridLines.map((line, i) => (
                     <Line
                       key={i}
@@ -251,12 +271,12 @@ export const KonvaPhase3Test: React.FC = () => {
                 </Layer>
 
                 {/* Shapes Layer */}
-                <Layer ref={layerRefs.shapesLayer.ref}>
+                <Layer ref={layerRefs.shapesLayer}>
                   {renderShapes()}
                 </Layer>
 
                 {/* Drawing Preview Layer */}
-                <Layer ref={layerRefs.uiLayer.ref}>
+                <Layer ref={layerRefs.uiLayer}>
                   {/* Polygon preview */}
                   {currentTool === 'polygon' && polygonDrawing.isDrawing && (
                     <PolygonDrawingPreview
@@ -268,9 +288,14 @@ export const KonvaPhase3Test: React.FC = () => {
                   )}
 
                   {/* Rectangle preview */}
-                  {currentTool === 'rectangle' && rectDrawing.isDrawing && (
+                  {currentTool === 'rect' && rectDrawing.isDrawing && rectDrawing.state.startPoint && rectDrawing.state.currentPoint && (
                     <RectangleDrawingPreview
-                      rect={rectDrawing.previewRect}
+                      rect={{
+                        x: Math.min(rectDrawing.state.startPoint.x, rectDrawing.state.currentPoint.x),
+                        y: Math.min(rectDrawing.state.startPoint.y, rectDrawing.state.currentPoint.y),
+                        width: Math.abs(rectDrawing.state.currentPoint.x - rectDrawing.state.startPoint.x),
+                        height: Math.abs(rectDrawing.state.currentPoint.y - rectDrawing.state.startPoint.y),
+                      }}
                       category={currentCategory}
                     />
                   )}
@@ -309,15 +334,15 @@ export const KonvaPhase3Test: React.FC = () => {
             <Space direction="vertical" style={{ width: '100%' }}>
               <div>
                 <Switch
-                  checked={gridConfig.enabled}
+                  checked={gridConfig.visible}
                   onChange={(checked) => setGridConfig((prev) => ({ ...prev, enabled: checked }))}
                 />
                 <Text style={{ marginLeft: '8px' }}>Show Grid</Text>
               </div>
               <div>
                 <Switch
-                  checked={gridConfig.snapToGrid}
-                  onChange={(checked) => setGridConfig((prev) => ({ ...prev, snapToGrid: checked }))}
+                  checked={snapToGridEnabled}
+                  onChange={setSnapToGridEnabled}
                 />
                 <Text style={{ marginLeft: '8px' }}>Snap to Grid</Text>
               </div>

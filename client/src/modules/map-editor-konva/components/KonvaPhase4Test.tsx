@@ -60,8 +60,8 @@ export const KonvaPhase4Test: React.FC = () => {
   // Grid hook
   const { gridLines, shouldRenderGrid } = useKonvaGrid({
     config: gridConfig,
-    canvasWidth: CANVAS.WIDTH,
-    canvasHeight: CANVAS.HEIGHT,
+    canvasWidth: CANVAS.DEFAULT_WIDTH,
+    canvasHeight: CANVAS.DEFAULT_HEIGHT,
     viewport,
   });
 
@@ -160,8 +160,8 @@ export const KonvaPhase4Test: React.FC = () => {
         },
         metadata: {
           name: 'Rectangle 1',
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
       },
       {
@@ -179,8 +179,8 @@ export const KonvaPhase4Test: React.FC = () => {
         },
         metadata: {
           name: 'Polygon 1',
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
       },
     ];
@@ -221,7 +221,7 @@ export const KonvaPhase4Test: React.FC = () => {
                 onMouseUp={selection.handleMouseUp}
               >
                 {/* Grid Layer */}
-                <Layer ref={layerRefs.gridLayer.ref}>
+                <Layer ref={layerRefs.gridLayer}>
                   {shouldRenderGrid && gridLines.map((line, i) => (
                     <Line
                       key={i}
@@ -235,7 +235,7 @@ export const KonvaPhase4Test: React.FC = () => {
                 </Layer>
 
                 {/* Shapes Layer */}
-                <Layer ref={layerRefs.shapesLayer.ref}>
+                <Layer ref={layerRefs.shapesLayer}>
                   {shapes.map((shape) => {
                     const isSelected = selection.isSelected(shape.id);
                     
@@ -245,7 +245,7 @@ export const KonvaPhase4Test: React.FC = () => {
                           key={shape.id}
                           shape={shape}
                           isSelected={isSelected}
-                          onSelect={() => selection.handleShapeClick(shape.id, { evt: { ctrlKey: false, metaKey: false }, cancelBubble: false })}
+                          onSelect={() => selection.selectShape(shape.id)}
                           onDragEnd={(e) => transform.handleDragEnd(shape.id, e)}
                           onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
                         />
@@ -256,7 +256,7 @@ export const KonvaPhase4Test: React.FC = () => {
                           key={shape.id}
                           shape={shape}
                           isSelected={isSelected}
-                          onSelect={() => selection.handleShapeClick(shape.id, { evt: { ctrlKey: false, metaKey: false }, cancelBubble: false })}
+                          onSelect={() => selection.selectShape(shape.id)}
                           onDragEnd={(e) => transform.handleDragEnd(shape.id, e)}
                           onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
                         />
@@ -270,7 +270,7 @@ export const KonvaPhase4Test: React.FC = () => {
                 </Layer>
 
                 {/* Selection Layer */}
-                <Layer ref={layerRefs.selectionLayer.ref}>
+                <Layer ref={layerRefs.uiLayer}>
                   <SelectionRect rect={selection.selectionRect} />
                 </Layer>
               </Stage>

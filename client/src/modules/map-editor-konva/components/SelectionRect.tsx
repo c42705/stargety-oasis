@@ -42,7 +42,6 @@ export const SelectionRect: React.FC<SelectionRectProps> = ({ rect }) => {
       stroke={SELECTION.RECT_STROKE}
       strokeWidth={SELECTION.RECT_STROKE_WIDTH}
       dash={SELECTION.RECT_DASH}
-      opacity={SELECTION.RECT_OPACITY}
       listening={false}
     />
   );

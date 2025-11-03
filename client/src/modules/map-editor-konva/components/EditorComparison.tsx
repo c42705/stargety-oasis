@@ -156,7 +156,7 @@ export const EditorComparison: React.FC<EditorComparisonProps> = ({
             extra={<Text type="success">Migration Target</Text>}
           >
             <div style={{ border: '1px solid #d9d9d9' }}>
-              <KonvaMapCanvas mapData={mapData} />
+              <KonvaMapCanvas />
             </div>
           </Card>
         </Col>

@@ -257,7 +257,6 @@ export function useKonvaPan(params: UseKonvaPanParams): UseKonvaPanReturn {
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
-    handleMouseLeave,
 
     // Touch event handlers
     handleTouchStart,

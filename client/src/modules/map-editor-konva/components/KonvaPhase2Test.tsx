@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { Stage, Layer, Line, Image, Rect, Circle, Text } from 'react-konva';
+import { Stage, Layer, Line, Image, Rect, Circle, Text as KonvaText } from 'react-konva';
 import { Card, Space, Button, Slider, Switch, InputNumber, Typography, Row, Col, Upload, message } from 'antd';
 import {
   ZoomInOutlined,
@@ -79,8 +79,8 @@ export const KonvaPhase2Test: React.FC = () => {
     snapToGrid,
   } = useKonvaGrid({
     config: gridConfig,
-    canvasWidth: CANVAS.WIDTH,
-    canvasHeight: CANVAS.HEIGHT,
+    canvasWidth: CANVAS.DEFAULT_WIDTH,
+    canvasHeight: CANVAS.DEFAULT_HEIGHT,
     viewport,
   });
 
@@ -92,8 +92,7 @@ export const KonvaPhase2Test: React.FC = () => {
     reload: reloadBackground,
   } = useKonvaBackground({
     imageUrl: backgroundUrl,
-    onLoad: (img) => message.success(`Background loaded: ${img.width}x${img.height}`),
-    onError: (err) => message.error(`Failed to load background: ${err.message}`),
+    viewport,
   });
 
   // Layer management hook
@@ -162,7 +161,7 @@ export const KonvaPhase2Test: React.FC = () => {
                 style={{ cursor: isPanning ? 'grabbing' : panToolEnabled ? 'grab' : 'default' }}
               >
                 {/* Grid Layer */}
-                <Layer ref={layerRefs.gridLayer.ref}>
+                <Layer ref={layerRefs.gridLayer}>
                   {shouldRenderGrid && gridLines.map((line, i) => (
                     <Line
                       key={i}
@@ -176,7 +175,7 @@ export const KonvaPhase2Test: React.FC = () => {
                 </Layer>
 
                 {/* Background Layer */}
-                <Layer ref={layerRefs.backgroundLayer.ref}>
+                <Layer ref={layerRefs.backgroundLayer}>
                   {backgroundImage && (
                     <Image
                       image={backgroundImage}
@@ -188,7 +187,7 @@ export const KonvaPhase2Test: React.FC = () => {
                 </Layer>
 
                 {/* Shapes Layer - Demo shapes */}
-                <Layer ref={layerRefs.shapesLayer.ref}>
+                <Layer ref={layerRefs.shapesLayer}>
                   <Rect
                     x={100}
                     y={100}
@@ -206,7 +205,7 @@ export const KonvaPhase2Test: React.FC = () => {
                     stroke="blue"
                     strokeWidth={2}
                   />
-                  <Text
+                  <KonvaText
                     x={300}
                     y={400}
                     text="Phase 2 Test"
@@ -216,7 +215,7 @@ export const KonvaPhase2Test: React.FC = () => {
                 </Layer>
 
                 {/* UI Layer - Viewport info */}
-                <Layer ref={layerRefs.uiLayer.ref}>
+                <Layer ref={layerRefs.uiLayer}>
                   <Rect
                     x={10}
                     y={10}
@@ -226,21 +225,21 @@ export const KonvaPhase2Test: React.FC = () => {
                     stroke="#d9d9d9"
                     strokeWidth={1}
                   />
-                  <Text
+                  <KonvaText
                     x={20}
                     y={20}
                     text={`Zoom: ${zoomPercentage}%`}
                     fontSize={14}
                     fill="black"
                   />
-                  <Text
+                  <KonvaText
                     x={20}
                     y={40}
                     text={`Pan: (${Math.round(viewport.pan.x)}, ${Math.round(viewport.pan.y)})`}
                     fontSize={14}
                     fill="black"
                   />
-                  <Text
+                  <KonvaText
                     x={20}
                     y={60}
                     text={`Panning: ${isPanning ? 'Yes' : 'No'}`}
@@ -317,7 +316,7 @@ export const KonvaPhase2Test: React.FC = () => {
             <Space direction="vertical" style={{ width: '100%' }}>
               <div>
                 <Switch
-                  checked={gridConfig.enabled}
+                  checked={gridConfig.visible}
                   onChange={handleGridVisibilityChange}
                 />
                 <Text style={{ marginLeft: '8px' }}>Show Grid</Text>

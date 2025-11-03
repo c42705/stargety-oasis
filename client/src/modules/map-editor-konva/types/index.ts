@@ -172,6 +172,30 @@ export type {
   // Background Image Hook
   UseKonvaBackgroundParams,
   UseKonvaBackgroundReturn,
+
+  // Performance Hook
+  UseKonvaPerformanceParams,
+  UseKonvaPerformanceReturn,
+
+  // Persistence Hook
+  UseKonvaPersistenceParams,
+  UseKonvaPersistenceReturn,
+
+  // Preview Mode Hook
+  UseKonvaPreviewModeParams,
+  UseKonvaPreviewModeReturn,
+
+  // SharedMap Hook
+  UseKonvaSharedMapParams,
+  UseKonvaSharedMapReturn,
+
+  // Rectangle Drawing Hook (aliases)
+  UseKonvaRectDrawingParams,
+  UseKonvaRectDrawingReturn,
+
+  // Accessibility Hook
+  UseKonvaAccessibilityParams,
+  UseKonvaAccessibilityReturn,
 } from './hooks.types';
 
 // ============================================================================

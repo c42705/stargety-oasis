@@ -242,8 +242,6 @@ export function useKonvaHistory(
     // State
     canUndo: past.length > 0,
     canRedo: future.length > 0,
-    historySize: past.length,
-    futureSize: future.length,
 
     // Actions
     undo,

@@ -8,7 +8,7 @@
 import { useMemo } from 'react';
 import type { GridConfig, UseKonvaGridParams, UseKonvaGridReturn } from '../types';
 import { GRID_DEFAULTS } from '../constants/konvaConstants';
-
+ 
 /**
  * Hook for managing grid rendering
  * 
@@ -39,7 +39,7 @@ export function useKonvaGrid(params: UseKonvaGridParams): UseKonvaGridReturn {
   } = params;
 
   const {
-    enabled = GRID_DEFAULTS.enabled,
+    // enabled removed - not in GridConfig
     spacing = GRID_DEFAULTS.spacing,
     color = GRID_DEFAULTS.color,
     opacity = GRID_DEFAULTS.opacity,
@@ -54,14 +54,15 @@ export function useKonvaGrid(params: UseKonvaGridParams): UseKonvaGridReturn {
    * Determine if grid should be rendered based on zoom level
    */
   const shouldRenderGrid = useMemo(() => {
-    if (!enabled) return false;
-    
+    // Grid is always enabled (visibility controlled by config.visible)
+    if (!config.visible) return false;
+
     // Hide grid at extreme zoom levels for performance
     if (viewport && viewport.zoom > 5.0) return false;
     if (viewport && viewport.zoom < 0.2) return false;
-    
+
     return true;
-  }, [enabled, viewport]);
+  }, [config.visible, viewport]);
 
   /**
    * Calculate optimal grid spacing based on zoom level
@@ -114,6 +115,7 @@ export function useKonvaGrid(params: UseKonvaGridParams): UseKonvaGridReturn {
    */
   const gridLines = useMemo(() => {
     if (!shouldRenderGrid) return [];
+    if (!canvasWidth || !canvasHeight) return [];
 
     const lines: Array<{
       points: number[];
@@ -166,7 +168,7 @@ export function useKonvaGrid(params: UseKonvaGridParams): UseKonvaGridReturn {
    * Snap a point to the grid
    */
   const snapToGrid = (x: number, y: number): { x: number; y: number } => {
-    if (!config.snapToGrid) {
+    if (!false) {
       return { x, y };
     }
 
@@ -183,7 +185,7 @@ export function useKonvaGrid(params: UseKonvaGridParams): UseKonvaGridReturn {
   const snapPointsToGrid = (
     points: Array<{ x: number; y: number }>
   ): Array<{ x: number; y: number }> => {
-    if (!config.snapToGrid) {
+    if (!false) {
       return points;
     }
 
@@ -198,12 +200,11 @@ export function useKonvaGrid(params: UseKonvaGridParams): UseKonvaGridReturn {
    * Get current grid configuration
    */
   const gridConfig: GridConfig = {
-    enabled,
+    visible: config.visible,
     spacing: effectiveSpacing,
     color,
     opacity: effectiveOpacity,
     pattern,
-    snapToGrid: config.snapToGrid ?? false,
   };
 
   // ==========================================================================

@@ -165,6 +165,20 @@ export const HOVER_STYLE = {
   OPACITY_MULTIPLIER: 1.2,
 } as const;
 
+/**
+ * Combined shape styles for easy access
+ */
+export const SHAPE_STYLES = {
+  /** Default style for collision shapes */
+  COLLISION_DEFAULT: COLLISION_STYLE,
+  /** Default style for interactive shapes */
+  INTERACTIVE_DEFAULT: INTERACTIVE_STYLE,
+  /** Style for selected shapes */
+  SELECTION: SELECTION_STYLE,
+  /** Style for hovered shapes */
+  HOVER: HOVER_STYLE,
+} as const;
+
 // ============================================================================
 // POLYGON DRAWING
 // ============================================================================
@@ -315,6 +329,16 @@ export const LAYER_Z_INDEX = {
   BACKGROUND: 1,
   SHAPES: 2,
   UI: 3,
+} as const;
+
+/**
+ * Layer configuration and settings
+ */
+export const LAYER = {
+  /** Enable layer caching for performance */
+  ENABLE_CACHING: true,
+  /** Clear cache on updates */
+  CLEAR_CACHE_ON_UPDATE: true,
 } as const;
 
 // ============================================================================

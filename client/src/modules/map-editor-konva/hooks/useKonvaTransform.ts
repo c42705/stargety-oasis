@@ -87,7 +87,7 @@ export function useKonvaTransform(
           x: newX,
           y: newY,
         };
-        onShapeUpdate(shapeId, { geometry: { ...shape.geometry, ...updates } });
+        onShapeUpdate?.(shapeId, { geometry: { ...shape.geometry, ...updates } });
       } else if (shape.geometry.type === 'polygon') {
         // For polygons, we need to update the points array
         // The drag moves the entire polygon, so we just update x/y offset
@@ -109,8 +109,8 @@ export function useKonvaTransform(
         // Reset node position to 0,0 since we've updated the points
         node.x(0);
         node.y(0);
-        
-        onShapeUpdate(shapeId, { geometry: { ...shape.geometry, points: newPoints } });
+
+        onShapeUpdate?.(shapeId, { geometry: { ...shape.geometry, points: newPoints } });
       }
     },
     [getShape, canTransform, onShapeUpdate]
@@ -144,7 +144,7 @@ export function useKonvaTransform(
           rotation: node.rotation(),
         };
 
-        onShapeUpdate(shapeId, { geometry: { ...shape.geometry, ...updates } });
+        onShapeUpdate?.(shapeId, { geometry: { ...shape.geometry, ...updates } });
       } else if (shape.geometry.type === 'polygon') {
         // For polygons, we keep the scale and rotation
         const updates: Partial<PolygonGeometry> = {
@@ -168,7 +168,7 @@ export function useKonvaTransform(
           node.scaleY(1);
         }
 
-        onShapeUpdate(shapeId, { geometry: { ...shape.geometry, ...updates } });
+        onShapeUpdate?.(shapeId, { geometry: { ...shape.geometry, ...updates } });
       }
     },
     [getShape, canTransform, onShapeUpdate]
@@ -179,12 +179,22 @@ export function useKonvaTransform(
   // ==========================================================================
 
   return {
+    // State
+    state: {
+      isTransforming: false,
+      transformType: null,
+      originalShapes: [],
+    },
+
     // Transform queries
-    canTransform,
+    canTransform: selectedIds.length > 0,
 
     // Event handlers
+    handleTransformStart: () => {},
+    handleTransform: () => {},
     handleDragEnd,
     handleTransformEnd,
+    cancelTransform: () => {},
   };
 }
 

@@ -84,12 +84,12 @@ export function useKonvaRectDrawing(
    */
   const snapPoint = useCallback(
     (point: { x: number; y: number }): { x: number; y: number } => {
-      if (!gridConfig?.snapToGrid || !snapToGridFn) {
+      if (!snapToGridFn) {
         return point;
       }
       return snapToGridFn(point.x, point.y);
     },
-    [gridConfig?.snapToGrid, snapToGridFn]
+    [snapToGridFn]
   );
 
   // ==========================================================================
@@ -197,7 +197,7 @@ export function useKonvaRectDrawing(
     }
 
     // Create shape
-    onShapeCreate(shape);
+    onShapeCreate?.(shape);
 
     // Reset state
     setDrawingState({
@@ -251,6 +251,14 @@ export function useKonvaRectDrawing(
 
   return {
     // State
+    state: {
+      isDrawing: drawingState.isDrawing,
+      startPoint: drawingState.isDrawing ? { x: drawingState.startX, y: drawingState.startY } : null,
+      currentPoint: drawingState.isDrawing ? { x: drawingState.currentX, y: drawingState.currentY } : null,
+      isValidSize: drawingState.isDrawing &&
+        Math.abs(drawingState.currentX - drawingState.startX) >= (params.minSize || RECTANGLE_DRAWING.MIN_WIDTH) &&
+        Math.abs(drawingState.currentY - drawingState.startY) >= (params.minSize || RECTANGLE_DRAWING.MIN_WIDTH),
+    },
     isDrawing: drawingState.isDrawing,
 
     // Preview data
@@ -262,6 +270,7 @@ export function useKonvaRectDrawing(
     handleMouseUp,
 
     // Actions
+    cancel: cancelDrawing,
     cancelDrawing,
   };
 }

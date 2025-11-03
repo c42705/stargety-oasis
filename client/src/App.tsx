@@ -25,6 +25,7 @@ import { MyProfileTab } from './components/panel-tabs/MyProfileTab';
 import { MapSyncStatus } from './components/MapSyncStatus';
 import { MapEditorPage } from './pages/MapEditorPage';
 import { MapEditorPOCPage } from './pages/MapEditorPOCPage';
+import { KonvaTestSuitePage } from './pages/KonvaTestSuitePage';
 import ConsolidatedSettings from './components/settings/ConsolidatedSettings';
 
 import './App.css';
@@ -329,6 +330,12 @@ const App: React.FC = () => {
             <LoginModule />
           )
         }
+      />
+
+      {/* Konva Test Suite Route - Comprehensive testing */}
+      <Route
+        path="/konva-test-suite"
+        element={<KonvaTestSuitePage />}
       />
 
       {/* Main App Route */}

@@ -130,7 +130,7 @@ export const KonvaPhase6Test: React.FC = () => {
   });
 
   // Layer management
-  const { layerRefs } = useKonvaLayers();
+  const { layers: layerRefs } = useKonvaLayers();
 
   // ==========================================================================
   // SHAPE MANAGEMENT
@@ -202,7 +202,7 @@ export const KonvaPhase6Test: React.FC = () => {
                 onMouseUp={previewMode.canEdit ? selection.handleMouseUp : undefined}
               >
                 {/* Grid Layer */}
-                <Layer ref={layerRefs.gridLayer.ref}>
+                <Layer ref={layerRefs.gridLayer}>
                   {shouldRenderGrid && gridLines.map((line, i) => (
                     <Line
                       key={i}
@@ -216,7 +216,7 @@ export const KonvaPhase6Test: React.FC = () => {
                 </Layer>
 
                 {/* Shapes Layer */}
-                <Layer ref={layerRefs.shapesLayer.ref}>
+                <Layer ref={layerRefs.shapesLayer}>
                   {shapes.map((shape) => {
                     const isSelected = selection.isSelected(shape.id) && previewMode.canEdit;
                     
@@ -226,7 +226,7 @@ export const KonvaPhase6Test: React.FC = () => {
                           key={shape.id}
                           shape={shape}
                           isSelected={isSelected}
-                          onSelect={() => previewMode.canEdit && selection.handleShapeClick(shape.id, { evt: { ctrlKey: false, metaKey: false }, cancelBubble: false })}
+                          onSelect={() => previewMode.canEdit && selection.selectShape(shape.id)}
                           onDragEnd={(e) => transform.handleDragEnd(shape.id, e)}
                           onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
                         />
@@ -237,7 +237,7 @@ export const KonvaPhase6Test: React.FC = () => {
                           key={shape.id}
                           shape={shape}
                           isSelected={isSelected}
-                          onSelect={() => previewMode.canEdit && selection.handleShapeClick(shape.id, { evt: { ctrlKey: false, metaKey: false }, cancelBubble: false })}
+                          onSelect={() => previewMode.canEdit && selection.selectShape(shape.id)}
                           onDragEnd={(e) => transform.handleDragEnd(shape.id, e)}
                           onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
                         />
@@ -252,7 +252,7 @@ export const KonvaPhase6Test: React.FC = () => {
 
                 {/* Selection Layer (only in edit mode) */}
                 {previewMode.canEdit && (
-                  <Layer ref={layerRefs.selectionLayer.ref}>
+                  <Layer ref={layerRefs.uiLayer}>
                     <SelectionRect rect={selection.selectionRect} />
                   </Layer>
                 )}

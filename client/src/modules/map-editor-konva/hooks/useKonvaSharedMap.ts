@@ -146,10 +146,11 @@ export function useKonvaSharedMap(
 
   return {
     // Actions
-    syncToSharedMap,
+    syncToSharedMap: () => syncToSharedMap(),
+    loadFromSharedMap: () => {},
 
     // State
-    isConnected: !!sharedMapSystem,
+    isSynced: !!sharedMapSystem,
     lastSyncTime: lastSyncTimeRef.current,
   };
 }

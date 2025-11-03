@@ -38,10 +38,10 @@ export function useKonvaZoom(params: UseKonvaZoomParams): UseKonvaZoomReturn {
     enabled = true,
   } = params;
 
-  const minZoom = config.min ?? ZOOM.MIN;
-  const maxZoom = config.max ?? ZOOM.MAX;
-  const zoomStep = config.step ?? ZOOM.STEP;
-  const wheelSensitivity = config.wheelSensitivity ?? ZOOM.WHEEL_SENSITIVITY;
+  const minZoom = config.min ?? ZOOM.min;
+  const maxZoom = config.max ?? ZOOM.max;
+  const zoomStep = config.step ?? ZOOM.step;
+  const wheelSensitivity = config.wheelSensitivity ?? ZOOM.wheelSensitivity;
 
   // ==========================================================================
   // ZOOM UTILITIES
@@ -210,17 +210,20 @@ export function useKonvaZoom(params: UseKonvaZoomParams): UseKonvaZoomReturn {
   return {
     // Current state
     zoom: viewport.zoom,
+    currentZoom: viewport.zoom, // Alias for backward compatibility
     zoomPercentage,
     isAtMin,
+    isMinZoom: isAtMin, // Alias for backward compatibility
     isAtMax,
+    isMaxZoom: isAtMax, // Alias for backward compatibility
 
     // Actions
     zoomIn,
     zoomOut,
     zoomTo,
+    setZoom: zoomTo, // Alias for backward compatibility
     resetZoom,
     zoomToFit,
-    zoomToPercentage,
 
     // Event handlers
     handleWheel,

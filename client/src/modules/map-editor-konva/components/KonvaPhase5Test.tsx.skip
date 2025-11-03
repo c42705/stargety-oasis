@@ -19,7 +19,7 @@ import {
   DeleteOutlined,
   ClearOutlined,
 } from '@ant-design/icons';
-import type { Viewport, GridConfig, Shape, EditorState } from '../types';
+import type { Viewport, GridConfig, Shape, EditorState, EditorTool } from '../types';
 import { useKonvaZoom } from '../hooks/useKonvaZoom';
 import { useKonvaGrid } from '../hooks/useKonvaGrid';
 import { useKonvaSelection } from '../hooks/useKonvaSelection';
@@ -43,11 +43,34 @@ export const KonvaPhase5Test: React.FC = () => {
   const [gridConfig] = useState<GridConfig>(GRID_DEFAULTS);
   const [shapes, setShapes] = useState<Shape[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [currentTool] = useState<EditorTool>('select');
 
   // Current editor state for history
   const currentState: EditorState = {
+    viewport,
+    grid: gridConfig,
     shapes,
-    selectedIds,
+    selection: {
+      selectedIds,
+      selectionRect: null,
+      isMultiSelect: false,
+    },
+    tool: {
+      current: currentTool,
+      previous: 'select',
+      isActive: true,
+    },
+    history: {
+      past: [],
+      future: [],
+      maxSize: 50,
+    },
+    worldDimensions: {
+      width: 1920,
+      height: 1080,
+    },
+    isPreviewMode: false,
+    isDirty: false,
   };
 
   // ==========================================================================
@@ -109,7 +132,7 @@ export const KonvaPhase5Test: React.FC = () => {
   });
 
   // Layer management
-  const { layerRefs } = useKonvaLayers();
+  const { layers: layerRefs } = useKonvaLayers();
 
   // ==========================================================================
   // SHAPE MANAGEMENT
@@ -189,7 +212,7 @@ export const KonvaPhase5Test: React.FC = () => {
                 onMouseUp={selection.handleMouseUp}
               >
                 {/* Grid Layer */}
-                <Layer ref={layerRefs.gridLayer.ref}>
+                <Layer ref={layerRefs.gridLayer}>
                   {shouldRenderGrid && gridLines.map((line, i) => (
                     <Line
                       key={i}
@@ -203,7 +226,7 @@ export const KonvaPhase5Test: React.FC = () => {
                 </Layer>
 
                 {/* Shapes Layer */}
-                <Layer ref={layerRefs.shapesLayer.ref}>
+                <Layer ref={layerRefs.shapesLayer}>
                   {shapes.map((shape) => {
                     const isSelected = selection.isSelected(shape.id);
                     
@@ -213,7 +236,7 @@ export const KonvaPhase5Test: React.FC = () => {
                           key={shape.id}
                           shape={shape}
                           isSelected={isSelected}
-                          onSelect={() => selection.handleShapeClick(shape.id, { evt: { ctrlKey: false, metaKey: false }, cancelBubble: false })}
+                          onSelect={() => selection.selectShape(shape.id)}
                           onDragEnd={(e) => transform.handleDragEnd(shape.id, e)}
                           onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
                         />
@@ -224,7 +247,7 @@ export const KonvaPhase5Test: React.FC = () => {
                           key={shape.id}
                           shape={shape}
                           isSelected={isSelected}
-                          onSelect={() => selection.handleShapeClick(shape.id, { evt: { ctrlKey: false, metaKey: false }, cancelBubble: false })}
+                          onSelect={() => selection.selectShape(shape.id)}
                           onDragEnd={(e) => transform.handleDragEnd(shape.id, e)}
                           onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
                         />
@@ -238,7 +261,7 @@ export const KonvaPhase5Test: React.FC = () => {
                 </Layer>
 
                 {/* Selection Layer */}
-                <Layer ref={layerRefs.selectionLayer.ref}>
+                <Layer ref={layerRefs.uiLayer}>
                   <SelectionRect rect={selection.selectionRect} />
                 </Layer>
               </Stage>

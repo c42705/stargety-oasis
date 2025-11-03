@@ -376,9 +376,9 @@ export interface EditorEvent<T = any> {
 export type StageRef = Konva.Stage | null;
 
 /**
- * Konva layer reference
+ * Konva layer reference (React ref object)
  */
-export type LayerRef = Konva.Layer | null;
+export type LayerRef = React.RefObject<Konva.Layer | null>;
 
 /**
  * Konva event object (re-export for convenience)

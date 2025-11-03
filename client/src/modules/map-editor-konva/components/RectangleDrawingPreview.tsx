@@ -37,7 +37,9 @@ export const RectangleDrawingPreview: React.FC<RectangleDrawingPreviewProps> = (
   if (!rect) return null;
 
   // Get style for category
-  const style = SHAPE_STYLES[category] || SHAPE_STYLES.collision;
+  const style = category === 'collision' ? SHAPE_STYLES.COLLISION_DEFAULT : SHAPE_STYLES.INTERACTIVE_DEFAULT;
+
+  const isValid = rect.width >= RECTANGLE_DRAWING.MIN_WIDTH && rect.height >= RECTANGLE_DRAWING.MIN_HEIGHT;
 
   return (
     <Rect
@@ -45,11 +47,11 @@ export const RectangleDrawingPreview: React.FC<RectangleDrawingPreviewProps> = (
       y={rect.y}
       width={rect.width}
       height={rect.height}
-      fill={RECTANGLE_DRAWING.PREVIEW_FILL}
-      stroke={RECTANGLE_DRAWING.PREVIEW_STROKE}
+      fill={style.fill}
+      stroke={isValid ? RECTANGLE_DRAWING.VALID_STROKE : RECTANGLE_DRAWING.INVALID_STROKE}
       strokeWidth={RECTANGLE_DRAWING.PREVIEW_STROKE_WIDTH}
-      dash={RECTANGLE_DRAWING.PREVIEW_DASH}
-      opacity={RECTANGLE_DRAWING.PREVIEW_OPACITY}
+      dash={[5, 5]}
+      opacity={RECTANGLE_DRAWING.PREVIEW_FILL_OPACITY}
       listening={false}
     />
   );

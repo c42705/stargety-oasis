@@ -101,8 +101,8 @@ export const KonvaMapCanvas: React.FC<KonvaMapCanvasProps> = ({
 
   // State
   const [dimensions, setDimensions] = useState({
-    width: propWidth || CANVAS.WIDTH,
-    height: propHeight || CANVAS.HEIGHT,
+    width: propWidth || CANVAS.DEFAULT_WIDTH,
+    height: propHeight || CANVAS.DEFAULT_HEIGHT,
   });
 
   // ==========================================================================
@@ -116,8 +116,8 @@ export const KonvaMapCanvas: React.FC<KonvaMapCanvasProps> = ({
     if (!containerRef.current) return;
 
     const container = containerRef.current;
-    const newWidth = propWidth || container.clientWidth || CANVAS.WIDTH;
-    const newHeight = propHeight || container.clientHeight || CANVAS.HEIGHT;
+    const newWidth = propWidth || container.clientWidth || CANVAS.DEFAULT_WIDTH;
+    const newHeight = propHeight || container.clientHeight || CANVAS.DEFAULT_HEIGHT;
 
     setDimensions({ width: newWidth, height: newHeight });
     onResize?.(newWidth, newHeight);

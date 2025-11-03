@@ -91,7 +91,6 @@ export function useKonvaPreviewMode(
     enablePreview,
     disablePreview,
     togglePreview,
-    canPerformAction,
   };
 }
 

@@ -85,7 +85,7 @@ export function useKonvaPersistence(
     try {
       const data: PersistedData = {
         shapes: currentState.shapes,
-        selectedIds: currentState.selectedIds || [],
+        selectedIds: currentState.selection?.selectedIds || [],
         version: PERSISTENCE.VERSION,
         timestamp: Date.now(),
       };
@@ -136,8 +136,8 @@ export function useKonvaPersistence(
   /**
    * Load state from localStorage
    */
-  const load = useCallback(async (): Promise<boolean> => {
-    if (!enabled) return false;
+  const load = useCallback((): EditorState | null => {
+    if (!enabled) return null;
 
     setIsLoading(true);
     setError(null);
@@ -164,20 +164,27 @@ export function useKonvaPersistence(
         // TODO: Implement migration logic if needed
       }
 
-      // Restore state
-      onStateRestore({
+      // Create a partial EditorState with the loaded data
+      const loadedState = {
+        ...currentState,
         shapes: data.shapes,
-        selectedIds: data.selectedIds || [],
-      });
+        selection: {
+          ...currentState.selection,
+          selectedIds: data.selectedIds || [],
+        },
+      };
+
+      // Restore state
+      onStateRestore(loadedState);
 
       setIsLoading(false);
-      return true;
+      return loadedState;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load';
       setError(errorMessage);
       setIsLoading(false);
       console.error('Load failed:', err);
-      return false;
+      return null;
     }
   }, [enabled, storageKey, onStateRestore]);
 
@@ -251,15 +258,8 @@ export function useKonvaPersistence(
     clear,
 
     // State
-    isSaving,
-    isLoading,
-    lastSaved,
-    canLoad: canLoad(),
-    error,
-
-    // Auto-save
-    autoSaveEnabled,
-    setAutoSaveEnabled,
+    hasSavedState: canLoad(),
+    lastSaveTime: lastSaved,
   };
 }
 

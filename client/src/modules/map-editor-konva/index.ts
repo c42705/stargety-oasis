@@ -11,7 +11,7 @@
 export { KonvaMapCanvas } from './components/KonvaMapCanvas';
 
 // Hooks
-export * from './hooks/useKonvaLayers';
+export { useKonvaLayers } from './hooks/useKonvaLayers';
 export { useKonvaZoom } from './hooks/useKonvaZoom';
 export { useKonvaPan } from './hooks/useKonvaPan';
 export { useKonvaGrid } from './hooks/useKonvaGrid';
@@ -39,7 +39,7 @@ export { EditorComparison } from './components/EditorComparison';
 // export { PolygonEditor } from './components/PolygonEditor';
 
 // Types
-export type * from './types';
+export * from './types';
 
 // Constants
 export * from './constants/konvaConstants';

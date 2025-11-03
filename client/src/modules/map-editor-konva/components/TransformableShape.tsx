@@ -8,7 +8,7 @@ import React, { useEffect, useRef } from 'react';
 import { Rect, Line, Transformer } from 'react-konva';
 import Konva from 'konva';
 import type { Shape } from '../types';
-import { SELECTION } from '../constants/konvaConstants';
+import { SELECTION_STYLE } from '../constants/konvaConstants';
 
 // ==========================================================================
 // TRANSFORMABLE RECTANGLE
@@ -46,9 +46,8 @@ export const TransformableRect: React.FC<TransformableRectProps> = ({
       height={geometry.height}
       rotation={geometry.rotation || 0}
       fill={shape.style.fill}
-      stroke={isSelected ? SELECTION.HIGHLIGHT_STROKE : shape.style.stroke}
-      strokeWidth={isSelected ? SELECTION.HIGHLIGHT_STROKE_WIDTH : shape.style.strokeWidth}
-      dash={isSelected ? SELECTION.HIGHLIGHT_DASH : undefined}
+      stroke={isSelected ? SELECTION_STYLE.STROKE : shape.style.stroke}
+      strokeWidth={isSelected ? SELECTION_STYLE.STROKE_WIDTH : shape.style.strokeWidth}
       opacity={shape.style.opacity}
       draggable={isSelected}
       onClick={onSelect}
@@ -100,9 +99,8 @@ export const TransformablePolygon: React.FC<TransformablePolygonProps> = ({
       rotation={geometry.rotation || 0}
       closed
       fill={shape.style.fill}
-      stroke={isSelected ? SELECTION.HIGHLIGHT_STROKE : shape.style.stroke}
-      strokeWidth={isSelected ? SELECTION.HIGHLIGHT_STROKE_WIDTH : shape.style.strokeWidth}
-      dash={isSelected ? SELECTION.HIGHLIGHT_DASH : undefined}
+      stroke={isSelected ? SELECTION_STYLE.STROKE : shape.style.stroke}
+      strokeWidth={isSelected ? SELECTION_STYLE.STROKE_WIDTH : shape.style.strokeWidth}
       opacity={shape.style.opacity}
       draggable={isSelected}
       onClick={onSelect}

@@ -232,7 +232,7 @@ export const KonvaPerformanceBenchmark: React.FC = () => {
                 onMouseUp={selection.handleMouseUp}
               >
                 {/* Grid Layer */}
-                <Layer ref={layerRefs.gridLayer.ref}>
+                <Layer ref={layerRefs.gridLayer}>
                   {shouldRenderGrid && gridLines.map((line, i) => (
                     <Line
                       key={i}
@@ -246,7 +246,7 @@ export const KonvaPerformanceBenchmark: React.FC = () => {
                 </Layer>
 
                 {/* Shapes Layer */}
-                <Layer ref={layerRefs.shapesLayer.ref}>
+                <Layer ref={layerRefs.shapesLayer}>
                   {shapes.map((shape) => {
                     const isSelected = selection.isSelected(shape.id);
                     
@@ -256,7 +256,7 @@ export const KonvaPerformanceBenchmark: React.FC = () => {
                           key={shape.id}
                           shape={shape}
                           isSelected={isSelected}
-                          onSelect={() => selection.handleShapeClick(shape.id, { evt: { ctrlKey: false, metaKey: false }, cancelBubble: false })}
+                          onSelect={() => selection.selectShape(shape.id)}
                           onDragEnd={(e) => transform.handleDragEnd(shape.id, e)}
                           onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
                         />
@@ -267,7 +267,7 @@ export const KonvaPerformanceBenchmark: React.FC = () => {
                           key={shape.id}
                           shape={shape}
                           isSelected={isSelected}
-                          onSelect={() => selection.handleShapeClick(shape.id, { evt: { ctrlKey: false, metaKey: false }, cancelBubble: false })}
+                          onSelect={() => selection.selectShape(shape.id)}
                           onDragEnd={(e) => transform.handleDragEnd(shape.id, e)}
                           onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
                         />
