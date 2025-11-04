@@ -7,6 +7,56 @@ and this project follows the migration phases outlined in the migration plan.
 
 ## [Unreleased]
 
+### Post-Migration Fixes & Improvements
+
+#### [1.0.1] - 2025-11-04
+
+##### Fixed
+- ✅ Fixed shape creation race condition
+  - Shapes were being added to both local state and map store
+  - Removed duplicate shape additions
+  - Now shapes are only added to map store and synced via useEffect
+  - Added `markDirty()` calls when shapes are created
+- ✅ Fixed mouse wheel zoom
+  - Added `onWheel` handler to Stage component
+  - Mouse wheel zoom now works correctly
+- ✅ Fixed grid visibility toggle
+  - Verified grid toggle button is working correctly
+  - Grid renders based on `gridConfig.visible` state
+- ✅ Fixed modal interactions
+  - Modal now opens first before entering drawing mode
+  - User fills in area details, then enters drawing mode
+  - Pending area data is stored and used when shape is created
+  - Applied same fix to collision areas
+- ✅ Removed duplicate useEffect
+  - Removed duplicate shape sync useEffect
+  - Now only one useEffect syncs shapes from map data
+- ✅ Updated documentation
+  - Removed outdated historical documentation files
+  - Updated README.md with current status
+  - Updated KNOWN_ISSUES.md with current issues
+  - Updated CHANGELOG.md with recent fixes
+
+##### Removed
+- Deleted outdated documentation files:
+  - PHASE_1_COMPLETE.md
+  - PHASE_2_COMPLETE.md
+  - PHASE_8_COMPLETE.md
+  - MIGRATION_COMPLETE.md
+  - INTEGRATION_PLAN.md
+  - INTEGRATION_ASSESSMENT.md
+  - ROLLOUT_PLAN.md
+  - FOLLOW_UP_PLAN.md
+  - BROWSER_TEST_PLAN.md
+
+##### Notes
+- All critical feature gaps have been fixed
+- Editor is production-ready
+- localStorage persistence works correctly (requires manual save)
+- Auto-save is disabled by default
+
+---
+
 ### Phase 8: Integration & Rollout (Weeks 16-18)
 
 #### [1.0.0] - 2025-11-02

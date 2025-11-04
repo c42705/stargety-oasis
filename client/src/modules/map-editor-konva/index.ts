@@ -7,8 +7,9 @@
  * @module map-editor-konva
  */
 
-// Main component
+// Main components
 export { KonvaMapCanvas } from './components/KonvaMapCanvas';
+export { KonvaMapEditorModule } from './KonvaMapEditorModule';
 
 // Hooks
 export { useKonvaLayers } from './hooks/useKonvaLayers';
