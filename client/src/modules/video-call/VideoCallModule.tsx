@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useEventBus } from '../../shared/EventBusContext';
+import { jitsiAnalyticsService } from '../../shared/JitsiAnalyticsService';
 import './VideoCallModule.css';
 
 interface VideoCallModuleProps {
@@ -7,6 +8,9 @@ interface VideoCallModuleProps {
   userName: string;
   serverUrl?: string;
   className?: string;
+  onParticipantCountChange?: (count: number) => void;
+  onCallQuality?: (quality: 'good' | 'medium' | 'poor') => void;
+  onError?: (error: string) => void;
 }
 
 interface JitsiAPI {
@@ -24,19 +28,31 @@ declare global {
 export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
   roomId,
   userName,
-  serverUrl = 'meet.jit.si',
+  serverUrl = 'meet.stargety.com',
   className = '',
+  onParticipantCountChange,
+  onCallQuality,
+  onError,
 }) => {
   const [isJoined, setIsJoined] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [participants, setParticipants] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [participantCount, setParticipantCount] = useState(0);
+  const [connectionQuality, setConnectionQuality] = useState<'good' | 'medium' | 'poor'>('good');
 
   const jitsiContainerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<JitsiAPI | null>(null);
   const eventBus = useEventBus();
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
 
   const cleanRoomId = roomId.replace(/[^a-zA-Z0-9]/g, '');
+
+  const MAX_RETRIES = 3;
+  const BASE_RETRY_DELAY = 1000; // 1 second
 
   const loadJitsiScript = useCallback(() => {
     return new Promise<void>((resolve, reject) => {
@@ -53,10 +69,38 @@ export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
     });
   }, [serverUrl]);
 
+  const retryWithBackoff = useCallback((attemptNumber: number, initFn: () => Promise<void>) => {
+    if (attemptNumber >= MAX_RETRIES) {
+      setError(`Failed to connect after ${MAX_RETRIES} attempts. Please check your connection.`);
+      setIsLoading(false);
+      setIsRetrying(false);
+      return;
+    }
+
+    const delay = BASE_RETRY_DELAY * Math.pow(2, attemptNumber); // Exponential backoff: 1s, 2s, 4s
+    console.log(`🔄 Retry attempt ${attemptNumber + 1}/${MAX_RETRIES} in ${delay}ms...`);
+
+    setIsRetrying(true);
+    setError(`Connection failed. Retrying in ${delay / 1000}s... (Attempt ${attemptNumber + 1}/${MAX_RETRIES})`);
+
+    retryTimeoutRef.current = setTimeout(async () => {
+      try {
+        await initFn();
+        setRetryCount(0);
+        setIsRetrying(false);
+        setError(null);
+      } catch (err) {
+        console.error(`❌ Retry attempt ${attemptNumber + 1} failed:`, err);
+        setRetryCount(attemptNumber + 1);
+        retryWithBackoff(attemptNumber + 1, initFn);
+      }
+    }, delay);
+  }, [MAX_RETRIES, BASE_RETRY_DELAY]);
+
   const initializeJitsi = useCallback(async () => {
     if (!jitsiContainerRef.current || apiRef.current) return;
 
-    try {
+    const performInitialization = async () => {
       setIsLoading(true);
       setError(null);
       await loadJitsiScript();
@@ -90,23 +134,39 @@ export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
         videoConferenceJoined: () => {
           setIsJoined(true);
           setIsLoading(false);
+          setRetryCount(0);
+          setIsRetrying(false);
           const participantsList = [userName];
           setParticipants(participantsList);
+          setParticipantCount(1);
+          onParticipantCountChange?.(1);
           eventBus.publish('video:roomJoined', {
             roomId: cleanRoomId,
             participants: participantsList,
           });
+
+          // Start analytics session
+          sessionIdRef.current = jitsiAnalyticsService.startSession(cleanRoomId);
         },
         videoConferenceLeft: () => {
           setIsJoined(false);
           setParticipants([]);
+          setParticipantCount(0);
+          onParticipantCountChange?.(0);
           eventBus.publish('video:roomLeft', { roomId: cleanRoomId });
+
+          // End analytics session
+          jitsiAnalyticsService.endSession();
+          sessionIdRef.current = null;
         },
         participantJoined: (event: any) => {
           const participantName = event.displayName || 'Anonymous';
           setParticipants(prev => {
             if (!prev.includes(participantName)) {
               const newParticipants = [...prev, participantName];
+              const newCount = newParticipants.length;
+              setParticipantCount(newCount);
+              onParticipantCountChange?.(newCount);
               eventBus.publish('video:participantJoined', {
                 roomId: cleanRoomId,
                 participant: participantName,
@@ -120,6 +180,9 @@ export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
           const participantName = event.displayName || 'Anonymous';
           setParticipants(prev => {
             const newParticipants = prev.filter(p => p !== participantName);
+            const newCount = newParticipants.length;
+            setParticipantCount(newCount);
+            onParticipantCountChange?.(newCount);
             eventBus.publish('video:participantLeft', {
               roomId: cleanRoomId,
               participant: participantName,
@@ -127,28 +190,98 @@ export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
             return newParticipants;
           });
         },
+        // Enhanced event listeners
+        participantCountChanged: (event: any) => {
+          const count = event.count || 0;
+          setParticipantCount(count);
+          onParticipantCountChange?.(count);
+          console.log(`👥 Participant count changed: ${count}`);
+
+          // Log to analytics
+          jitsiAnalyticsService.logParticipantChange(count);
+        },
+        connectionQualityChanged: (event: any) => {
+          // Jitsi provides quality as a percentage (0-100)
+          const quality = event.quality || 100;
+          let qualityLevel: 'good' | 'medium' | 'poor' = 'good';
+
+          if (quality < 30) {
+            qualityLevel = 'poor';
+          } else if (quality < 70) {
+            qualityLevel = 'medium';
+          }
+
+          setConnectionQuality(qualityLevel);
+          onCallQuality?.(qualityLevel);
+          console.log(`📶 Connection quality: ${qualityLevel} (${quality}%)`);
+
+          // Log to analytics
+          jitsiAnalyticsService.logQualityChange(qualityLevel);
+        },
+        errorOccurred: (event: any) => {
+          const errorMsg = event.error || 'Unknown error occurred';
+          console.error('❌ Jitsi error:', errorMsg);
+          setError(errorMsg);
+          onError?.(errorMsg);
+
+          // Log to analytics
+          jitsiAnalyticsService.logError(errorMsg);
+        },
       };
 
       api.addEventListeners(eventListeners);
+    };
+
+    try {
+      await performInitialization();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to initialize video call');
-      setIsLoading(false);
+      console.error('❌ Jitsi initialization failed:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to initialize video call';
+
+      // Attempt retry with exponential backoff
+      if (retryCount < MAX_RETRIES) {
+        retryWithBackoff(retryCount, performInitialization);
+      } else {
+        setError(errorMessage);
+        setIsLoading(false);
+      }
     }
-  }, [cleanRoomId, userName, serverUrl, eventBus, loadJitsiScript]);
+  }, [cleanRoomId, userName, serverUrl, eventBus, loadJitsiScript, retryCount, retryWithBackoff, MAX_RETRIES]);
 
   const handleLeaveCall = useCallback(() => {
+    // Clear any pending retry timeouts
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+
     if (apiRef.current) {
       apiRef.current.dispose();
       apiRef.current = null;
     }
+
+    // End analytics session if active
+    if (sessionIdRef.current) {
+      jitsiAnalyticsService.endSession();
+      sessionIdRef.current = null;
+    }
+
     setIsJoined(false);
     setIsLoading(false);
     setParticipants([]);
     setError(null);
+    setRetryCount(0);
+    setIsRetrying(false);
   }, []);
 
   useEffect(() => {
-    return () => handleLeaveCall();
+    return () => {
+      handleLeaveCall();
+      // Clean up retry timeout on unmount
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
   }, [handleLeaveCall]);
 
   return (
@@ -156,8 +289,17 @@ export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
       <div className="video-call-header">
         <h3>Video Call - {roomId}</h3>
         <div className="call-info">
-          <span>👥 {participants.length} participant{participants.length !== 1 ? 's' : ''}</span>
-          {isJoined && <span className="call-status">🟢 Connected</span>}
+          <span>👥 {participantCount} participant{participantCount !== 1 ? 's' : ''}</span>
+          {isJoined && (
+            <>
+              <span className="call-status">🟢 Connected</span>
+              <span className={`quality-indicator quality-${connectionQuality}`}>
+                {connectionQuality === 'good' && '📶 Good'}
+                {connectionQuality === 'medium' && '📶 Medium'}
+                {connectionQuality === 'poor' && '📶 Poor'}
+              </span>
+            </>
+          )}
         </div>
       </div>
 
@@ -169,7 +311,7 @@ export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
       )}
 
       <div className="video-container">
-        {!isJoined && !isLoading && (
+        {!isJoined && !isLoading && !isRetrying && (
           <div className="join-screen">
             <div className="join-content">
               <h4>Join Video Call</h4>
@@ -182,10 +324,10 @@ export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
           </div>
         )}
 
-        {isLoading && (
+        {(isLoading || isRetrying) && (
           <div className="loading-screen">
             <div className="loading-spinner"></div>
-            <p>Connecting to video call...</p>
+            <p>{isRetrying ? `Retrying connection... (${retryCount}/${MAX_RETRIES})` : 'Connecting to video call...'}</p>
           </div>
         )}
 

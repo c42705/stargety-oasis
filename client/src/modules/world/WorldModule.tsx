@@ -28,6 +28,7 @@ class GameScene extends Phaser.Scene {
   private playerId: string;
   private onAreaClick: (areaId: string) => void;
   private currentArea: string | null = null;
+  private previousArea: string | null = null; // Track previous area for entry/exit detection
   private mapRenderer!: PhaserMapRenderer;
   private sharedMapSystem!: SharedMapSystem;
   public avatarRenderer!: AvatarGameRenderer;
@@ -1017,33 +1018,51 @@ class GameScene extends Phaser.Scene {
     }
 
     const areas = mapData.interactiveAreas;
+    let currentlyInArea: string | null = null;
 
+    // Find which area player is currently in
     areas.forEach(area => {
       // Check if player is within area bounds
       if (this.player.x >= area.x &&
           this.player.x <= area.x + area.width &&
           this.player.y >= area.y &&
           this.player.y <= area.y + area.height) {
-
-        // Trigger area entry if not already triggered and no modals are blocking
-        if ((!this.currentArea || this.currentArea !== area.id) && !shouldBlockBackgroundInteractions()) {
-          this.currentArea = area.id;
-          this.onAreaClick(area.id);
-        }
+        currentlyInArea = area.id;
       }
     });
 
-    // Reset current area if player is not in any area
-    const inAnyArea = areas.some(area =>
-      this.player.x >= area.x &&
-      this.player.x <= area.x + area.width &&
-      this.player.y >= area.y &&
-      this.player.y <= area.y + area.height
-    );
+    // Detect area changes and emit events for Jitsi auto-join/leave
+    if (currentlyInArea !== this.previousArea) {
+      // Exited previous area
+      if (this.previousArea && !shouldBlockBackgroundInteractions()) {
+        const previousAreaData = areas.find(a => a.id === this.previousArea);
+        if (previousAreaData) {
+          this.eventBus.publish('area-exited', {
+            areaId: previousAreaData.id,
+            areaName: previousAreaData.name
+          });
+        }
+      }
 
-    if (!inAnyArea) {
-      this.currentArea = null;
+      // Entered new area
+      if (currentlyInArea && !shouldBlockBackgroundInteractions()) {
+        const currentAreaData = areas.find(a => a.id === currentlyInArea);
+        if (currentAreaData) {
+          this.eventBus.publish('area-entered', {
+            areaId: currentAreaData.id,
+            areaName: currentAreaData.name,
+            roomId: currentAreaData.id // Use area ID as default room ID
+          });
+
+          // Also trigger the legacy area click handler for backward compatibility
+          this.onAreaClick(currentAreaData.id);
+        }
+      }
+
+      this.previousArea = currentlyInArea;
     }
+
+    this.currentArea = currentlyInArea;
 
     // Camera following is now handled natively by Phaser
   }

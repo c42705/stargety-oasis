@@ -24,6 +24,7 @@ import { AreasTab } from '../map-editor/components/tabs/AreasTab';
 import { TerrainTab } from '../map-editor/components/tabs/TerrainTab';
 import { AssetsTab } from '../map-editor/components/tabs/AssetsTab';
 import { CollisionTab } from '../map-editor/components/tabs/CollisionTab';
+import { JitsiTab } from '../map-editor/components/tabs/JitsiTab';
 import { SettingsTab } from '../map-editor/components/tabs/SettingsTab';
 import { shouldIgnoreKeyboardEvent } from '../../shared/keyboardFocusUtils';
 
@@ -1206,6 +1207,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
                   onDeleteCollisionArea={handleDeleteCollisionArea}
                 />
               )}
+              {activeTab === 'jitsi' && <JitsiTab />}
               {activeTab === 'settings' && (
                 <SettingsTab
                   gridConfig={fabricGridConfig}

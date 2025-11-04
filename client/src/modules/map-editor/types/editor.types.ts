@@ -49,7 +49,7 @@ export interface PerformanceMetrics {
   renderTime: number;
 }
 
-export type TabId = 'areas' | 'terrain' | 'assets' | 'layers' | 'collision' | 'settings';
+export type TabId = 'areas' | 'terrain' | 'assets' | 'layers' | 'collision' | 'jitsi' | 'settings';
 
 export interface EditorTab {
   id: TabId;

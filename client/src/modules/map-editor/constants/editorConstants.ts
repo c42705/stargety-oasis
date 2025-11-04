@@ -4,7 +4,8 @@ import {
   Palette,
   Settings,
   Shield,
-  TreePine
+  TreePine,
+  Video
 } from 'lucide-react';
 import { EditorTab, GridConfig, EditorState, GridPattern } from '../types/editor.types';
 
@@ -13,6 +14,7 @@ export const EDITOR_TABS: EditorTab[] = [
   { id: 'terrain', label: 'Terrain', icon: React.createElement(TreePine, { size: 16 }) },
   { id: 'assets', label: 'Assets', icon: React.createElement(Palette, { size: 16 }) },
   { id: 'collision', label: 'Collision', icon: React.createElement(Shield, { size: 16 }) },
+  { id: 'jitsi', label: 'Jitsi Rooms', icon: React.createElement(Video, { size: 16 }) },
   { id: 'settings', label: 'Settings', icon: React.createElement(Settings, { size: 16 }) }
 ];
 

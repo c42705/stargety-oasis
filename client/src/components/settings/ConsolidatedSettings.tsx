@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Modal, Card, Typography, Space, Select, Button, Divider, message } from 'antd';
-import { SettingOutlined, SaveOutlined, VideoCameraOutlined, UserOutlined, SecurityScanOutlined } from '@ant-design/icons';
+import { Modal, Card, Typography, Space, Select, Button, Divider, message, Input } from 'antd';
+import { SettingOutlined, SaveOutlined, VideoCameraOutlined, UserOutlined, SecurityScanOutlined, LinkOutlined } from '@ant-design/icons';
 import { useAuth } from '../../shared/AuthContext';
 import { useSettings, VideoServiceType } from '../../shared/SettingsContext';
 import { useTheme } from '../../shared/ThemeContext';
@@ -18,9 +18,10 @@ export const ConsolidatedSettings: React.FC<ConsolidatedSettingsProps> = ({
   onClose
 }) => {
   const { user } = useAuth();
-  const { settings, updateVideoService, saveSettings } = useSettings();
+  const { settings, updateVideoService, updateJitsiServerUrl, saveSettings } = useSettings();
   const { themeType, setTheme } = useTheme();
   const [hasChanges, setHasChanges] = useState(false);
+  const [jitsiUrl, setJitsiUrl] = useState(settings.jitsiServerUrl || 'meet.stargety.com');
 
   const handleVideoServiceChange = (service: VideoServiceType) => {
     updateVideoService(service);
@@ -29,6 +30,12 @@ export const ConsolidatedSettings: React.FC<ConsolidatedSettingsProps> = ({
 
   const handleThemeChange = (newTheme: ThemeType) => {
     setTheme(newTheme);
+    setHasChanges(true);
+  };
+
+  const handleJitsiUrlChange = (url: string) => {
+    setJitsiUrl(url);
+    updateJitsiServerUrl(url);
     setHasChanges(true);
   };
 
@@ -187,6 +194,46 @@ export const ConsolidatedSettings: React.FC<ConsolidatedSettingsProps> = ({
                     ))}
                   </Space>
                 </div>
+
+                {/* Jitsi Server Configuration - Only shown when Jitsi is selected */}
+                {settings.videoService === 'jitsi' && (
+                  <div>
+                    <Title level={5}>
+                      <LinkOutlined /> Jitsi Server Configuration
+                    </Title>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+                      Configure the Jitsi Meet server URL for video conferencing
+                    </Text>
+
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                      <div>
+                        <Text strong>Server URL</Text>
+                        <Input
+                          placeholder="meet.stargety.com"
+                          value={jitsiUrl}
+                          onChange={(e) => handleJitsiUrlChange(e.target.value)}
+                          prefix={<LinkOutlined />}
+                          style={{ marginTop: 8 }}
+                        />
+                        <Text type="secondary" style={{ fontSize: '11px', display: 'block', marginTop: 4 }}>
+                          Enter the domain of your Jitsi Meet server (without https://)
+                        </Text>
+                      </div>
+
+                      <Card size="small" style={{ backgroundColor: 'var(--color-bg-tertiary)' }}>
+                        <Space direction="vertical" size="small">
+                          <Text strong style={{ fontSize: '12px' }}>💡 Server Configuration Tips:</Text>
+                          <ul style={{ margin: '4px 0 0 16px', fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                            <li>Use your custom Jitsi server domain (e.g., meet.stargety.com)</li>
+                            <li>Do not include "https://" or trailing slashes</li>
+                            <li>Default: meet.stargety.com</li>
+                            <li>Public option: meet.jit.si (free, no setup required)</li>
+                          </ul>
+                        </Space>
+                      </Card>
+                    </Space>
+                  </div>
+                )}
               </Space>
             </Card>
           </>

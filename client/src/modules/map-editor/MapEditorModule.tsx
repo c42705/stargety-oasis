@@ -18,6 +18,7 @@ import { AreasTab } from './components/tabs/AreasTab';
 import { TerrainTab } from './components/tabs/TerrainTab';
 import { AssetsTab } from './components/tabs/AssetsTab';
 import { CollisionTab } from './components/tabs/CollisionTab';
+import { JitsiTab } from './components/tabs/JitsiTab';
 import { SettingsTab } from './components/tabs/SettingsTab';
 import { useEditorState } from './hooks/useEditorState';
 import { useGridConfig } from './hooks/useGridConfig';
@@ -369,6 +370,8 @@ export const MapEditorModule: React.FC<MapEditorModuleProps> = ({
             onDeleteCollisionArea={collisionModalState.handleDeleteCollisionArea}
           />
         );
+      case 'jitsi':
+        return <JitsiTab />;
       case 'settings':
         return (
           <SettingsTab

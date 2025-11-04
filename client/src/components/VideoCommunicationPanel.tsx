@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Button, Space, Typography, Select, Card, Empty, Spin, Badge } from 'antd';
-import { VideoCameraOutlined, PhoneOutlined, SettingOutlined, DisconnectOutlined } from '@ant-design/icons';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Button, Space, Typography, Select, Card, Empty, Spin, Badge, Modal, Switch } from 'antd';
+import { VideoCameraOutlined, PhoneOutlined, SettingOutlined, DisconnectOutlined, PushpinOutlined } from '@ant-design/icons';
 import { useSettings } from '../shared/SettingsContext';
 import { useAuth } from '../shared/AuthContext';
 import { useEventBus } from '../shared/EventBusContext';
 import { VideoCallModule } from '../modules/video-call/VideoCallModule';
 import { RingCentralModule } from '../modules/ringcentral/RingCentralModule';
+import { jitsiRoomMappingService } from '../shared/JitsiRoomMappingService';
 
 const { Text } = Typography;
 const { Option } = Select;
@@ -38,6 +39,17 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
     { id: 'conference', name: 'Conference Room', description: 'Large conference room' },
     { id: 'private', name: 'Private Room', description: 'Private meeting space' }
   ]);
+
+  // Auto-join/leave state
+  const [autoJoinEnabled] = useState(true); // Enable auto-join by default
+  const [currentAreaRoom, setCurrentAreaRoom] = useState<string | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sticky mode state
+  const [stickyMode, setStickyMode] = useState(false);
+  const [showStickyModal, setShowStickyModal] = useState(false);
+  const [pendingDisconnect, setPendingDisconnect] = useState(false);
 
   useEffect(() => {
     if (currentRoom && currentRoom !== activeRoom) {
@@ -76,6 +88,91 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
     return unsubscribe;
   }, [eventBus, isConnected, isConnecting, onRoomChange, activeRoom, handleConnect]);
 
+  // Auto-join/leave logic for Jitsi based on area entry/exit
+  useEffect(() => {
+    if (!autoJoinEnabled || settings.videoService !== 'jitsi') {
+      return; // Only auto-join for Jitsi when enabled
+    }
+
+    const handleAreaEntered = (data: { areaId: string; areaName: string; roomId: string }) => {
+      console.log('🚪 Area entered:', data.areaName, '- Auto-joining Jitsi room');
+
+      // Clear any pending transition
+      if (transitionTimeoutRef.current) {
+        clearTimeout(transitionTimeoutRef.current);
+        transitionTimeoutRef.current = null;
+      }
+
+      // Get Jitsi room name from mapping service
+      const jitsiRoomName = jitsiRoomMappingService.getJitsiRoomForArea(data.areaId);
+
+      setIsTransitioning(true);
+      setCurrentAreaRoom(jitsiRoomName);
+
+      // Debounce: wait 500ms before actually joining
+      // This prevents rapid room switches when walking through multiple areas
+      transitionTimeoutRef.current = setTimeout(() => {
+        setActiveRoom(jitsiRoomName);
+        onRoomChange?.(jitsiRoomName);
+
+        if (!isConnected) {
+          // Not connected yet, connect to new room
+          handleConnect();
+        } else if (activeRoom !== jitsiRoomName) {
+          // Already connected to different room, switch rooms
+          handleDisconnect();
+          setTimeout(() => {
+            setActiveRoom(jitsiRoomName);
+            handleConnect();
+          }, 500);
+        }
+
+        setIsTransitioning(false);
+      }, 500);
+    };
+
+    const handleAreaExited = (data: { areaId: string; areaName: string }) => {
+      console.log('🚪 Area exited:', data.areaName, '- Auto-leaving Jitsi room');
+
+      // Clear any pending transition
+      if (transitionTimeoutRef.current) {
+        clearTimeout(transitionTimeoutRef.current);
+        transitionTimeoutRef.current = null;
+      }
+
+      setCurrentAreaRoom(null);
+      setIsTransitioning(true);
+
+      // Debounce: wait 500ms before actually leaving
+      // This prevents disconnecting if user quickly re-enters
+      transitionTimeoutRef.current = setTimeout(() => {
+        if (isConnected) {
+          // If sticky mode is enabled, ask user before disconnecting
+          if (stickyMode) {
+            setShowStickyModal(true);
+            setPendingDisconnect(true);
+          } else {
+            handleDisconnect();
+          }
+        }
+        setIsTransitioning(false);
+      }, 500);
+    };
+
+    const unsubscribeEntered = eventBus.subscribe('area-entered', handleAreaEntered);
+    const unsubscribeExited = eventBus.subscribe('area-exited', handleAreaExited);
+
+    return () => {
+      unsubscribeEntered();
+      unsubscribeExited();
+
+      // Clean up timeout on unmount
+      if (transitionTimeoutRef.current) {
+        clearTimeout(transitionTimeoutRef.current);
+      }
+    };
+  }, [eventBus, autoJoinEnabled, settings.videoService, isConnected, activeRoom, onRoomChange, handleConnect]);
+
   const handleDisconnect = () => {
     setIsConnected(false);
     setIsConnecting(false);
@@ -104,6 +201,7 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
           className="video-panel-content"
           roomId={videoRoomId}
           userName={user.username}
+          serverUrl={settings.jitsiServerUrl || 'meet.stargety.com'}
         />
       );
     } else {
@@ -151,6 +249,22 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
           </Select>
         </div>
 
+        {/* Sticky Mode Toggle (Jitsi only) */}
+        {settings.videoService === 'jitsi' && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Space size="small">
+              <PushpinOutlined style={{ color: stickyMode ? 'var(--color-primary)' : 'var(--color-text-secondary)' }} />
+              <Text style={{ fontSize: '12px' }}>Sticky Mode</Text>
+            </Space>
+            <Switch
+              size="small"
+              checked={stickyMode}
+              onChange={setStickyMode}
+              title="Keep call active after leaving area"
+            />
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 8 }}>
           {!isConnected ? (
             <Button
@@ -174,7 +288,7 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
               Leave Meeting
             </Button>
           )}
-          
+
           <Button
             icon={<SettingOutlined />}
             size="small"
@@ -231,26 +345,59 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
   );
 
   return (
-    <div className={`video-communication-panel ${className}`} style={{ 
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column',
-      backgroundColor: 'var(--color-bg-primary)'
-    }}>
-      {/* Connection Controls */}
-      {renderConnectionControls()}
+    <>
+      <div className={`video-communication-panel ${className}`} style={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: 'var(--color-bg-primary)'
+      }}>
+        {/* Connection Controls */}
+        {renderConnectionControls()}
 
-      {/* Video Content Area */}
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        {isConnecting && renderConnectingState()}
-        {!isConnecting && !isConnected && renderEmptyState()}
-        {!isConnecting && isConnected && (
-          <div style={{ height: '100%', width: '100%' }}>
-            {renderVideoService()}
-          </div>
-        )}
+        {/* Video Content Area */}
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          {isConnecting && renderConnectingState()}
+          {!isConnecting && !isConnected && renderEmptyState()}
+          {!isConnecting && isConnected && (
+            <div style={{ height: '100%', width: '100%' }}>
+              {renderVideoService()}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Sticky Mode Confirmation Modal */}
+      <Modal
+        title="Continue Call?"
+        open={showStickyModal}
+        onOk={() => {
+          setStickyMode(false);
+          setShowStickyModal(false);
+          setPendingDisconnect(false);
+          handleDisconnect();
+        }}
+        onCancel={() => {
+          setShowStickyModal(false);
+          setPendingDisconnect(false);
+        }}
+        okText="Leave Call"
+        cancelText="Stay Connected"
+        okButtonProps={{ danger: true }}
+      >
+        <Space direction="vertical" size="small">
+          <Typography.Text>
+            You've left the interactive area, but you're still in the video call.
+          </Typography.Text>
+          <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
+            Would you like to leave the call or stay connected?
+          </Typography.Text>
+          <Typography.Text type="secondary" style={{ fontSize: '11px', fontStyle: 'italic' }}>
+            💡 Tip: You can disable "Sticky Mode" to automatically leave calls when exiting areas.
+          </Typography.Text>
+        </Space>
+      </Modal>
+    </>
   );
 };
 

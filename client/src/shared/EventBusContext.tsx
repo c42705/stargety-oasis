@@ -14,6 +14,9 @@ export interface EventMap {
   'world:playerLeft': { playerId: string };
   'world:objectInteraction': { playerId: string; objectId: string };
   'area-selected': { areaId: string; areaName: string; roomId: string };
+  // Area entry/exit events for Jitsi auto-join/leave
+  'area-entered': { areaId: string; areaName: string; roomId: string };
+  'area-exited': { areaId: string; areaName: string };
   'app:moduleLoaded': { module: string };
   'app:error': { error: string; module?: string };
   // RingCentral events

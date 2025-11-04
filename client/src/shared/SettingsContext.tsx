@@ -7,12 +7,14 @@ export interface AppSettings {
   videoService: VideoServiceType;
   adminMode: boolean;
   theme: ThemeType;
+  jitsiServerUrl?: string; // Optional custom Jitsi server URL
 }
 
 interface SettingsContextType {
   settings: AppSettings;
   updateVideoService: (service: VideoServiceType) => void;
   updateTheme: (theme: ThemeType) => void;
+  updateJitsiServerUrl: (url: string) => void;
   isAdmin: (username: string) => boolean;
   saveSettings: () => void;
   resetSettings: () => void;
@@ -94,12 +96,21 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children, cu
     }));
   }, []);
 
+  // Update Jitsi server URL
+  const updateJitsiServerUrl = useCallback((url: string) => {
+    setSettings(prev => ({
+      ...prev,
+      jitsiServerUrl: url,
+    }));
+  }, []);
+
   // Save settings to localStorage
   const saveSettings = useCallback(() => {
     try {
       const settingsToSave = {
         videoService: settings.videoService,
         theme: settings.theme,
+        jitsiServerUrl: settings.jitsiServerUrl,
         // Don't save adminMode as it's calculated based on username
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsToSave));
@@ -122,6 +133,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children, cu
     settings,
     updateVideoService,
     updateTheme,
+    updateJitsiServerUrl,
     isAdmin,
     saveSettings,
     resetSettings,
