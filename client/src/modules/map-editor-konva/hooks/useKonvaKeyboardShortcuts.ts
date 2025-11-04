@@ -1,6 +1,6 @@
 /**
  * Konva Map Editor - Keyboard Shortcuts Hook
- * 
+ *
  * Centralized keyboard shortcut management for all editor actions.
  */
 
@@ -10,6 +10,7 @@ import type {
   UseKonvaKeyboardShortcutsReturn,
   KeyboardShortcut
 } from '../types';
+import { shouldIgnoreKeyboardEvent } from '../../../shared/keyboardFocusUtils';
 
 /**
  * Hook for centralized keyboard shortcut management
@@ -82,6 +83,11 @@ export function useKonvaKeyboardShortcuts(
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (!enabledParam) return;
+
+      // Ignore keyboard events when typing in input fields or when modal is open
+      if (shouldIgnoreKeyboardEvent()) {
+        return;
+      }
 
       // Find matching shortcut
       const matchingShortcut = registeredShortcuts.find((shortcut) =>

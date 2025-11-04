@@ -11,6 +11,7 @@ import * as fabric from 'fabric';
 import { logger } from '../../../shared/logger';
 import { CanvasObject } from '../types/fabricCanvas.types';
 import { updatePolygonFromHandles, updateEdgeHandles, PolygonEditHandles } from '../utils/polygonEditUtils';
+import { shouldIgnoreKeyboardEvent } from '../../../shared/keyboardFocusUtils';
 
 export interface UseCanvasEventsOptions {
   /** Fabric.js canvas instance */
@@ -341,6 +342,11 @@ export function useCanvasEvents(options: UseCanvasEventsOptions): UseCanvasEvent
 
     // Keyboard event handling for deletion
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore keyboard events when typing in input fields or when modal is open
+      if (shouldIgnoreKeyboardEvent()) {
+        return;
+      }
+
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const activeObjects = canvas.getActiveObjects();
         if (activeObjects.length > 0) {

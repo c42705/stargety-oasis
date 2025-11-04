@@ -28,6 +28,7 @@ import { TransformableRect, TransformablePolygon, TransformerComponent } from '.
 import { SelectionRect } from './SelectionRect';
 import { duplicateShape } from '../utils/shapeFactories';
 import { VIEWPORT_DEFAULTS, GRID_DEFAULTS, CANVAS } from '../constants/konvaConstants';
+import { shouldIgnoreKeyboardEvent } from '../../../shared/keyboardFocusUtils';
 
 const { Title, Text } = Typography;
 
@@ -114,6 +115,11 @@ export const KonvaPhase4Test: React.FC = () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore keyboard events when typing in input fields or when modal is open
+      if (shouldIgnoreKeyboardEvent()) {
+        return;
+      }
+
       // Delete
       if (e.key === 'Delete' && selection.hasSelection) {
         e.preventDefault();

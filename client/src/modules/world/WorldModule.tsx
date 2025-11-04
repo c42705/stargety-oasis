@@ -8,6 +8,7 @@ import { InteractiveArea } from '../../shared/MapDataContext';
 import { SharedMapSystem } from '../../shared/SharedMapSystem';
 import { worldDimensionsManager, WorldDimensionsState } from '../../shared/WorldDimensionsManager';
 import WorldZoomControls from './WorldZoomControls';
+import { makeFocusable, addClickToFocus } from '../../shared/keyboardFocusUtils';
 
 import { shouldBlockBackgroundInteractions } from '../../shared/ModalStateManager';
 import './WorldModule.css';
@@ -437,20 +438,34 @@ class GameScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Check if the game canvas has focus
+   * Only process keyboard input when canvas is focused
+   */
+  private canvasHasFocus(): boolean {
+    return document.activeElement === this.game.canvas;
+  }
+
   private setupKeyHandlers() {
     // Jump action (Spacebar)
     this.spaceKey.on('down', () => {
-      this.performJump();
+      if (this.canvasHasFocus()) {
+        this.performJump();
+      }
     });
 
     // Fire action (X key)
     this.xKey.on('down', () => {
-      this.performFire();
+      if (this.canvasHasFocus()) {
+        this.performFire();
+      }
     });
 
     // Rotation toggle (O key)
     this.oKey.on('down', () => {
-      this.toggleRotation();
+      if (this.canvasHasFocus()) {
+        this.toggleRotation();
+      }
     });
   }
 
@@ -710,6 +725,11 @@ class GameScene extends Phaser.Scene {
   }
 
   update() {
+    // Only process keyboard input when canvas has focus
+    if (!this.canvasHasFocus()) {
+      return;
+    }
+
     // Only allow movement if player exists and not jumping
     if (!this.isJumping && this.player) {
       const speed = 250;
@@ -3265,6 +3285,16 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
         const canvas = phaserGameRef.current?.canvas;
         if (canvas && gameSceneRef.current) {
           // Removed: Non-critical world mode: canvas ready log.
+
+          // Make canvas focusable and add click-to-focus behavior
+          const cleanupFocusable = makeFocusable(canvas);
+          const cleanupClickToFocus = addClickToFocus(canvas);
+
+          // Store cleanup functions for later
+          (canvas as any).__focusCleanup = () => {
+            cleanupFocusable();
+            cleanupClickToFocus();
+          };
         }
       }, 1000);
 
@@ -3389,6 +3419,13 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
         }
         if (resizeTimeout) {
           clearTimeout(resizeTimeout);
+        }
+
+        // Clean up focus handlers
+        const canvas = phaserGameRef.current.canvas;
+        if (canvas && (canvas as any).__focusCleanup) {
+          (canvas as any).__focusCleanup();
+          delete (canvas as any).__focusCleanup;
         }
 
         // Keyboard listeners cleanup removed (no longer needed)

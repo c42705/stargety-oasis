@@ -25,6 +25,7 @@ import { TerrainTab } from '../map-editor/components/tabs/TerrainTab';
 import { AssetsTab } from '../map-editor/components/tabs/AssetsTab';
 import { CollisionTab } from '../map-editor/components/tabs/CollisionTab';
 import { SettingsTab } from '../map-editor/components/tabs/SettingsTab';
+import { shouldIgnoreKeyboardEvent } from '../../shared/keyboardFocusUtils';
 
 // Import CSS
 import '../map-editor/MapEditorModule.css';
@@ -230,6 +231,11 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
   // Spacebar pan support
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore spacebar when typing in input fields or when modal is open
+      if (shouldIgnoreKeyboardEvent()) {
+        return;
+      }
+
       if (e.code === 'Space' && !isSpacebarPressed && !e.repeat) {
         e.preventDefault();
         setIsSpacebarPressed(true);
@@ -238,6 +244,11 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
+      // Ignore spacebar when typing in input fields or when modal is open
+      if (shouldIgnoreKeyboardEvent()) {
+        return;
+      }
+
       if (e.code === 'Space') {
         e.preventDefault();
         setIsSpacebarPressed(false);

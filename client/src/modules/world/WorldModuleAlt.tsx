@@ -34,6 +34,7 @@ const MIN_ZOOM = 0.25;
 interface WorldModuleAltProps {
   playerId: string;
   className?: string;
+  showMapAreas?: boolean;
 }
 
 // Main Phaser scene: Handles sprite, movement, animation, and camera logic.
@@ -51,12 +52,14 @@ class ExampleScene extends Phaser.Scene {
   public isPerformingAction: boolean = false;
   private isSettingDefaultZoom = false;
   private mapRenderer!: PhaserMapRenderer;
+  private showMapAreas: boolean;
 
-  constructor(config: { backgroundImageUrl: string; worldWidth: number; worldHeight: number }) {
+  constructor(config: { backgroundImageUrl: string; worldWidth: number; worldHeight: number; showMapAreas?: boolean }) {
     super({ key: 'ExampleScene' });
     this.backgroundImageUrl = config.backgroundImageUrl;
     this.worldWidth = config.worldWidth;
     this.worldHeight = config.worldHeight;
+    this.showMapAreas = config.showMapAreas ?? false;
   }
 
   preload() {
@@ -70,11 +73,12 @@ class ExampleScene extends Phaser.Scene {
     ExampleScene.instance = this;
 
     // Initialize map renderer to load collision areas and interactive areas
+    // debugMode controls visibility of map areas (impassable polygons and interactive zones)
     this.mapRenderer = new PhaserMapRenderer({
       scene: this,
       enablePhysics: false,
       enableInteractions: true,
-      debugMode: false
+      debugMode: this.showMapAreas
     });
 
     // Initialize and render map (includes background, collision areas, interactive areas)
@@ -214,6 +218,14 @@ class ExampleScene extends Phaser.Scene {
     this.currentAnim = action;
     this.currentText.setText('Anim: ' + action);
     this.isPerformingAction = true;
+  }
+
+  // Update map areas visibility (for admin debug toggle)
+  setMapAreasVisibility(visible: boolean) {
+    this.showMapAreas = visible;
+    if (this.mapRenderer) {
+      this.mapRenderer.setDebugMode(visible);
+    }
   }
 
   // Camera/zoom logic for viewport-filling config
@@ -417,7 +429,7 @@ class ExampleScene extends Phaser.Scene {
 }
 
 // Main React wrapper: Handles layout, state, and Phaser integration.
-export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, className = '' }) => {
+export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, className = '', showMapAreas = false }) => {
   const gameRef = useRef<HTMLDivElement>(null);
   const phaserGameRef = useRef<Phaser.Game | null>(null);
 
@@ -428,10 +440,11 @@ export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, classN
 
   // State for map config (async load)
   const [mapReady, setMapReady] = useState(false);
-  const [mapConfig, setMapConfig] = useState<{ backgroundImageUrl: string; worldWidth: number; worldHeight: number }>({
+  const [mapConfig, setMapConfig] = useState<{ backgroundImageUrl: string; worldWidth: number; worldHeight: number; showMapAreas: boolean }>({
     backgroundImageUrl: '',
     worldWidth: 800,
     worldHeight: 600,
+    showMapAreas: showMapAreas,
   });
 
   // Sync camera state for UI controls
@@ -458,6 +471,7 @@ export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, classN
             backgroundImageUrl: mapData.backgroundImage,
             worldWidth: mapData.worldDimensions.width,
             worldHeight: mapData.worldDimensions.height,
+            showMapAreas: false,
           });
         }
         setMapReady(true);
@@ -503,6 +517,14 @@ export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, classN
       syncCameraState();
     }
   }, [syncCameraState]);
+
+  // Update map areas visibility when showMapAreas prop changes
+  useEffect(() => {
+    const scene = ExampleScene.instance;
+    if (scene) {
+      scene.setMapAreasVisibility(showMapAreas);
+    }
+  }, [showMapAreas]);
 
   // Phaser game instantiation, teardown, and state polling
   useEffect(() => {

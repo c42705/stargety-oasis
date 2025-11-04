@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { logger } from './shared/logger';
 import { Routes, Route } from 'react-router-dom';
-import { ConfigProvider, Layout, Space, Button, Badge, Typography, Modal, Dropdown, Avatar, App as AntdApp } from 'antd';
-import { LogoutOutlined, UserOutlined, TeamOutlined, DownOutlined, SettingOutlined } from '@ant-design/icons';
+import { ConfigProvider, Layout, Space, Button, Badge, Typography, Modal, Dropdown, Avatar, Switch, Tooltip, App as AntdApp } from 'antd';
+import { LogoutOutlined, UserOutlined, TeamOutlined, DownOutlined, SettingOutlined, EyeOutlined } from '@ant-design/icons';
 import { Star, MapPin } from 'lucide-react';
 import { EventBusProvider } from './shared/EventBusContext';
 import { SettingsProvider } from './shared/SettingsContext';
@@ -38,6 +38,7 @@ const AppContent: React.FC = () => {
   const [showProfile, setShowProfile] = useState(false);
   const [showPeople, setShowPeople] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showMapAreas, setShowMapAreas] = useState(false);
 
   // If no user is authenticated, this shouldn't render
   if (!user) {
@@ -118,8 +119,24 @@ const AppContent: React.FC = () => {
           </Typography.Title>
           <span>Room: {user.roomId}</span>
           <Space size="middle" style={{ color: 'var(--color-text-secondary)' }}>
+
+            {/* Admin-only Debug Toggle for Map Areas */}
+            {user.isAdmin && (
+              <Tooltip title="Show/hide map areas (impassable polygons and interactive zones) for debugging">
+                <Space size="small">
+                  <EyeOutlined style={{ fontSize: '16px' }} />
+                  <Switch
+                    checked={showMapAreas}
+                    onChange={setShowMapAreas}
+                    size="small"
+                  />
+                  <span style={{ fontSize: '12px' }}>Map Areas</span>
+                </Space>
+              </Tooltip>
+            )}
+
             {/* Map Sync Status */}
-            <MapSyncStatus showText={false} />
+            <MapSyncStatus showText={true} />
             {/* User Menu Dropdown */}
             <Dropdown
               menu={{
@@ -200,6 +217,7 @@ const AppContent: React.FC = () => {
               <WorldModuleAlt
                 playerId={user.username}
                 className="world-module-panel"
+                showMapAreas={showMapAreas}
               />
             }
             rightTopPanel={

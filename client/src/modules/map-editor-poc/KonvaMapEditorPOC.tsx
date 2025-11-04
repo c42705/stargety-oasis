@@ -28,6 +28,7 @@ import { useKonvaPan } from './hooks/useKonvaPan';
 import { useKonvaRectDrawing } from './hooks/useKonvaRectDrawing';
 import { useKonvaSelection } from './hooks/useKonvaSelection';
 import { useKonvaPolygonDrawing } from './hooks/useKonvaPolygonDrawing';
+import { shouldIgnoreKeyboardEvent } from '../../shared/keyboardFocusUtils';
 import {
   TransformableRect,
   TransformablePolygon,
@@ -150,6 +151,11 @@ export const KonvaMapEditorPOC: React.FC = () => {
   // Keyboard listener for Delete key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore keyboard events when typing in input fields or when modal is open
+      if (shouldIgnoreKeyboardEvent()) {
+        return;
+      }
+
       console.log('Key pressed:', e.key, 'Selected shapes:', selectedIds.length);
 
       if (e.key === 'Delete' || e.key === 'Backspace') {

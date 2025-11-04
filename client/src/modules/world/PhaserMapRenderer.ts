@@ -348,20 +348,23 @@ export class PhaserMapRenderer {
     // Remove existing object if it exists
     this.removeInteractiveArea(area.id);
 
-    // Create visual representation
+    // Create visual representation with visibility based on debug mode
+    const fillAlpha = this.debugMode ? 0.7 : 0;
     const rect = this.scene.add.rectangle(
       area.x + area.width / 2,
       area.y + area.height / 2,
       area.width,
       area.height,
       Phaser.Display.Color.HexStringToColor(area.color).color,
-      0.7
+      fillAlpha
     );
 
-    // Add border
-    rect.setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(area.color).color);
+    // Add border (visible only in debug mode)
+    if (this.debugMode) {
+      rect.setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(area.color).color);
+    }
 
-    // Add text label
+    // Add text label (visible only in debug mode)
     const text = this.scene.add.text(
       area.x + area.width / 2,
       area.y + area.height / 2,
@@ -374,16 +377,17 @@ export class PhaserMapRenderer {
       }
     );
     text.setOrigin(0.5, 0.5);
+    text.setAlpha(this.debugMode ? 1 : 0);
 
     // Create container for grouping
     const container = this.scene.add.container(0, 0, [rect, text]);
-    
+
     // Add metadata
     (container as any).mapElementId = area.id;
     (container as any).mapElementType = 'interactive';
     (container as any).mapElementData = area;
 
-    // Enable interactions if configured
+    // Enable interactions if configured (always interactive, even when invisible)
     if (this.enableInteractions) {
       rect.setInteractive();
       rect.on('pointerdown', () => {
@@ -392,14 +396,18 @@ export class PhaserMapRenderer {
           this.handleInteractiveAreaClick(area);
         }
       });
-      
+
       rect.on('pointerover', () => {
-        rect.setAlpha(1);
+        if (this.debugMode) {
+          rect.setAlpha(1);
+        }
         this.scene.input.setDefaultCursor('pointer');
       });
-      
+
       rect.on('pointerout', () => {
-        rect.setAlpha(0.7);
+        if (this.debugMode) {
+          rect.setAlpha(0.7);
+        }
         this.scene.input.setDefaultCursor('default');
       });
     }
@@ -453,11 +461,15 @@ export class PhaserMapRenderer {
         debugMode: this.debugMode
       });
 
-      // Create polygon graphics
+      // Create polygon graphics with visibility based on debug mode
       const graphics = this.scene.add.graphics();
 
-      graphics.fillStyle(0xff0000, 0.3);  
-      graphics.lineStyle(4, 0xff0000, 0.6); 
+      // Set alpha based on debug mode (invisible by default, visible in debug mode)
+      const fillAlpha = this.debugMode ? 0.3 : 0;
+      const strokeAlpha = this.debugMode ? 0.6 : 0;
+
+      graphics.fillStyle(0xff0000, fillAlpha);
+      graphics.lineStyle(4, 0xff0000, strokeAlpha);
 
       // Begin path and draw polygon
       graphics.beginPath();
@@ -487,20 +499,24 @@ export class PhaserMapRenderer {
         depth: graphics.depth,
         firstPoint: area.points[0],
         visible: graphics.visible,
-        alpha: graphics.alpha
+        alpha: graphics.alpha,
+        debugMode: this.debugMode
       });
     } else {
-      // Create rectangular visual representation (default behavior)
+      // Create rectangular visual representation with visibility based on debug mode
+      const fillAlpha = this.debugMode ? 0.3 : 0;
       const rect = this.scene.add.rectangle(
         area.x + area.width / 2,
         area.y + area.height / 2,
         area.width,
         area.height,
         0xff0000,
-        this.debugMode ? 0.3 : 0.1
+        fillAlpha
       );
 
-      rect.setStrokeStyle(2, 0xff0000, this.debugMode ? 0.8 : 0.3);
+      // Set stroke style based on debug mode (invisible by default)
+      const strokeAlpha = this.debugMode ? 0.8 : 0;
+      rect.setStrokeStyle(2, 0xff0000, strokeAlpha);
 
       // Set depth to ensure rectangle is visible above background
       rect.setDepth(100);
@@ -574,11 +590,75 @@ export class PhaserMapRenderer {
   }
 
   /**
-   * Set debug mode
+   * Set debug mode - updates visibility of map areas without re-rendering
    */
   public setDebugMode(enabled: boolean): void {
     this.debugMode = enabled;
-    this.renderMap();
+
+    // Update interactive areas visibility
+    this.interactiveAreaObjects.forEach((container: any) => {
+      if (container && container.list) {
+        const rect = container.list[0]; // Rectangle
+        const text = container.list[1]; // Text label
+
+        if (rect) {
+          // Update rectangle fill alpha
+          rect.setAlpha(enabled ? 0.7 : 0);
+
+          // Update stroke (border)
+          if (enabled) {
+            const area = (container as any).mapElementData;
+            if (area && area.color) {
+              rect.setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(area.color).color);
+            }
+          } else {
+            rect.setStrokeStyle(0); // Remove stroke when not in debug mode
+          }
+        }
+
+        if (text) {
+          // Update text visibility
+          text.setAlpha(enabled ? 1 : 0);
+        }
+      }
+    });
+
+    // Update collision areas visibility
+    this.collisionAreaObjects.forEach((obj: any) => {
+      if (!obj) return;
+
+      const area = obj.mapElementData;
+
+      // Check if it's a polygon (Graphics object) or rectangle
+      if (area && area.type === 'impassable-polygon' && obj.clear) {
+        // It's a Graphics object (polygon) - redraw with new alpha
+        obj.clear();
+
+        const fillAlpha = enabled ? 0.3 : 0;
+        const strokeAlpha = enabled ? 0.6 : 0;
+
+        obj.fillStyle(0xff0000, fillAlpha);
+        obj.lineStyle(4, 0xff0000, strokeAlpha);
+
+        if (area.points && area.points.length > 0) {
+          obj.beginPath();
+          obj.moveTo(area.points[0].x, area.points[0].y);
+          for (let i = 1; i < area.points.length; i++) {
+            obj.lineTo(area.points[i].x, area.points[i].y);
+          }
+          obj.closePath();
+          obj.fillPath();
+          obj.strokePath();
+        }
+      } else if (obj.setAlpha && obj.setStrokeStyle) {
+        // It's a Rectangle object
+        const fillAlpha = enabled ? 0.3 : 0;
+        const strokeAlpha = enabled ? 0.8 : 0;
+
+        obj.setAlpha(fillAlpha);
+        obj.setStrokeStyle(2, 0xff0000, strokeAlpha);
+      }
+    });
   }
 
   /**

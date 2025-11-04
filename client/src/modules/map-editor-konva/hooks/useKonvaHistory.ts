@@ -1,6 +1,6 @@
 /**
  * Konva Map Editor - History Hook
- * 
+ *
  * Handles undo/redo functionality with state snapshot management.
  */
 
@@ -12,6 +12,7 @@ import type {
   EditorState,
 } from '../types';
 import { HISTORY } from '../constants/konvaConstants';
+import { shouldIgnoreKeyboardEvent } from '../../../shared/keyboardFocusUtils';
 
 /**
  * History entry containing a state snapshot
@@ -215,6 +216,11 @@ export function useKonvaHistory(
     if (!enabled) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore keyboard events when typing in input fields or when modal is open
+      if (shouldIgnoreKeyboardEvent()) {
+        return;
+      }
+
       // Undo: Ctrl+Z (or Cmd+Z on Mac)
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
