@@ -22,10 +22,13 @@ export interface FeatureFlags {
 
 /**
  * Default feature flags
+ *
+ * NOTE: Konva editor is now the production default (USE_KONVA_EDITOR: true)
+ * The toggle switch in MapEditorPage allows switching back to Fabric.js if needed.
  */
 export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
-  USE_KONVA_EDITOR: false,
-  KONVA_ROLLOUT_PERCENTAGE: 0,
+  USE_KONVA_EDITOR: true,  // Changed to true - Konva is now the default editor
+  KONVA_ROLLOUT_PERCENTAGE: 100,  // 100% rollout
   ENABLE_COMPARISON_VIEW: false,
   ENABLE_PERFORMANCE_MONITORING: true,
   ENABLE_DEBUG_OVERLAY: false,

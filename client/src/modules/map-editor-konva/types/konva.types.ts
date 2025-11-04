@@ -53,6 +53,8 @@ export interface GridConfig {
   color: string;
   /** Grid opacity (0-1) */
   opacity: number;
+  /** Whether to snap shapes to grid */
+  snapToGrid?: boolean;
 }
 
 // ============================================================================
@@ -177,6 +179,10 @@ export interface Shape {
   style: ShapeStyle;
   /** Additional metadata */
   metadata: ShapeMetadata;
+  /** Visibility flag */
+  visible?: boolean;
+  /** Display name (convenience accessor for metadata.name) */
+  name?: string;
 }
 
 /**
@@ -189,6 +195,8 @@ export interface ShapeMetadata {
   description?: string;
   /** Area type (for interactive areas) */
   areaType?: 'meeting-room' | 'presentation-hall' | 'coffee-corner' | 'game-zone' | 'custom';
+  /** Group ID for grouped shapes */
+  groupId?: string;
   /** Creation timestamp */
   createdAt?: Date;
   /** Last modified timestamp */

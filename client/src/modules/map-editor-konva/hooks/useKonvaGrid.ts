@@ -168,7 +168,7 @@ export function useKonvaGrid(params: UseKonvaGridParams): UseKonvaGridReturn {
    * Snap a point to the grid
    */
   const snapToGrid = (x: number, y: number): { x: number; y: number } => {
-    if (!false) {
+    if (!config.snapToGrid) {
       return { x, y };
     }
 
@@ -185,7 +185,7 @@ export function useKonvaGrid(params: UseKonvaGridParams): UseKonvaGridReturn {
   const snapPointsToGrid = (
     points: Array<{ x: number; y: number }>
   ): Array<{ x: number; y: number }> => {
-    if (!false) {
+    if (!config.snapToGrid) {
       return points;
     }
 

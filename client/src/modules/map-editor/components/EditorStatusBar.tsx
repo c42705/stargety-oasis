@@ -66,7 +66,7 @@ export const EditorStatusBar: React.FC<EditorStatusBarProps> = ({
         <Space size="small">
           <ZoomInOutlined />
           <Text type="secondary">Zoom:</Text>
-          <Text strong>{editorState.zoom}%</Text>
+          <Text strong>{Math.round(editorState.zoom)}%</Text>
         </Space>
       </Space>
 

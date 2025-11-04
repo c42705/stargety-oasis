@@ -1,6 +1,6 @@
 /**
  * Konva Map Editor - Shape Factory Utilities
- * 
+ *
  * Factory functions for creating shapes with proper defaults, validation, and ID generation.
  * All shapes are created with consistent structure and styling.
  */
@@ -60,10 +60,10 @@ function createDefaultMetadata(customMetadata?: Partial<ShapeMetadata>): ShapeMe
 
 /**
  * Create a polygon shape from vertices
- * 
+ *
  * @param params - Polygon creation parameters
  * @returns Complete polygon shape
- * 
+ *
  * @example
  * ```typescript
  * const polygon = createPolygonShape({
@@ -108,13 +108,13 @@ export function createPolygonShape(params: CreatePolygonParams): Shape {
 
 /**
  * Create a polygon shape from flat points array
- * 
+ *
  * @param points - Flat array of coordinates [x1, y1, x2, y2, ...]
  * @param category - Shape category
  * @param name - Optional name
  * @param customStyle - Optional custom style
  * @returns Complete polygon shape
- * 
+ *
  * @example
  * ```typescript
  * const polygon = createPolygonFromPoints(
@@ -152,10 +152,10 @@ export function createPolygonFromPoints(
 
 /**
  * Create a rectangle shape
- * 
+ *
  * @param params - Rectangle creation parameters
  * @returns Complete rectangle shape
- * 
+ *
  * @example
  * ```typescript
  * const rect = createRectangleShape({
@@ -199,7 +199,7 @@ export function createRectangleShape(params: CreateRectangleParams): Shape {
 
 /**
  * Create a shape from generic parameters
- * 
+ *
  * @param params - Shape creation parameters
  * @returns Complete shape
  */
@@ -221,11 +221,11 @@ export function createShape(params: CreateShapeParams): Shape {
 
 /**
  * Duplicate a shape with a new ID and optional offset
- * 
+ *
  * @param shape - Shape to duplicate
  * @param offset - Optional offset to apply
  * @returns Duplicated shape with new ID
- * 
+ *
  * @example
  * ```typescript
  * const duplicate = duplicateShape(originalShape, { x: 20, y: 20 });
@@ -273,7 +273,7 @@ export function duplicateShape(
 
 /**
  * Clone a shape (same ID, deep copy)
- * 
+ *
  * @param shape - Shape to clone
  * @returns Cloned shape
  */
@@ -292,7 +292,7 @@ export function cloneShape(shape: Shape): Shape {
 
 /**
  * Create multiple polygon shapes from an array of vertex arrays
- * 
+ *
  * @param polygonsData - Array of polygon data
  * @param category - Shape category for all polygons
  * @returns Array of polygon shapes
@@ -312,7 +312,7 @@ export function createPolygonShapes(
 
 /**
  * Create multiple rectangle shapes from an array of rectangle data
- * 
+ *
  * @param rectanglesData - Array of rectangle data
  * @param category - Shape category for all rectangles
  * @returns Array of rectangle shapes
@@ -335,3 +335,89 @@ export function createRectangleShapes(
   );
 }
 
+
+// ============================================================================
+// SHAPE GROUPING
+// ============================================================================
+
+/**
+ * Group multiple shapes together by assigning them a shared group ID
+ *
+ * @param shapes - Shapes to group
+ * @param groupId - Optional group ID (generates new UUID if not provided)
+ * @returns Shapes with group ID assigned
+ *
+ * @example
+ * ```typescript
+ * const grouped = groupShapes([shape1, shape2, shape3]);
+ * ```
+ */
+export function groupShapes(
+  shapes: Shape[],
+  groupId?: string
+): Shape[] {
+  const id = groupId || uuidv4();
+  return shapes.map(shape => ({
+    ...shape,
+    metadata: {
+      ...shape.metadata,
+      groupId: id,
+    },
+  }));
+}
+
+/**
+ * Ungroup shapes by removing their group ID
+ *
+ * @param shapes - Shapes to ungroup
+ * @returns Shapes with group ID removed
+ *
+ * @example
+ * ```typescript
+ * const ungrouped = ungroupShapes([shape1, shape2, shape3]);
+ * ```
+ */
+export function ungroupShapes(shapes: Shape[]): Shape[] {
+  return shapes.map(shape => ({
+    ...shape,
+    metadata: {
+      ...shape.metadata,
+      groupId: undefined,
+    },
+  }));
+}
+
+/**
+ * Get all shapes in the same group as the given shape
+ *
+ * @param shape - Shape to find group members for
+ * @param allShapes - All shapes to search through
+ * @returns Array of shapes in the same group (including the input shape)
+ *
+ * @example
+ * ```typescript
+ * const groupMembers = getGroupMembers(selectedShape, allShapes);
+ * ```
+ */
+export function getGroupMembers(
+  shape: Shape,
+  allShapes: Shape[]
+): Shape[] {
+  if (!shape.metadata.groupId) {
+    return [shape];
+  }
+
+  return allShapes.filter(
+    s => s.metadata.groupId === shape.metadata.groupId
+  );
+}
+
+/**
+ * Check if a shape is part of a group
+ *
+ * @param shape - Shape to check
+ * @returns True if shape is grouped
+ */
+export function isGrouped(shape: Shape): boolean {
+  return !!shape.metadata.groupId;
+}

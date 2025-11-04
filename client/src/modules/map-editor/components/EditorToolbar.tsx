@@ -13,7 +13,8 @@ import {
   Hand,
   RotateCcw,
   Info,
-  Pentagon
+  Pentagon,
+  Magnet
 } from 'lucide-react';
 import { EditorState, GridConfig } from '../types/editor.types';
 import { SaveStatusIndicator } from '../../../components/SaveStatusIndicator';
@@ -32,6 +33,7 @@ interface EditorToolbarProps {
   onFitToScreen: () => void;
   onResetZoom: () => void;
   onToggleGrid: () => void;
+  onToggleSnapToGrid?: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onTogglePreview: () => void;
@@ -50,6 +52,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onFitToScreen,
   onResetZoom,
   onToggleGrid,
+  onToggleSnapToGrid,
   onUndo,
   onRedo,
   onTogglePreview,
@@ -132,6 +135,17 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             onClick={onToggleGrid}
           />
         </Tooltip>
+
+        {onToggleSnapToGrid && (
+          <Tooltip title="Snap to Grid">
+            <Button
+              type={gridConfig.snapToGrid ? 'primary' : 'default'}
+              icon={<Magnet size={16} />}
+              onClick={onToggleSnapToGrid}
+              disabled={!gridConfig.visible}
+            />
+          </Tooltip>
+        )}
 
         <Divider type="vertical" style={{ height: '24px' }} />
 

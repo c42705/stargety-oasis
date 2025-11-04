@@ -17,7 +17,7 @@ import { SELECTION_STYLE } from '../constants/konvaConstants';
 export interface TransformableRectProps {
   shape: Shape;
   isSelected: boolean;
-  onSelect: () => void;
+  onSelect: (e: any) => void;
   onDragEnd: (e: any) => void;
   onTransformEnd: (node: any) => void;
 }
@@ -70,7 +70,7 @@ export const TransformableRect: React.FC<TransformableRectProps> = ({
 export interface TransformablePolygonProps {
   shape: Shape;
   isSelected: boolean;
-  onSelect: () => void;
+  onSelect: (e: any) => void;
   onDragEnd: (e: any) => void;
   onTransformEnd: (node: any) => void;
 }

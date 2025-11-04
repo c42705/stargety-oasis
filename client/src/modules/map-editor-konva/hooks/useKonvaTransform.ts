@@ -39,6 +39,7 @@ export function useKonvaTransform(
     selectedIds,
     shapes,
     onShapeUpdate,
+    snapToGrid,
   } = params;
 
   // ==========================================================================
@@ -78,8 +79,18 @@ export function useKonvaTransform(
       if (!shape || !canTransform(shapeId)) return;
 
       const node = e.target;
-      const newX = node.x();
-      const newY = node.y();
+      let newX = node.x();
+      let newY = node.y();
+
+      // Snap to grid if enabled
+      if (snapToGrid) {
+        const snapped = snapToGrid(newX, newY);
+        newX = snapped.x;
+        newY = snapped.y;
+        // Update node position to snapped value for visual feedback
+        node.x(newX);
+        node.y(newY);
+      }
 
       // Update shape geometry based on type
       if (shape.geometry.type === 'rectangle') {
@@ -94,7 +105,7 @@ export function useKonvaTransform(
         const updates: Partial<PolygonGeometry> = {
           points: shape.geometry.points, // Keep points the same
         };
-        
+
         // Calculate the delta from the original position
         const deltaX = newX;
         const deltaY = newY;
@@ -113,7 +124,7 @@ export function useKonvaTransform(
         onShapeUpdate?.(shapeId, { geometry: { ...shape.geometry, points: newPoints } });
       }
     },
-    [getShape, canTransform, onShapeUpdate]
+    [getShape, canTransform, onShapeUpdate, snapToGrid]
   );
 
   // ==========================================================================

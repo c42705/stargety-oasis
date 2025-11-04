@@ -77,6 +77,7 @@ export const GRID_DEFAULTS: GridConfig = {
   pattern: 'dots',
   color: '#333333',
   opacity: 0.5,
+  snapToGrid: false,
 };
 
 /**

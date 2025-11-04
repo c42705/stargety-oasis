@@ -372,6 +372,8 @@ export interface UseKonvaTransformParams {
   viewport?: Viewport;
   /** Whether transform is enabled */
   enabled?: boolean;
+  /** Snap to grid function */
+  snapToGrid?: (x: number, y: number) => { x: number; y: number };
 }
 
 /**
@@ -757,5 +759,53 @@ export interface UseKonvaAccessibilityReturn {
   announceAction: (message: string) => void;
   /** Whether accessibility features are enabled */
   enabled: boolean;
+}
+
+// ============================================================================
+// VERTEX EDIT HOOK
+// ============================================================================
+
+/**
+ * Parameters for useKonvaVertexEdit hook
+ */
+export interface UseKonvaVertexEditParams {
+  /** Shape being edited (must be a polygon) */
+  shape: Shape | null;
+  /** Whether vertex editing is enabled */
+  enabled: boolean;
+  /** Callback when shape is updated */
+  onShapeUpdate?: (shapeId: string, updates: Partial<Shape>) => void;
+  /** Callback when editing is cancelled */
+  onCancel?: () => void;
+}
+
+/**
+ * Return value from useKonvaVertexEdit hook
+ */
+export interface UseKonvaVertexEditReturn {
+  /** Current edit state */
+  editState: import('./shapes.types').PolygonEditState;
+  /** Vertex handles for rendering */
+  vertexHandles: import('./shapes.types').VertexHandle[];
+  /** Edge handles for rendering */
+  edgeHandles: import('./shapes.types').EdgeHandle[];
+  /** Whether currently editing */
+  isEditing: boolean;
+  /** Start editing a polygon */
+  startEditing: (shape: Shape) => void;
+  /** Stop editing */
+  stopEditing: () => void;
+  /** Handle vertex drag start */
+  handleVertexDragStart: (vertexIndex: number) => void;
+  /** Handle vertex drag move */
+  handleVertexDragMove: (vertexIndex: number, x: number, y: number) => void;
+  /** Handle vertex drag end */
+  handleVertexDragEnd: (vertexIndex: number, x: number, y: number) => void;
+  /** Handle edge click to add vertex */
+  handleEdgeClick: (edgeIndex: number) => void;
+  /** Handle vertex delete (right-click or delete key) */
+  handleVertexDelete: (vertexIndex: number) => void;
+  /** Handle vertex hover */
+  handleVertexHover: (vertexIndex: number | null) => void;
 }
 

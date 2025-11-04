@@ -43,11 +43,15 @@ import { useKonvaHistory } from './hooks/useKonvaHistory';
 import { useKonvaPersistence } from './hooks/useKonvaPersistence';
 import { useKonvaPreviewMode } from './hooks/useKonvaPreviewMode';
 import { useKonvaKeyboardShortcuts } from './hooks/useKonvaKeyboardShortcuts';
+import { useKonvaVertexEdit } from './hooks/useKonvaVertexEdit';
 
 // Import Konva components
 import { PolygonDrawingPreview } from './components/PolygonDrawingPreview';
 import { RectangleDrawingPreview } from './components/RectangleDrawingPreview';
 import { TransformablePolygon, TransformableRect, TransformerComponent } from './components/TransformableShape';
+import { KonvaLayersPanel } from './components/KonvaLayersPanel';
+import { SelectionRect } from './components/SelectionRect';
+import { PolygonEditor } from './components/PolygonEditor';
 
 // Import types
 import type { Shape, EditorState, Viewport, GridConfig } from './types';
@@ -56,7 +60,9 @@ import type { EditorTool as FabricEditorTool } from '../map-editor/types/editor.
 import { VIEWPORT_DEFAULTS, GRID_DEFAULTS } from './constants/konvaConstants';
 
 // Import utilities
-import { mapDataToShapes, shapesToMapData } from './utils/mapDataAdapter';
+import { mapDataToShapes, shapeToInteractiveArea, shapeToImpassableArea } from './utils/mapDataAdapter';
+import { calculateZoomToShape } from './utils/zoomToShape';
+import { duplicateShape, groupShapes, ungroupShapes } from './utils/shapeFactories';
 
 // Import shared types
 import type { TabId } from '../map-editor/types/editor.types';
@@ -120,7 +126,10 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     addCollisionArea,
     updateCollisionArea,
     removeCollisionArea,
-    markDirty
+    markDirty,
+    // saveMap is used by SaveStatusIndicator component
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    saveMap
   } = useMapStore();
 
   // ===== STATE =====
@@ -130,6 +139,8 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
   const [viewport, setViewport] = useState<Viewport>(VIEWPORT_DEFAULTS);
   const [gridConfig, setGridConfig] = useState<GridConfig>(GRID_DEFAULTS);
   const [currentTool, setCurrentTool] = useState<KonvaEditorTool>('select');
+  const [isSpacebarPressed, setIsSpacebarPressed] = useState(false);
+  const [cursorStyle, setCursorStyle] = useState<string>('default');
   
   // Modal state
   const [showAreaModal, setShowAreaModal] = useState(false);
@@ -198,6 +209,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
   // ===== KONVA HOOKS =====
 
   // Layer management
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { layerRefs, refreshAllLayers } = useKonvaLayers();
 
   // Zoom controls
@@ -207,12 +219,51 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     enabled: true,
   });
 
-  // Pan controls
+  // Pan controls (enabled for pan tool OR spacebar pressed)
   const pan = useKonvaPan({
     viewport,
     onViewportChange: setViewport,
-    enabled: currentTool === 'pan',
+    enabled: currentTool === 'pan' || isSpacebarPressed,
+    enableMiddleButton: true, // Always allow middle mouse button pan
   });
+
+  // Spacebar pan support
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !isSpacebarPressed && !e.repeat) {
+        e.preventDefault();
+        setIsSpacebarPressed(true);
+        setCursorStyle('grab');
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        setIsSpacebarPressed(false);
+        setCursorStyle('default');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [isSpacebarPressed]);
+
+  // Update cursor when panning
+  useEffect(() => {
+    if (pan.isPanning) {
+      setCursorStyle('grabbing');
+    } else if (isSpacebarPressed || currentTool === 'pan') {
+      setCursorStyle('grab');
+    } else {
+      setCursorStyle('default');
+    }
+  }, [pan.isPanning, isSpacebarPressed, currentTool]);
 
   // Grid
   const grid = useKonvaGrid({
@@ -280,6 +331,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     gridConfig,
     category: 'collision',
     enabled: currentTool === 'polygon' || collisionDrawingMode,
+    snapToGrid: grid.snapToGrid,
     onShapeCreate: (shape: Shape) => {
       // If we have pending collision area data, create the collision area
       if (pendingCollisionAreaData && shape.geometry.type === 'polygon') {
@@ -308,12 +360,13 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     minVertices: 3,
   });
 
-  // Rectangle drawing
+  // Rectangle drawing for interactive areas
   const rectDrawing = useKonvaRectDrawing({
     viewport,
     gridConfig,
     category: 'interactive',
-    enabled: currentTool === 'rect' || drawingMode,
+    enabled: currentTool === 'rect' || (drawingMode && !collisionDrawingMode),
+    snapToGrid: grid.snapToGrid,
     onShapeCreate: (shape: Shape) => {
       // If we have pending area data, create the interactive area
       if (pendingAreaData && shape.geometry.type === 'rectangle') {
@@ -341,6 +394,39 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     minSize: 10,
   });
 
+  // Rectangle drawing for collision areas
+  const collisionRectDrawing = useKonvaRectDrawing({
+    viewport,
+    gridConfig,
+    category: 'collision',
+    enabled: collisionDrawingMode && pendingCollisionAreaData?.drawingMode === 'rectangle',
+    snapToGrid: grid.snapToGrid,
+    onShapeCreate: (shape: Shape) => {
+      // If we have pending collision area data, create the collision area
+      if (pendingCollisionAreaData && shape.geometry.type === 'rectangle') {
+        const rect = shape.geometry;
+        const newCollisionArea = {
+          id: shape.id,
+          name: pendingCollisionAreaData.name || 'New Collision Area',
+          type: 'rectangle',
+          color: pendingCollisionAreaData.color || '#ff0000',
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+        };
+        addCollisionArea(newCollisionArea);
+        setPendingCollisionAreaData(null);
+        markDirty();
+      }
+
+      history.pushState('Draw collision rectangle');
+      setCollisionDrawingMode(false);
+      setCurrentTool('select');
+    },
+    minSize: 10,
+  });
+
   // Selection
   const selection = useKonvaSelection({
     shapes,
@@ -353,14 +439,73 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
   const transform = useKonvaTransform({
     shapes,
     selectedIds,
+    snapToGrid: grid.snapToGrid,
     onShapeUpdate: (id: string, updates: Partial<Shape>) => {
+      // Update local shapes state
       setShapes(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+
+      // Sync changes back to map data store
+      const updatedShape = shapes.find(s => s.id === id);
+      if (updatedShape) {
+        const mergedShape = { ...updatedShape, ...updates };
+
+        if (mergedShape.category === 'interactive') {
+          // Update interactive area in store
+          const interactiveArea = shapeToInteractiveArea(mergedShape);
+          updateInteractiveArea(id, interactiveArea);
+          markDirty();
+        } else if (mergedShape.category === 'collision') {
+          // Update collision area in store
+          const collisionArea = shapeToImpassableArea(mergedShape);
+          updateCollisionArea(id, collisionArea);
+          markDirty();
+        }
+      }
+
       history.pushState('Transform shape');
     },
     enabled: !previewMode.isPreviewMode,
   });
 
-  // Persistence
+  // Vertex editing - get the shape being edited
+  const editingShape = selectedIds.length === 1
+    ? (shapes.find(s => s.id === selectedIds[0]) || null)
+    : null;
+
+  const vertexEdit = useKonvaVertexEdit({
+    shape: editingShape,
+    enabled: currentTool === 'edit-vertex' && !previewMode.isPreviewMode,
+    onShapeUpdate: (id: string, updates: Partial<Shape>) => {
+      // Update local shapes state
+      setShapes(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+
+      // Sync changes back to map data store
+      const updatedShape = shapes.find(s => s.id === id);
+      if (updatedShape) {
+        const mergedShape = { ...updatedShape, ...updates };
+
+        if (mergedShape.category === 'interactive') {
+          // Update interactive area in store
+          const interactiveArea = shapeToInteractiveArea(mergedShape);
+          updateInteractiveArea(id, interactiveArea);
+          markDirty();
+        } else if (mergedShape.category === 'collision') {
+          // Update collision area in store
+          const collisionArea = shapeToImpassableArea(mergedShape);
+          updateCollisionArea(id, collisionArea);
+          markDirty();
+        }
+      }
+
+      history.pushState('Edit vertex');
+    },
+    onCancel: () => {
+      setCurrentTool('select');
+    },
+  });
+
+  // Persistence - auto-save is enabled, hook manages state internally
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const persistence = useKonvaPersistence({
     currentState: currentEditorState,
     onStateRestore: (state: EditorState) => {
@@ -376,6 +521,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
   });
 
   // Keyboard shortcuts
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const shortcuts = useKonvaKeyboardShortcuts({
     enabled: true,
     shortcuts: [
@@ -399,9 +545,104 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
         },
       },
       {
+        key: 'ctrl+d',
+        description: 'Duplicate selected shapes',
+        handler: () => {
+          if (selectedIds.length === 0) return;
+
+          const newShapes: Shape[] = [];
+          const newIds: string[] = [];
+
+          selectedIds.forEach((id) => {
+            const shape = shapes.find((s) => s.id === id);
+            if (shape) {
+              const duplicated = duplicateShape(shape, { x: 20, y: 20 });
+              newShapes.push(duplicated);
+              newIds.push(duplicated.id);
+
+              // Sync to map data store
+              if (duplicated.category === 'interactive') {
+                const interactiveArea = shapeToInteractiveArea(duplicated);
+                addInteractiveArea(interactiveArea);
+              } else if (duplicated.category === 'collision') {
+                const collisionArea = shapeToImpassableArea(duplicated);
+                addCollisionArea(collisionArea);
+              }
+            }
+          });
+
+          setShapes(prev => [...prev, ...newShapes]);
+          setSelectedIds(newIds);
+          markDirty();
+          history.pushState('Duplicate shapes');
+        },
+      },
+      {
+        key: 'ctrl+g',
+        description: 'Group selected shapes',
+        handler: (e) => {
+          e?.preventDefault(); // Prevent browser default
+          if (selectedIds.length < 2) return; // Need at least 2 shapes to group
+
+          const selectedShapes = shapes.filter(s => selectedIds.includes(s.id));
+          const grouped = groupShapes(selectedShapes);
+
+          setShapes(prev => prev.map(shape => {
+            const groupedShape = grouped.find(g => g.id === shape.id);
+            return groupedShape || shape;
+          }));
+
+          markDirty();
+          history.pushState('Group shapes');
+        },
+      },
+      {
+        key: 'ctrl+shift+g',
+        description: 'Ungroup selected shapes',
+        handler: (e) => {
+          e?.preventDefault(); // Prevent browser default
+          if (selectedIds.length === 0) return;
+
+          const selectedShapes = shapes.filter(s => selectedIds.includes(s.id));
+          const ungrouped = ungroupShapes(selectedShapes);
+
+          setShapes(prev => prev.map(shape => {
+            const ungroupedShape = ungrouped.find(u => u.id === shape.id);
+            return ungroupedShape || shape;
+          }));
+
+          markDirty();
+          history.pushState('Ungroup shapes');
+        },
+      },
+      {
         key: 'g',
         description: 'Toggle grid',
         handler: () => setGridConfig(prev => ({ ...prev, visible: !prev.visible })),
+      },
+      {
+        key: 'v',
+        description: 'Enter vertex edit mode (for selected polygon)',
+        handler: () => {
+          // Only allow vertex edit if a single polygon is selected
+          if (selectedIds.length === 1) {
+            const shape = shapes.find(s => s.id === selectedIds[0]);
+            if (shape && shape.geometry.type === 'polygon') {
+              setCurrentTool('edit-vertex');
+            }
+          }
+        },
+      },
+      {
+        key: 'Escape',
+        description: 'Exit vertex edit mode / Clear selection',
+        handler: () => {
+          if (currentTool === 'edit-vertex') {
+            setCurrentTool('select');
+          } else {
+            setSelectedIds([]);
+          }
+        },
       },
     ],
   });
@@ -477,6 +718,10 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     setGridConfig(prev => ({ ...prev, visible: !prev.visible }));
   }, []);
 
+  const handleToggleSnapToGrid = useCallback(() => {
+    setGridConfig(prev => ({ ...prev, snapToGrid: !prev.snapToGrid }));
+  }, []);
+
   // ===== UNIFIED EVENT HANDLERS =====
   // Route events to the appropriate hook based on current tool
 
@@ -494,9 +739,14 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     } else if (currentTool === 'pan') {
       pan.handleMouseDown(e);
     } else if (currentTool === 'rect') {
-      rectDrawing.handleMouseDown(e);
+      // Handle both interactive and collision rectangle drawing
+      if (collisionDrawingMode && pendingCollisionAreaData?.drawingMode === 'rectangle') {
+        collisionRectDrawing.handleMouseDown(e);
+      } else {
+        rectDrawing.handleMouseDown(e);
+      }
     }
-  }, [currentTool, selection, pan, rectDrawing]);
+  }, [currentTool, selection, pan, rectDrawing, collisionRectDrawing, collisionDrawingMode, pendingCollisionAreaData]);
 
   const handleStageMouseMove = useCallback((e: any) => {
     if (currentTool === 'select') {
@@ -506,9 +756,14 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     } else if (currentTool === 'polygon') {
       polygonDrawing.handleMouseMove(e);
     } else if (currentTool === 'rect') {
-      rectDrawing.handleMouseMove(e);
+      // Handle both interactive and collision rectangle drawing
+      if (collisionDrawingMode && pendingCollisionAreaData?.drawingMode === 'rectangle') {
+        collisionRectDrawing.handleMouseMove(e);
+      } else {
+        rectDrawing.handleMouseMove(e);
+      }
     }
-  }, [currentTool, selection, pan, polygonDrawing, rectDrawing]);
+  }, [currentTool, selection, pan, polygonDrawing, rectDrawing, collisionRectDrawing, collisionDrawingMode, pendingCollisionAreaData]);
 
   const handleStageMouseUp = useCallback(() => {
     if (currentTool === 'select') {
@@ -516,9 +771,14 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     } else if (currentTool === 'pan') {
       pan.handleMouseUp();
     } else if (currentTool === 'rect') {
-      rectDrawing.handleMouseUp();
+      // Handle both interactive and collision rectangle drawing
+      if (collisionDrawingMode && pendingCollisionAreaData?.drawingMode === 'rectangle') {
+        collisionRectDrawing.handleMouseUp();
+      } else {
+        rectDrawing.handleMouseUp();
+      }
     }
-  }, [currentTool, selection, pan, rectDrawing]);
+  }, [currentTool, selection, pan, rectDrawing, collisionRectDrawing, collisionDrawingMode, pendingCollisionAreaData]);
 
   const handleStageDoubleClick = useCallback(() => {
     if (currentTool === 'polygon') {
@@ -533,16 +793,6 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
   const handleRedo = useCallback(() => {
     history.redo();
   }, [history]);
-
-  const handleSave = useCallback(() => {
-    persistence.save();
-    logger.info('Map editor state saved');
-  }, [persistence]);
-
-  const handleLoad = useCallback(() => {
-    persistence.load();
-    logger.info('Map editor state loaded');
-  }, [persistence]);
 
   // ===== AREA HANDLERS =====
   const handleCreateArea = useCallback(() => {
@@ -622,9 +872,60 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
       setPendingCollisionAreaData(data);
       setShowCollisionAreaModal(false);
       setCollisionDrawingMode(true);
-      setCurrentTool('polygon');
+      // Set tool based on drawing mode from the form
+      if (data.drawingMode === 'rectangle') {
+        setCurrentTool('rect');
+      } else {
+        setCurrentTool('polygon');
+      }
     }
   }, [editingCollisionArea, updateCollisionArea, markDirty]);
+
+  // ===== LAYERS PANEL HANDLERS =====
+
+  const handleShapeSelect = useCallback((shapeId: string) => {
+    setSelectedIds([shapeId]);
+    setCurrentTool('select');
+  }, []);
+
+  const handleShapeVisibilityToggle = useCallback((shapeId: string) => {
+    setShapes(prev => prev.map(s =>
+      s.id === shapeId ? { ...s, visible: !s.visible } : s
+    ));
+    history.pushState('Toggle shape visibility');
+  }, [history]);
+
+  const handleShapeDelete = useCallback((shapeId: string) => {
+    const shape = shapes.find(s => s.id === shapeId);
+    if (!shape) return;
+
+    if (shape.category === 'interactive') {
+      const area = areas.find(a => a.id === shapeId);
+      if (area) {
+        setAreaToDelete(area);
+        setShowDeleteConfirm(true);
+      }
+    } else if (shape.category === 'collision') {
+      const area = impassableAreas.find(a => a.id === shapeId);
+      if (area) {
+        setCollisionAreaToDelete(area);
+        setShowCollisionDeleteConfirm(true);
+      }
+    }
+  }, [shapes, areas, impassableAreas]);
+
+  const handleZoomToShape = useCallback((shape: Shape) => {
+    if (!mainRef.current) return;
+
+    const newViewport = calculateZoomToShape(
+      shape,
+      mainRef.current.offsetWidth,
+      mainRef.current.offsetHeight,
+      0.2 // 20% padding
+    );
+
+    setViewport(newViewport);
+  }, []);
 
   // ===== RENDER =====
 
@@ -645,7 +946,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     opacity: gridConfig.opacity,
     pattern: 'pattern-32px', // Default pattern
     visible: gridConfig.visible,
-    snapToGrid: false, // TODO: Add snap to grid support
+    snapToGrid: gridConfig.snapToGrid || false,
   };
 
   return (
@@ -663,6 +964,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
           onFitToScreen={handleFitToScreen}
           onResetZoom={handleZoomReset}
           onToggleGrid={handleToggleGrid}
+          onToggleSnapToGrid={handleToggleSnapToGrid}
           onUndo={handleUndo}
           onRedo={handleRedo}
           onTogglePreview={previewMode.togglePreview}
@@ -671,10 +973,35 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
 
       {/* Main Layout */}
       <div className="editor-layout">
-        {/* TODO: Add LayersPanel here when Konva version is implemented */}
+        {/* Layers Panel */}
+        <KonvaLayersPanel
+          shapes={shapes}
+          selectedIds={selectedIds}
+          viewport={viewport}
+          viewportWidth={viewportWidth}
+          viewportHeight={viewportHeight}
+          onShapeSelect={handleShapeSelect}
+          onShapeVisibilityToggle={handleShapeVisibilityToggle}
+          onShapeDelete={handleShapeDelete}
+          onZoomToShape={handleZoomToShape}
+          onEditInteractiveArea={(areaId) => {
+            const area = areas.find(a => a.id === areaId);
+            if (area) {
+              setEditingArea(area);
+              setShowAreaModal(true);
+            }
+          }}
+          onEditCollisionArea={(areaId) => {
+            const area = impassableAreas.find(a => a.id === areaId);
+            if (area) {
+              setEditingCollisionArea(area);
+              setShowCollisionAreaModal(true);
+            }
+          }}
+        />
 
         {/* Canvas Container */}
-        <main ref={mainRef} className="editor-main" style={{ position: 'relative' }}>
+        <main ref={mainRef} className="editor-main" style={{ position: 'relative', cursor: cursorStyle }}>
           {viewportWidth > 0 && viewportHeight > 0 && (
             <Stage
               ref={stageRef}
@@ -722,27 +1049,27 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
             {/* Shapes Layer */}
             <Layer ref={layerRefs.shapesLayer}>
               {shapes.map(shape => {
-                const geom = shape.geometry as any;
-                if (geom.vertices) {
+                const geom = shape.geometry;
+                if (geom.type === 'polygon') {
                   // Polygon geometry
                   return (
                     <TransformablePolygon
                       key={shape.id}
                       shape={shape}
                       isSelected={selectedIds.includes(shape.id)}
-                      onSelect={() => selection.selectShape(shape.id)}
+                      onSelect={(e) => selection.handleShapeClick(shape.id, e)}
                       onDragEnd={(e) => transform.handleDragEnd(shape.id, e)}
                       onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
                     />
                   );
-                } else if (geom.x !== undefined && geom.y !== undefined && geom.width !== undefined && geom.height !== undefined) {
+                } else if (geom.type === 'rectangle') {
                   // Rectangle geometry
                   return (
                     <TransformableRect
                       key={shape.id}
                       shape={shape}
                       isSelected={selectedIds.includes(shape.id)}
-                      onSelect={() => selection.selectShape(shape.id)}
+                      onSelect={(e) => selection.handleShapeClick(shape.id, e)}
                       onDragEnd={(e) => transform.handleDragEnd(shape.id, e)}
                       onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
                     />
@@ -766,11 +1093,38 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
                   category="interactive"
                 />
               )}
+              {collisionRectDrawing.isDrawing && collisionRectDrawing.previewRect && (
+                <RectangleDrawingPreview
+                  rect={collisionRectDrawing.previewRect}
+                  category="collision"
+                />
+              )}
             </Layer>
 
             {/* Selection Layer */}
             <Layer ref={layerRefs.selectionLayer}>
-              <TransformerComponent selectedShapeIds={selectedIds} />
+              {/* Show transformer only when not in vertex edit mode */}
+              {currentTool !== 'edit-vertex' && (
+                <TransformerComponent selectedShapeIds={selectedIds} />
+              )}
+              {selection.selectionRect && (
+                <SelectionRect rect={selection.selectionRect} />
+              )}
+              {/* Vertex editing UI */}
+              {vertexEdit.isEditing && (
+                <PolygonEditor
+                  vertexHandles={vertexEdit.vertexHandles}
+                  edgeHandles={vertexEdit.edgeHandles}
+                  draggingVertexIndex={vertexEdit.editState.draggingVertexIndex}
+                  hoveringHandleIndex={vertexEdit.editState.hoveringHandleIndex}
+                  onVertexDragStart={vertexEdit.handleVertexDragStart}
+                  onVertexDragMove={vertexEdit.handleVertexDragMove}
+                  onVertexDragEnd={vertexEdit.handleVertexDragEnd}
+                  onEdgeClick={vertexEdit.handleEdgeClick}
+                  onVertexDelete={vertexEdit.handleVertexDelete}
+                  onVertexHover={vertexEdit.handleVertexHover}
+                />
+              )}
             </Layer>
 
             {/* UI Layer */}
@@ -814,11 +1168,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
                 aria-selected={activeTab === tab.id}
               >
                 <span className="tab-icon">
-                  {tab.icon === 'eye' && <Eye size={18} />}
-                  {tab.icon === 'square' && <Square size={18} />}
-                  {tab.icon === 'shield' && <Shield size={18} />}
-                  {tab.icon === 'image' && <Square size={18} />}
-                  {tab.icon === 'settings' && <Square size={18} />}
+                  {tab.icon}
                 </span>
                 <span className="tab-label">{tab.label}</span>
               </button>

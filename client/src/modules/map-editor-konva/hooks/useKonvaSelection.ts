@@ -143,6 +143,7 @@ export function useKonvaSelection(
 
   /**
    * Handle shape click - single select or multi-select with Ctrl
+   * If shape is part of a group, selects all shapes in the group
    */
   const handleShapeClick = useCallback(
     (shapeId: string, e: any) => {
@@ -152,15 +153,47 @@ export function useKonvaSelection(
 
       const ctrlPressed = e.evt.ctrlKey || e.evt.metaKey;
 
-      if (ctrlPressed) {
-        // Toggle selection
-        toggleShape(shapeId);
+      // Find the clicked shape
+      const clickedShape = shapes.find(s => s.id === shapeId);
+      if (!clickedShape) return;
+
+      // Check if shape is part of a group
+      const groupId = clickedShape.metadata.groupId;
+
+      if (groupId) {
+        // Select all shapes in the group
+        const groupShapeIds = shapes
+          .filter(s => s.metadata.groupId === groupId)
+          .map(s => s.id);
+
+        if (ctrlPressed) {
+          // Toggle group selection
+          const allGroupSelected = groupShapeIds.every(id => selectedIds.includes(id));
+          if (allGroupSelected) {
+            // Deselect all shapes in group
+            updateSelection(selectedIds.filter(id => !groupShapeIds.includes(id)));
+          } else {
+            // Add all shapes in group to selection
+            const combined = [...selectedIds, ...groupShapeIds];
+            const newSelection = combined.filter((id, index) => combined.indexOf(id) === index);
+            updateSelection(newSelection);
+          }
+        } else {
+          // Select only this group
+          updateSelection(groupShapeIds);
+        }
       } else {
-        // Single selection
-        selectShape(shapeId);
+        // Shape is not grouped - normal selection behavior
+        if (ctrlPressed) {
+          // Toggle selection
+          toggleShape(shapeId);
+        } else {
+          // Single selection
+          selectShape(shapeId);
+        }
       }
     },
-    [enabled, toggleShape, selectShape]
+    [enabled, shapes, selectedIds, toggleShape, selectShape, updateSelection]
   );
 
   // ==========================================================================

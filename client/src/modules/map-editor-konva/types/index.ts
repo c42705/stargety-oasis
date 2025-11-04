@@ -196,6 +196,10 @@ export type {
   // Accessibility Hook
   UseKonvaAccessibilityParams,
   UseKonvaAccessibilityReturn,
+
+  // Vertex Edit Hook
+  UseKonvaVertexEditParams,
+  UseKonvaVertexEditReturn,
 } from './hooks.types';
 
 // ============================================================================
