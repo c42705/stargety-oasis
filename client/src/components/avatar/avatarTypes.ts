@@ -33,6 +33,33 @@ export const ASSET_DIMENSIONS: Record<LayerId, { width: number; height: number }
 
 export const AVATAR_STORAGE_KEY = (username: string) => `stargety_avatar_${username}`;
 
+// Character slot system
+export const MAX_CHARACTER_SLOTS = 5;
+
+export interface CharacterSlot {
+  slotNumber: number;
+  name: string;
+  config: AvatarConfig;
+  createdAt: string;
+  updatedAt: string;
+  previewUrl?: string; // Optional preview image
+}
+
+export interface CharacterSlotMetadata {
+  slotNumber: number;
+  name: string;
+  isEmpty: boolean;
+  previewUrl?: string;
+  updatedAt?: string;
+}
+
+// Storage keys for character slots
+export const CHARACTER_SLOT_KEY = (username: string, slotNumber: number) =>
+  `stargety_character_${username}_slot_${slotNumber}`;
+
+export const ACTIVE_CHARACTER_SLOT_KEY = (username: string) =>
+  `stargety_active_character_${username}`;
+
 // Validate PNG and dimensions
 export const validatePngDimensions = (file: File, dims: { width: number; height: number }): Promise<void> => {
   return new Promise((resolve, reject) => {

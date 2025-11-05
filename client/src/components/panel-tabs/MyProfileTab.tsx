@@ -7,9 +7,11 @@ import { useSettings } from '../../shared/SettingsContext';
 import { useTheme } from '../../shared/ThemeContext';
 import { ThemeType } from '../../theme/theme-system';
 import AvatarCustomizerModal from '../avatar/AvatarCustomizerModal';
+import { CharacterSelector } from '../avatar/CharacterSelector';
 import { AvatarConfig, DEFAULT_AVATAR_CONFIG } from '../avatar/avatarTypes';
 import { loadAvatarConfig, saveAvatarConfig } from '../avatar/avatarStorage';
 import { composeAvatarDataUrl } from '../avatar/composeAvatar';
+import { loadCharacterSlot, setActiveSlot } from '../avatar/avatarSlotStorage';
 
 interface UserPreferences {
   notifications: boolean;
@@ -118,6 +120,29 @@ export const MyProfileTab: React.FC = () => {
   };
   const handleCustomizerCancel = () => setCustomizerOpen(false);
 
+  // Character switching handlers
+  const handleCharacterSwitch = (slotNumber: number) => {
+    if (!user) return;
+
+    // Reload avatar config from the new active slot
+    const cfg = loadAvatarConfig(user.username);
+    setAvatarConfig(cfg);
+
+    message.success(`Switched to character slot ${slotNumber}`);
+  };
+
+  const handleCharacterEdit = (slotNumber: number) => {
+    if (!user) return;
+
+    // Switch to the slot and open customizer
+    const slot = loadCharacterSlot(user.username, slotNumber);
+    if (slot) {
+      setActiveSlot(user.username, slotNumber);
+      setAvatarConfig(slot.config);
+      setCustomizerOpen(true);
+    }
+  };
+
 
 
 
@@ -167,22 +192,22 @@ export const MyProfileTab: React.FC = () => {
                 Room: {user.roomId}
               </Typography.Text>
 
-              {/* Customize Character Button */}
-              <Button
-                size="small"
-                icon={<EditFilled />}
-                onClick={() => setCustomizerOpen(true)}
-                style={{
-                  backgroundColor: 'var(--color-accent)',
-                  borderColor: 'var(--color-accent)',
-                  color: 'white',
-                  marginTop: '8px'
-                }}
-              >
-                Customize Character
-              </Button>
+        
             </Space>
           </Space>
+        </Card>
+
+        {/* Character Management Section */}
+        <Card
+          title="My Characters"
+          size="small"
+          style={{ backgroundColor: 'var(--color-bg-secondary)', borderColor: 'var(--color-border-light)' }}
+        >
+          <CharacterSelector
+            username={user.username}
+            onCharacterSwitch={handleCharacterSwitch}
+            onCharacterEdit={handleCharacterEdit}
+          />
         </Card>
 
         {/* Status Section */}
