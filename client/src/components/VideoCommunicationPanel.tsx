@@ -158,11 +158,10 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
           flexDirection: 'column'
         }}>
           <VideoCallModule
-            className="video-panel-content"
             roomId={currentAreaRoom}
             userName={user.username}
             serverUrl={settings.jitsiServerUrl || 'meet.stargety.com'}
-            autoJoin={true}
+            hideToolbar={true}
           />
         </div>
       );

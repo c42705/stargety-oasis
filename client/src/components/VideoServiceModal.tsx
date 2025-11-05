@@ -105,7 +105,6 @@ export const VideoServiceModal: React.FC<VideoServiceModalProps> = ({
     if (settings.videoService === 'jitsi') {
       return (
         <VideoCallModule
-          className="video-service-content"
           roomId={videoRoomId}
           userName={user.username}
         />
