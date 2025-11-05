@@ -21,9 +21,9 @@ interface SettingsContextType {
 }
 
 const defaultSettings: AppSettings = {
-  videoService: 'ringcentral',
+  videoService: 'jitsi',
   adminMode: false,
-  theme: 'dark',
+  theme: 'light',
 };
 
 const STORAGE_KEY = 'stargetyOasisSettings';

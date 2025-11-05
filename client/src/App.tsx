@@ -153,12 +153,13 @@ const AppContent: React.FC = () => {
                     icon: <TeamOutlined />,
                     onClick: handlePeopleClick
                   },
-                  {
+                  // Admin-only Settings menu item
+                  ...(user.isAdmin ? [{
                     key: 'settings',
-                    label: 'Settings',
+                    label: 'Admin Settings',
                     icon: <SettingOutlined />,
                     onClick: handleSettingsClick
-                  },
+                  }] : []),
                   { type: 'divider' },
                   {
                     key: 'logout',

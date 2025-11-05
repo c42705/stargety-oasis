@@ -22,7 +22,7 @@ interface UserPreferences {
 
 export const MyProfileTab: React.FC = () => {
   const { user, logout } = useAuth();
-  const { settings, updateVideoService, updateTheme, saveSettings } = useSettings();
+  const { settings, updateTheme, saveSettings } = useSettings();
   const { currentTheme, setTheme, availableThemes } = useTheme();
 
   const [preferences, setPreferences] = useState<UserPreferences>({
@@ -291,29 +291,6 @@ export const MyProfileTab: React.FC = () => {
             </Space>
           </Form>
         </Card>
-
-        {/* Admin Settings (if admin) */}
-        {user.isAdmin && (
-          <Card
-            title="Admin Settings"
-            size="small"
-            style={{ backgroundColor: 'var(--color-bg-secondary)', borderColor: 'var(--color-border-light)' }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography.Text>Video Service</Typography.Text>
-              <Select
-                value={settings.videoService}
-                onChange={(value) => updateVideoService(value as 'jitsi' | 'ringcentral')}
-                size="small"
-                style={{ width: 120 }}
-                options={[
-                  { value: 'jitsi', label: 'Jitsi Meet' },
-                  { value: 'ringcentral', label: 'RingCentral' }
-                ]}
-              />
-            </div>
-          </Card>
-        )}
 
         {/* Account Actions */}
         <Card
