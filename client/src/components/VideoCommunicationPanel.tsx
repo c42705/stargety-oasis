@@ -30,6 +30,14 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
   const { user } = useAuth();
   const eventBus = useEventBus();
 
+  // Debug: Log when this panel mounts
+  useEffect(() => {
+    console.log('🎬 VideoCommunicationPanel MOUNTED');
+    return () => {
+      console.log('🔴 VideoCommunicationPanel UNMOUNTING');
+    };
+  }, []);
+
   // Simplified state: only track current area room
   const [currentAreaRoom, setCurrentAreaRoom] = useState<string | null>(null);
   const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
