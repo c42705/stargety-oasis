@@ -8,6 +8,7 @@ interface VideoCallModuleProps {
   userName: string;
   serverUrl?: string;
   className?: string;
+  autoJoin?: boolean; // Auto-join call when component mounts
   onParticipantCountChange?: (count: number) => void;
   onCallQuality?: (quality: 'good' | 'medium' | 'poor') => void;
   onError?: (error: string) => void;
@@ -30,6 +31,7 @@ export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
   userName,
   serverUrl = 'meet.stargety.com',
   className = '',
+  autoJoin = false,
   onParticipantCountChange,
   onCallQuality,
   onError,
@@ -127,11 +129,14 @@ export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
         },
       };
 
+      console.log('🎬 Creating Jitsi API instance for room:', cleanRoomId);
       apiRef.current = new window.JitsiMeetExternalAPI(serverUrl, options);
       const api = apiRef.current;
+      console.log('✅ Jitsi API instance created successfully');
 
       const eventListeners = {
         videoConferenceJoined: () => {
+          console.log('✅ Jitsi: videoConferenceJoined event fired - setting isJoined to true');
           setIsJoined(true);
           setIsLoading(false);
           setRetryCount(0);
@@ -273,6 +278,24 @@ export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
     setRetryCount(0);
     setIsRetrying(false);
   }, []);
+
+  // Auto-join effect: automatically join call when autoJoin is true
+  useEffect(() => {
+    if (autoJoin && !isJoined && !isLoading && !isRetrying) {
+      console.log('🎬 Auto-joining Jitsi call for room:', roomId);
+      initializeJitsi();
+    }
+  }, [autoJoin, isJoined, isLoading, isRetrying, roomId, initializeJitsi]);
+
+  // Debug: Log when isJoined changes
+  useEffect(() => {
+    console.log('🔄 VideoCallModule: isJoined changed to:', isJoined);
+    if (isJoined) {
+      console.log('✅ Jitsi iframe should now be visible (class: active)');
+    } else {
+      console.log('❌ Jitsi iframe should be hidden (class: hidden)');
+    }
+  }, [isJoined]);
 
   useEffect(() => {
     return () => {
