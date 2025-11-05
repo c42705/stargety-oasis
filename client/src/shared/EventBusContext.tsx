@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useCallback, useRef, useMemo } from 'react';
 
 // Event types for type safety
 export interface EventMap {
@@ -107,12 +107,14 @@ export const EventBusProvider: React.FC<{ children: React.ReactNode }> = ({
     eventsRef.current.clear();
   }, []);
 
-  const eventBus: EventBusInterface = {
+  // Memoize the eventBus object to prevent unnecessary re-renders
+  // This is critical for components that depend on eventBus (like WorldModuleAlt)
+  const eventBus: EventBusInterface = useMemo(() => ({
     publish,
     subscribe,
     unsubscribe,
     clear,
-  };
+  }), [publish, subscribe, unsubscribe, clear]);
 
   return (
     <EventBusContext.Provider value={eventBus}>

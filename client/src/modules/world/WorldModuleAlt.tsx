@@ -13,6 +13,8 @@ import Phaser from 'phaser';
 import WorldZoomControls from './WorldZoomControls';
 import { SharedMapSystem } from '../../shared/SharedMapSystem';
 import { PhaserMapRenderer } from './PhaserMapRenderer';
+import { useEventBus } from '../../shared/EventBusContext';
+import { shouldBlockBackgroundInteractions } from '../../shared/ModalStateManager';
 
 // Animation frame mapping for the 3x7 sprite sheet
 const ANIMATION_FRAMES = {
@@ -53,13 +55,16 @@ class ExampleScene extends Phaser.Scene {
   private isSettingDefaultZoom = false;
   private mapRenderer!: PhaserMapRenderer;
   private showMapAreas: boolean;
+  private eventBus: any; // EventBus for cross-component communication
+  private previousArea: string | null = null; // Track previous area for entry/exit detection
 
-  constructor(config: { backgroundImageUrl: string; worldWidth: number; worldHeight: number; showMapAreas?: boolean }) {
+  constructor(config: { backgroundImageUrl: string; worldWidth: number; worldHeight: number; showMapAreas?: boolean; eventBus?: any }) {
     super({ key: 'ExampleScene' });
     this.backgroundImageUrl = config.backgroundImageUrl;
     this.worldWidth = config.worldWidth;
     this.worldHeight = config.worldHeight;
     this.showMapAreas = config.showMapAreas ?? false;
+    this.eventBus = config.eventBus;
   }
 
   preload() {
@@ -210,6 +215,9 @@ class ExampleScene extends Phaser.Scene {
         }
       }
     }
+
+    // Check for collision with interactive areas (for Jitsi auto-join/leave)
+    this.checkAreaCollisions();
   }
 
   playAction(action: 'jump' | 'attack') {
@@ -426,12 +434,83 @@ class ExampleScene extends Phaser.Scene {
 
     return false; // No collision
   }
+
+  /**
+   * Check for collision with interactive areas and emit events for Jitsi auto-join/leave
+   */
+  private checkAreaCollisions() {
+    // Only check collisions if player exists
+    if (!this.cody) {
+      return;
+    }
+
+    const mapData = this.mapRenderer?.getMapData();
+    if (!mapData || !mapData.interactiveAreas) {
+      return; // No areas to check
+    }
+
+    const areas = mapData.interactiveAreas;
+    const playerSize = 64; // Match the display size
+    const playerLeft = this.cody.x - playerSize / 2;
+    const playerRight = this.cody.x + playerSize / 2;
+    const playerTop = this.cody.y - playerSize / 2;
+    const playerBottom = this.cody.y + playerSize / 2;
+
+    let currentlyInArea: string | null = null;
+
+    // Check if player is in any interactive area
+    areas.forEach(area => {
+      const areaLeft = area.x;
+      const areaRight = area.x + area.width;
+      const areaTop = area.y;
+      const areaBottom = area.y + area.height;
+
+      // Check for overlap using AABB collision detection
+      if (playerLeft < areaRight &&
+          playerRight > areaLeft &&
+          playerTop < areaBottom &&
+          playerBottom > areaTop) {
+        currentlyInArea = area.id;
+      }
+    });
+
+    // Detect area changes and emit events for Jitsi auto-join/leave
+    if (currentlyInArea !== this.previousArea) {
+      // Exited previous area
+      if (this.previousArea && !shouldBlockBackgroundInteractions()) {
+        const previousAreaData = areas.find(a => a.id === this.previousArea);
+        if (previousAreaData && this.eventBus) {
+          console.log('🚪 Area exited:', previousAreaData.name);
+          this.eventBus.publish('area-exited', {
+            areaId: previousAreaData.id,
+            areaName: previousAreaData.name
+          });
+        }
+      }
+
+      // Entered new area
+      if (currentlyInArea && !shouldBlockBackgroundInteractions()) {
+        const currentAreaData = areas.find(a => a.id === currentlyInArea);
+        if (currentAreaData && this.eventBus) {
+          console.log('🚪 Area entered:', currentAreaData.name);
+          this.eventBus.publish('area-entered', {
+            areaId: currentAreaData.id,
+            areaName: currentAreaData.name,
+            roomId: currentAreaData.id // Use area ID as default room ID
+          });
+        }
+      }
+
+      this.previousArea = currentlyInArea;
+    }
+  }
 }
 
 // Main React wrapper: Handles layout, state, and Phaser integration.
 export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, className = '', showMapAreas = false }) => {
   const gameRef = useRef<HTMLDivElement>(null);
   const phaserGameRef = useRef<Phaser.Game | null>(null);
+  const eventBus = useEventBus(); // Get EventBus for cross-component communication
 
   // State for zoom/camera controls UI
   const [canZoomIn, setCanZoomIn] = useState(true);
@@ -536,7 +615,7 @@ export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, classN
       height: '100%',
       parent: gameRef.current,
       backgroundColor: 'black',
-      scene: new ExampleScene(mapConfig),
+      scene: new ExampleScene({ ...mapConfig, eventBus }), // Pass eventBus to scene
       pixelArt: true,
       scale: {
         mode: Phaser.Scale.RESIZE,
@@ -558,7 +637,7 @@ export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, classN
       }
       ExampleScene.instance = null;
     };
-  }, [mapReady, mapConfig, syncCameraState]);
+  }, [mapReady, mapConfig, syncCameraState, eventBus]);
 
   // Layout: world-module > world-container > game-canvas + controls (controls are absolutely positioned in map panel)
   return (
