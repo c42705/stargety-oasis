@@ -18,7 +18,7 @@ export const ConsolidatedSettings: React.FC<ConsolidatedSettingsProps> = ({
   onClose
 }) => {
   const { user } = useAuth();
-  const { settings, updateVideoService, updateJitsiServerUrl, saveSettings } = useSettings();
+  const { settings, updateVideoService, updateJitsiServerUrl, updateTheme, saveSettings } = useSettings();
   const { themeType, setTheme } = useTheme();
   const [hasChanges, setHasChanges] = useState(false);
   const [jitsiUrl, setJitsiUrl] = useState(settings.jitsiServerUrl || 'meet.stargety.com');
@@ -30,6 +30,7 @@ export const ConsolidatedSettings: React.FC<ConsolidatedSettingsProps> = ({
 
   const handleThemeChange = (newTheme: ThemeType) => {
     setTheme(newTheme);
+    updateTheme(newTheme);
     setHasChanges(true);
   };
 

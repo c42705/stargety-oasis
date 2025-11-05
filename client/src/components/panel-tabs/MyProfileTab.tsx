@@ -22,7 +22,7 @@ interface UserPreferences {
 
 export const MyProfileTab: React.FC = () => {
   const { user, logout } = useAuth();
-  const { settings, updateVideoService, updateTheme } = useSettings();
+  const { settings, updateVideoService, updateTheme, saveSettings } = useSettings();
   const { currentTheme, setTheme, availableThemes } = useTheme();
 
   const [preferences, setPreferences] = useState<UserPreferences>({
@@ -58,6 +58,9 @@ export const MyProfileTab: React.FC = () => {
   const handleThemeChange = (themeType: ThemeType) => {
     setTheme(themeType);
     updateTheme(themeType);
+    // Save settings to persist theme change to SettingsContext's localStorage
+    // Use setTimeout to ensure state update completes before saving
+    setTimeout(() => saveSettings(), 0);
   };
 
   // Get theme options for the select

@@ -27,6 +27,7 @@ const defaultSettings: AppSettings = {
 };
 
 const STORAGE_KEY = 'stargetyOasisSettings';
+const THEME_STORAGE_KEY = 'stargetyOasisTheme'; // ThemeContext's storage key
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
@@ -65,10 +66,23 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children, cu
           adminMode: isAdmin(currentUser), // Always recalculate admin mode
         }));
       } else {
-        // Set default with admin mode
+        // If no saved settings, try to get theme from ThemeContext's localStorage
+        // This ensures theme persistence when SettingsContext hasn't saved yet
+        let initialTheme: ThemeType = 'dark';
+        try {
+          const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+          if (savedTheme) {
+            initialTheme = savedTheme as ThemeType;
+          }
+        } catch (e) {
+          console.warn('Failed to load theme from ThemeContext storage:', e);
+        }
+
+        // Set default with admin mode and theme from ThemeContext
         setSettings(prev => ({
           ...prev,
           adminMode: isAdmin(currentUser),
+          theme: initialTheme,
         }));
       }
     } catch (error) {
@@ -90,10 +104,26 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children, cu
 
   // Update theme preference
   const updateTheme = useCallback((theme: ThemeType) => {
-    setSettings(prev => ({
-      ...prev,
-      theme: theme,
-    }));
+    setSettings(prev => {
+      const newSettings = {
+        ...prev,
+        theme: theme,
+      };
+      // Auto-save settings when theme changes
+      setTimeout(() => {
+        try {
+          const settingsToSave = {
+            videoService: newSettings.videoService,
+            theme: newSettings.theme,
+            jitsiServerUrl: newSettings.jitsiServerUrl,
+          };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsToSave));
+        } catch (error) {
+          console.error('Failed to auto-save theme settings:', error);
+        }
+      }, 0);
+      return newSettings;
+    });
   }, []);
 
   // Update Jitsi server URL
