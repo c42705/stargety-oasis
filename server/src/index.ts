@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 import { ChatController } from './chat/chatController';
 import { WorldController } from './world/worldController';
 import { VideoCallController } from './video-call/videoCallController';
-import { RingCentralController } from './ringcentral/ringCentralController';
+
 
 // Load environment variables
 dotenv.config();
@@ -91,25 +91,15 @@ app.get('/api/video/rooms', (req, res) => {
   res.json({ success: true, data: rooms });
 });
 
-app.get('/api/ringcentral/calls/:callId', (req, res) => {
-  const { callId } = req.params;
-  const call = ringCentralController.getActiveCall(callId);
-  if (!call) {
-    return res.status(404).json({ success: false, error: 'Call not found' });
-  }
-  res.json({ success: true, data: call });
-});
 
-app.get('/api/ringcentral/calls', (req, res) => {
-  const calls = ringCentralController.getAllActiveCalls();
-  res.json({ success: true, data: calls });
-});
+
+
 
 // Initialize controllers
 const chatController = new ChatController(io);
 const worldController = new WorldController(io);
 const videoCallController = new VideoCallController(io);
-const ringCentralController = new RingCentralController(io);
+
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
@@ -128,11 +118,7 @@ io.on('connection', (socket) => {
   socket.on('join-video-call', (data) => videoCallController.handleJoinVideoCall(socket, data));
   socket.on('leave-video-call', (data) => videoCallController.handleLeaveVideoCall(socket, data));
 
-  // RingCentral events
-  socket.on('ringcentral-call-started', (data) => ringCentralController.handleCallStarted(socket, data));
-  socket.on('ringcentral-participant-joined', (data) => ringCentralController.handleParticipantJoined(socket, data));
-  socket.on('ringcentral-participant-left', (data) => ringCentralController.handleParticipantLeft(socket, data));
-  socket.on('ringcentral-call-ended', (data) => ringCentralController.handleCallEnded(socket, data));
+  
 
   // Handle disconnection
   socket.on('disconnect', () => {
@@ -140,7 +126,7 @@ io.on('connection', (socket) => {
     chatController.handleDisconnect(socket);
     worldController.handleDisconnect(socket);
     videoCallController.handleDisconnect(socket);
-    ringCentralController.handleDisconnect(socket);
+    
   });
 });
 

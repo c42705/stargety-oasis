@@ -1,10 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ThemeType } from '../theme/theme-system';
 
-export type VideoServiceType = 'ringcentral' | 'jitsi';
-
 export interface AppSettings {
-  videoService: VideoServiceType;
   adminMode: boolean;
   theme: ThemeType;
   jitsiServerUrl?: string; // Optional custom Jitsi server URL
@@ -12,7 +9,6 @@ export interface AppSettings {
 
 interface SettingsContextType {
   settings: AppSettings;
-  updateVideoService: (service: VideoServiceType) => void;
   updateTheme: (theme: ThemeType) => void;
   updateJitsiServerUrl: (url: string) => void;
   isAdmin: (username: string) => boolean;
@@ -21,7 +17,6 @@ interface SettingsContextType {
 }
 
 const defaultSettings: AppSettings = {
-  videoService: 'jitsi',
   adminMode: false,
   theme: 'light',
 };
@@ -94,14 +89,6 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children, cu
     }
   }, [currentUser, isAdmin]);
 
-  // Update video service preference
-  const updateVideoService = useCallback((service: VideoServiceType) => {
-    setSettings(prev => ({
-      ...prev,
-      videoService: service,
-    }));
-  }, []);
-
   // Update theme preference
   const updateTheme = useCallback((theme: ThemeType) => {
     setSettings(prev => {
@@ -113,7 +100,6 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children, cu
       setTimeout(() => {
         try {
           const settingsToSave = {
-            videoService: newSettings.videoService,
             theme: newSettings.theme,
             jitsiServerUrl: newSettings.jitsiServerUrl,
           };
@@ -138,7 +124,6 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children, cu
   const saveSettings = useCallback(() => {
     try {
       const settingsToSave = {
-        videoService: settings.videoService,
         theme: settings.theme,
         jitsiServerUrl: settings.jitsiServerUrl,
         // Don't save adminMode as it's calculated based on username
@@ -161,7 +146,6 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children, cu
 
   const contextValue: SettingsContextType = {
     settings,
-    updateVideoService,
     updateTheme,
     updateJitsiServerUrl,
     isAdmin,

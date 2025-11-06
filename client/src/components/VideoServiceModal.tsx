@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useSettings } from '../shared/SettingsContext';
 import { useAuth } from '../shared/AuthContext';
 import { VideoCallModule } from '../modules/video-call/VideoCallModule';
-import { RingCentralModule } from '../modules/ringcentral/RingCentralModule';
 import { useModalRegistration } from '../shared/ModalStateManager';
 import './VideoServiceModal.css';
 
@@ -102,21 +101,12 @@ export const VideoServiceModal: React.FC<VideoServiceModalProps> = ({
 
     const videoRoomId = roomId || areaName.toLowerCase().replace(/\s+/g, '-');
 
-    if (settings.videoService === 'jitsi') {
-      return (
-        <VideoCallModule
-          roomId={videoRoomId}
-          userName={user.username}
-        />
-      );
-    } else {
-      return (
-        <RingCentralModule
-          className="video-service-content"
-          userName={user.username}
-        />
-      );
-    }
+    return (
+      <VideoCallModule
+        roomId={videoRoomId}
+        userName={user.username}
+      />
+    );
   };
 
   return (
@@ -162,7 +152,7 @@ export const VideoServiceModal: React.FC<VideoServiceModalProps> = ({
               <div className="modal-title">
                 <h3>{areaName}</h3>
                 <span className="service-indicator">
-                  {settings.videoService === 'jitsi' ? '📹 Jitsi Meet' : '📞 RingCentral'}
+                  📹 Jitsi Meet
                 </span>
               </div>
               

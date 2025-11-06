@@ -19,14 +19,7 @@ export interface EventMap {
   'area-exited': { areaId: string; areaName: string };
   'app:moduleLoaded': { module: string };
   'app:error': { error: string; module?: string };
-  // RingCentral events
-  'ringcentral:callStarted': { meetingId: string; participants: any[] };
-  'ringcentral:callEnded': { meetingId: string; duration: number };
-  'ringcentral:participantJoined': { participant: any };
-  'ringcentral:participantLeft': { participantId: string; participantName: string };
-  'ringcentral:audioToggled': { participantId: string; muted: boolean };
-  'ringcentral:videoToggled': { participantId: string; muted: boolean };
-  'ringcentral:error': { error: string; code?: string };
+
 }
 
 type EventCallback<T = any> = (data: T) => void;
