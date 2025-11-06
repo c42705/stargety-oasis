@@ -1,17 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Input, Switch, Select, Button, Space, Typography, Badge, Avatar, message } from 'antd';
-import { SaveOutlined, EditOutlined, UserOutlined, LogoutOutlined, EditFilled } from '@ant-design/icons';
+import { Card, Form, Input, Switch, Select, Button, Space, Typography, Badge, Avatar, message, Alert } from 'antd';
+import { SaveOutlined, EditOutlined, UserOutlined, LogoutOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { Lock, Mail } from 'lucide-react';
 import { useAuth } from '../../shared/AuthContext';
 import { useSettings } from '../../shared/SettingsContext';
 import { useTheme } from '../../shared/ThemeContext';
 import { ThemeType } from '../../theme/theme-system';
-import AvatarCustomizerModal from '../avatar/AvatarCustomizerModal';
-import { CharacterSelector } from '../avatar/CharacterSelector';
-import { AvatarConfig, DEFAULT_AVATAR_CONFIG } from '../avatar/avatarTypes';
-import { loadAvatarConfig, saveAvatarConfig } from '../avatar/avatarStorage';
-import { composeAvatarDataUrl } from '../avatar/composeAvatar';
-import { loadCharacterSlot, setActiveSlot } from '../avatar/avatarSlotStorage';
+// V2 Character Selector
+import { CharacterSelector as CharacterSelectorV2, MigrationDetector, MigrationModal } from '../avatar/v2';
 
 interface UserPreferences {
   notifications: boolean;
@@ -44,6 +40,20 @@ export const MyProfileTab: React.FC = () => {
   }, [settings.theme, currentTheme.id, setTheme]);
 
   const [isEditing, setIsEditing] = useState(false);
+
+  // Migration state
+  const [showMigrationBanner, setShowMigrationBanner] = useState(false);
+  const [isMigrationModalOpen, setMigrationModalOpen] = useState(false);
+  const [migrationCount, setMigrationCount] = useState(0);
+
+  // Check for old characters on mount
+  useEffect(() => {
+    if (user) {
+      const count = MigrationDetector.getMigrationCount(user.username);
+      setMigrationCount(count);
+      setShowMigrationBanner(count > 0);
+    }
+  }, [user]);
 
   const handlePreferenceChange = (key: keyof UserPreferences, value: any) => {
     setPreferences(prev => ({
@@ -83,64 +93,37 @@ export const MyProfileTab: React.FC = () => {
       </Space>
     ),
   }));
-  // Avatar customization state
-  const [isCustomizerOpen, setCustomizerOpen] = useState(false);
-  const [avatarConfig, setAvatarConfig] = useState<AvatarConfig>(DEFAULT_AVATAR_CONFIG);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
-  // Load saved avatar config for this user
-  useEffect(() => {
-    if (!user) return;
-    const cfg = loadAvatarConfig(user.username);
-    setAvatarConfig(cfg);
-  }, [user]);
-
-  // Compose preview whenever config changes
-  useEffect(() => {
-    (async () => {
-      const url = await composeAvatarDataUrl(avatarConfig);
-      setAvatarUrl(url);
-    })();
-  }, [avatarConfig]);
-
-  const handleCustomizerSave = async (config: AvatarConfig) => {
-    setAvatarConfig(config);
-    if (user) {
-      saveAvatarConfig(user.username, config);
-    }
-    setCustomizerOpen(false);
-    message.success('Character updated');
-
-    // Trigger avatar update event for game canvas
-    if (user) {
-      window.dispatchEvent(new CustomEvent('avatarConfigUpdated', {
-        detail: { username: user.username, config }
-      }));
-    }
-  };
-  const handleCustomizerCancel = () => setCustomizerOpen(false);
-
-  // Character switching handlers
-  const handleCharacterSwitch = (slotNumber: number) => {
+  // Character switching handlers (V2 system)
+  const handleCharacterSwitchV2 = (slotNumber: number) => {
     if (!user) return;
 
-    // Reload avatar config from the new active slot
-    const cfg = loadAvatarConfig(user.username);
-    setAvatarConfig(cfg);
+    message.success(`Switched to character ${slotNumber} (V2)`);
 
-    message.success(`Switched to character slot ${slotNumber}`);
+    // Emit custom event for game world to listen to
+    window.dispatchEvent(new CustomEvent('characterSwitchedV2', {
+      detail: {
+        username: user.username,
+        slotNumber
+      }
+    }));
   };
 
-  const handleCharacterEdit = (slotNumber: number) => {
+  const handleCharacterEditV2 = (slotNumber: number) => {
     if (!user) return;
+    // V2 system handles editing through AvatarBuilderIntegration
+    // This callback is triggered after the edit is complete
+    message.info(`Character ${slotNumber} edited (V2)`);
+  };
 
-    // Switch to the slot and open customizer
-    const slot = loadCharacterSlot(user.username, slotNumber);
-    if (slot) {
-      setActiveSlot(user.username, slotNumber);
-      setAvatarConfig(slot.config);
-      setCustomizerOpen(true);
-    }
+  const handleCharacterDeleteV2 = (slotNumber: number) => {
+    if (!user) return;
+    message.success(`Character ${slotNumber} deleted (V2)`);
+  };
+
+  const handleCharacterCreateV2 = (slotNumber: number) => {
+    if (!user) return;
+    message.success(`Character ${slotNumber} created (V2)`);
   };
 
 
@@ -163,7 +146,6 @@ export const MyProfileTab: React.FC = () => {
             >
               <Avatar
                 size={64}
-                src={avatarUrl || undefined}
                 icon={<UserOutlined />}
                 style={{
                   backgroundColor: 'var(--color-accent)',
@@ -197,18 +179,71 @@ export const MyProfileTab: React.FC = () => {
           </Space>
         </Card>
 
-        {/* Character Management Section */}
+        {/* Migration Banner */}
+        {showMigrationBanner && (
+          <Alert
+            message="Old Characters Detected!"
+            description={
+              <div>
+                <Typography.Text>
+                  You have {migrationCount} character(s) from the old system that need to be migrated.
+                </Typography.Text>
+                <br />
+                <Button
+                  type="primary"
+                  size="small"
+                  onClick={() => setMigrationModalOpen(true)}
+                  style={{ marginTop: 8 }}
+                >
+                  Migrate Now
+                </Button>
+              </div>
+            }
+            type="warning"
+            icon={<ExclamationCircleOutlined />}
+            showIcon
+            closable
+            onClose={() => setShowMigrationBanner(false)}
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
+        {/* Character Management Section - PRIMARY */}
         <Card
           title="My Characters"
           size="small"
           style={{ backgroundColor: 'var(--color-bg-secondary)', borderColor: 'var(--color-border-light)' }}
         >
-          <CharacterSelector
+          <CharacterSelectorV2
             username={user.username}
-            onCharacterSwitch={handleCharacterSwitch}
-            onCharacterEdit={handleCharacterEdit}
+            onCharacterSwitch={handleCharacterSwitchV2}
+            onCharacterEdit={handleCharacterEditV2}
+            onCharacterDelete={handleCharacterDeleteV2}
+            onCharacterCreate={handleCharacterCreateV2}
           />
         </Card>
+
+        {/* Migration Modal */}
+        {user && (
+          <MigrationModal
+            username={user.username}
+            visible={isMigrationModalOpen}
+            onClose={() => {
+              setMigrationModalOpen(false);
+              // Refresh migration count after closing
+              const count = MigrationDetector.getMigrationCount(user.username);
+              setMigrationCount(count);
+              setShowMigrationBanner(count > 0);
+            }}
+            onMigrationComplete={(result) => {
+              if (result.success) {
+                message.success(`Successfully migrated ${result.successCount} character(s)!`);
+              } else {
+                message.error(`Migration failed for ${result.failureCount} character(s)`);
+              }
+            }}
+          />
+        )}
 
         {/* Status Section */}
         <Card
@@ -323,12 +358,6 @@ export const MyProfileTab: React.FC = () => {
           size="small"
           style={{ backgroundColor: 'var(--color-bg-secondary)', borderColor: 'var(--color-border-light)' }}
         >
-        <AvatarCustomizerModal
-          open={isCustomizerOpen}
-          initialConfig={avatarConfig}
-          onOk={handleCustomizerSave}
-          onCancel={handleCustomizerCancel}
-        />
           <Space direction="vertical" style={{ width: '100%' }}>
             <Button
               icon={<Lock size={16} />}

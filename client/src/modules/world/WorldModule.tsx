@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Phaser from 'phaser';
 import { useEventBus } from '../../shared/EventBusContext';
 import { PhaserMapRenderer } from './PhaserMapRenderer';
-import { AvatarGameRenderer } from '../../components/avatar/AvatarGameRenderer';
+import { AvatarRenderer as AvatarRendererV2 } from '../../components/avatar/v2';
+import { AnimationCategory } from '../../components/avatar/AvatarBuilderTypes';
 import { useAuth } from '../../shared/AuthContext';
 import { InteractiveArea } from '../../shared/MapDataContext';
 import { SharedMapSystem } from '../../shared/SharedMapSystem';
@@ -31,7 +32,7 @@ class GameScene extends Phaser.Scene {
   private previousArea: string | null = null; // Track previous area for entry/exit detection
   private mapRenderer!: PhaserMapRenderer;
   private sharedMapSystem!: SharedMapSystem;
-  public avatarRenderer!: AvatarGameRenderer;
+  public avatarRendererV2!: AvatarRendererV2; // V2 renderer
 
   // Interactive controls
   private spaceKey!: Phaser.Input.Keyboard.Key;
@@ -139,8 +140,8 @@ class GameScene extends Phaser.Scene {
       this.onAreaClick(area.id);
     });
 
-    // Initialize avatar renderer
-    this.avatarRenderer = new AvatarGameRenderer(this);
+    // Initialize avatar renderer V2
+    this.avatarRendererV2 = new AvatarRendererV2(this);
 
     // Set camera background color to transparent to show background image
     this.cameras.main.setBackgroundColor('transparent');
@@ -304,6 +305,9 @@ class GameScene extends Phaser.Scene {
     });
 
     // Player initialization will be handled in initializePlayer()
+
+    // Listen for V2 character switching events
+    this.setupCharacterSwitchingV2();
   }
 
   /**
@@ -336,74 +340,112 @@ class GameScene extends Phaser.Scene {
     }
   }
 
-  async initializePlayer() {
-    // If the base avatar is the sprite sheet character, use only Phaser native methods and suppress AvatarGameRenderer logic.
-    const baseConfig = (window as any).LATEST_SELECTED_AVATAR_BASE_SRC || null;
-    if (baseConfig === '/assets/test frame.png') {
-      // Suppress all AvatarGameRenderer and avatar builder logic.
-      // Only announce the player and setup camera.
-      this.eventBus.publish('world:playerJoined', {
-        playerId: this.playerId,
-        x: this.player.x,
-        y: this.player.y,
-      });
-      this.time.delayedCall(50, () => {
-        this.setDefaultZoomAndCenter();
-        this.enableCameraFollowing();
-        this.centerCameraOnPlayer();
-      });
+  /**
+   * Set up V2 character switching event listener
+   */
+  private setupCharacterSwitchingV2(): void {
+    // Listen for characterSwitchedV2 custom event from MyProfileTab
+    window.addEventListener('characterSwitchedV2', async (event) => {
+      const customEvent = event as CustomEvent;
+      const { username, slotNumber } = customEvent.detail;
+
+      // Only handle events for this player
+      if (username !== this.playerId) {
+        return;
+      }
+
+      logger.info(`[WorldModule] Character switched to slot ${slotNumber} for ${username}`);
+
+      // Update player sprite with new character
+      await this.updatePlayerCharacterV2(slotNumber);
+    });
+  }
+
+  /**
+   * Update player character sprite using V2 renderer
+   */
+  private async updatePlayerCharacterV2(slotNumber: number): Promise<void> {
+    if (!this.player) {
+      logger.warn('[WorldModule] Cannot update character - player sprite not initialized');
       return;
     }
-    // --- Default AvatarRenderer logic ---
-    // DEPRECATED: ComposeAvatar/AvatarBuilder logic will be removed in favor of Phaser native only.
-    // REMOVE this block once all avatars are sprite sheet based.
+
     try {
-      // Try to load player avatar sprite sheet for animations
-      let spriteSheetKey = null;
+      // Store current position
+      const currentX = this.player.x;
+      const currentY = this.player.y;
 
-      try {
-        spriteSheetKey = await this.avatarRenderer.loadPlayerAvatarSpriteSheet(this.playerId);
-      } catch (error) {
-        spriteSheetKey = null;
-      }
+      // Create or update sprite using V2 renderer
+      const newSprite = await this.avatarRendererV2.createOrUpdateSprite(
+        this.playerId,
+        currentX,
+        currentY,
+        slotNumber
+      );
 
-      if (spriteSheetKey) {
-        // Create animated avatar sprite to replace the default one
-        const avatarSprite = this.avatarRenderer.createAnimatedPlayerSprite(this.playerId, this.player.x, this.player.y);
+      if (newSprite) {
+        // Replace the old player sprite with the new one
+        this.player.destroy();
+        this.player = newSprite;
+        this.player.setOrigin(0.5, 0.5);
+        this.player.setDepth(10);
 
-        if (avatarSprite) {
-          // Replace the default sprite with the animated avatar sprite
-          const oldX = this.player.x;
-          const oldY = this.player.y;
-          this.player.destroy();
+        // Play idle animation
+        this.avatarRendererV2.playAnimation(this.playerId, AnimationCategory.IDLE);
 
-          this.player = avatarSprite;
-          this.player.setPosition(oldX, oldY);
-          this.player.setOrigin(0.5, 0.5); // Ensure avatar sprite is centered on its position
-          this.player.setDepth(10);
-        }
+        logger.info(`[WorldModule] Successfully updated player character to slot ${slotNumber}`);
       } else {
-        // Fallback to single frame avatar
-        try {
-          await this.avatarRenderer.loadPlayerAvatar(this.playerId);
-          const avatarSprite = this.avatarRenderer.createPlayerSprite(this.playerId, this.player.x, this.player.y);
-
-          if (avatarSprite) {
-            const oldX = this.player.x;
-            const oldY = this.player.y;
-            this.player.destroy();
-
-            this.player = avatarSprite;
-            this.player.setPosition(oldX, oldY);
-            this.player.setOrigin(0.5, 0.5); // Ensure avatar sprite is centered on its position
-            this.player.setDepth(10);
-          }
-        } catch (error) {
-          // Keep default sprite on error
-        }
+        logger.warn(`[WorldModule] Failed to create sprite for slot ${slotNumber}`);
       }
+    } catch (error) {
+      logger.error('[WorldModule] Error updating player character:', error);
+    }
+  }
 
-      // Announce player joined
+  async initializePlayer() {
+    // Try V2 system first (NEW)
+    try {
+      const v2Sprite = await this.avatarRendererV2.createOrUpdateSprite(
+        this.playerId,
+        this.player.x,
+        this.player.y
+      );
+
+      if (v2Sprite) {
+        // Successfully loaded from V2 system
+        const oldX = this.player.x;
+        const oldY = this.player.y;
+        this.player.destroy();
+
+        this.player = v2Sprite;
+        this.player.setPosition(oldX, oldY);
+        this.player.setOrigin(0.5, 0.5);
+        this.player.setDepth(10);
+
+        // Play idle animation
+        this.avatarRendererV2.playAnimation(this.playerId, AnimationCategory.IDLE);
+
+        logger.info('[WorldModule] Player initialized with V2 character system');
+
+        // Announce player joined
+        this.eventBus.publish('world:playerJoined', {
+          playerId: this.playerId,
+          x: this.player.x,
+          y: this.player.y,
+        });
+
+        this.time.delayedCall(50, () => {
+          this.setDefaultZoomAndCenter();
+          this.enableCameraFollowing();
+          this.centerCameraOnPlayer();
+        });
+
+        return; // Successfully initialized with V2 system
+      }
+    } catch (error) {
+      logger.info('[WorldModule] No V2 character found, using default sprite');
+
+      // Announce player joined with default sprite
       this.eventBus.publish('world:playerJoined', {
         playerId: this.playerId,
         x: this.player.x,
@@ -413,28 +455,8 @@ class GameScene extends Phaser.Scene {
       // Apply camera settings after player is fully initialized
       this.time.delayedCall(50, () => {
         this.setDefaultZoomAndCenter();
-        // Ensure camera follows and centers on the new player sprite
         this.enableCameraFollowing();
         this.centerCameraOnPlayer();
-        // Player init logging removed for cleaner console
-      });
-    } catch (error) {
-      logger.error('Failed to load player avatar, keeping default sprite', error);
-
-      // Still announce player joined with default sprite
-      this.eventBus.publish('world:playerJoined', {
-        playerId: this.playerId,
-        x: this.player.x,
-        y: this.player.y,
-      });
-
-      // Apply camera settings even with default sprite
-      this.time.delayedCall(50, () => {
-        this.setDefaultZoomAndCenter();
-        // Ensure camera follows and centers on the new player sprite
-        this.enableCameraFollowing();
-        this.centerCameraOnPlayer();
-        // Player init fallback logging removed for cleaner console
       });
     }
   }
@@ -794,29 +816,31 @@ class GameScene extends Phaser.Scene {
         this.originalY = this.player.y;
       }
 
-      // Play appropriate animation if avatar renderer supports it
-      if (this.avatarRenderer.hasAnimatedSprite(this.playerId)) {
+      // Play appropriate animation - Try V2 renderer first (PRIMARY)
+      if (this.avatarRendererV2.hasSprite(this.playerId)) {
         if (moved) {
-          // Play walking animation based on direction (only if not already playing the correct animation)
-          const currentAnim = this.player.anims.currentAnim;
-          const targetAnimKey = direction === 'right' ? `${this.playerId}_left` : `${this.playerId}_${direction}`;
-          const isPlayingCorrectAnim = currentAnim && currentAnim.key === targetAnimKey;
-
-          if (!isPlayingCorrectAnim) {
-            if (direction === 'right') {
-              // Use left animation flipped for right movement
-              this.avatarRenderer.playPlayerAnimation(this.playerId, 'left', true);
-            } else {
-              this.avatarRenderer.playPlayerAnimation(this.playerId, direction, false);
-            }
+          // Determine animation category based on direction
+          let animCategory: AnimationCategory;
+          switch (direction) {
+            case 'up':
+              animCategory = AnimationCategory.WALK_UP;
+              break;
+            case 'down':
+              animCategory = AnimationCategory.WALK_DOWN;
+              break;
+            case 'left':
+              animCategory = AnimationCategory.WALK_LEFT;
+              break;
+            case 'right':
+              animCategory = AnimationCategory.WALK_RIGHT;
+              break;
+            default:
+              animCategory = AnimationCategory.IDLE;
           }
+          this.avatarRendererV2.playAnimation(this.playerId, animCategory);
         } else {
-          // Play idle animation when not moving (only if not already playing idle)
-          const currentAnim = this.player.anims.currentAnim;
-          const isPlayingIdle = currentAnim && currentAnim.key === `${this.playerId}_idle`;
-          if (!isPlayingIdle) {
-            this.avatarRenderer.playPlayerAnimation(this.playerId, 'idle', false);
-          }
+          // Play idle animation when not moving
+          this.avatarRendererV2.playAnimation(this.playerId, AnimationCategory.IDLE);
         }
       } else {
         // Fallback to simple sprite flipping for non-animated sprites
@@ -841,9 +865,9 @@ class GameScene extends Phaser.Scene {
   }
 
   shutdown() {
-    // Clean up avatar renderer
-    if (this.avatarRenderer) {
-      this.avatarRenderer.cleanup();
+    // Clean up avatar renderer V2
+    if (this.avatarRendererV2) {
+      this.avatarRendererV2.cleanup();
     }
 
     // Clean up map renderer

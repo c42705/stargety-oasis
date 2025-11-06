@@ -64,15 +64,7 @@ export const ConsolidatedSettings: React.FC<ConsolidatedSettingsProps> = ({
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {/* Admin Settings - Only visible to admin users */}
         {user?.isAdmin ? (
-          <Card
-            title={
-              <Space>
-                <LinkOutlined />
-                Jitsi Server Configuration
-              </Space>
-            }
-            size="small"
-          >
+          
             <Space direction="vertical" style={{ width: '100%' }}>
               <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
                 Configure the Jitsi Meet server URL for video conferencing
@@ -104,7 +96,7 @@ export const ConsolidatedSettings: React.FC<ConsolidatedSettingsProps> = ({
                 </Space>
               </Card>
             </Space>
-          </Card>
+          
         ) : (
           <Card size="small">
             <Typography.Text type="secondary">
