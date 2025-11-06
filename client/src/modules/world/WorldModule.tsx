@@ -344,20 +344,45 @@ class GameScene extends Phaser.Scene {
    * Set up V2 character switching event listener
    */
   private setupCharacterSwitchingV2(): void {
+    console.log('[WorldModule] Setting up character switching listener for player:', this.playerId);
+
     // Listen for characterSwitchedV2 custom event from MyProfileTab
     window.addEventListener('characterSwitchedV2', async (event) => {
-      const customEvent = event as CustomEvent;
-      const { username, slotNumber } = customEvent.detail;
+      try {
+        console.log('[WorldModule] 🔵 Event listener triggered');
+        const customEvent = event as CustomEvent;
+        const { username, slotNumber } = customEvent.detail;
 
-      // Only handle events for this player
-      if (username !== this.playerId) {
-        return;
+        console.log('[WorldModule] Received characterSwitchedV2 event:', { username, slotNumber, myPlayerId: this.playerId });
+        console.log('[WorldModule] Username comparison:', {
+          username,
+          playerId: this.playerId,
+          areEqual: username === this.playerId,
+          usernameType: typeof username,
+          playerIdType: typeof this.playerId,
+          usernameLength: username?.length,
+          playerIdLength: this.playerId?.length
+        });
+
+        console.log('[WorldModule] 🔵 About to check username match...');
+
+        // Only handle events for this player
+        if (username !== this.playerId) {
+          console.log('[WorldModule] ❌ Ignoring event - not for this player');
+          return;
+        }
+
+        console.log('[WorldModule] ✅ Event is for this player, proceeding with character update');
+        logger.info(`[WorldModule] Character switched to slot ${slotNumber} for ${username}`);
+
+        console.log('[WorldModule] 🔵 About to call updatePlayerCharacterV2...');
+        // Update player sprite with new character
+        await this.updatePlayerCharacterV2(slotNumber);
+        console.log('[WorldModule] 🔵 updatePlayerCharacterV2 completed');
+      } catch (error) {
+        console.error('[WorldModule] ❌ Error in characterSwitchedV2 event handler:', error);
+        logger.error('[WorldModule] Error in characterSwitchedV2 event handler:', error);
       }
-
-      logger.info(`[WorldModule] Character switched to slot ${slotNumber} for ${username}`);
-
-      // Update player sprite with new character
-      await this.updatePlayerCharacterV2(slotNumber);
     });
   }
 
@@ -366,16 +391,20 @@ class GameScene extends Phaser.Scene {
    */
   private async updatePlayerCharacterV2(slotNumber: number): Promise<void> {
     if (!this.player) {
+      console.error('[WorldModule] Cannot update character - player sprite not initialized');
       logger.warn('[WorldModule] Cannot update character - player sprite not initialized');
       return;
     }
 
     try {
+      console.log('[WorldModule] Updating player character to slot:', slotNumber);
       // Store current position
       const currentX = this.player.x;
       const currentY = this.player.y;
+      console.log('[WorldModule] Current player position:', { x: currentX, y: currentY });
 
       // Create or update sprite using V2 renderer
+      console.log('[WorldModule] Calling createOrUpdateSprite...');
       const newSprite = await this.avatarRendererV2.createOrUpdateSprite(
         this.playerId,
         currentX,
@@ -384,6 +413,7 @@ class GameScene extends Phaser.Scene {
       );
 
       if (newSprite) {
+        console.log('[WorldModule] New sprite created successfully, replacing old sprite');
         // Replace the old player sprite with the new one
         this.player.destroy();
         this.player = newSprite;
@@ -391,13 +421,17 @@ class GameScene extends Phaser.Scene {
         this.player.setDepth(10);
 
         // Play idle animation
+        console.log('[WorldModule] Playing idle animation...');
         this.avatarRendererV2.playAnimation(this.playerId, AnimationCategory.IDLE);
 
+        console.log('[WorldModule] ✅ Successfully updated player character to slot', slotNumber);
         logger.info(`[WorldModule] Successfully updated player character to slot ${slotNumber}`);
       } else {
+        console.error('[WorldModule] ❌ Failed to create sprite for slot', slotNumber);
         logger.warn(`[WorldModule] Failed to create sprite for slot ${slotNumber}`);
       }
     } catch (error) {
+      console.error('[WorldModule] ❌ Error updating player character:', error);
       logger.error('[WorldModule] Error updating player character:', error);
     }
   }

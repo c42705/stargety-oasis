@@ -162,6 +162,16 @@ export const AvatarBuilderIntegration: React.FC<AvatarBuilderIntegrationProps> =
         });
       }
 
+      // Automatically set this character as active
+      console.log('[AvatarBuilderIntegration] Setting character as active:', { username, slotNumber });
+      const setActiveResult = CharacterStorage.setActiveCharacter(username, slotNumber);
+      if (!setActiveResult.success) {
+        console.error('[AvatarBuilderIntegration] Failed to set as active:', setActiveResult.error);
+        message.warning('Character saved but failed to set as active');
+      } else {
+        console.log('[AvatarBuilderIntegration] Character set as active successfully');
+      }
+
       message.success(`Character saved to slot ${slotNumber}!`);
 
       // Call onSave callback
@@ -223,6 +233,8 @@ export const AvatarBuilderIntegration: React.FC<AvatarBuilderIntegrationProps> =
           // Save character
           const saveResult = CharacterStorage.saveCharacterSlot(username, newCharacter);
           if (saveResult.success) {
+            // Set as active character
+            CharacterStorage.setActiveCharacter(username, slotNumber);
             message.success(`Template "${template.name}" applied successfully!`);
             onSave?.(newCharacter);
           } else {
@@ -233,6 +245,8 @@ export const AvatarBuilderIntegration: React.FC<AvatarBuilderIntegrationProps> =
       // Save character immediately
       const saveResult = CharacterStorage.saveCharacterSlot(username, newCharacter);
       if (saveResult.success) {
+        // Set as active character
+        CharacterStorage.setActiveCharacter(username, slotNumber);
         message.success(`Template "${template.name}" applied successfully!`);
         onSave?.(newCharacter);
       } else {

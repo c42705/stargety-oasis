@@ -7,7 +7,7 @@ import { useSettings } from '../../shared/SettingsContext';
 import { useTheme } from '../../shared/ThemeContext';
 import { ThemeType } from '../../theme/theme-system';
 // V2 Character Selector
-import { CharacterSelector as CharacterSelectorV2, MigrationDetector, MigrationModal } from '../avatar/v2';
+import { CharacterSelector as CharacterSelectorV2, MigrationDetector, MigrationModal, CharacterStorage } from '../avatar/v2';
 
 interface UserPreferences {
   notifications: boolean;
@@ -98,15 +98,28 @@ export const MyProfileTab: React.FC = () => {
   const handleCharacterSwitchV2 = (slotNumber: number) => {
     if (!user) return;
 
-    message.success(`Switched to character ${slotNumber} (V2)`);
+    console.log('[MyProfileTab] Character switch triggered:', { username: user.username, slotNumber });
+
+    // CRITICAL: Save the active character to localStorage
+    const result = CharacterStorage.setActiveCharacter(user.username, slotNumber);
+    if (!result.success) {
+      console.error('[MyProfileTab] Failed to set active character:', result.error);
+      message.error(`Failed to switch character: ${result.error}`);
+      return;
+    }
+
+    console.log('[MyProfileTab] Active character saved to localStorage');
+    message.success(`Switched to character ${slotNumber}`);
 
     // Emit custom event for game world to listen to
-    window.dispatchEvent(new CustomEvent('characterSwitchedV2', {
+    const event = new CustomEvent('characterSwitchedV2', {
       detail: {
         username: user.username,
         slotNumber
       }
-    }));
+    });
+    console.log('[MyProfileTab] Dispatching characterSwitchedV2 event:', event.detail);
+    window.dispatchEvent(event);
   };
 
   const handleCharacterEditV2 = (slotNumber: number) => {

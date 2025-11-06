@@ -105,14 +105,18 @@ export class AvatarRenderer {
   async loadCharacterTexture(username: string, slotNumber?: number): Promise<RenderResult> {
     return PerformanceMonitor.measure('AvatarRenderer.loadCharacterTexture', async () => {
       try {
+        console.log('[AvatarRenderer] Loading character texture for:', username, 'slot:', slotNumber);
         this.log('TextureLoading', `Loading character texture for ${username}`, { slotNumber });
 
       // Load character slot
       let characterSlot: CharacterSlot | EmptyCharacterSlot;
-      
+
       if (slotNumber !== undefined) {
+        console.log('[AvatarRenderer] Loading specific slot:', slotNumber);
         const result = CharacterStorage.loadCharacterSlot(username, slotNumber);
+        console.log('[AvatarRenderer] Load slot result:', result);
         if (!result.success || !result.data) {
+          console.error('[AvatarRenderer] Failed to load slot:', result.error);
           return {
             success: false,
             error: result.error || 'Failed to load character slot'
@@ -121,8 +125,11 @@ export class AvatarRenderer {
         characterSlot = result.data;
       } else {
         // Load active character
+        console.log('[AvatarRenderer] Loading active character');
         const result = CharacterStorage.getActiveCharacterSlot(username);
+        console.log('[AvatarRenderer] Active character result:', result);
         if (!result.success || !result.data) {
+          console.error('[AvatarRenderer] Failed to load active character:', result.error);
           return {
             success: false,
             error: result.error || 'Failed to load active character'
@@ -132,16 +139,21 @@ export class AvatarRenderer {
       }
 
       // Check if slot is empty
+      console.log('[AvatarRenderer] Checking if slot is empty:', isEmptySlot(characterSlot));
       if (isEmptySlot(characterSlot)) {
+        console.error('[AvatarRenderer] Character slot is empty!');
         return {
           success: false,
           error: 'Character slot is empty'
         };
       }
 
+      console.log('[AvatarRenderer] Character slot loaded successfully:', characterSlot.name);
+
       // Check cache first
       const cachedTexture = this.getCachedTexture(characterSlot.spriteSheet.id);
       if (cachedTexture) {
+        console.log('[AvatarRenderer] Using cached texture:', cachedTexture.textureKey);
         this.log('TextureLoading', 'Using cached texture', { textureKey: cachedTexture.textureKey });
         return {
           success: true,
@@ -150,15 +162,18 @@ export class AvatarRenderer {
       }
 
       // Load sprite sheet into Phaser
+      console.log('[AvatarRenderer] Loading sprite sheet into Phaser...');
       const textureKey = await this.loadSpriteSheet(username, characterSlot.spriteSheet);
-      
+
       if (!textureKey) {
+        console.error('[AvatarRenderer] Failed to load sprite sheet into Phaser');
         return {
           success: false,
           error: 'Failed to load sprite sheet into Phaser'
         };
       }
 
+      console.log('[AvatarRenderer] Sprite sheet loaded successfully:', textureKey);
       return {
         success: true,
         textureKey
@@ -180,7 +195,8 @@ export class AvatarRenderer {
   private async loadSpriteSheet(username: string, definition: SpriteSheetDefinition): Promise<string | null> {
     try {
       const textureKey = `avatar_v2_${username}_${definition.id}`;
-      
+
+      console.log('[AvatarRenderer] Loading sprite sheet:', { textureKey, frameCount: definition.frames.length });
       this.log('SpriteSheetLoading', 'Loading sprite sheet', {
         textureKey,
         frameCount: definition.frames.length,
@@ -189,18 +205,22 @@ export class AvatarRenderer {
 
       // Check if texture already exists
       if (this.scene.textures.exists(textureKey)) {
+        console.log('[AvatarRenderer] Texture already exists, reusing:', textureKey);
         this.log('SpriteSheetLoading', 'Texture already exists, reusing', { textureKey });
         return textureKey;
       }
 
       // Load image from source data
+      console.log('[AvatarRenderer] Loading image from data URL...');
       const img = await this.loadImage(definition.source.imageData);
-      
+
       if (!img) {
+        console.error('[AvatarRenderer] Failed to load source image');
         this.logError('SpriteSheetLoading', 'Failed to load source image');
         return null;
       }
 
+      console.log('[AvatarRenderer] Source image loaded:', { width: img.width, height: img.height });
       this.log('SpriteSheetLoading', 'Source image loaded', {
         width: img.width,
         height: img.height
@@ -208,14 +228,17 @@ export class AvatarRenderer {
 
       // Determine if we can use grid layout or need custom frames
       if (definition.gridLayout) {
+        console.log('[AvatarRenderer] Using grid layout');
         // Use Phaser's built-in sprite sheet loader for grid layouts
         return this.loadGridSpriteSheet(textureKey, img, definition);
       } else {
+        console.log('[AvatarRenderer] Using custom frame layout');
         // Use custom frame loading for non-grid layouts
         return this.loadCustomFrameSpriteSheet(textureKey, img, definition);
       }
 
     } catch (error) {
+      console.error('[AvatarRenderer] Failed to load sprite sheet:', error);
       this.logError('SpriteSheetLoading', 'Failed to load sprite sheet', error);
       return null;
     }
@@ -246,11 +269,18 @@ export class AvatarRenderer {
   ): string | null {
     try {
       const { gridLayout } = definition;
-      
+
       if (!gridLayout) {
+        console.error('[AvatarRenderer] No grid layout defined');
         return null;
       }
 
+      console.log('[AvatarRenderer] Loading grid-based sprite sheet:', {
+        columns: gridLayout.columns,
+        rows: gridLayout.rows,
+        frameWidth: gridLayout.frameWidth,
+        frameHeight: gridLayout.frameHeight
+      });
       this.log('GridSpriteSheet', 'Loading grid-based sprite sheet', {
         columns: gridLayout.columns,
         rows: gridLayout.rows,
@@ -259,6 +289,7 @@ export class AvatarRenderer {
       });
 
       // Use Phaser's addSpriteSheet for grid layouts
+      console.log('[AvatarRenderer] Adding sprite sheet to Phaser textures...');
       this.scene.textures.addSpriteSheet(textureKey, img, {
         frameWidth: gridLayout.frameWidth,
         frameHeight: gridLayout.frameHeight,
@@ -269,16 +300,20 @@ export class AvatarRenderer {
       });
 
       // Register animations
+      console.log('[AvatarRenderer] Registering animations...');
       this.registerAnimations(textureKey, definition);
 
       // Cache texture
+      console.log('[AvatarRenderer] Caching texture...');
       this.cacheTexture(textureKey, definition);
 
+      console.log('[AvatarRenderer] Grid sprite sheet loaded successfully:', textureKey);
       this.log('GridSpriteSheet', 'Grid sprite sheet loaded successfully', { textureKey });
-      
+
       return textureKey;
 
     } catch (error) {
+      console.error('[AvatarRenderer] Failed to load grid sprite sheet:', error);
       this.logError('GridSpriteSheet', 'Failed to load grid sprite sheet', error);
       return null;
     }
@@ -477,28 +512,34 @@ export class AvatarRenderer {
     slotNumber?: number
   ): Promise<Phaser.GameObjects.Sprite | null> {
     try {
+      console.log('[AvatarRenderer] createOrUpdateSprite called:', { username, x, y, slotNumber });
       this.log('SpriteCreation', `Creating/updating sprite for ${username}`, { x, y, slotNumber });
 
       // Load texture
+      console.log('[AvatarRenderer] Loading character texture...');
       const textureResult = await this.loadCharacterTexture(username, slotNumber);
 
       if (!textureResult.success || !textureResult.textureKey) {
+        console.error('[AvatarRenderer] Failed to load texture:', textureResult.error);
         this.logError('SpriteCreation', 'Failed to load texture', textureResult.error);
         return null;
       }
 
       const textureKey = textureResult.textureKey;
+      console.log('[AvatarRenderer] Texture loaded successfully:', textureKey);
 
       // Check if sprite already exists
       let sprite = this.avatarSprites.get(username);
 
       if (sprite) {
         // Update existing sprite
+        console.log('[AvatarRenderer] Updating existing sprite with new texture');
         this.log('SpriteCreation', 'Updating existing sprite', { username, textureKey });
         sprite.setTexture(textureKey);
         sprite.setPosition(x, y);
       } else {
         // Create new sprite
+        console.log('[AvatarRenderer] Creating new sprite');
         this.log('SpriteCreation', 'Creating new sprite', { username, textureKey });
         sprite = this.scene.add.sprite(x, y, textureKey);
         this.avatarSprites.set(username, sprite);
@@ -506,10 +547,15 @@ export class AvatarRenderer {
 
       // Play idle animation by default
       const idleAnimKey = this.getAnimationKey(textureKey, AnimationCategory.IDLE);
+      console.log('[AvatarRenderer] Checking for idle animation:', idleAnimKey);
       if (this.scene.anims.exists(idleAnimKey)) {
+        console.log('[AvatarRenderer] Playing idle animation');
         sprite.play(idleAnimKey);
+      } else {
+        console.warn('[AvatarRenderer] Idle animation not found:', idleAnimKey);
       }
 
+      console.log('[AvatarRenderer] ✅ Sprite created/updated successfully');
       this.log('SpriteCreation', 'Sprite created/updated successfully', { username });
 
       return sprite;

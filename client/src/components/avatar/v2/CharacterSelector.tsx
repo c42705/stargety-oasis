@@ -311,11 +311,20 @@ export const CharacterSelector: React.FC<CharacterSelectorProps> = ({
    * Handle Avatar Builder save
    */
   const handleBuilderSave = useCallback((character: CharacterSlot) => {
+    console.log('[CharacterSelector] Character saved:', character);
     setIsBuilderOpen(false);
     setSelectedSlot(null);
     setExistingCharacter(undefined);
     loadSlots(); // Reload slots to show new/updated character
-  }, [loadSlots]);
+
+    // Notify that character was switched (since we auto-set it as active)
+    console.log('[CharacterSelector] Calling onCharacterSwitch with slot:', character.slotNumber);
+    if (onCharacterSwitch) {
+      onCharacterSwitch(character.slotNumber);
+    } else {
+      console.warn('[CharacterSelector] onCharacterSwitch callback is not defined!');
+    }
+  }, [loadSlots, onCharacterSwitch]);
 
   /**
    * Handle Avatar Builder cancel
