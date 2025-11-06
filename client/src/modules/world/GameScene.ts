@@ -10,6 +10,8 @@ import { DebugDiagnostics } from './DebugDiagnostics';
 import { shouldBlockBackgroundInteractions } from '../../shared/ModalStateManager';
 import { logger } from '../../shared/logger';
 
+console.log('🎮🎮🎮 GameScene.ts FILE LOADED 🎮🎮🎮');
+
 /**
  * GameScene - Main Phaser scene for the game world
  * 
@@ -48,6 +50,7 @@ export class GameScene extends Phaser.Scene {
 
   constructor(eventBus: any, playerId: string, onAreaClick: (areaId: string) => void) {
     super({ key: 'GameScene' });
+    console.log('🎮🎮🎮 GameScene CONSTRUCTOR called for player:', playerId);
     this.eventBus = eventBus;
     this.playerId = playerId;
     this.onAreaClick = onAreaClick;
@@ -92,14 +95,17 @@ export class GameScene extends Phaser.Scene {
     // Set camera background color to transparent
     this.cameras.main.setBackgroundColor('transparent');
 
-    // Create player idle animation
-    if (!this.anims.exists('player_idle')) {
+    // Create player idle animation (only if sprite sheet loaded successfully)
+    if (this.textures.exists('player-sheet') && !this.anims.exists('player_idle')) {
       this.anims.create({
         key: 'player_idle',
         frames: this.anims.generateFrameNumbers('player-sheet', { start: 0, end: 3 }),
         frameRate: 8,
         repeat: -1
       });
+      logger.debug('Created player_idle animation');
+    } else if (!this.textures.exists('player-sheet')) {
+      logger.warn('player-sheet texture not loaded, skipping animation creation');
     }
 
     // Initialize world bounds manager
@@ -285,7 +291,7 @@ export class GameScene extends Phaser.Scene {
    */
   private setupResizeObserver(): void {
     this.scale.on('resize', () => {
-      this.cameraController.adjustViewportWithoutZoomReset();
+      this.cameraController?.adjustViewportWithoutZoomReset();
     });
   }
 
@@ -301,26 +307,32 @@ export class GameScene extends Phaser.Scene {
   // Public API for React component
 
   public zoomIn(): void {
+    if (!this.cameraController) return;
     this.cameraController.zoomIn();
   }
 
   public zoomOut(): void {
+    if (!this.cameraController) return;
     this.cameraController.zoomOut();
   }
 
   public resetZoom(): void {
+    if (!this.cameraController) return;
     this.cameraController.resetZoom();
   }
 
   public canZoomIn(): boolean {
+    if (!this.cameraController) return false;
     return this.cameraController.canZoomIn();
   }
 
   public canZoomOut(): boolean {
+    if (!this.cameraController) return false;
     return this.cameraController.canZoomOut();
   }
 
   public centerCameraOnPlayer(): void {
+    if (!this.cameraController) return;
     this.cameraController.centerCameraOnPlayer();
   }
 
@@ -329,10 +341,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   public disableCameraFollowing(): void {
+    if (!this.cameraController) return;
     this.cameraController.disableCameraFollowing();
   }
 
   public isCameraFollowingPlayer(): boolean {
+    if (!this.cameraController) return false;
     return this.cameraController.isCameraFollowingPlayer();
   }
 
@@ -359,6 +373,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   public adjustViewportWithoutZoomReset(): void {
+    if (!this.cameraController) return;
     this.cameraController.adjustViewportWithoutZoomReset();
   }
 }

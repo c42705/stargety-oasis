@@ -602,7 +602,7 @@ export class AvatarRenderer {
       }
 
       // Only play if not already playing this animation
-      if (sprite.anims.currentAnim?.key !== animKey) {
+      if (sprite.anims?.currentAnim?.key !== animKey) {
         sprite.play(animKey);
         this.log('AnimationPlayback', `Playing animation ${category} for ${username}`);
       }

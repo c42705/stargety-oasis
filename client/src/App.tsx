@@ -11,7 +11,7 @@ import { MapDataProvider } from './shared/MapDataContext';
 import { ThemeProvider, useTheme } from './shared/ThemeContext';
 import { MapSynchronizer } from './shared/MapSynchronizer';
 import { ModalStateProvider } from './shared/ModalStateManager';
-import { WorldModuleAlt } from './modules/world/WorldModuleAlt';
+import { WorldModule } from './modules/world/WorldModule';
 import SimpleWorldModuleDemo from './modules/simple-world-test/SimpleWorldModuleDemo';
 import { LoginModule } from './modules/login/LoginModule';
 import { SplitLayoutComponent } from './components/SplitLayoutComponent';
@@ -215,10 +215,9 @@ const AppContent: React.FC = () => {
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <SplitLayoutComponent
             leftPanel={
-              <WorldModuleAlt
+              <WorldModule
                 playerId={user.username}
                 className="world-module-panel"
-                showMapAreas={showMapAreas}
               />
             }
             rightTopPanel={
