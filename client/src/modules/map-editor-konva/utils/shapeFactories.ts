@@ -13,8 +13,10 @@ import type {
   ShapeMetadata,
   PolygonGeometry,
   RectangleGeometry,
+  ImageGeometry,
   CreatePolygonParams,
   CreateRectangleParams,
+  CreateImageParams,
   CreateShapeParams,
 } from '../types';
 import { COLLISION_STYLE, INTERACTIVE_STYLE } from '../constants/konvaConstants';
@@ -27,7 +29,18 @@ import { COLLISION_STYLE, INTERACTIVE_STYLE } from '../constants/konvaConstants'
  * Get default style for a shape category
  */
 function getDefaultStyle(category: ShapeCategory): ShapeStyle {
-  return category === 'collision' ? { ...COLLISION_STYLE } : { ...INTERACTIVE_STYLE };
+  if (category === 'collision') {
+    return { ...COLLISION_STYLE };
+  } else if (category === 'asset') {
+    // Assets (images) have minimal styling - mostly transparent
+    return {
+      fill: 'transparent',
+      stroke: 'transparent',
+      strokeWidth: 0,
+      opacity: 1,
+    };
+  }
+  return { ...INTERACTIVE_STYLE };
 }
 
 /**
@@ -189,6 +202,70 @@ export function createRectangleShape(params: CreateRectangleParams): Shape {
     category,
     geometry,
     style: mergeStyle(category, customStyle),
+    metadata,
+  };
+}
+
+// ============================================================================
+// IMAGE FACTORIES
+// ============================================================================
+
+/**
+ * Create an image shape
+ *
+ * @param params - Image creation parameters
+ * @returns Complete image shape
+ *
+ * @example
+ * ```typescript
+ * const imageShape = createImageShape({
+ *   x: 100,
+ *   y: 100,
+ *   width: 200,
+ *   height: 200,
+ *   imageData: 'data:image/png;base64,...',
+ *   fileName: 'my-sprite.png',
+ *   name: 'Custom Sprite',
+ * });
+ * ```
+ */
+export function createImageShape(params: CreateImageParams): Shape {
+  const { x, y, width, height, imageData, fileName, name, description, style: customStyle } = params;
+
+  // Validate image data
+  if (!imageData || !imageData.startsWith('data:image/')) {
+    throw new Error('Invalid image data: must be a base64 data URL');
+  }
+
+  // Validate dimensions
+  if (width <= 0 || height <= 0) {
+    throw new Error('Invalid dimensions: width and height must be positive');
+  }
+
+  if (width > 800 || height > 800) {
+    throw new Error('Invalid dimensions: maximum size is 800x800 pixels');
+  }
+
+  const geometry: ImageGeometry = {
+    type: 'image',
+    x,
+    y,
+    width,
+    height,
+    imageData,
+    fileName,
+  };
+
+  const metadata = createDefaultMetadata({
+    name: name || fileName || 'Custom Asset',
+    description,
+  });
+
+  return {
+    id: uuidv4(),
+    category: 'asset',
+    geometry,
+    style: mergeStyle('asset', customStyle),
     metadata,
   };
 }

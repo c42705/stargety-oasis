@@ -64,6 +64,30 @@ export interface CreateRectangleParams {
   style?: Partial<ShapeStyle>;
 }
 
+/**
+ * Parameters for creating an image shape
+ */
+export interface CreateImageParams {
+  /** X coordinate */
+  x: number;
+  /** Y coordinate */
+  y: number;
+  /** Width */
+  width: number;
+  /** Height */
+  height: number;
+  /** Base64 encoded image data */
+  imageData: string;
+  /** Original file name */
+  fileName?: string;
+  /** Optional name */
+  name?: string;
+  /** Optional description */
+  description?: string;
+  /** Optional custom style */
+  style?: Partial<ShapeStyle>;
+}
+
 // ============================================================================
 // SHAPE UPDATES
 // ============================================================================
@@ -408,5 +432,19 @@ export function isCollisionShape(shape: Shape): boolean {
  */
 export function isInteractiveShape(shape: Shape): boolean {
   return shape.category === 'interactive';
+}
+
+/**
+ * Type guard for image geometry
+ */
+export function isImageGeometry(geometry: ShapeGeometry): geometry is import('./konva.types').ImageGeometry {
+  return geometry.type === 'image';
+}
+
+/**
+ * Type guard for asset shape
+ */
+export function isAssetShape(shape: Shape): boolean {
+  return shape.category === 'asset';
 }
 

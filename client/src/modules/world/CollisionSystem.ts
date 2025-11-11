@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import { SharedMapSystem } from '../../shared/SharedMapSystem';
-import { InteractiveArea } from '../../shared/MapDataContext';
 import { logger } from '../../shared/logger';
 
 /**

@@ -4,8 +4,8 @@
  * Shapes that can be selected, dragged, and resized with Transformer.
  */
 
-import React, { useEffect, useRef } from 'react';
-import { Rect, Line, Transformer } from 'react-konva';
+import React, { useEffect, useRef, useState } from 'react';
+import { Rect, Line, Transformer, Image as KonvaImage } from 'react-konva';
 import Konva from 'konva';
 import type { Shape } from '../types';
 import { SELECTION_STYLE } from '../constants/konvaConstants';
@@ -177,6 +177,94 @@ export const TransformerComponent: React.FC<TransformerComponentProps> = ({
         'middle-left',
         'bottom-center',
       ]}
+    />
+  );
+};
+
+// ==========================================================================
+// TRANSFORMABLE IMAGE
+// ==========================================================================
+
+export interface TransformableImageProps {
+  shape: Shape;
+  isSelected: boolean;
+  onSelect: (e: any) => void;
+  onDragEnd: (e: any) => void;
+  onTransformEnd: (node: any) => void;
+}
+
+export const TransformableImage: React.FC<TransformableImageProps> = ({
+  shape,
+  isSelected,
+  onSelect,
+  onDragEnd,
+  onTransformEnd,
+}) => {
+  const shapeRef = useRef<Konva.Image>(null);
+  const [image, setImage] = useState<HTMLImageElement | null>(null);
+
+  // Load image from base64 data - must be before early return
+  useEffect(() => {
+    if (shape.geometry.type !== 'image') return;
+
+    const geometry = shape.geometry;
+    const img = new window.Image();
+    img.onload = () => {
+      setImage(img);
+    };
+    img.onerror = () => {
+      console.error('Failed to load image:', geometry.fileName);
+    };
+    img.src = geometry.imageData;
+  }, [shape.geometry]);
+
+  if (shape.geometry.type !== 'image') return null;
+
+  const geometry = shape.geometry;
+
+  if (!image) {
+    // Show placeholder while loading
+    return (
+      <Rect
+        x={geometry.x}
+        y={geometry.y}
+        width={geometry.width}
+        height={geometry.height}
+        fill="#f0f0f0"
+        stroke="#d9d9d9"
+        strokeWidth={1}
+        dash={[5, 5]}
+      />
+    );
+  }
+
+  return (
+    <KonvaImage
+      ref={shapeRef}
+      id={shape.id}
+      name="shape"
+      image={image}
+      x={geometry.x}
+      y={geometry.y}
+      width={geometry.width}
+      height={geometry.height}
+      rotation={geometry.rotation || 0}
+      scaleX={geometry.scaleX || 1}
+      scaleY={geometry.scaleY || 1}
+      opacity={shape.style.opacity}
+      draggable={isSelected}
+      onClick={onSelect}
+      onTap={onSelect}
+      onDragEnd={onDragEnd}
+      onTransformEnd={(e) => {
+        const node = shapeRef.current;
+        if (node) {
+          onTransformEnd(node);
+        }
+      }}
+      // Add selection border when selected
+      stroke={isSelected ? SELECTION_STYLE.STROKE : undefined}
+      strokeWidth={isSelected ? SELECTION_STYLE.STROKE_WIDTH : 0}
     />
   );
 };

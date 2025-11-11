@@ -7,8 +7,6 @@
 
 import { useState, useCallback } from 'react';
 import type {
-  Viewport,
-  Shape,
   UseKonvaSelectionParams,
   UseKonvaSelectionReturn,
 } from '../types';
@@ -331,7 +329,7 @@ export function useKonvaSelection(
           );
         } else if (shape.geometry.type === 'polygon') {
           const poly = shape.geometry;
-          
+
           // Check if any point of the polygon is inside the selection box
           for (let i = 0; i < poly.points.length; i += 2) {
             const px = poly.points[i];
@@ -347,6 +345,15 @@ export function useKonvaSelection(
               break;
             }
           }
+        } else if (shape.geometry.type === 'image') {
+          const img = shape.geometry;
+          // Check if image rectangle intersects with selection box
+          intersects = !(
+            img.x + img.width < box.x ||
+            img.x > box.x + box.width ||
+            img.y + img.height < box.y ||
+            img.y > box.y + box.height
+          );
         }
 
         if (intersects) {

@@ -7,9 +7,9 @@
 import { useCallback } from 'react';
 import type {
   Shape,
-  ShapeGeometry,
   RectangleGeometry,
   PolygonGeometry,
+  ImageGeometry,
   UseKonvaTransformParams,
   UseKonvaTransformReturn,
 } from '../types';
@@ -102,26 +102,30 @@ export function useKonvaTransform(
       } else if (shape.geometry.type === 'polygon') {
         // For polygons, we need to update the points array
         // The drag moves the entire polygon, so we just update x/y offset
-        const updates: Partial<PolygonGeometry> = {
-          points: shape.geometry.points, // Keep points the same
-        };
 
         // Calculate the delta from the original position
         const deltaX = newX;
         const deltaY = newY;
-        
+
         // Update all points by the delta
         const newPoints = [...shape.geometry.points];
         for (let i = 0; i < newPoints.length; i += 2) {
           newPoints[i] += deltaX;
           newPoints[i + 1] += deltaY;
         }
-        
+
         // Reset node position to 0,0 since we've updated the points
         node.x(0);
         node.y(0);
 
         onShapeUpdate?.(shapeId, { geometry: { ...shape.geometry, points: newPoints } });
+      } else if (shape.geometry.type === 'image') {
+        // For images, update position
+        const updates: Partial<ImageGeometry> = {
+          x: newX,
+          y: newY,
+        };
+        onShapeUpdate?.(shapeId, { geometry: { ...shape.geometry, ...updates } });
       }
     },
     [getShape, canTransform, onShapeUpdate, snapToGrid]
@@ -165,7 +169,7 @@ export function useKonvaTransform(
         // Apply scale to points
         const scaleX = node.scaleX();
         const scaleY = node.scaleY();
-        
+
         if (scaleX !== 1 || scaleY !== 1) {
           const newPoints = [...shape.geometry.points];
           for (let i = 0; i < newPoints.length; i += 2) {
@@ -173,11 +177,29 @@ export function useKonvaTransform(
             newPoints[i + 1] *= scaleY;
           }
           updates.points = newPoints;
-          
+
           // Reset scale
           node.scaleX(1);
           node.scaleY(1);
         }
+
+        onShapeUpdate?.(shapeId, { geometry: { ...shape.geometry, ...updates } });
+      } else if (shape.geometry.type === 'image') {
+        // For images, update dimensions and rotation
+        const scaleX = node.scaleX();
+        const scaleY = node.scaleY();
+
+        // Reset scale to 1 and adjust width/height instead
+        node.scaleX(1);
+        node.scaleY(1);
+
+        const updates: Partial<ImageGeometry> = {
+          x: node.x(),
+          y: node.y(),
+          width: Math.max(5, node.width() * scaleX),
+          height: Math.max(5, node.height() * scaleY),
+          rotation: node.rotation(),
+        };
 
         onShapeUpdate?.(shapeId, { geometry: { ...shape.geometry, ...updates } });
       }

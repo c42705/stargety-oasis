@@ -8,7 +8,7 @@
 
 import { CharacterStorage } from './CharacterStorage';
 import { CharacterSlot, EmptyCharacterSlot, isEmptySlot } from './types';
-import { SpriteSheetDefinition, AnimationCategory, FrameDefinition } from '../AvatarBuilderTypes';
+import { SpriteSheetDefinition, AnimationCategory } from '../AvatarBuilderTypes';
 import { PerformanceMonitor } from './PerformanceMonitor';
 import { TextureCache } from './TextureCache';
 
@@ -757,7 +757,7 @@ export class AvatarRenderer {
    */
   cleanup(): void {
     // Remove all sprites
-    this.avatarSprites.forEach((sprite, username) => {
+    this.avatarSprites.forEach((sprite) => {
       sprite.destroy();
     });
     this.avatarSprites.clear();

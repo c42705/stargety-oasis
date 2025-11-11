@@ -126,9 +126,35 @@ export interface PolygonGeometry extends BaseGeometry {
 }
 
 /**
+ * Image geometry
+ * Represents an image/sprite object on the map
+ */
+export interface ImageGeometry extends BaseGeometry {
+  type: 'image';
+  /** X coordinate */
+  x: number;
+  /** Y coordinate */
+  y: number;
+  /** Width of the image */
+  width: number;
+  /** Height of the image */
+  height: number;
+  /** Base64 encoded image data */
+  imageData: string;
+  /** Original file name */
+  fileName?: string;
+  /** Rotation in degrees */
+  rotation?: number;
+  /** Scale X */
+  scaleX?: number;
+  /** Scale Y */
+  scaleY?: number;
+}
+
+/**
  * Union type for all geometry types
  */
-export type ShapeGeometry = RectangleGeometry | PolygonGeometry;
+export type ShapeGeometry = RectangleGeometry | PolygonGeometry | ImageGeometry;
 
 // ============================================================================
 // SHAPES - STYLE
@@ -157,9 +183,10 @@ export interface ShapeStyle {
 /**
  * Shape category determines behavior and styling
  */
-export type ShapeCategory = 
+export type ShapeCategory =
   | 'collision'    // Impassable areas (collision detection)
-  | 'interactive'; // Interactive areas (clickable zones)
+  | 'interactive'  // Interactive areas (clickable zones)
+  | 'asset';       // Custom uploaded assets (images/sprites)
 
 // ============================================================================
 // SHAPES - MAIN DEFINITION

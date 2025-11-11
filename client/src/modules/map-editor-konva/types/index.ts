@@ -25,6 +25,7 @@ export type {
   BaseGeometry,
   RectangleGeometry,
   PolygonGeometry,
+  ImageGeometry,
   ShapeGeometry,
   
   // Shapes - Style
@@ -74,6 +75,7 @@ export type {
   CreateShapeParams,
   CreatePolygonParams,
   CreateRectangleParams,
+  CreateImageParams,
   
   // Shape Updates
   UpdateShapeParams,
@@ -118,8 +120,10 @@ export type {
 export {
   isPolygonGeometry,
   isRectangleGeometry,
+  isImageGeometry,
   isCollisionShape,
   isInteractiveShape,
+  isAssetShape,
 } from './shapes.types';
 
 // ============================================================================

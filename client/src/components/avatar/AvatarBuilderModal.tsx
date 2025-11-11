@@ -175,7 +175,7 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
       message.error('Failed to process uploaded file');
       setBuilderState(prev => ({ ...prev, isProcessing: false }));
     }
-  }, [username]);
+  }, [username, builderState.userFrameRate]);
 
   // Step 2: Generate frames from grid
   const generateFramesFromGrid = useCallback(() => {
@@ -351,7 +351,8 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
     }));
 
     message.success(`Created ${animations.length} default animations`);
-  }, [builderState.spriteSheetDefinition, setBuilderState]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [builderState.spriteSheetDefinition, builderState.userFrameRate, setBuilderState]);
 
   // Validate and save
   const handleSave = useCallback(() => {
@@ -459,7 +460,8 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
           imageData={builderState.spriteSheetDefinition.source.imageData}
           imageDimensions={builderState.spriteSheetDefinition.source.originalDimensions}
           onGridChange={setGridLayout}
-          onFrameSelect={(frameIndex, frameRect) => {
+          onFrameSelect={() => {
+            // Frame selection handled by grid layout
           }}
           selectedFrames={[]}
           initialGrid={gridLayout || undefined}

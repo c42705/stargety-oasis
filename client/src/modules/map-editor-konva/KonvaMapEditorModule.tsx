@@ -50,7 +50,7 @@ import { useKonvaVertexEdit } from './hooks/useKonvaVertexEdit';
 // Import Konva components
 import { PolygonDrawingPreview } from './components/PolygonDrawingPreview';
 import { RectangleDrawingPreview } from './components/RectangleDrawingPreview';
-import { TransformablePolygon, TransformableRect, TransformerComponent } from './components/TransformableShape';
+import { TransformablePolygon, TransformableRect, TransformableImage, TransformerComponent } from './components/TransformableShape';
 import { KonvaLayersPanel } from './components/KonvaLayersPanel';
 import { SelectionRect } from './components/SelectionRect';
 import { PolygonEditor } from './components/PolygonEditor';
@@ -64,7 +64,7 @@ import { VIEWPORT_DEFAULTS, GRID_DEFAULTS } from './constants/konvaConstants';
 // Import utilities
 import { mapDataToShapes, shapeToInteractiveArea, shapeToImpassableArea } from './utils/mapDataAdapter';
 import { calculateZoomToShape } from './utils/zoomToShape';
-import { duplicateShape, groupShapes, ungroupShapes } from './utils/shapeFactories';
+import { duplicateShape, groupShapes, ungroupShapes, createImageShape } from './utils/shapeFactories';
 
 // Import shared types
 import type { TabId } from '../map-editor/types/editor.types';
@@ -743,7 +743,8 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     } else if (currentTool === 'polygon') {
       polygonDrawing.handleClick(e);
     }
-  }, [currentTool, selection, polygonDrawing]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTool]);
 
   const handleStageMouseDown = useCallback((e: any) => {
     if (currentTool === 'select') {
@@ -758,7 +759,8 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
         rectDrawing.handleMouseDown(e);
       }
     }
-  }, [currentTool, selection, pan, rectDrawing, collisionRectDrawing, collisionDrawingMode, pendingCollisionAreaData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTool, collisionDrawingMode, pendingCollisionAreaData]);
 
   const handleStageMouseMove = useCallback((e: any) => {
     if (currentTool === 'select') {
@@ -775,7 +777,8 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
         rectDrawing.handleMouseMove(e);
       }
     }
-  }, [currentTool, selection, pan, polygonDrawing, rectDrawing, collisionRectDrawing, collisionDrawingMode, pendingCollisionAreaData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTool, collisionDrawingMode, pendingCollisionAreaData]);
 
   const handleStageMouseUp = useCallback(() => {
     if (currentTool === 'select') {
@@ -790,21 +793,25 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
         rectDrawing.handleMouseUp();
       }
     }
-  }, [currentTool, selection, pan, rectDrawing, collisionRectDrawing, collisionDrawingMode, pendingCollisionAreaData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTool, collisionDrawingMode, pendingCollisionAreaData]);
 
   const handleStageDoubleClick = useCallback(() => {
     if (currentTool === 'polygon') {
       polygonDrawing.handleDoubleClick();
     }
-  }, [currentTool, polygonDrawing]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTool]);
 
   const handleUndo = useCallback(() => {
     history.undo();
-  }, [history]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleRedo = useCallback(() => {
     history.redo();
-  }, [history]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ===== AREA HANDLERS =====
   const handleCreateArea = useCallback(() => {
@@ -923,8 +930,15 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
         setCollisionAreaToDelete(area);
         setShowCollisionDeleteConfirm(true);
       }
+    } else if (shape.category === 'asset') {
+      // Delete asset shapes directly without confirmation
+      setShapes(prev => prev.filter(s => s.id !== shapeId));
+      setSelectedIds(prev => prev.filter(id => id !== shapeId));
+      markDirty();
+      history.pushState('Delete asset');
+      logger.info('ASSET DELETED', { id: shapeId, name: shape.name });
     }
-  }, [shapes, areas, impassableAreas]);
+  }, [shapes, areas, impassableAreas, setShapes, setSelectedIds, markDirty, history]);
 
   const handleZoomToShape = useCallback((shape: Shape) => {
     if (!mainRef.current) return;
@@ -1086,6 +1100,18 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
                       onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
                     />
                   );
+                } else if (geom.type === 'image') {
+                  // Image geometry
+                  return (
+                    <TransformableImage
+                      key={shape.id}
+                      shape={shape}
+                      isSelected={selectedIds.includes(shape.id)}
+                      onSelect={(e) => selection.handleShapeClick(shape.id, e)}
+                      onDragEnd={(e) => transform.handleDragEnd(shape.id, e)}
+                      onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
+                    />
+                  );
                 }
                 return null;
               })}
@@ -1198,7 +1224,41 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
                 />
               )}
               {activeTab === 'terrain' && <TerrainTab />}
-              {activeTab === 'assets' && <AssetsTab />}
+              {activeTab === 'assets' && (
+                <AssetsTab
+                  onPlaceAsset={(fileData, fileName, width, height) => {
+                    // Calculate center of viewport
+                    const centerX = -viewport.pan.x + (viewportWidth / 2) / viewport.zoom;
+                    const centerY = -viewport.pan.y + (viewportHeight / 2) / viewport.zoom;
+
+                    // Create image shape at viewport center
+                    const imageShape = createImageShape({
+                      x: centerX - width / 2,
+                      y: centerY - height / 2,
+                      width,
+                      height,
+                      imageData: fileData,
+                      fileName,
+                    });
+
+                    // Add shape to map
+                    setShapes(prev => [...prev, imageShape]);
+
+                    // Select the new shape
+                    selection.selectShape(imageShape.id);
+
+                    // Mark as dirty
+                    markDirty();
+
+                    logger.info('ASSET PLACED ON MAP', {
+                      id: imageShape.id,
+                      fileName,
+                      position: { x: imageShape.geometry.x, y: imageShape.geometry.y },
+                      dimensions: { width, height }
+                    });
+                  }}
+                />
+              )}
               {activeTab === 'collision' && (
                 <CollisionTab
                   impassableAreas={impassableAreas}

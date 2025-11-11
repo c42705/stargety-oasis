@@ -19,7 +19,8 @@ import {
   Layers,
   Square,
   Shield,
-  TreePine
+  TreePine,
+  Image as ImageIcon
 } from 'lucide-react';
 import type { Shape, Viewport } from '../types';
 
@@ -29,11 +30,12 @@ const { Text } = Typography;
 interface LayerObject {
   id: string;
   name: string;
-  type: 'background' | 'grid' | 'interactive' | 'collision' | 'terrain';
+  type: 'background' | 'grid' | 'interactive' | 'collision' | 'terrain' | 'asset';
   visible: boolean;
   position?: { x: number; y: number };
   size?: { width: number; height: number };
   shape: Shape;
+  thumbnail?: string; // For image assets
 }
 
 interface LayerGroup {
@@ -80,6 +82,7 @@ export const KonvaLayersPanel: React.FC<KonvaLayersPanelProps> = ({
     const interactiveObjects: LayerObject[] = [];
     const collisionObjects: LayerObject[] = [];
     const terrainObjects: LayerObject[] = [];
+    const assetObjects: LayerObject[] = [];
 
     shapes.forEach((shape, index) => {
       let layerObj: LayerObject;
@@ -102,6 +105,22 @@ export const KonvaLayersPanel: React.FC<KonvaLayersPanelProps> = ({
           shape
         };
         collisionObjects.push(layerObj);
+      } else if (shape.category === 'asset') {
+        // Asset objects (images)
+        const thumbnail = shape.geometry.type === 'image' ? shape.geometry.imageData : undefined;
+        const defaultName = shape.geometry.type === 'image' && shape.geometry.fileName
+          ? shape.geometry.fileName
+          : `Asset ${assetObjects.length + 1}`;
+
+        layerObj = {
+          id: shape.id,
+          name: shape.name || defaultName,
+          type: 'asset',
+          visible: shape.visible !== false,
+          shape,
+          thumbnail
+        };
+        assetObjects.push(layerObj);
       } else {
         // Default to terrain for other objects
         layerObj = {
@@ -128,6 +147,13 @@ export const KonvaLayersPanel: React.FC<KonvaLayersPanelProps> = ({
         title: 'Collision Areas',
         icon: <Shield size={14} />,
         objects: collisionObjects,
+        visible: true
+      },
+      {
+        key: 'assets',
+        title: 'Assets',
+        icon: <ImageIcon size={14} />,
+        objects: assetObjects,
         visible: true
       },
       {
@@ -184,16 +210,31 @@ export const KonvaLayersPanel: React.FC<KonvaLayersPanelProps> = ({
         key: obj.id,
         title: (
           <Flex justify="space-between" align="center" style={{ width: '100%' }}>
-            <Text
-              ellipsis
-              style={{
-                flex: 1,
-                fontWeight: selectedIds.includes(obj.id) ? 600 : 400,
-                color: selectedIds.includes(obj.id) ? token.colorPrimary : token.colorText
-              }}
-            >
-              {obj.name}
-            </Text>
+            <Flex align="center" gap={8} style={{ flex: 1, minWidth: 0 }}>
+              {obj.thumbnail && (
+                <img
+                  src={obj.thumbnail}
+                  alt={obj.name}
+                  style={{
+                    width: 24,
+                    height: 24,
+                    objectFit: 'cover',
+                    borderRadius: 4,
+                    border: `1px solid ${token.colorBorder}`
+                  }}
+                />
+              )}
+              <Text
+                ellipsis
+                style={{
+                  flex: 1,
+                  fontWeight: selectedIds.includes(obj.id) ? 600 : 400,
+                  color: selectedIds.includes(obj.id) ? token.colorPrimary : token.colorText
+                }}
+              >
+                {obj.name}
+              </Text>
+            </Flex>
             <Space size="small">
               <Tooltip title={obj.visible ? 'Hide' : 'Show'}>
                 <Button

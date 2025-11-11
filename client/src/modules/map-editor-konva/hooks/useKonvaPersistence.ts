@@ -60,10 +60,14 @@ export function useKonvaPersistence(
   } = params;
 
   // State
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isSaving, setIsSaving] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isLoading, setIsLoading] = useState(false);
   const [lastSaved, setLastSaved] = useState<number | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [error, setError] = useState<string | null>(null);
 
   // Auto-save timer ref
@@ -75,6 +79,10 @@ export function useKonvaPersistence(
 
   /**
    * Save current state to localStorage
+   *
+   * TODO: Migrate to database storage for better scalability and to avoid localStorage quota limits.
+   * Image assets stored as base64 can quickly consume localStorage space (typically 5-10MB limit).
+   * Consider storing images separately in IndexedDB or on a server.
    */
   const save = useCallback(async (): Promise<boolean> => {
     if (!enabled) return false;
@@ -96,11 +104,12 @@ export function useKonvaPersistence(
       const estimatedSize = new Blob([serialized]).size;
       if (estimatedSize > PERSISTENCE.MAX_SIZE) {
         throw new Error(
-          `Data size (${estimatedSize} bytes) exceeds maximum (${PERSISTENCE.MAX_SIZE} bytes)`
+          `Data size (${estimatedSize} bytes) exceeds maximum (${PERSISTENCE.MAX_SIZE} bytes). Consider reducing the number of image assets or their sizes.`
         );
       }
 
       // Save to localStorage
+      // TODO: Replace with database storage to handle larger datasets
       localStorage.setItem(storageKey, serialized);
 
       setLastSaved(Date.now());
@@ -186,7 +195,7 @@ export function useKonvaPersistence(
       console.error('Load failed:', err);
       return null;
     }
-  }, [enabled, storageKey, onStateRestore]);
+  }, [enabled, storageKey, onStateRestore, currentState]);
 
   /**
    * Clear saved data
@@ -245,6 +254,7 @@ export function useKonvaPersistence(
     if (canLoad()) {
       load();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount
 
   // ==========================================================================

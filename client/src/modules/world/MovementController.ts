@@ -1,5 +1,4 @@
 import Phaser from 'phaser';
-import { logger } from '../../shared/logger';
 
 /**
  * MovementController - Handles player movement and input
