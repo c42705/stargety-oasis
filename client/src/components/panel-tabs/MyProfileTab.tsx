@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Input, Switch, Select, Button, Space, Typography, Badge, Avatar, message, Alert } from 'antd';
+import { Card, Form, Input, Switch, Select, Button, Space, Typography, Badge, Avatar, message, Alert, Flex } from 'antd';
 import { SaveOutlined, EditOutlined, UserOutlined, LogoutOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { Lock, Mail } from 'lucide-react';
 import { useAuth } from '../../shared/AuthContext';
@@ -145,51 +145,77 @@ export const MyProfileTab: React.FC = () => {
   if (!user) return null;
 
   return (
-    <div style={{ height: '100%', padding: '16px', backgroundColor: 'var(--color-bg-primary)' }}>
+    <div style={{ height: '100%' }}>
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {/* User Profile Header */}
         <Card style={{ backgroundColor: 'var(--color-bg-secondary)', borderColor: 'var(--color-border-light)' }}>
-          <Space direction="vertical" size="middle" style={{ width: '100%', textAlign: 'center' }}>
-            <Badge
-              dot
-              status={preferences.status === 'online' ? 'success' :
-                     preferences.status === 'busy' ? 'error' :
-                     preferences.status === 'away' ? 'warning' : 'default'}
-              offset={[-8, 8]}
-            >
-              <Avatar
-                size={64}
-                icon={<UserOutlined />}
-                style={{
-                  backgroundColor: 'var(--color-accent)',
-                  fontSize: '24px'
-                }}
+          <Flex justify="space-between" align="center">
+            <Space direction="vertical" size="large" style={{ width: '100%', textAlign: 'center' }}>
+              <Badge
+                dot
+                status={preferences.status === 'online' ? 'success' :
+                  preferences.status === 'busy' ? 'error' :
+                    preferences.status === 'away' ? 'warning' : 'default'}
+                offset={[-8, 8]}
               >
-                {user.displayName.split(' ').map(n => n[0]).join('')}
-              </Avatar>
-            </Badge>
-
-            <Space direction="vertical" size="small">
-              <Typography.Title level={4} style={{ margin: 0, color: 'var(--color-text-primary)' }}>
-                {user.displayName}
-              </Typography.Title>
-              <Typography.Text type="secondary">@{user.username}</Typography.Text>
-              {user.isAdmin && (
-                <Badge
-                  count="Administrator"
+                <Avatar
+                  size={64}
+                  icon={<UserOutlined />}
                   style={{
                     backgroundColor: 'var(--color-accent)',
-                    color: 'var(--color-text-primary)'
+                    fontSize: '24px'
                   }}
-                />
-              )}
-              <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
-                Room: {user.roomId}
-              </Typography.Text>
+                >
+                  {user.displayName.split(' ').map(n => n[0]).join('')}
+                </Avatar>
+              </Badge>
 
-        
+              <Space direction="vertical" size="small">
+                <Typography.Title level={4} style={{ margin: 0, color: 'var(--color-text-primary)' }}>
+                  {user.displayName}
+                </Typography.Title>
+                <Typography.Text type="secondary">@{user.username}</Typography.Text>
+                {user.isAdmin && (
+                  <Badge
+                    count="Administrator"
+                    style={{
+                      backgroundColor: 'var(--color-accent)',
+                      color: 'var(--color-text-primary)'
+                    }}
+                  />
+                )}
+                <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
+                  Room: {user.roomId}
+                </Typography.Text>
+
+
+              </Space>
             </Space>
-          </Space>
+            <Space direction="vertical" size="large" style={{ width: '100%' }}>
+              <Select
+                value={preferences.status}
+                onChange={(value) => handlePreferenceChange('status', value)}
+                style={{ width: '100%' }}
+                options={[
+                  { value: 'online', label: '● Online' },
+                  { value: 'busy', label: '● Busy' },
+                  { value: 'away', label: '● Away' },
+                  { value: 'offline', label: '● Offline' }
+                ]}
+              />
+
+              <Input
+                placeholder="Set a status message..."
+                value={preferences.statusMessage}
+                onChange={(e) => handlePreferenceChange('statusMessage', e.target.value)}
+                style={{
+                  backgroundColor: 'var(--color-bg-tertiary)',
+                  borderColor: 'var(--color-border)',
+                  color: 'var(--color-text-primary)'
+                }}
+              />
+            </Space>
+          </Flex>
         </Card>
 
         {/* Migration Banner */}
@@ -258,154 +284,125 @@ export const MyProfileTab: React.FC = () => {
           />
         )}
 
-        {/* Status Section */}
-        <Card
-          title="Status"
-          size="small"
-          style={{ backgroundColor: 'var(--color-bg-secondary)', borderColor: 'var(--color-border-light)' }}
-        >
-          <Space direction="vertical" style={{ width: '100%' }}>
-            <Select
-              value={preferences.status}
-              onChange={(value) => handlePreferenceChange('status', value)}
-              style={{ width: '100%' }}
-              options={[
-                { value: 'online', label: '● Online' },
-                { value: 'busy', label: '● Busy' },
-                { value: 'away', label: '● Away' },
-                { value: 'offline', label: '● Offline' }
-              ]}
-            />
+     
+        <Flex justify="space-between" align="center">
+          {/* Preferences Section */}
+          <Card
+            title="Preferences"
+            size="small"
+            style={{ backgroundColor: 'var(--color-bg-secondary)', borderColor: 'var(--color-border-light)', width: '100%' }}
+            extra={
+              <Button
+                size="small"
+                icon={isEditing ? <SaveOutlined /> : <EditOutlined />}
+                onClick={() => isEditing ? handleSavePreferences() : setIsEditing(!isEditing)}
+                style={{
+                  backgroundColor: isEditing ? 'var(--color-accent)' : 'var(--color-bg-tertiary)',
+                  borderColor: isEditing ? 'var(--color-accent)' : 'var(--color-border)',
+                  color: isEditing ? 'white' : 'var(--color-text-primary)'
+                }}
+              >
+                {isEditing ? 'Save' : 'Edit'}
+              </Button>
+            }
+          >
+            <Form layout="vertical" size="small">
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography.Text>Enable Notifications</Typography.Text>
+                  <Switch
+                    checked={preferences.notifications}
+                    onChange={(checked) => handlePreferenceChange('notifications', checked)}
+                    disabled={!isEditing}
+                    size="small"
+                  />
+                </div>
 
-            <Input
-              placeholder="Set a status message..."
-              value={preferences.statusMessage}
-              onChange={(e) => handlePreferenceChange('statusMessage', e.target.value)}
-              style={{
-                backgroundColor: 'var(--color-bg-tertiary)',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-text-primary)'
-              }}
-            />
-          </Space>
-        </Card>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography.Text>Sound Effects</Typography.Text>
+                  <Switch
+                    checked={preferences.soundEnabled}
+                    onChange={(checked) => handlePreferenceChange('soundEnabled', checked)}
+                    disabled={!isEditing}
+                    size="small"
+                  />
+                </div>
 
-        {/* Preferences Section */}
-        <Card
-          title="Preferences"
-          size="small"
-          style={{ backgroundColor: 'var(--color-bg-secondary)', borderColor: 'var(--color-border-light)' }}
-          extra={
-            <Button
-              size="small"
-              icon={isEditing ? <SaveOutlined /> : <EditOutlined />}
-              onClick={() => isEditing ? handleSavePreferences() : setIsEditing(!isEditing)}
-              style={{
-                backgroundColor: isEditing ? 'var(--color-accent)' : 'var(--color-bg-tertiary)',
-                borderColor: isEditing ? 'var(--color-accent)' : 'var(--color-border)',
-                color: isEditing ? 'white' : 'var(--color-text-primary)'
-              }}
-            >
-              {isEditing ? 'Save' : 'Edit'}
-            </Button>
-          }
-        >
-          <Form layout="vertical" size="small">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography.Text>Theme</Typography.Text>
+                  <Select
+                    value={currentTheme.id}
+                    onChange={handleThemeChange}
+                    disabled={!isEditing}
+                    size="small"
+                    style={{ width: 150 }}
+                    options={themeOptions}
+                    placeholder="Select theme"
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography.Text>Language</Typography.Text>
+                  <Select
+                    value={preferences.language}
+                    onChange={(value) => handlePreferenceChange('language', value)}
+                    disabled={!isEditing}
+                    size="small"
+                    style={{ width: 100 }}
+                    options={[
+                      { value: 'en', label: 'English' },
+                      { value: 'es', label: 'Español' },
+                      { value: 'fr', label: 'Français' },
+                      { value: 'de', label: 'Deutsch' }
+                    ]}
+                  />
+                </div>
+              </Space>
+            </Form>
+          </Card>
+
+          {/* Account Actions */}
+          <Card
+            title="Account"
+            size="small"
+            style={{ backgroundColor: 'var(--color-bg-secondary)', borderColor: 'var(--color-border-light)', width: '100%'  }}
+          >
             <Space direction="vertical" style={{ width: '100%' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography.Text>Enable Notifications</Typography.Text>
-                <Switch
-                  checked={preferences.notifications}
-                  onChange={(checked) => handlePreferenceChange('notifications', checked)}
-                  disabled={!isEditing}
-                  size="small"
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography.Text>Sound Effects</Typography.Text>
-                <Switch
-                  checked={preferences.soundEnabled}
-                  onChange={(checked) => handlePreferenceChange('soundEnabled', checked)}
-                  disabled={!isEditing}
-                  size="small"
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography.Text>Theme</Typography.Text>
-                <Select
-                  value={currentTheme.id}
-                  onChange={handleThemeChange}
-                  disabled={!isEditing}
-                  size="small"
-                  style={{ width: 150 }}
-                  options={themeOptions}
-                  placeholder="Select theme"
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography.Text>Language</Typography.Text>
-                <Select
-                  value={preferences.language}
-                  onChange={(value) => handlePreferenceChange('language', value)}
-                  disabled={!isEditing}
-                  size="small"
-                  style={{ width: 100 }}
-                  options={[
-                    { value: 'en', label: 'English' },
-                    { value: 'es', label: 'Español' },
-                    { value: 'fr', label: 'Français' },
-                    { value: 'de', label: 'Deutsch' }
-                  ]}
-                />
-              </div>
+              <Button
+                icon={<Lock size={16} />}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  backgroundColor: 'var(--color-bg-tertiary)',
+                  borderColor: 'var(--color-border)',
+                  color: 'var(--color-text-primary)'
+                }}
+              >
+                Change Password
+              </Button>
+              <Button
+                icon={<Mail size={16} />}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  backgroundColor: 'var(--color-bg-tertiary)',
+                  borderColor: 'var(--color-border)',
+                  color: 'var(--color-text-primary)'
+                }}
+              >
+                Update Email
+              </Button>
+              <Button
+                danger
+                icon={<LogoutOutlined />}
+                onClick={logout}
+                style={{ width: '100%', textAlign: 'left' }}
+              >
+                Sign Out
+              </Button>
             </Space>
-          </Form>
-        </Card>
-
-        {/* Account Actions */}
-        <Card
-          title="Account"
-          size="small"
-          style={{ backgroundColor: 'var(--color-bg-secondary)', borderColor: 'var(--color-border-light)' }}
-        >
-          <Space direction="vertical" style={{ width: '100%' }}>
-            <Button
-              icon={<Lock size={16} />}
-              style={{
-                width: '100%',
-                textAlign: 'left',
-                backgroundColor: 'var(--color-bg-tertiary)',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-text-primary)'
-              }}
-            >
-              Change Password
-            </Button>
-            <Button
-              icon={<Mail size={16} />}
-              style={{
-                width: '100%',
-                textAlign: 'left',
-                backgroundColor: 'var(--color-bg-tertiary)',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-text-primary)'
-              }}
-            >
-              Update Email
-            </Button>
-            <Button
-              danger
-              icon={<LogoutOutlined />}
-              onClick={logout}
-              style={{ width: '100%', textAlign: 'left' }}
-            >
-              Sign Out
-            </Button>
-          </Space>
-        </Card>
+          </Card>
+        </Flex>
       </Space>
     </div>
   );

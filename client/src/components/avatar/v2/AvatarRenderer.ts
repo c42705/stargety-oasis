@@ -105,55 +105,61 @@ export class AvatarRenderer {
   async loadCharacterTexture(username: string, slotNumber?: number): Promise<RenderResult> {
     return PerformanceMonitor.measure('AvatarRenderer.loadCharacterTexture', async () => {
       try {
-        console.log('[AvatarRenderer] Loading character texture for:', username, 'slot:', slotNumber);
+        console.log('[AvatarRenderer] 🟦 loadCharacterTexture START:', { username, slotNumber });
         this.log('TextureLoading', `Loading character texture for ${username}`, { slotNumber });
 
       // Load character slot
       let characterSlot: CharacterSlot | EmptyCharacterSlot;
 
       if (slotNumber !== undefined) {
-        console.log('[AvatarRenderer] Loading specific slot:', slotNumber);
+        console.log('[AvatarRenderer] 🟦 Loading specific slot:', slotNumber);
         const result = CharacterStorage.loadCharacterSlot(username, slotNumber);
-        console.log('[AvatarRenderer] Load slot result:', result);
+        console.log('[AvatarRenderer] 🟦 Load slot result:', result);
         if (!result.success || !result.data) {
-          console.error('[AvatarRenderer] Failed to load slot:', result.error);
+          console.error('[AvatarRenderer] ❌ Failed to load slot:', result.error);
           return {
             success: false,
             error: result.error || 'Failed to load character slot'
           };
         }
         characterSlot = result.data;
+        console.log('[AvatarRenderer] ✅ Slot loaded:', characterSlot);
       } else {
         // Load active character
-        console.log('[AvatarRenderer] Loading active character');
+        console.log('[AvatarRenderer] 🟦 Loading active character (no slot specified)');
         const result = CharacterStorage.getActiveCharacterSlot(username);
-        console.log('[AvatarRenderer] Active character result:', result);
+        console.log('[AvatarRenderer] 🟦 Active character result:', result);
         if (!result.success || !result.data) {
-          console.error('[AvatarRenderer] Failed to load active character:', result.error);
+          console.error('[AvatarRenderer] ❌ Failed to load active character:', result.error);
           return {
             success: false,
             error: result.error || 'Failed to load active character'
           };
         }
         characterSlot = result.data;
+        console.log('[AvatarRenderer] ✅ Active character loaded:', characterSlot);
       }
 
       // Check if slot is empty
-      console.log('[AvatarRenderer] Checking if slot is empty:', isEmptySlot(characterSlot));
-      if (isEmptySlot(characterSlot)) {
-        console.error('[AvatarRenderer] Character slot is empty!');
+      const isEmpty = isEmptySlot(characterSlot);
+      console.log('[AvatarRenderer] 🟦 Checking if slot is empty:', isEmpty);
+      if (isEmpty) {
+        console.error('[AvatarRenderer] ❌ Character slot is empty!');
         return {
           success: false,
           error: 'Character slot is empty'
         };
       }
 
-      console.log('[AvatarRenderer] Character slot loaded successfully:', characterSlot.name);
+      // TypeScript: After checking isEmpty, we know it's a CharacterSlot
+      const character = characterSlot as CharacterSlot;
+      console.log('[AvatarRenderer] ✅ Character slot loaded successfully:', character.name);
 
       // Check cache first
-      const cachedTexture = this.getCachedTexture(characterSlot.spriteSheet.id);
+      console.log('[AvatarRenderer] 🟦 Checking texture cache for sprite sheet ID:', character.spriteSheet.id);
+      const cachedTexture = this.getCachedTexture(character.spriteSheet.id);
       if (cachedTexture) {
-        console.log('[AvatarRenderer] Using cached texture:', cachedTexture.textureKey);
+        console.log('[AvatarRenderer] ✅ Using cached texture:', cachedTexture.textureKey);
         this.log('TextureLoading', 'Using cached texture', { textureKey: cachedTexture.textureKey });
         return {
           success: true,
@@ -162,18 +168,19 @@ export class AvatarRenderer {
       }
 
       // Load sprite sheet into Phaser
-      console.log('[AvatarRenderer] Loading sprite sheet into Phaser...');
-      const textureKey = await this.loadSpriteSheet(username, characterSlot.spriteSheet);
+      console.log('[AvatarRenderer] 🟦 No cached texture found, loading sprite sheet into Phaser...');
+      const textureKey = await this.loadSpriteSheet(username, character.spriteSheet);
+      console.log('[AvatarRenderer] 🟦 loadSpriteSheet returned:', textureKey);
 
       if (!textureKey) {
-        console.error('[AvatarRenderer] Failed to load sprite sheet into Phaser');
+        console.error('[AvatarRenderer] ❌ Failed to load sprite sheet into Phaser');
         return {
           success: false,
           error: 'Failed to load sprite sheet into Phaser'
         };
       }
 
-      console.log('[AvatarRenderer] Sprite sheet loaded successfully:', textureKey);
+      console.log('[AvatarRenderer] ✅✅ Sprite sheet loaded successfully:', textureKey);
       return {
         success: true,
         textureKey
@@ -446,8 +453,11 @@ export class AvatarRenderer {
     try {
       this.log('AnimationRegistration', 'Registering animations', {
         textureKey,
-        animationCount: definition.animations.length
+        animationCount: definition.animations.length,
+        defaultFrameRate: definition.defaultSettings.frameRate
       });
+
+      console.log('[AvatarRenderer] Default framerate from definition:', definition.defaultSettings.frameRate);
 
       definition.animations.forEach(animation => {
         const animKey = `${textureKey}_${animation.category}`;
@@ -464,17 +474,26 @@ export class AvatarRenderer {
           return frameIndex >= 0 ? frameIndex : 0;
         });
 
+        // Determine framerate (animation-specific or default)
+        const finalFrameRate = animation.sequence.frameRate || definition.defaultSettings.frameRate;
+
         // Create animation config
         const animConfig: Phaser.Types.Animations.Animation = {
           key: animKey,
           frames: this.scene.anims.generateFrameNumbers(textureKey, {
             frames: frameIndices
           }),
-          frameRate: animation.sequence.frameRate || definition.defaultSettings.frameRate,
+          frameRate: finalFrameRate,
           repeat: animation.sequence.loop ? -1 : 0
         };
 
         this.scene.anims.create(animConfig);
+
+        console.log(`[AvatarRenderer] Animation ${animation.category}:`, {
+          sequenceFrameRate: animation.sequence.frameRate,
+          defaultFrameRate: definition.defaultSettings.frameRate,
+          finalFrameRate: finalFrameRate
+        });
 
         this.log('AnimationRegistration', 'Animation registered', {
           animKey,
@@ -512,55 +531,95 @@ export class AvatarRenderer {
     slotNumber?: number
   ): Promise<Phaser.GameObjects.Sprite | null> {
     try {
-      console.log('[AvatarRenderer] createOrUpdateSprite called:', { username, x, y, slotNumber });
+      console.log('[AvatarRenderer] 🔵 createOrUpdateSprite START:', { username, x, y, slotNumber });
       this.log('SpriteCreation', `Creating/updating sprite for ${username}`, { x, y, slotNumber });
 
       // Load texture
-      console.log('[AvatarRenderer] Loading character texture...');
+      console.log('[AvatarRenderer] 🔵 Step 1: Loading character texture...');
       const textureResult = await this.loadCharacterTexture(username, slotNumber);
+      console.log('[AvatarRenderer] 🔵 Step 1 COMPLETE: textureResult =', textureResult);
 
       if (!textureResult.success || !textureResult.textureKey) {
-        console.error('[AvatarRenderer] Failed to load texture:', textureResult.error);
+        console.error('[AvatarRenderer] ❌ FAILED at Step 1: Texture loading failed:', textureResult.error);
         this.logError('SpriteCreation', 'Failed to load texture', textureResult.error);
         return null;
       }
 
       const textureKey = textureResult.textureKey;
-      console.log('[AvatarRenderer] Texture loaded successfully:', textureKey);
+      console.log('[AvatarRenderer] ✅ Texture loaded successfully:', textureKey);
 
       // Check if sprite already exists
+      console.log('[AvatarRenderer] 🔵 Step 2: Checking for existing sprite...');
       let sprite = this.avatarSprites.get(username);
+      console.log('[AvatarRenderer] 🔵 Existing sprite found:', !!sprite);
 
       if (sprite) {
         // Update existing sprite
-        console.log('[AvatarRenderer] Updating existing sprite with new texture');
+        console.log('[AvatarRenderer] 🔵 Step 3a: Updating existing sprite with new texture');
         this.log('SpriteCreation', 'Updating existing sprite', { username, textureKey });
+
+        console.log('[AvatarRenderer] 🔵 Calling sprite.setTexture...');
         sprite.setTexture(textureKey);
+        console.log('[AvatarRenderer] 🔵 Calling sprite.setPosition...');
         sprite.setPosition(x, y);
+
+        // CRITICAL FIX: Ensure sprite is visible and active after texture change
+        console.log('[AvatarRenderer] 🔵 Setting sprite to visible and active...');
+        sprite.setVisible(true);
+        sprite.setActive(true);
+
+        console.log('[AvatarRenderer] ✅ Existing sprite updated');
       } else {
         // Create new sprite
-        console.log('[AvatarRenderer] Creating new sprite');
+        console.log('[AvatarRenderer] 🔵 Step 3b: Creating NEW sprite');
         this.log('SpriteCreation', 'Creating new sprite', { username, textureKey });
+
+        console.log('[AvatarRenderer] 🔵 Calling scene.add.sprite...');
         sprite = this.scene.add.sprite(x, y, textureKey);
+        console.log('[AvatarRenderer] 🔵 New sprite created:', !!sprite);
+
+        // Ensure new sprite is visible and active
+        console.log('[AvatarRenderer] 🔵 Setting new sprite to visible and active...');
+        sprite.setVisible(true);
+        sprite.setActive(true);
+
+        console.log('[AvatarRenderer] 🔵 Adding sprite to avatarSprites map...');
         this.avatarSprites.set(username, sprite);
+        console.log('[AvatarRenderer] ✅ New sprite added to map');
       }
 
       // Play idle animation by default
+      console.log('[AvatarRenderer] 🔵 Step 4: Setting up idle animation...');
       const idleAnimKey = this.getAnimationKey(textureKey, AnimationCategory.IDLE);
-      console.log('[AvatarRenderer] Checking for idle animation:', idleAnimKey);
+      console.log('[AvatarRenderer] 🔵 Idle animation key:', idleAnimKey);
+      console.log('[AvatarRenderer] 🔵 Animation exists?', this.scene.anims.exists(idleAnimKey));
+
       if (this.scene.anims.exists(idleAnimKey)) {
-        console.log('[AvatarRenderer] Playing idle animation');
-        sprite.play(idleAnimKey);
+        console.log('[AvatarRenderer] 🔵 Playing idle animation');
+        // Safety check before playing
+        if (sprite && sprite.active && sprite.scene && sprite.play && typeof sprite.play === 'function') {
+          sprite.play(idleAnimKey);
+          console.log('[AvatarRenderer] ✅ Idle animation playing');
+        } else {
+          console.warn('[AvatarRenderer] ⚠️ Sprite not ready for animation playback:', {
+            exists: !!sprite,
+            active: sprite?.active,
+            hasScene: !!sprite?.scene,
+            hasPlay: !!sprite?.play
+          });
+        }
       } else {
-        console.warn('[AvatarRenderer] Idle animation not found:', idleAnimKey);
+        console.warn('[AvatarRenderer] ⚠️ Idle animation not found:', idleAnimKey);
       }
 
-      console.log('[AvatarRenderer] ✅ Sprite created/updated successfully');
+      console.log('[AvatarRenderer] ✅✅✅ Sprite created/updated successfully - RETURNING SPRITE');
       this.log('SpriteCreation', 'Sprite created/updated successfully', { username });
 
       return sprite;
 
     } catch (error) {
+      console.error('[AvatarRenderer] ❌❌❌ EXCEPTION CAUGHT in createOrUpdateSprite:', error);
+      console.error('[AvatarRenderer] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       this.logError('SpriteCreation', 'Failed to create/update sprite', error);
       return null;
     }
@@ -585,31 +644,61 @@ export class AvatarRenderer {
    */
   playAnimation(username: string, category: AnimationCategory): boolean {
     try {
+      console.log('[AvatarRenderer] 🎬 playAnimation called:', { username, category });
       const sprite = this.avatarSprites.get(username);
+      console.log('[AvatarRenderer] 🎬 Sprite from map:', {
+        exists: !!sprite,
+        active: sprite?.active,
+        hasScene: !!sprite?.scene,
+        texture: sprite?.texture?.key
+      });
 
-      if (!sprite) {
-        this.logError('AnimationPlayback', `No sprite found for ${username}`);
+      if (!sprite || !sprite.active || !sprite.scene) {
+        console.error('[AvatarRenderer] ❌ No valid sprite found for', username, {
+          exists: !!sprite,
+          active: sprite?.active,
+          hasScene: !!sprite?.scene
+        });
         return false;
       }
 
       // Get texture key from sprite
       const textureKey = sprite.texture.key;
       const animKey = this.getAnimationKey(textureKey, category);
+      console.log('[AvatarRenderer] 🎬 Animation key:', animKey);
+      console.log('[AvatarRenderer] 🎬 Animation exists?', this.scene.anims.exists(animKey));
 
       if (!this.scene.anims.exists(animKey)) {
+        console.error('[AvatarRenderer] ❌ Animation not found:', animKey);
         this.logError('AnimationPlayback', `Animation not found: ${animKey}`);
         return false;
       }
 
       // Only play if not already playing this animation
-      if (sprite.anims?.currentAnim?.key !== animKey) {
-        sprite.play(animKey);
-        this.log('AnimationPlayback', `Playing animation ${category} for ${username}`);
+      const currentAnimKey = sprite.anims?.currentAnim?.key;
+      console.log('[AvatarRenderer] 🎬 Current animation:', currentAnimKey);
+      console.log('[AvatarRenderer] 🎬 Need to switch?', currentAnimKey !== animKey);
+
+      if (currentAnimKey !== animKey) {
+        // Additional safety check before playing
+        if (sprite.play && typeof sprite.play === 'function') {
+          console.log('[AvatarRenderer] 🎬 Calling sprite.play...');
+          sprite.play(animKey);
+          console.log('[AvatarRenderer] ✅ Animation playing:', animKey);
+          this.log('AnimationPlayback', `Playing animation ${category} for ${username}`);
+        } else {
+          console.error('[AvatarRenderer] ❌ Sprite play method not available');
+          this.logError('AnimationPlayback', `Sprite play method not available for ${username}`);
+          return false;
+        }
+      } else {
+        console.log('[AvatarRenderer] ℹ️ Animation already playing, skipping');
       }
 
       return true;
 
     } catch (error) {
+      console.error('[AvatarRenderer] ❌ Exception in playAnimation:', error);
       this.logError('AnimationPlayback', 'Failed to play animation', error);
       return false;
     }

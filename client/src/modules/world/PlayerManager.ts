@@ -255,22 +255,49 @@ export class PlayerManager {
       console.log('[PlayerManager] 🔵 avatarRendererV2.createOrUpdateSprite returned:', newSprite ? 'SUCCESS' : 'NULL');
 
       if (newSprite) {
-        console.log('[PlayerManager] ✅ New sprite created successfully, replacing old sprite');
-        logger.debug('[PlayerManager] New sprite created successfully, replacing old sprite');
+        console.log('[PlayerManager] ✅ Sprite updated successfully by AvatarRenderer');
+        console.log('[PlayerManager] Old sprite details:', {
+          exists: !!this.player,
+          x: this.player?.x,
+          y: this.player?.y,
+          texture: this.player?.texture?.key
+        });
+        logger.debug('[PlayerManager] Sprite updated successfully by AvatarRenderer');
 
-        // Replace the old player sprite with the new one
-        this.player.destroy();
+        // IMPORTANT: AvatarRenderer.createOrUpdateSprite() already updated the sprite
+        // It either updated the existing sprite's texture OR created a new one
+        // We just need to update our reference to point to the returned sprite
+
+        console.log('[PlayerManager] 🔵 Updating player reference to point to updated sprite...');
         this.player = newSprite;
+        console.log('[PlayerManager] 🔵 Player reference updated');
+
+        // Set sprite properties (origin, depth, visibility)
+        console.log('[PlayerManager] 🔵 Setting sprite properties...');
         this.player.setOrigin(0.5, 0.5);
         this.player.setDepth(10);
+        this.player.setVisible(true);
+        this.player.setActive(true);
+
+        console.log('[PlayerManager] New sprite details:', {
+          x: this.player.x,
+          y: this.player.y,
+          depth: this.player.depth,
+          texture: this.player.texture.key,
+          visible: this.player.visible,
+          active: this.player.active
+        });
 
         // Play idle animation
-        this.avatarRendererV2.playAnimation(this.playerId, AnimationCategory.IDLE);
+        console.log('[PlayerManager] 🔵 Playing idle animation...');
+        const animResult = this.avatarRendererV2.playAnimation(this.playerId, AnimationCategory.IDLE);
+        console.log('[PlayerManager] Animation play result:', animResult);
 
         console.log('[PlayerManager] ✅ Successfully updated player character to slot', slotNumber);
         logger.info(`[PlayerManager] Successfully updated player character to slot ${slotNumber}`);
       } else {
         console.error('[PlayerManager] ❌ Failed to create sprite for slot', slotNumber);
+        console.error('[PlayerManager] createOrUpdateSprite returned NULL - character may not exist or failed to load');
         logger.warn(`[PlayerManager] Failed to create sprite for slot ${slotNumber}`);
       }
     } catch (error) {

@@ -222,9 +222,21 @@ export const CharacterSelector: React.FC<CharacterSelectorProps> = ({
    * Confirm character switch after preview
    */
   const handleConfirmSwitch = useCallback(() => {
-    if (!previewCharacter) return;
+    console.log('[CharacterSelector] 🔵 handleConfirmSwitch called');
+
+    if (!previewCharacter) {
+      console.log('[CharacterSelector] ❌ No preview character');
+      return;
+    }
+
+    console.log('[CharacterSelector] Preview character:', {
+      name: previewCharacter.name,
+      slotNumber: previewCharacter.slotNumber,
+      username: previewCharacter.username
+    });
 
     const result = CharacterStorage.setActiveCharacter(username, previewCharacter.slotNumber);
+    console.log('[CharacterSelector] setActiveCharacter result:', result);
 
     if (result.success) {
       message.success(`Switched to ${previewCharacter.name}`);
@@ -232,10 +244,15 @@ export const CharacterSelector: React.FC<CharacterSelectorProps> = ({
       setPreviewCharacter(null);
       loadSlots(); // Reload to update active indicator
 
+      console.log('[CharacterSelector] 🔵 About to call onCharacterSwitch callback');
       if (onCharacterSwitch) {
+        console.log('[CharacterSelector] ✅ Calling onCharacterSwitch with slot:', previewCharacter.slotNumber);
         onCharacterSwitch(previewCharacter.slotNumber);
+      } else {
+        console.warn('[CharacterSelector] ⚠️ onCharacterSwitch callback is undefined!');
       }
     } else {
+      console.error('[CharacterSelector] ❌ Failed to set active character:', result.error);
       message.error(result.error || 'Failed to switch character');
     }
   }, [username, previewCharacter, loadSlots, onCharacterSwitch]);
@@ -247,6 +264,16 @@ export const CharacterSelector: React.FC<CharacterSelectorProps> = ({
     setIsPreviewOpen(false);
     setPreviewCharacter(null);
   }, []);
+
+  /**
+   * Handle character update from preview modal
+   */
+  const handleCharacterUpdate = useCallback((updatedCharacter: CharacterSlot) => {
+    // Update the preview character state with the new data
+    setPreviewCharacter(updatedCharacter);
+    // Reload slots to update the card display
+    loadSlots();
+  }, [loadSlots]);
 
   /**
    * Handle create character
@@ -387,6 +414,7 @@ export const CharacterSelector: React.FC<CharacterSelectorProps> = ({
         visible={isPreviewOpen}
         onConfirm={handleConfirmSwitch}
         onCancel={handleCancelPreview}
+        onCharacterUpdate={handleCharacterUpdate}
       />
     </div>
   );

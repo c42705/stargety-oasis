@@ -21,6 +21,8 @@ export interface FramePreviewSystemProps {
   animations: AnimationMapping[];
   imageData: string;
   onFrameSelect: (frameId: string) => void;
+  onFrameRateChange?: (frameRate: number) => void; // Callback for framerate changes
+  initialFrameRate?: number; // Initial framerate value
   className?: string;
 }
 
@@ -42,16 +44,18 @@ export const FramePreviewSystem: React.FC<FramePreviewSystemProps> = ({
   animations,
   imageData,
   onFrameSelect,
+  onFrameRateChange,
+  initialFrameRate = 8,
   className = ''
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number>(0);
-  
+
   const [previewState, setPreviewState] = useState<PreviewState>({
     isPlaying: false,
     currentFrameIndex: 0,
-    frameRate: 8,
+    frameRate: initialFrameRate, // Use initial framerate from props
     selectedAnimation: null,
     loop: true,
     direction: 'forward'
@@ -386,9 +390,15 @@ export const FramePreviewSystem: React.FC<FramePreviewSystemProps> = ({
                 min={1}
                 max={30}
                 value={previewState.frameRate}
-                onChange={(value) => setPreviewState(prev => ({ ...prev, frameRate: value }))}
+                onChange={(value) => {
+                  setPreviewState(prev => ({ ...prev, frameRate: value }));
+                  onFrameRateChange?.(value); // Notify parent of framerate change
+                }}
                 style={{ marginTop: 8 }}
               />
+              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
+                This framerate will be used for all walk animations in-game
+              </Text>
             </div>
           </Card>
         </Col>

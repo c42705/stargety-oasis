@@ -37,6 +37,7 @@ interface BuilderState {
   uploadProgress: number;
   isProcessing: boolean;
   validationErrors: string[];
+  userFrameRate: number; // User-selected framerate for animations
 }
 
 /**
@@ -53,7 +54,8 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
     spriteSheetDefinition: {},
     uploadProgress: 0,
     isProcessing: false,
-    validationErrors: []
+    validationErrors: [],
+    userFrameRate: 8 // Default framerate: 8 FPS
   });
 
   const [selectedFrameIds, setSelectedFrameIds] = useState<string[]>([]);
@@ -67,7 +69,8 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
         spriteSheetDefinition: {},
         uploadProgress: 0,
         isProcessing: false,
-        validationErrors: []
+        validationErrors: [],
+        userFrameRate: 8 // Reset to default framerate
       });
       setSelectedFrameIds([]);
       setGridLayout(null);
@@ -124,7 +127,7 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
         frames: [],
         animations: [],
         defaultSettings: {
-          frameRate: 8,
+          frameRate: builderState.userFrameRate, // Use user-selected framerate
           loop: true,
           category: AnimationCategory.IDLE
         },
@@ -239,6 +242,8 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
   // Step 3: Create default animations
   const createDefaultAnimations = useCallback(() => {
     const { frames } = builderState.spriteSheetDefinition;
+    const { userFrameRate } = builderState;
+
     if (!frames || frames.length < 4) {
       message.error('Need at least 4 frames to create default animations');
       return;
@@ -251,7 +256,7 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
         name: 'Idle',
         sequence: {
           frameIds: [frames[1].id], // Middle frame for idle
-          frameRate: 1,
+          frameRate: userFrameRate, // Use user-selected framerate
           loop: true,
           pingPong: false
         },
@@ -267,7 +272,7 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
         name: 'Walk Down',
         sequence: {
           frameIds: frames.slice(0, 3).map(f => f.id), // First row
-          frameRate: 8,
+          frameRate: userFrameRate, // Use user-selected framerate
           loop: true,
           pingPong: false
         },
@@ -287,7 +292,7 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
         name: 'Walk Left',
         sequence: {
           frameIds: frames.slice(3, 6).map(f => f.id), // Second row
-          frameRate: 8,
+          frameRate: userFrameRate, // Use user-selected framerate
           loop: true,
           pingPong: false
         },
@@ -306,7 +311,7 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
         name: 'Walk Up',
         sequence: {
           frameIds: frames.slice(6, 9).map(f => f.id), // Third row
-          frameRate: 8,
+          frameRate: userFrameRate, // Use user-selected framerate
           loop: true,
           pingPong: false
         },
@@ -324,7 +329,7 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
         name: 'Walk Right',
         sequence: {
           frameIds: frames.slice(3, 6).map(f => f.id), // Reuse left frames
-          frameRate: 8,
+          frameRate: userFrameRate, // Use user-selected framerate
           loop: true,
           pingPong: false
         },
@@ -350,28 +355,28 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
 
   // Validate and save
   const handleSave = useCallback(() => {
-    const { spriteSheetDefinition } = builderState;
-    
+    const { spriteSheetDefinition, userFrameRate } = builderState;
+
     // Validation
     const errors: string[] = [];
-    
+
     if (!spriteSheetDefinition.source) {
       errors.push('No sprite sheet uploaded');
     }
-    
+
     if (!spriteSheetDefinition.frames || spriteSheetDefinition.frames.length === 0) {
       errors.push('No frames defined');
     }
-    
+
     if (!spriteSheetDefinition.animations || spriteSheetDefinition.animations.length === 0) {
       errors.push('No animations defined');
     }
 
     // Check required animations
-    const requiredMissing = REQUIRED_ANIMATIONS.filter(category => 
+    const requiredMissing = REQUIRED_ANIMATIONS.filter(category =>
       !spriteSheetDefinition.animations?.some(anim => anim.category === category)
     );
-    
+
     if (requiredMissing.length > 0) {
       errors.push(`Missing required animations: ${requiredMissing.join(', ')}`);
     }
@@ -382,11 +387,25 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
       return;
     }
 
-    // Save
+    // Save with user-selected framerate in defaultSettings
     const completeDefinition: SpriteSheetDefinition = {
       ...spriteSheetDefinition as SpriteSheetDefinition,
-      id: `avatar_${username}_${Date.now()}`
+      id: `avatar_${username}_${Date.now()}`,
+      defaultSettings: {
+        ...spriteSheetDefinition.defaultSettings!,
+        frameRate: userFrameRate // Save user-selected framerate
+      }
     };
+
+    // Debug logging
+    console.log('[AvatarBuilderModal] Saving character with framerate:', {
+      userFrameRate,
+      defaultSettingsFrameRate: completeDefinition.defaultSettings.frameRate,
+      animations: completeDefinition.animations.map(a => ({
+        category: a.category,
+        frameRate: a.sequence.frameRate
+      }))
+    });
 
     onSave?.(completeDefinition);
     message.success('Avatar saved successfully!');
@@ -517,6 +536,10 @@ export const AvatarBuilderModal: React.FC<AvatarBuilderModalProps> = ({
             animations={builderState.spriteSheetDefinition.animations || []}
             imageData={builderState.spriteSheetDefinition.source.imageData}
             onFrameSelect={(frameId) => setSelectedFrameIds([frameId])}
+            initialFrameRate={builderState.userFrameRate}
+            onFrameRateChange={(frameRate) => {
+              setBuilderState(prev => ({ ...prev, userFrameRate: frameRate }));
+            }}
           />
         </>
       )
