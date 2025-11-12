@@ -603,7 +603,7 @@ export class PhaserMapRenderer {
 
         if (rect) {
           // Update rectangle fill alpha
-          rect.setAlpha(enabled ? 0.7 : 0);
+          rect.setAlpha(enabled ? 1.0 : 0);
 
           // Update stroke (border)
           if (enabled) {
@@ -618,7 +618,7 @@ export class PhaserMapRenderer {
 
         if (text) {
           // Update text visibility
-          text.setAlpha(enabled ? 1 : 0);
+          text.setAlpha(enabled ? 1.0 : 0);
         }
       }
     });
@@ -634,8 +634,8 @@ export class PhaserMapRenderer {
         // It's a Graphics object (polygon) - redraw with new alpha
         obj.clear();
 
-        const fillAlpha = enabled ? 0.3 : 0;
-        const strokeAlpha = enabled ? 0.6 : 0;
+        const fillAlpha = enabled ? 1.0 : 0;
+        const strokeAlpha = enabled ? 1.0 : 0;
 
         obj.fillStyle(0xff0000, fillAlpha);
         obj.lineStyle(4, 0xff0000, strokeAlpha);
@@ -652,8 +652,8 @@ export class PhaserMapRenderer {
         }
       } else if (obj.setAlpha && obj.setStrokeStyle) {
         // It's a Rectangle object
-        const fillAlpha = enabled ? 0.3 : 0;
-        const strokeAlpha = enabled ? 0.8 : 0;
+        const fillAlpha = enabled ? 1.0 : 0;
+        const strokeAlpha = enabled ? 1.0 : 0;
 
         obj.setAlpha(fillAlpha);
         obj.setStrokeStyle(2, 0xff0000, strokeAlpha);

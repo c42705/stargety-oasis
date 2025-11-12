@@ -12,6 +12,7 @@ import './WorldModule.css';
 interface WorldModuleProps {
   playerId: string;
   className?: string;
+  showMapAreas?: boolean;
 }
 
 /**
@@ -26,6 +27,7 @@ interface WorldModuleProps {
 export const WorldModule: React.FC<WorldModuleProps> = ({
   playerId,
   className = '',
+  showMapAreas = false,
 }) => {
   const gameRef = useRef<HTMLDivElement>(null);
   const phaserGameRef = useRef<Phaser.Game | null>(null);
@@ -232,6 +234,13 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
       }
     };
   }, [eventBus, user?.username, playerId, handleAreaClick, updateZoomState]);
+
+  // Update map areas visibility when showMapAreas prop changes
+  useEffect(() => {
+    if (gameSceneRef.current) {
+      gameSceneRef.current.setMapAreasVisibility(showMapAreas);
+    }
+  }, [showMapAreas]);
 
   return (
     <div className={`world-module ${className}`} style={{ height: '100%', width: '100%' }}>

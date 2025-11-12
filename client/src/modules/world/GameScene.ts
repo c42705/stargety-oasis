@@ -78,6 +78,15 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * Set map areas visibility (for admin debug toggle)
+   */
+  setMapAreasVisibility(visible: boolean): void {
+    if (this.mapRenderer) {
+      this.mapRenderer.setDebugMode(visible);
+    }
+  }
+
   create(): void {
     // Initialize and render map from localStorage
     this.mapRenderer.initialize().then(() => {

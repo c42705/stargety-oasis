@@ -147,11 +147,15 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
   const [editingArea, setEditingArea] = useState<InteractiveArea | null>(null);
   const [areaToDelete, setAreaToDelete] = useState<InteractiveArea | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  
+
   const [showCollisionAreaModal, setShowCollisionAreaModal] = useState(false);
   const [editingCollisionArea, setEditingCollisionArea] = useState<any | null>(null);
   const [collisionAreaToDelete, setCollisionAreaToDelete] = useState<any | null>(null);
   const [showCollisionDeleteConfirm, setShowCollisionDeleteConfirm] = useState(false);
+
+  // Keyboard delete confirmation state
+  const [showKeyboardDeleteConfirm, setShowKeyboardDeleteConfirm] = useState(false);
+  const [shapesToDelete, setShapesToDelete] = useState<string[]>([]);
   
   // Drawing mode state
   const [drawingMode, setDrawingMode] = useState(false);
@@ -358,6 +362,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
             return acc;
           }, []),
         };
+
         addCollisionArea(newCollisionArea);
         setPendingCollisionAreaData(null);
         markDirty();
@@ -514,7 +519,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     },
   });
 
-  // Persistence - auto-save is enabled, hook manages state internally
+  // Persistence - auto-save and auto-load are enabled, hook manages state internally
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const persistence = useKonvaPersistence({
     currentState: currentEditorState,
@@ -549,9 +554,22 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
         key: 'Delete',
         description: 'Delete selected shapes',
         handler: () => {
-          setShapes(prev => prev.filter(s => !selectedIds.includes(s.id)));
-          setSelectedIds([]);
-          history.pushState('Delete shapes');
+          // Show confirmation dialog before deleting
+          if (selectedIds.length > 0) {
+            setShapesToDelete(selectedIds);
+            setShowKeyboardDeleteConfirm(true);
+          }
+        },
+      },
+      {
+        key: 'Backspace',
+        description: 'Delete selected shapes (alternative)',
+        handler: () => {
+          // Show confirmation dialog before deleting
+          if (selectedIds.length > 0) {
+            setShapesToDelete(selectedIds);
+            setShowKeyboardDeleteConfirm(true);
+          }
         },
       },
       {
@@ -656,6 +674,27 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
       },
     ],
   });
+
+  // Handle confirmed keyboard delete
+  const handleConfirmKeyboardDelete = useCallback(() => {
+    if (shapesToDelete.length > 0) {
+      // Delete the shapes
+      setShapes(prev => prev.filter(s => !shapesToDelete.includes(s.id)));
+      setSelectedIds([]);
+      markDirty();
+      history.pushState('Delete shapes');
+
+      // Log deletion
+      logger.info('SHAPES DELETED VIA KEYBOARD', {
+        count: shapesToDelete.length,
+        ids: shapesToDelete
+      });
+
+      // Reset state
+      setShapesToDelete([]);
+      setShowKeyboardDeleteConfirm(false);
+    }
+  }, [shapesToDelete, setShapes, setSelectedIds, markDirty, history]);
 
   // ===== SYNC SHAPES WITH MAP DATA =====
   useEffect(() => {
@@ -1383,6 +1422,19 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
         onClose={() => {
           setShowCollisionDeleteConfirm(false);
           setCollisionAreaToDelete(null);
+        }}
+      />
+
+      <ConfirmationDialog
+        isOpen={showKeyboardDeleteConfirm}
+        title="Delete Selected Shapes"
+        message={`Are you sure you want to delete ${shapesToDelete.length} selected shape${shapesToDelete.length > 1 ? 's' : ''}?`}
+        confirmText="Delete"
+        type="danger"
+        onConfirm={handleConfirmKeyboardDelete}
+        onClose={() => {
+          setShowKeyboardDeleteConfirm(false);
+          setShapesToDelete([]);
         }}
       />
     </div>

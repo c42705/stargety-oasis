@@ -5,7 +5,7 @@
  * Supports grid snapping, validation, and keyboard shortcuts.
  */
 
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import type {
   UseKonvaPolygonDrawingParams,
   UseKonvaPolygonDrawingReturn,
@@ -14,6 +14,7 @@ import { screenToWorld } from '../utils/coordinateTransform';
 import { createPolygonShape } from '../utils/shapeFactories';
 import { validatePolygon } from '../utils/validation';
 import { POLYGON_DRAWING } from '../constants/konvaConstants';
+import { shouldIgnoreKeyboardEvent } from '../../../shared/keyboardFocusUtils';
 
 /**
  * Internal drawing state
@@ -71,6 +72,9 @@ export function useKonvaPolygonDrawing(
     isOriginHovered: false,
   });
 
+  // Flag to trigger polygon completion
+  const shouldCompleteRef = useRef(false);
+
   // ==========================================================================
   // COORDINATE UTILITIES
   // ==========================================================================
@@ -89,38 +93,18 @@ export function useKonvaPolygonDrawing(
   );
 
   // ==========================================================================
-  // ORIGIN DETECTION
-  // ==========================================================================
-
-  /**
-   * Check if a point is near the origin (first vertex)
-   */
-  const isNearOrigin = useCallback(
-    (point: { x: number; y: number }): boolean => {
-      if (drawingState.vertices.length < POLYGON_DRAWING.MIN_VERTICES) {
-        return false;
-      }
-
-      const origin = drawingState.vertices[0];
-      const distance = Math.sqrt(
-        Math.pow(point.x - origin.x, 2) + Math.pow(point.y - origin.y, 2)
-      );
-
-      // Threshold in world coordinates (adjust based on zoom)
-      const threshold = POLYGON_DRAWING.CLOSE_THRESHOLD / viewport.zoom;
-      return distance < threshold;
-    },
-    [drawingState.vertices, viewport.zoom]
-  );
-
-  // ==========================================================================
   // POLYGON COMPLETION
   // ==========================================================================
 
   /**
-   * Complete polygon and create shape
+   * Effect to complete polygon when flag is set
+   * This ensures we use the current state, not stale closure state
    */
-  const completePolygon = useCallback(() => {
+  useEffect(() => {
+    if (!shouldCompleteRef.current) return;
+
+    shouldCompleteRef.current = false;
+
     if (drawingState.vertices.length < POLYGON_DRAWING.MIN_VERTICES) {
       onValidationError?.([
         `Polygon must have at least ${POLYGON_DRAWING.MIN_VERTICES} vertices`,
@@ -163,7 +147,16 @@ export function useKonvaPolygonDrawing(
       previewPoint: null,
       isOriginHovered: false,
     });
-  }, [drawingState.vertices, category, onShapeCreate, onValidationError]);
+  }, [drawingState, category, onShapeCreate, onValidationError]);
+
+  /**
+   * Trigger polygon completion
+   */
+  const completePolygon = useCallback(() => {
+    shouldCompleteRef.current = true;
+    // Force a re-render to trigger the useEffect
+    setDrawingState(prev => ({ ...prev }));
+  }, []);
 
   // ==========================================================================
   // EVENT HANDLERS
@@ -181,20 +174,32 @@ export function useKonvaPolygonDrawing(
       const worldPos = screenToWorld(pointerPos.x, pointerPos.y, viewport);
       const snappedPos = snapPoint(worldPos);
 
-      // Check if clicking on origin to close polygon
-      if (isNearOrigin(snappedPos)) {
-        completePolygon();
-        return;
-      }
+      // Use functional state update to access current state
+      setDrawingState((prev) => {
+        // Check if clicking on origin to close polygon
+        const origin = prev.vertices[0];
+        if (prev.vertices.length >= POLYGON_DRAWING.MIN_VERTICES && origin) {
+          const distance = Math.sqrt(
+            Math.pow(snappedPos.x - origin.x, 2) + Math.pow(snappedPos.y - origin.y, 2)
+          );
+          const threshold = POLYGON_DRAWING.CLOSE_THRESHOLD / viewport.zoom;
 
-      // Add vertex
-      setDrawingState((prev) => ({
-        ...prev,
-        isDrawing: true,
-        vertices: [...prev.vertices, snappedPos],
-      }));
+          if (distance < threshold) {
+            // Set flag to trigger completion
+            shouldCompleteRef.current = true;
+            return prev; // Don't add vertex, completion will happen in useEffect
+          }
+        }
+
+        // Add vertex
+        return {
+          ...prev,
+          isDrawing: true,
+          vertices: [...prev.vertices, snappedPos],
+        };
+      });
     },
-    [enabled, viewport, snapPoint, isNearOrigin, completePolygon]
+    [enabled, viewport, snapPoint]
   );
 
   /**
@@ -202,34 +207,51 @@ export function useKonvaPolygonDrawing(
    */
   const handleMouseMove = useCallback(
     (e: any) => {
-      if (!drawingState.isDrawing || drawingState.vertices.length === 0) return;
-
       const stage = e.target.getStage();
       const pointerPos = stage.getPointerPosition();
       const worldPos = screenToWorld(pointerPos.x, pointerPos.y, viewport);
       const snappedPos = snapPoint(worldPos);
 
-      // Check if hovering over origin
-      const hovering = isNearOrigin(snappedPos);
+      // Use functional state update to access current state
+      setDrawingState((prev) => {
+        if (!prev.isDrawing || prev.vertices.length === 0) return prev;
 
-      setDrawingState((prev) => ({
-        ...prev,
-        previewPoint: snappedPos,
-        isOriginHovered: hovering,
-      }));
+        // Check if hovering over origin
+        const origin = prev.vertices[0];
+        let hovering = false;
+
+        if (prev.vertices.length >= POLYGON_DRAWING.MIN_VERTICES && origin) {
+          const distance = Math.sqrt(
+            Math.pow(snappedPos.x - origin.x, 2) + Math.pow(snappedPos.y - origin.y, 2)
+          );
+          const threshold = POLYGON_DRAWING.CLOSE_THRESHOLD / viewport.zoom;
+          hovering = distance < threshold;
+        }
+
+        return {
+          ...prev,
+          previewPoint: snappedPos,
+          isOriginHovered: hovering,
+        };
+      });
     },
-    [drawingState.isDrawing, drawingState.vertices.length, viewport, snapPoint, isNearOrigin]
+    [viewport, snapPoint]
   );
 
   /**
    * Handle double click - complete polygon
    */
   const handleDoubleClick = useCallback(() => {
-    if (!drawingState.isDrawing || drawingState.vertices.length < POLYGON_DRAWING.MIN_VERTICES) {
-      return;
-    }
-    completePolygon();
-  }, [drawingState.isDrawing, drawingState.vertices.length, completePolygon]);
+    setDrawingState((prev) => {
+      if (!prev.isDrawing || prev.vertices.length < POLYGON_DRAWING.MIN_VERTICES) {
+        return prev;
+      }
+
+      // Set flag to trigger completion
+      shouldCompleteRef.current = true;
+      return prev; // Completion will happen in useEffect
+    });
+  }, []);
 
   /**
    * Cancel drawing and reset state
@@ -264,6 +286,11 @@ export function useKonvaPolygonDrawing(
     if (!enabled) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore keyboard events when typing in inputs or when modal is open
+      if (shouldIgnoreKeyboardEvent()) {
+        return;
+      }
+
       // Enter - complete polygon
       if (e.key === 'Enter' && drawingState.isDrawing && drawingState.vertices.length >= POLYGON_DRAWING.MIN_VERTICES) {
         e.preventDefault();

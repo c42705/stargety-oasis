@@ -217,6 +217,7 @@ const AppContent: React.FC = () => {
               <WorldModule
                 playerId={user.username}
                 className="world-module-panel"
+                showMapAreas={showMapAreas}
               />
             }
             rightTopPanel={
