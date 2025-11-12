@@ -41,7 +41,7 @@ map-editor-konva/
 
 ## 🎯 Architecture Principles
 
-This implementation follows the patterns validated in the POC (`map-editor-poc/`):
+This implementation follows a hook-based architecture pattern:
 
 ### 1. Hook-Based Architecture
 Each feature is isolated in its own hook, making the code:
@@ -112,18 +112,18 @@ The migration from Fabric.js to React Konva has been successfully completed. The
 
 See `FEATURE_PARITY_COMPARISON.md` for detailed feature comparison with Fabric.js editor.
 
-## 📚 Reference Implementation
+## 📚 Implementation Details
 
-The POC implementation at `client/src/modules/map-editor-poc/` serves as the reference for this production implementation. Key differences:
+This is the production-ready Konva-based map editor implementation with the following characteristics:
 
-| Aspect | POC | Production |
-|--------|-----|------------|
-| **Purpose** | Validate feasibility | Production-ready code |
-| **Data** | localStorage | Backend + SharedMap |
-| **Error Handling** | Basic | Comprehensive |
-| **Testing** | Manual | Automated tests |
-| **Integration** | Standalone | Full integration |
-| **Performance** | Good enough | Optimized |
+| Aspect | Implementation |
+|--------|----------------|
+| **Purpose** | Production-ready code |
+| **Data** | Backend + SharedMap |
+| **Error Handling** | Comprehensive |
+| **Testing** | Automated tests |
+| **Integration** | Full integration |
+| **Performance** | Optimized |
 
 ## 🛠️ Development Guidelines
 
@@ -191,14 +191,12 @@ interface EditorState {
 ## 📖 Additional Documentation
 
 - **Migration Plan**: `client/src/docs/fabricjs-to-react-konva-migration-plan.md`
-- **POC Implementation Guide**: `client/src/docs/konva-poc-implementation-guide.md`
-- **POC Evaluation**: `client/src/docs/konva-poc-evaluation-checklist.md`
 
 ## 🤝 Contributing
 
 When working on this module:
 
-1. **Follow POC Patterns**: Use the POC as a reference for architecture and patterns
+1. **Follow Hook-Based Architecture**: Keep hooks focused and modular
 2. **Keep Hooks Focused**: Each hook should have a single responsibility
 3. **Test Thoroughly**: Write tests for all new functionality
 4. **Document Changes**: Update this README and related docs

@@ -11,7 +11,6 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const chatController_1 = require("./chat/chatController");
 const worldController_1 = require("./world/worldController");
 const videoCallController_1 = require("./video-call/videoCallController");
-const ringCentralController_1 = require("./ringcentral/ringCentralController");
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -84,23 +83,10 @@ app.get('/api/video/rooms', (req, res) => {
     const rooms = videoCallController.getAllVideoCallRooms();
     res.json({ success: true, data: rooms });
 });
-app.get('/api/ringcentral/calls/:callId', (req, res) => {
-    const { callId } = req.params;
-    const call = ringCentralController.getActiveCall(callId);
-    if (!call) {
-        return res.status(404).json({ success: false, error: 'Call not found' });
-    }
-    res.json({ success: true, data: call });
-});
-app.get('/api/ringcentral/calls', (req, res) => {
-    const calls = ringCentralController.getAllActiveCalls();
-    res.json({ success: true, data: calls });
-});
 // Initialize controllers
 const chatController = new chatController_1.ChatController(io);
 const worldController = new worldController_1.WorldController(io);
 const videoCallController = new videoCallController_1.VideoCallController(io);
-const ringCentralController = new ringCentralController_1.RingCentralController(io);
 // Socket.IO connection handling
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
@@ -114,18 +100,12 @@ io.on('connection', (socket) => {
     // Video call events
     socket.on('join-video-call', (data) => videoCallController.handleJoinVideoCall(socket, data));
     socket.on('leave-video-call', (data) => videoCallController.handleLeaveVideoCall(socket, data));
-    // RingCentral events
-    socket.on('ringcentral-call-started', (data) => ringCentralController.handleCallStarted(socket, data));
-    socket.on('ringcentral-participant-joined', (data) => ringCentralController.handleParticipantJoined(socket, data));
-    socket.on('ringcentral-participant-left', (data) => ringCentralController.handleParticipantLeft(socket, data));
-    socket.on('ringcentral-call-ended', (data) => ringCentralController.handleCallEnded(socket, data));
     // Handle disconnection
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.id}`);
         chatController.handleDisconnect(socket);
         worldController.handleDisconnect(socket);
         videoCallController.handleDisconnect(socket);
-        ringCentralController.handleDisconnect(socket);
     });
 });
 // Start server

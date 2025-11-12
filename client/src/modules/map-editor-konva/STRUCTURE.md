@@ -94,7 +94,7 @@ Reusable UI components for the map editor.
   - Wrapper component for shapes that can be transformed
   - Integrates Konva.Transformer
   - Handles resize/rotate
-  - Ports from POC TransformableRect/TransformablePolygon
+  - Provides TransformableRect, TransformablePolygon, and TransformableImage components
 
 - **`PolygonEditor.tsx`**
   - Polygon vertex editing UI
@@ -295,7 +295,5 @@ This module depends on:
 
 ## 📚 References
 
-- POC Implementation: `client/src/modules/map-editor-poc/`
 - Migration Plan: `client/src/docs/fabricjs-to-react-konva-migration-plan.md`
-- POC Guide: `client/src/docs/konva-poc-implementation-guide.md`
 

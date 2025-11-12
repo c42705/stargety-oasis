@@ -18,18 +18,18 @@ import { useWorldDimensions } from '../../shared/useWorldDimensions';
 import { AreaFormModal } from '../../components/AreaFormModal';
 import { CollisionAreaFormModal } from '../../components/CollisionAreaFormModal';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
-import { EditorToolbar } from '../map-editor/components/EditorToolbar';
-import { EditorStatusBar } from '../map-editor/components/EditorStatusBar';
-import { AreasTab } from '../map-editor/components/tabs/AreasTab';
-import { TerrainTab } from '../map-editor/components/tabs/TerrainTab';
-import { AssetsTab } from '../map-editor/components/tabs/AssetsTab';
-import { CollisionTab } from '../map-editor/components/tabs/CollisionTab';
-import { JitsiTab } from '../map-editor/components/tabs/JitsiTab';
-import { SettingsTab } from '../map-editor/components/tabs/SettingsTab';
+import { EditorToolbar } from './components/shared/EditorToolbar';
+import { EditorStatusBar } from './components/shared/EditorStatusBar';
+import { AreasTab } from './components/tabs/AreasTab';
+import { TerrainTab } from './components/tabs/TerrainTab';
+import { AssetsTab } from './components/tabs/AssetsTab';
+import { CollisionTab } from './components/tabs/CollisionTab';
+import { JitsiTab } from './components/tabs/JitsiTab';
+import { SettingsTab } from './components/tabs/SettingsTab';
 import { shouldIgnoreKeyboardEvent } from '../../shared/keyboardFocusUtils';
 
 // Import CSS
-import '../map-editor/MapEditorModule.css';
+import './MapEditorModule.css';
 
 // Import Konva hooks
 import { useKonvaLayers } from './hooks/useKonvaLayers';
@@ -58,7 +58,7 @@ import { PolygonEditor } from './components/PolygonEditor';
 // Import types
 import type { Shape, EditorState, Viewport, GridConfig } from './types';
 import type { EditorTool as KonvaEditorTool } from './types';
-import type { EditorTool as FabricEditorTool } from '../map-editor/types/editor.types';
+import type { EditorTool as FabricEditorTool } from './types/editor.types';
 import { VIEWPORT_DEFAULTS, GRID_DEFAULTS } from './constants/konvaConstants';
 
 // Import utilities
@@ -67,10 +67,8 @@ import { calculateZoomToShape } from './utils/zoomToShape';
 import { duplicateShape, groupShapes, ungroupShapes, createImageShape } from './utils/shapeFactories';
 
 // Import shared types
-import type { TabId } from '../map-editor/types/editor.types';
-import { EDITOR_TABS } from '../map-editor/constants/editorConstants';
-
-import '../map-editor/MapEditorModule.css';
+import type { TabId } from './types/editor.types';
+import { EDITOR_TABS } from './constants/editorConstants';
 
 // ============================================================================
 // TYPE ADAPTERS
@@ -955,8 +953,8 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
 
   // ===== RENDER =====
 
-  // Create Fabric.js-compatible EditorState for toolbar
-  const fabricEditorState: import('../map-editor/types/editor.types').EditorState = {
+  // Create EditorState for toolbar
+  const fabricEditorState: import('./types/editor.types').EditorState = {
     tool: konvaToFabricTool(currentTool),
     zoom: viewport.zoom * 100, // Convert to percentage
     mousePosition: { x: 0, y: 0 },
@@ -966,8 +964,8 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     isPanning: currentTool === 'pan',
   };
 
-  // Create Fabric.js-compatible GridConfig for toolbar
-  const fabricGridConfig: import('../map-editor/types/editor.types').GridConfig = {
+  // Create GridConfig for toolbar
+  const fabricGridConfig: import('./types/editor.types').GridConfig = {
     spacing: gridConfig.spacing,
     opacity: gridConfig.opacity,
     pattern: 'pattern-32px', // Default pattern
@@ -1076,6 +1074,18 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
             <Layer ref={layerRefs.shapesLayer}>
               {shapes.map(shape => {
                 const geom = shape.geometry;
+
+                // Debug logging for image shapes
+                if (geom.type === 'image') {
+                  console.log('[KonvaMapEditor] Rendering image shape:', {
+                    id: shape.id,
+                    fileName: geom.fileName,
+                    position: { x: geom.x, y: geom.y },
+                    size: { width: geom.width, height: geom.height },
+                    isSelected: selectedIds.includes(shape.id)
+                  });
+                }
+
                 if (geom.type === 'polygon') {
                   // Polygon geometry
                   return (
@@ -1227,9 +1237,28 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
               {activeTab === 'assets' && (
                 <AssetsTab
                   onPlaceAsset={(fileData, fileName, width, height) => {
+                    console.log('[KonvaMapEditor] onPlaceAsset called:', {
+                      fileName,
+                      dimensions: { width, height },
+                      imageDataLength: fileData?.length || 0,
+                      imageDataPrefix: fileData?.substring(0, 30) || 'N/A',
+                      viewport: {
+                        pan: viewport.pan,
+                        zoom: viewport.zoom,
+                        viewportSize: { width: viewportWidth, height: viewportHeight }
+                      }
+                    });
+
                     // Calculate center of viewport
                     const centerX = -viewport.pan.x + (viewportWidth / 2) / viewport.zoom;
                     const centerY = -viewport.pan.y + (viewportHeight / 2) / viewport.zoom;
+
+                    console.log('[KonvaMapEditor] Calculated position:', {
+                      centerX,
+                      centerY,
+                      finalX: centerX - width / 2,
+                      finalY: centerY - height / 2
+                    });
 
                     // Create image shape at viewport center
                     const imageShape = createImageShape({
@@ -1241,11 +1270,28 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
                       fileName,
                     });
 
+                    console.log('[KonvaMapEditor] Created image shape:', {
+                      id: imageShape.id,
+                      category: imageShape.category,
+                      geometry: imageShape.geometry,
+                      style: imageShape.style,
+                      metadata: imageShape.metadata
+                    });
+
                     // Add shape to map
-                    setShapes(prev => [...prev, imageShape]);
+                    setShapes(prev => {
+                      const newShapes = [...prev, imageShape];
+                      console.log('[KonvaMapEditor] Updated shapes array:', {
+                        previousCount: prev.length,
+                        newCount: newShapes.length,
+                        imageShapes: newShapes.filter(s => s.geometry.type === 'image').length
+                      });
+                      return newShapes;
+                    });
 
                     // Select the new shape
                     selection.selectShape(imageShape.id);
+                    console.log('[KonvaMapEditor] Selected shape:', imageShape.id);
 
                     // Mark as dirty
                     markDirty();
