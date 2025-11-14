@@ -347,6 +347,13 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     enabled: currentTool === 'polygon' || collisionDrawingMode,
     snapToGrid: grid.snapToGrid,
     onShapeCreate: (shape: Shape) => {
+      console.log('[KonvaMapEditor] Polygon shape created:', shape);
+      console.log('[KonvaMapEditor] Current state:', {
+        pendingCollisionAreaData,
+        collisionDrawingMode,
+        currentTool
+      });
+
       // If we have pending collision area data, create the collision area
       if (pendingCollisionAreaData && shape.geometry.type === 'polygon') {
         const polygon = shape.geometry;
@@ -363,9 +370,14 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
           }, []),
         };
 
+        console.log('[KonvaMapEditor] Adding collision area:', newCollisionArea);
         addCollisionArea(newCollisionArea);
         setPendingCollisionAreaData(null);
         markDirty();
+
+        console.log('[KonvaMapEditor] Collision area added, shapes will be synced via useEffect');
+      } else {
+        console.log('[KonvaMapEditor] No pending collision area data, polygon not saved');
       }
 
       history.pushState('Draw polygon');
@@ -917,21 +929,28 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
   }, [collisionAreaToDelete, removeCollisionArea, markDirty]);
 
   const handleCollisionAreaFormSubmit = useCallback((data: any) => {
+    console.log('[KonvaMapEditor] Collision area form submitted:', data);
+
     if (editingCollisionArea) {
       // Update existing collision area
+      console.log('[KonvaMapEditor] Updating existing collision area:', editingCollisionArea.id);
       updateCollisionArea(editingCollisionArea.id, data);
       markDirty();
       setShowCollisionAreaModal(false);
       setEditingCollisionArea(null);
     } else {
       // For new collision areas, save the data and enter drawing mode
+      console.log('[KonvaMapEditor] Setting pending collision area data and entering drawing mode');
+      console.log('[KonvaMapEditor] Drawing mode:', data.drawingMode);
       setPendingCollisionAreaData(data);
       setShowCollisionAreaModal(false);
       setCollisionDrawingMode(true);
       // Set tool based on drawing mode from the form
       if (data.drawingMode === 'rectangle') {
+        console.log('[KonvaMapEditor] Setting tool to rect');
         setCurrentTool('rect');
       } else {
+        console.log('[KonvaMapEditor] Setting tool to polygon');
         setCurrentTool('polygon');
       }
     }

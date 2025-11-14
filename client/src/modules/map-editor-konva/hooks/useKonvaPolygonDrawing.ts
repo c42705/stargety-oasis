@@ -105,7 +105,13 @@ export function useKonvaPolygonDrawing(
 
     shouldCompleteRef.current = false;
 
+    console.log('[PolygonDrawing] Completing polygon with current state:', {
+      vertexCount: drawingState.vertices.length,
+      isDrawing: drawingState.isDrawing,
+    });
+
     if (drawingState.vertices.length < POLYGON_DRAWING.MIN_VERTICES) {
+      console.log('[PolygonDrawing] Cannot complete - not enough vertices');
       onValidationError?.([
         `Polygon must have at least ${POLYGON_DRAWING.MIN_VERTICES} vertices`,
       ]);
@@ -113,11 +119,14 @@ export function useKonvaPolygonDrawing(
     }
 
     if (drawingState.vertices.length > POLYGON_DRAWING.MAX_VERTICES) {
+      console.log('[PolygonDrawing] Cannot complete - too many vertices');
       onValidationError?.([
         `Polygon cannot have more than ${POLYGON_DRAWING.MAX_VERTICES} vertices`,
       ]);
       return;
     }
+
+    console.log('[PolygonDrawing] Creating polygon shape...');
 
     // Create shape
     const shape = createPolygonShape({
@@ -125,9 +134,12 @@ export function useKonvaPolygonDrawing(
       category,
     });
 
+    console.log('[PolygonDrawing] Shape created:', shape);
+
     // Validate polygon
     const validation = validatePolygon(shape.geometry as any);
     if (!validation.isValid) {
+      console.log('[PolygonDrawing] Validation failed:', validation.errors);
       onValidationError?.(validation.errors);
       return;
     }
@@ -137,8 +149,12 @@ export function useKonvaPolygonDrawing(
       console.warn('Polygon warnings:', validation.warnings);
     }
 
+    console.log('[PolygonDrawing] Calling onShapeCreate...');
+
     // Create shape
     onShapeCreate?.(shape);
+
+    console.log('[PolygonDrawing] Resetting drawing state...');
 
     // Reset state
     setDrawingState({
@@ -147,12 +163,15 @@ export function useKonvaPolygonDrawing(
       previewPoint: null,
       isOriginHovered: false,
     });
+
+    console.log('[PolygonDrawing] Polygon completed successfully!');
   }, [drawingState, category, onShapeCreate, onValidationError]);
 
   /**
    * Trigger polygon completion
    */
   const completePolygon = useCallback(() => {
+    console.log('[PolygonDrawing] Setting completion flag...');
     shouldCompleteRef.current = true;
     // Force a re-render to trigger the useEffect
     setDrawingState(prev => ({ ...prev }));
@@ -167,7 +186,10 @@ export function useKonvaPolygonDrawing(
    */
   const handleClick = useCallback(
     (e: any) => {
-      if (!enabled) return;
+      if (!enabled) {
+        console.log('[PolygonDrawing] Click ignored - not enabled');
+        return;
+      }
 
       const stage = e.target.getStage();
       const pointerPos = stage.getPointerPosition();
@@ -176,6 +198,8 @@ export function useKonvaPolygonDrawing(
 
       // Use functional state update to access current state
       setDrawingState((prev) => {
+        console.log('[PolygonDrawing] Click at:', snappedPos, 'current vertices:', prev.vertices.length);
+
         // Check if clicking on origin to close polygon
         const origin = prev.vertices[0];
         if (prev.vertices.length >= POLYGON_DRAWING.MIN_VERTICES && origin) {
@@ -185,6 +209,7 @@ export function useKonvaPolygonDrawing(
           const threshold = POLYGON_DRAWING.CLOSE_THRESHOLD / viewport.zoom;
 
           if (distance < threshold) {
+            console.log('[PolygonDrawing] Clicking near origin - triggering completion');
             // Set flag to trigger completion
             shouldCompleteRef.current = true;
             return prev; // Don't add vertex, completion will happen in useEffect
@@ -192,6 +217,7 @@ export function useKonvaPolygonDrawing(
         }
 
         // Add vertex
+        console.log('[PolygonDrawing] Adding vertex');
         return {
           ...prev,
           isDrawing: true,
@@ -228,6 +254,10 @@ export function useKonvaPolygonDrawing(
           hovering = distance < threshold;
         }
 
+        if (hovering && !prev.isOriginHovered) {
+          console.log('[PolygonDrawing] Hovering over origin - should show yellow highlight');
+        }
+
         return {
           ...prev,
           previewPoint: snappedPos,
@@ -242,11 +272,20 @@ export function useKonvaPolygonDrawing(
    * Handle double click - complete polygon
    */
   const handleDoubleClick = useCallback(() => {
+    // Access current state via ref or check in completePolygon
     setDrawingState((prev) => {
+      console.log('[PolygonDrawing] Double-click detected', {
+        isDrawing: prev.isDrawing,
+        vertexCount: prev.vertices.length,
+        minVertices: POLYGON_DRAWING.MIN_VERTICES
+      });
+
       if (!prev.isDrawing || prev.vertices.length < POLYGON_DRAWING.MIN_VERTICES) {
+        console.log('[PolygonDrawing] Double-click ignored - not enough vertices');
         return prev;
       }
 
+      console.log('[PolygonDrawing] Triggering polygon completion via double-click');
       // Set flag to trigger completion
       shouldCompleteRef.current = true;
       return prev; // Completion will happen in useEffect
@@ -288,21 +327,30 @@ export function useKonvaPolygonDrawing(
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore keyboard events when typing in inputs or when modal is open
       if (shouldIgnoreKeyboardEvent()) {
+        console.log('[PolygonDrawing] Keyboard event ignored - input focused or modal open');
         return;
       }
 
+      console.log('[PolygonDrawing] Key pressed:', e.key, {
+        isDrawing: drawingState.isDrawing,
+        vertexCount: drawingState.vertices.length
+      });
+
       // Enter - complete polygon
       if (e.key === 'Enter' && drawingState.isDrawing && drawingState.vertices.length >= POLYGON_DRAWING.MIN_VERTICES) {
+        console.log('[PolygonDrawing] Completing polygon via Enter key');
         e.preventDefault();
         completePolygon();
       }
       // Escape - cancel drawing
       else if (e.key === 'Escape' && drawingState.isDrawing) {
+        console.log('[PolygonDrawing] Canceling polygon via Escape key');
         e.preventDefault();
         cancelDrawing();
       }
       // Backspace - remove last vertex
       else if (e.key === 'Backspace' && drawingState.isDrawing && drawingState.vertices.length > 0) {
+        console.log('[PolygonDrawing] Removing last vertex via Backspace key');
         e.preventDefault();
         removeLastVertex();
       }
