@@ -7,17 +7,12 @@
  * This component mirrors the structure of MapEditorModule.tsx but uses Konva instead of Fabric.js.
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Stage, Layer, Line, Image as KonvaImage } from 'react-konva';
+import React, { useEffect, useCallback } from 'react';
 import { logger } from '../../shared/logger';
-import { Eye, Square, Shield } from 'lucide-react';
 import { useMapData, InteractiveArea } from '../../shared/MapDataContext';
 import { useMapStore } from '../../stores/useMapStore';
 import { useMapStoreInit } from '../../stores/useMapStoreInit';
 import { useWorldDimensions } from '../../shared/useWorldDimensions';
-import { AreaFormModal } from '../../components/AreaFormModal';
-import { CollisionAreaFormModal } from '../../components/CollisionAreaFormModal';
-import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 import { EditorToolbar } from './components/shared/EditorToolbar';
 import { EditorStatusBar } from './components/shared/EditorStatusBar';
 import { shouldIgnoreKeyboardEvent } from '../../shared/keyboardFocusUtils';
@@ -47,36 +42,27 @@ import { useToolbarHandlers } from './hooks/useToolbarHandlers';
 import { useAreaHandlers } from './hooks/useAreaHandlers';
 import { useLayersHandlers } from './hooks/useLayersHandlers';
 import { useStageEventHandlers } from './hooks/useStageEventHandlers';
+import { useRenderPreparation } from './hooks/useRenderPreparation';
 
 // Import Konva components
 import { KonvaLayersPanel } from './components/KonvaLayersPanel';
-import { TransformablePolygon, TransformableRect, TransformableImage, TransformerComponent } from './components/TransformableShape';
-import { AnimatedGifImage } from './components/AnimatedGifImage';
-import { PolygonDrawingPreview } from './components/PolygonDrawingPreview';
-import { RectangleDrawingPreview } from './components/RectangleDrawingPreview';
-import { SelectionRect } from './components/SelectionRect';
-import { PolygonEditor } from './components/PolygonEditor';
 
 // Import refactored components
 import { EditorCanvas } from './components/EditorCanvas';
-import { EditorSidebar } from './components/EditorSidebar';
 import { EditorModals } from './components/EditorModals';
+import { EditorSidebar } from './components/EditorSidebar';
 
 // Import types
-import type { Shape, EditorState, Viewport, GridConfig } from './types';
+import type { Shape, EditorState } from './types';
 import type { EditorTool as KonvaEditorTool } from './types';
-import type { EditorTool as FabricEditorTool } from './types/editor.types';
-import { VIEWPORT_DEFAULTS, GRID_DEFAULTS } from './constants/konvaConstants';
 
 // Import utilities
 import { mapDataToShapes, shapeToInteractiveArea, shapeToImpassableArea } from './utils/mapDataAdapter';
 import { calculateZoomToShape } from './utils/zoomToShape';
-import { duplicateShape, groupShapes, ungroupShapes, createImageShape } from './utils/shapeFactories';
-import { screenToWorld } from './utils/coordinateTransform';
+import { duplicateShape, groupShapes, ungroupShapes } from './utils/shapeFactories';
+import { placeAsset, convertFabricToKonvaGridConfig } from './utils/editorHelpers';
 
-// Import shared types
-import type { TabId } from './types/editor.types';
-import { EDITOR_TABS } from './constants/editorConstants';
+
 
 // ============================================================================
 // DEAD CODE REMOVED
@@ -825,44 +811,17 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     setViewport(newViewport);
   }, [mainRef, setViewport]);
 
-  // ===== RENDER =====
+  // ===== RENDER PREPARATION =====
 
-  // Create EditorState for toolbar (Fabric.js compatibility layer)
-  // When spacebar is pressed, show 'pan' tool in the status bar
-  const effectiveTool = isSpacebarPressed ? 'pan' : currentTool;
-
-  // Map Konva tool to Fabric tool for legacy components
-  const mapKonvaToFabricTool = (tool: typeof currentTool): import('./types/editor.types').EditorTool => {
-    switch (tool) {
-      case 'polygon':
-        return 'draw-polygon';
-      case 'rect':
-      case 'edit-vertex':
-      case 'delete':
-        return 'select'; // Map unsupported tools to select
-      default:
-        return tool as import('./types/editor.types').EditorTool;
-    }
-  };
-
-  const fabricEditorState: import('./types/editor.types').EditorState = {
-    tool: mapKonvaToFabricTool(effectiveTool),
-    zoom: viewport.zoom * 100, // Convert to percentage
-    mousePosition: { x: 0, y: 0 },
-    saveStatus: 'saved',
+  // Prepare data for rendering (convert Konva types to Fabric.js types for legacy components)
+  const { fabricEditorState, fabricGridConfig } = useRenderPreparation({
+    currentTool,
+    isSpacebarPressed,
+    viewport,
+    gridConfig,
     canUndo: history.canUndo,
     canRedo: history.canRedo,
-    isPanning: currentTool === 'pan',
-  };
-
-  // Create GridConfig for toolbar
-  const fabricGridConfig: import('./types/editor.types').GridConfig = {
-    spacing: gridConfig.spacing,
-    opacity: gridConfig.opacity,
-    pattern: 'pattern-32px', // Default pattern
-    visible: gridConfig.visible,
-    snapToGrid: gridConfig.snapToGrid || false,
-  };
+  });
 
   // ===== HANDLERS =====
 
@@ -875,65 +834,25 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
 
   // Handle asset placement from AssetsTab
   const handlePlaceAsset = useCallback((fileData: string, fileName: string, width: number, height: number) => {
-    logger.info('PLACE ASSET CALLED', {
+    placeAsset({
+      fileData,
       fileName,
-      dimensions: { width, height },
-      viewport: {
-        pan: viewport.pan,
-        zoom: viewport.zoom,
-        viewportSize: { width: viewportWidth, height: viewportHeight }
-      }
-    });
-
-    // Calculate center of viewport in screen coordinates
-    const screenCenter = {
-      x: viewportWidth / 2,
-      y: viewportHeight / 2
-    };
-
-    // Convert screen coordinates to world coordinates
-    const worldCenter = screenToWorld(screenCenter.x, screenCenter.y, viewport);
-
-    // Create image shape at viewport center
-    const imageShape = createImageShape({
-      x: worldCenter.x - width / 2,
-      y: worldCenter.y - height / 2,
       width,
       height,
-      imageData: fileData,
-      fileName,
+      viewport,
+      viewportWidth,
+      viewportHeight,
+      onShapeCreated: (shape) => setShapes(prev => [...prev, shape]),
+      onSelectShape: selection.selectShape,
+      onZoomToShape: handleZoomToShape,
+      onMarkDirty: markDirty,
     });
-
-    // Add shape to map
-    setShapes(prev => [...prev, imageShape]);
-
-    // Select the new shape
-    selection.selectShape(imageShape.id);
-
-    // Zoom to the placed asset
-    handleZoomToShape(imageShape);
-
-    // Mark as dirty
-    markDirty();
-
-    logger.info('ASSET PLACED ON MAP', {
-      id: imageShape.id,
-      fileName,
-      position: { x: imageShape.geometry.x, y: imageShape.geometry.y },
-      dimensions: { width, height }
-    });
-  }, [viewport, viewportWidth, viewportHeight, setShapes, selection, handleZoomToShape, markDirty]);
+  }, [viewport, viewportWidth, viewportHeight, setShapes, selection.selectShape, handleZoomToShape, markDirty]);
 
   // Handle grid config change from SettingsTab (Fabric.js format)
   const handleGridConfigChange = useCallback((newConfig: Partial<import('./types/editor.types').GridConfig>) => {
-    // Convert Fabric.js GridConfig back to Konva GridConfig
-    setGridConfig({
-      visible: newConfig.visible ?? gridConfig.visible,
-      spacing: newConfig.spacing ?? gridConfig.spacing,
-      pattern: gridConfig.pattern, // Keep current pattern
-      color: gridConfig.color,
-      opacity: newConfig.opacity ?? gridConfig.opacity,
-    });
+    const konvaConfig = convertFabricToKonvaGridConfig(newConfig, gridConfig);
+    setGridConfig(konvaConfig);
   }, [gridConfig, setGridConfig]);
 
   // ===== RENDER =====
@@ -989,219 +908,36 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
         />
 
         {/* Canvas Container */}
-        <main ref={mainRef} className="editor-main" style={{ position: 'relative', cursor: cursorStyle }}>
-          {viewportWidth > 0 && viewportHeight > 0 && (
-            <Stage
-              ref={stageRef}
-              width={viewportWidth}
-              height={viewportHeight}
-              scaleX={viewport.zoom}
-              scaleY={viewport.zoom}
-              x={viewport.pan.x}
-              y={viewport.pan.y}
-              onClick={stageEventHandlers.handleStageClick}
-              onMouseDown={stageEventHandlers.handleStageMouseDown}
-              onMouseMove={stageEventHandlers.handleStageMouseMove}
-              onMouseUp={stageEventHandlers.handleStageMouseUp}
-              onDblClick={stageEventHandlers.handleStageDoubleClick}
-              onWheel={zoom.handleWheel}
-            >
-            {/* Background Layer - Render first (bottom) */}
-            <Layer ref={layerRefs.backgroundLayer}>
-              {background.image && (
-                <KonvaImage
-                  image={background.image}
-                  x={0}
-                  y={0}
-                  width={background.dimensions?.width}
-                  height={background.dimensions?.height}
-                  listening={false}
-                />
-              )}
-            </Layer>
-
-            {/* Grid Layer - Render on top of background */}
-            <Layer ref={layerRefs.gridLayer}>
-              {(() => {
-                // Debug logging for grid rendering
-                if (grid.shouldRenderGrid && grid.gridLines.length > 0) {
-                  logger.debug('GRID_RENDERING', {
-                    gridLinesCount: grid.gridLines.length,
-                    gridConfig: gridConfig,
-                    firstLine: grid.gridLines[0],
-                    viewport: viewport
-                  });
-                } else if (!grid.shouldRenderGrid) {
-                  logger.debug('GRID_NOT_RENDERING', {
-                    shouldRenderGrid: grid.shouldRenderGrid,
-                    gridVisible: gridConfig.visible,
-                    zoom: viewport.zoom
-                  });
-                }
-                return null;
-              })()}
-              {grid.shouldRenderGrid && grid.gridLines.map((line, index) => (
-                <Line
-                  key={`grid-line-${index}`}
-                  points={line.points}
-                  stroke={line.stroke}
-                  strokeWidth={line.strokeWidth}
-                  opacity={line.opacity}
-                  listening={line.listening}
-                />
-              ))}
-            </Layer>
-
-            {/* Shapes Layer */}
-            <Layer ref={layerRefs.shapesLayer}>
-              {shapes.map(shape => {
-                const geom = shape.geometry;
-
-                // Debug logging for image shapes
-                if (geom.type === 'image') {
-                  console.log('[KonvaMapEditor] Rendering image shape:', {
-                    id: shape.id,
-                    fileName: geom.fileName,
-                    position: { x: geom.x, y: geom.y },
-                    size: { width: geom.width, height: geom.height },
-                    isSelected: selectedIds.includes(shape.id)
-                  });
-                }
-
-                if (geom.type === 'polygon') {
-                  // Polygon geometry
-                  return (
-                    <TransformablePolygon
-                      key={shape.id}
-                      shape={shape}
-                      isSelected={selectedIds.includes(shape.id)}
-                      onSelect={(e) => selection.handleShapeClick(shape.id, e)}
-                      onDragEnd={(e) => transform.handleDragEnd(shape.id, e)}
-                      onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
-                    />
-                  );
-                } else if (geom.type === 'rectangle') {
-                  // Rectangle geometry
-                  return (
-                    <TransformableRect
-                      key={shape.id}
-                      shape={shape}
-                      isSelected={selectedIds.includes(shape.id)}
-                      onSelect={(e) => selection.handleShapeClick(shape.id, e)}
-                      onDragEnd={(e) => transform.handleDragEnd(shape.id, e)}
-                      onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
-                    />
-                  );
-                } else if (geom.type === 'image') {
-                  // Image geometry - detect if it's a GIF
-                  const isGif = geom.imageData?.startsWith('data:image/gif');
-
-                  if (isGif) {
-                    // Render animated GIF
-                    return (
-                      <AnimatedGifImage
-                        key={shape.id}
-                        shape={shape}
-                        isSelected={selectedIds.includes(shape.id)}
-                        onSelect={() => selection.selectShape(shape.id)}
-                        onDragEnd={(e) => transform.handleDragEnd(shape.id, e)}
-                        onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
-                      />
-                    );
-                  } else {
-                    // Render static image
-                    return (
-                      <TransformableImage
-                        key={shape.id}
-                        shape={shape}
-                        isSelected={selectedIds.includes(shape.id)}
-                        onSelect={(e) => selection.handleShapeClick(shape.id, e)}
-                        onDragEnd={(e) => transform.handleDragEnd(shape.id, e)}
-                        onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
-                      />
-                    );
-                  }
-                }
-                return null;
-              })}
-
-              {/* Drawing Previews */}
-              {polygonDrawing.isDrawing && (
-                <PolygonDrawingPreview
-                  vertices={polygonDrawing.vertices}
-                  previewLines={polygonDrawing.previewLines}
-                  isOriginHovered={polygonDrawing.isOriginHovered}
-                  category="collision"
-                />
-              )}
-              {rectDrawing.isDrawing && rectDrawing.previewRect && (
-                <RectangleDrawingPreview
-                  rect={rectDrawing.previewRect}
-                  category="interactive"
-                />
-              )}
-              {collisionRectDrawing.isDrawing && collisionRectDrawing.previewRect && (
-                <RectangleDrawingPreview
-                  rect={collisionRectDrawing.previewRect}
-                  category="collision"
-                />
-              )}
-            </Layer>
-
-            {/* Selection Layer */}
-            <Layer ref={layerRefs.selectionLayer}>
-              {/* Show transformer only when not in vertex edit mode */}
-              {currentTool !== 'edit-vertex' && (
-                <TransformerComponent selectedShapeIds={selectedIds} />
-              )}
-              {selection.selectionRect && (
-                <SelectionRect rect={selection.selectionRect} />
-              )}
-              {/* Vertex editing UI */}
-              {vertexEdit.isEditing && (
-                <PolygonEditor
-                  vertexHandles={vertexEdit.vertexHandles}
-                  edgeHandles={vertexEdit.edgeHandles}
-                  draggingVertexIndex={vertexEdit.editState.draggingVertexIndex}
-                  hoveringHandleIndex={vertexEdit.editState.hoveringHandleIndex}
-                  onVertexDragStart={vertexEdit.handleVertexDragStart}
-                  onVertexDragMove={vertexEdit.handleVertexDragMove}
-                  onVertexDragEnd={vertexEdit.handleVertexDragEnd}
-                  onEdgeClick={vertexEdit.handleEdgeClick}
-                  onVertexDelete={vertexEdit.handleVertexDelete}
-                  onVertexHover={vertexEdit.handleVertexHover}
-                />
-              )}
-            </Layer>
-
-            {/* UI Layer */}
-            <Layer ref={layerRefs.uiLayer} />
-          </Stage>
-        )}
-
-          {/* Preview Mode Overlay */}
-          {previewMode.isPreviewMode && (
-            <div className="preview-mode-overlay">
-              <Eye size={24} />
-              <span>Preview Mode</span>
-            </div>
-          )}
-
-          {/* Drawing Mode Overlay */}
-          {drawingMode && (
-            <div className="drawing-mode-overlay">
-              <Square size={24} />
-              <span>Drawing Interactive Area</span>
-            </div>
-          )}
-
-          {collisionDrawingMode && (
-            <div className="drawing-mode-overlay">
-              <Shield size={24} />
-              <span>Drawing Collision Area</span>
-            </div>
-          )}
-        </main>
+        <EditorCanvas
+          mainRef={mainRef}
+          stageRef={stageRef}
+          layerRefs={layerRefs}
+          viewport={viewport}
+          viewportWidth={viewportWidth}
+          viewportHeight={viewportHeight}
+          cursorStyle={cursorStyle}
+          gridConfig={gridConfig}
+          currentTool={currentTool}
+          shapes={shapes}
+          selectedIds={selectedIds}
+          drawingMode={drawingMode}
+          collisionDrawingMode={collisionDrawingMode}
+          background={background}
+          grid={grid}
+          zoom={zoom}
+          selection={selection}
+          transform={transform}
+          polygonDrawing={polygonDrawing}
+          rectDrawing={rectDrawing}
+          collisionRectDrawing={collisionRectDrawing}
+          vertexEdit={vertexEdit}
+          onStageClick={stageEventHandlers.handleStageClick}
+          onStageMouseDown={stageEventHandlers.handleStageMouseDown}
+          onStageMouseMove={stageEventHandlers.handleStageMouseMove}
+          onStageMouseUp={stageEventHandlers.handleStageMouseUp}
+          onStageDoubleClick={stageEventHandlers.handleStageDoubleClick}
+          isPreviewMode={previewMode.isPreviewMode}
+        />
 
         {/* Sidebar */}
         <EditorSidebar
@@ -1231,50 +967,33 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
       />
 
       {/* Modals */}
-      <AreaFormModal
-        isOpen={showAreaModal}
+      <EditorModals
+        showAreaModal={showAreaModal}
         editingArea={editingArea}
-        onSave={areaHandlers.interactive.handleAreaFormSubmit}
-        onClose={areaHandlers.interactive.handleAreaFormCancel}
-      />
-
-      <CollisionAreaFormModal
-        isOpen={showCollisionAreaModal}
-        editingArea={editingCollisionArea}
-        onSave={areaHandlers.collision.handleCollisionAreaFormSubmit}
-        onClose={areaHandlers.collision.handleCollisionAreaFormCancel}
-      />
-
-      <ConfirmationDialog
-        isOpen={showDeleteConfirm}
-        title="Delete Interactive Area"
-        message={`Are you sure you want to delete "${areaToDelete?.name}"?`}
-        onConfirm={areaHandlers.interactive.handleConfirmDeleteArea}
-        onClose={() => {
+        onAreaFormSubmit={areaHandlers.interactive.handleAreaFormSubmit}
+        onAreaFormCancel={areaHandlers.interactive.handleAreaFormCancel}
+        showCollisionAreaModal={showCollisionAreaModal}
+        editingCollisionArea={editingCollisionArea}
+        onCollisionAreaFormSubmit={areaHandlers.collision.handleCollisionAreaFormSubmit}
+        onCollisionAreaFormCancel={areaHandlers.collision.handleCollisionAreaFormCancel}
+        showDeleteConfirm={showDeleteConfirm}
+        areaToDelete={areaToDelete}
+        onConfirmDeleteArea={areaHandlers.interactive.handleConfirmDeleteArea}
+        onCancelDeleteArea={() => {
           setShowDeleteConfirm(false);
           setAreaToDelete(null);
         }}
-      />
-
-      <ConfirmationDialog
-        isOpen={showCollisionDeleteConfirm}
-        title="Delete Collision Area"
-        message={`Are you sure you want to delete this collision area?`}
-        onConfirm={areaHandlers.collision.handleConfirmDeleteCollisionArea}
-        onClose={() => {
+        showCollisionDeleteConfirm={showCollisionDeleteConfirm}
+        collisionAreaToDelete={collisionAreaToDelete}
+        onConfirmDeleteCollisionArea={areaHandlers.collision.handleConfirmDeleteCollisionArea}
+        onCancelDeleteCollisionArea={() => {
           setShowCollisionDeleteConfirm(false);
           setCollisionAreaToDelete(null);
         }}
-      />
-
-      <ConfirmationDialog
-        isOpen={showKeyboardDeleteConfirm}
-        title="Delete Selected Shapes"
-        message={`Are you sure you want to delete ${shapesToDelete.length} selected shape${shapesToDelete.length > 1 ? 's' : ''}?`}
-        confirmText="Delete"
-        type="danger"
-        onConfirm={areaHandlers.handleConfirmKeyboardDelete}
-        onClose={areaHandlers.handleCancelKeyboardDelete}
+        showKeyboardDeleteConfirm={showKeyboardDeleteConfirm}
+        shapesToDelete={shapesToDelete}
+        onConfirmKeyboardDelete={areaHandlers.handleConfirmKeyboardDelete}
+        onCancelKeyboardDelete={areaHandlers.handleCancelKeyboardDelete}
       />
     </div>
   );

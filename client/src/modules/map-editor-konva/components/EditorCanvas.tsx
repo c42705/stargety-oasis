@@ -1,13 +1,13 @@
 /**
  * EditorCanvas Component
- * 
+ *
  * Renders the main Konva Stage with all layers:
  * - Background layer (map image)
  * - Grid layer
  * - Shapes layer (interactive areas, collision areas, assets)
  * - Selection layer (transformer, selection rect, vertex editor)
  * - UI layer
- * 
+ *
  * Also renders overlay indicators for preview mode and drawing modes.
  */
 
@@ -15,7 +15,7 @@ import React, { RefObject } from 'react';
 import { Stage, Layer, Line, Image as KonvaImage } from 'react-konva';
 import { Eye, Square, Shield } from 'lucide-react';
 import type { EditorTool } from '../types/konva.types';
-import type { Shape, Viewport } from '../types';
+import type { Shape, Viewport, GridConfig } from '../types';
 import type {
   UseKonvaBackgroundReturn,
   UseKonvaGridReturn,
@@ -37,23 +37,24 @@ import { logger } from '../../../shared/logger';
 
 interface EditorCanvasProps {
   // Refs
-  mainRef: RefObject<HTMLDivElement>;
+  mainRef: RefObject<HTMLDivElement | null>;
   stageRef: RefObject<any>;
   layerRefs: LayerRefs;
-  
+
   // Viewport
   viewport: Viewport;
   viewportWidth: number;
   viewportHeight: number;
   cursorStyle: string;
-  
+  gridConfig: GridConfig;
+
   // State
   currentTool: EditorTool;
   shapes: Shape[];
   selectedIds: string[];
   drawingMode: boolean;
   collisionDrawingMode: boolean;
-  
+
   // Hooks
   background: UseKonvaBackgroundReturn;
   grid: UseKonvaGridReturn;
@@ -64,14 +65,14 @@ interface EditorCanvasProps {
   rectDrawing: UseKonvaRectDrawingReturn;
   collisionRectDrawing: UseKonvaRectDrawingReturn;
   vertexEdit: UseKonvaVertexEditReturn;
-  
+
   // Event handlers
   onStageClick: (e: any) => void;
   onStageMouseDown: (e: any) => void;
   onStageMouseMove: (e: any) => void;
-  onStageMouseUp: () => void;
-  onStageDoubleClick: () => void;
-  
+  onStageMouseUp: (e: any) => void;
+  onStageDoubleClick: (e: any) => void;
+
   // Preview mode
   isPreviewMode: boolean;
 }
@@ -84,6 +85,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
   viewportWidth,
   viewportHeight,
   cursorStyle,
+  gridConfig,
   currentTool,
   shapes,
   selectedIds,
@@ -144,6 +146,15 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
               if (grid.shouldRenderGrid && grid.gridLines.length > 0) {
                 logger.debug('GRID_RENDERING', {
                   gridLinesCount: grid.gridLines.length,
+                  gridConfig: gridConfig,
+                  firstLine: grid.gridLines[0],
+                  viewport: viewport
+                });
+              } else if (!grid.shouldRenderGrid) {
+                logger.debug('GRID_NOT_RENDERING', {
+                  shouldRenderGrid: grid.shouldRenderGrid,
+                  gridVisible: gridConfig.visible,
+                  zoom: viewport.zoom
                 });
               }
               return null;
