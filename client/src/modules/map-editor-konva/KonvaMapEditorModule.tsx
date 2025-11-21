@@ -20,12 +20,6 @@ import { CollisionAreaFormModal } from '../../components/CollisionAreaFormModal'
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 import { EditorToolbar } from './components/shared/EditorToolbar';
 import { EditorStatusBar } from './components/shared/EditorStatusBar';
-import { AreasTab } from './components/tabs/AreasTab';
-import { TerrainTab } from './components/tabs/TerrainTab';
-import { AssetsTab } from './components/tabs/AssetsTab';
-import { CollisionTab } from './components/tabs/CollisionTab';
-import { JitsiTab } from './components/tabs/JitsiTab';
-import { SettingsTab } from './components/tabs/SettingsTab';
 import { shouldIgnoreKeyboardEvent } from '../../shared/keyboardFocusUtils';
 
 // Import CSS
@@ -47,14 +41,26 @@ import { useKonvaPreviewMode } from './hooks/useKonvaPreviewMode';
 import { useKonvaKeyboardShortcuts } from './hooks/useKonvaKeyboardShortcuts';
 import { useKonvaVertexEdit } from './hooks/useKonvaVertexEdit';
 
+// Import refactored hooks
+import { useEditorState } from './hooks/useEditorState';
+import { useToolbarHandlers } from './hooks/useToolbarHandlers';
+import { useAreaHandlers } from './hooks/useAreaHandlers';
+import { useLayersHandlers } from './hooks/useLayersHandlers';
+import { useStageEventHandlers } from './hooks/useStageEventHandlers';
+
 // Import Konva components
-import { PolygonDrawingPreview } from './components/PolygonDrawingPreview';
-import { RectangleDrawingPreview } from './components/RectangleDrawingPreview';
+import { KonvaLayersPanel } from './components/KonvaLayersPanel';
 import { TransformablePolygon, TransformableRect, TransformableImage, TransformerComponent } from './components/TransformableShape';
 import { AnimatedGifImage } from './components/AnimatedGifImage';
-import { KonvaLayersPanel } from './components/KonvaLayersPanel';
+import { PolygonDrawingPreview } from './components/PolygonDrawingPreview';
+import { RectangleDrawingPreview } from './components/RectangleDrawingPreview';
 import { SelectionRect } from './components/SelectionRect';
 import { PolygonEditor } from './components/PolygonEditor';
+
+// Import refactored components
+import { EditorCanvas } from './components/EditorCanvas';
+import { EditorSidebar } from './components/EditorSidebar';
+import { EditorModals } from './components/EditorModals';
 
 // Import types
 import type { Shape, EditorState, Viewport, GridConfig } from './types';
@@ -73,36 +79,9 @@ import type { TabId } from './types/editor.types';
 import { EDITOR_TABS } from './constants/editorConstants';
 
 // ============================================================================
-// TYPE ADAPTERS
+// DEAD CODE REMOVED
 // ============================================================================
-
-/**
- * Convert Fabric.js EditorTool to Konva EditorTool
- */
-function fabricToKonvaTool(tool: FabricEditorTool): KonvaEditorTool {
-  switch (tool) {
-    case 'draw-polygon':
-      return 'polygon';
-    default:
-      return tool as KonvaEditorTool;
-  }
-}
-
-/**
- * Convert Konva EditorTool to Fabric.js EditorTool
- */
-function konvaToFabricTool(tool: KonvaEditorTool): FabricEditorTool {
-  switch (tool) {
-    case 'polygon':
-      return 'draw-polygon';
-    case 'rect':
-    case 'edit-vertex':
-    case 'delete':
-      return 'select'; // Map unsupported tools to select
-    default:
-      return tool as FabricEditorTool;
-  }
-}
+// Fabric.js type adapters removed - no longer needed as we use Konva exclusively
 
 // ============================================================================
 // COMPONENT
@@ -134,42 +113,67 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     saveMap
   } = useMapStore();
 
-  // ===== STATE =====
-  const [activeTab, setActiveTab] = useState<TabId>('areas');
-  const [shapes, setShapes] = useState<Shape[]>([]);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [viewport, setViewport] = useState<Viewport>(VIEWPORT_DEFAULTS);
-  const [gridConfig, setGridConfig] = useState<GridConfig>(GRID_DEFAULTS);
-  const [currentTool, setCurrentTool] = useState<KonvaEditorTool>('select');
-  const [isSpacebarPressed, setIsSpacebarPressed] = useState(false);
-  const [cursorStyle, setCursorStyle] = useState<string>('default');
-  
-  // Modal state
-  const [showAreaModal, setShowAreaModal] = useState(false);
-  const [editingArea, setEditingArea] = useState<InteractiveArea | null>(null);
-  const [areaToDelete, setAreaToDelete] = useState<InteractiveArea | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-  const [showCollisionAreaModal, setShowCollisionAreaModal] = useState(false);
-  const [editingCollisionArea, setEditingCollisionArea] = useState<any | null>(null);
-  const [collisionAreaToDelete, setCollisionAreaToDelete] = useState<any | null>(null);
-  const [showCollisionDeleteConfirm, setShowCollisionDeleteConfirm] = useState(false);
-
-  // Keyboard delete confirmation state
-  const [showKeyboardDeleteConfirm, setShowKeyboardDeleteConfirm] = useState(false);
-  const [shapesToDelete, setShapesToDelete] = useState<string[]>([]);
-  
-  // Drawing mode state
-  const [drawingMode, setDrawingMode] = useState(false);
-  const [pendingAreaData, setPendingAreaData] = useState<Partial<InteractiveArea> | null>(null);
-  const [collisionDrawingMode, setCollisionDrawingMode] = useState(false);
-  const [pendingCollisionAreaData, setPendingCollisionAreaData] = useState<any | null>(null);
-
-  // Refs
-  const stageRef = useRef<any>(null);
-  const mainRef = useRef<HTMLDivElement>(null);
-  const [viewportWidth, setViewportWidth] = useState(0);
-  const [viewportHeight, setViewportHeight] = useState(0);
+  // ===== STATE (REFACTORED) =====
+  // All state management extracted to useEditorState hook
+  const {
+    // Tab state
+    activeTab,
+    setActiveTab,
+    // Shape state
+    shapes,
+    setShapes,
+    selectedIds,
+    setSelectedIds,
+    // Viewport state
+    viewport,
+    setViewport,
+    viewportWidth,
+    viewportHeight,
+    // Grid state
+    gridConfig,
+    setGridConfig,
+    // Tool state
+    currentTool,
+    setCurrentTool,
+    // Interaction state
+    isSpacebarPressed,
+    setIsSpacebarPressed,
+    cursorStyle,
+    setCursorStyle,
+    // Modal states
+    showAreaModal,
+    setShowAreaModal,
+    editingArea,
+    setEditingArea,
+    areaToDelete,
+    setAreaToDelete,
+    showDeleteConfirm,
+    setShowDeleteConfirm,
+    showCollisionAreaModal,
+    setShowCollisionAreaModal,
+    editingCollisionArea,
+    setEditingCollisionArea,
+    collisionAreaToDelete,
+    setCollisionAreaToDelete,
+    showCollisionDeleteConfirm,
+    setShowCollisionDeleteConfirm,
+    showKeyboardDeleteConfirm,
+    setShowKeyboardDeleteConfirm,
+    shapesToDelete,
+    setShapesToDelete,
+    // Drawing mode states
+    drawingMode,
+    setDrawingMode,
+    pendingAreaData,
+    setPendingAreaData,
+    collisionDrawingMode,
+    setCollisionDrawingMode,
+    pendingCollisionAreaData,
+    setPendingCollisionAreaData,
+    // Refs
+    stageRef,
+    mainRef,
+  } = useEditorState();
 
   // Use shared map data
   const { interactiveAreas: areas, impassableAreas } = mapData;
@@ -185,32 +189,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
   // Get effective dimensions directly from WorldDimensionsManager
   const effectiveDimensions = worldDimensions.effectiveDimensions;
 
-  // Setup viewport measurement effect
-  useEffect(() => {
-    function updateSize() {
-      if (mainRef.current) {
-        const width = mainRef.current.offsetWidth;
-        const height = mainRef.current.offsetHeight;
-        logger.info('Konva viewport dimensions updated', { width, height });
-        setViewportWidth(width);
-        setViewportHeight(height);
-      } else {
-        logger.warn('mainRef.current is null in updateSize');
-      }
-    }
-
-    // Try immediate update
-    updateSize();
-
-    // Also try after a short delay to ensure DOM is ready
-    const timeoutId = setTimeout(updateSize, 100);
-
-    window.addEventListener('resize', updateSize);
-    return () => {
-      window.removeEventListener('resize', updateSize);
-      clearTimeout(timeoutId);
-    };
-  }, []);
+  // Viewport measurement effect is now handled by useEditorState hook
 
   // ===== KONVA HOOKS =====
 
@@ -739,27 +718,6 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     ],
   });
 
-  // Handle confirmed keyboard delete
-  const handleConfirmKeyboardDelete = useCallback(() => {
-    if (shapesToDelete.length > 0) {
-      // Delete the shapes
-      setShapes(prev => prev.filter(s => !shapesToDelete.includes(s.id)));
-      setSelectedIds([]);
-      markDirty();
-      history.pushState('Delete shapes');
-
-      // Log deletion
-      logger.info('SHAPES DELETED VIA KEYBOARD', {
-        count: shapesToDelete.length,
-        ids: shapesToDelete
-      });
-
-      // Reset state
-      setShapesToDelete([]);
-      setShowKeyboardDeleteConfirm(false);
-    }
-  }, [shapesToDelete, setShapes, setSelectedIds, markDirty, history]);
-
   // ===== SYNC SHAPES WITH MAP DATA =====
   useEffect(() => {
     // Convert MapData to Konva shapes
@@ -770,357 +728,90 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     setShapes(konvaShapes);
   }, [mapData.interactiveAreas, mapData.impassableAreas]);
 
-  // ===== TOOLBAR HANDLERS =====
-  const handleToolChange = useCallback((tool: FabricEditorTool) => {
-    setCurrentTool(fabricToKonvaTool(tool));
-  }, []);
+  // ===== HANDLER HOOKS (REFACTORED) =====
 
-  const handleZoomIn = useCallback(() => {
-    zoom.zoomIn();
-  }, [zoom]);
+  // Toolbar handlers
+  const toolbarHandlers = useToolbarHandlers({
+    setCurrentTool,
+    setGridConfig,
+    viewportWidth,
+    viewportHeight,
+    shapes,
+    background,
+    zoom,
+    history,
+  });
 
-  const handleZoomOut = useCallback(() => {
-    zoom.zoomOut();
-  }, [zoom]);
+  // Area handlers (interactive & collision areas + keyboard delete)
+  const areaHandlers = useAreaHandlers({
+    setCurrentTool,
+    setShowAreaModal,
+    setEditingArea,
+    setAreaToDelete,
+    setShowDeleteConfirm,
+    setShowCollisionAreaModal,
+    setEditingCollisionArea,
+    setCollisionAreaToDelete,
+    setShowCollisionDeleteConfirm,
+    setShowKeyboardDeleteConfirm,
+    setShapesToDelete,
+    setDrawingMode,
+    setPendingAreaData,
+    setCollisionDrawingMode,
+    setPendingCollisionAreaData,
+    setShapes,
+    setSelectedIds,
+    editingArea,
+    editingCollisionArea,
+    areaToDelete,
+    collisionAreaToDelete,
+    shapesToDelete,
+    addInteractiveArea,
+    updateInteractiveArea,
+    removeInteractiveArea,
+    addCollisionArea,
+    updateCollisionArea,
+    removeCollisionArea,
+    markDirty,
+    history,
+  });
 
-  const handleZoomReset = useCallback(() => {
-    zoom.resetZoom();
-  }, [zoom]);
+  // Layers panel handlers
+  const layersHandlers = useLayersHandlers({
+    setSelectedIds,
+    setCurrentTool,
+    setShapes,
+    setAreaToDelete,
+    setShowDeleteConfirm,
+    setCollisionAreaToDelete,
+    setShowCollisionDeleteConfirm,
+    setViewport,
+    shapes,
+    areas,
+    impassableAreas,
+    mainRef,
+    markDirty,
+    history,
+  });
 
-  const handleFitToScreen = useCallback(() => {
-    // Initialize bounds
-    let bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
-    let hasContent = false;
+  // Stage event handlers
+  const stageEventHandlers = useStageEventHandlers({
+    currentTool,
+    isSpacebarPressed,
+    collisionDrawingMode,
+    drawingMode,
+    pendingCollisionAreaData,
+    pendingAreaData,
+    pan,
+    selection,
+    polygonDrawing,
+    rectDrawing,
+    collisionRectDrawing,
+  });
 
-    // Include background image in bounds if it exists
-    if (background.image && background.dimensions) {
-      bounds.minX = 0;
-      bounds.minY = 0;
-      bounds.maxX = background.dimensions.width;
-      bounds.maxY = background.dimensions.height;
-      hasContent = true;
-      logger.info('FIT_TO_SCREEN_BACKGROUND', {
-        backgroundDimensions: background.dimensions
-      });
-    }
+  // All old handler functions removed - now using handler hooks above
 
-    // Include all shapes in bounds
-    if (shapes.length > 0) {
-      shapes.forEach(shape => {
-        const geom = shape.geometry as any;
-        if (geom.vertices) {
-          // Polygon geometry
-          geom.vertices.forEach((v: any) => {
-            bounds.minX = Math.min(bounds.minX, v.x);
-            bounds.minY = Math.min(bounds.minY, v.y);
-            bounds.maxX = Math.max(bounds.maxX, v.x);
-            bounds.maxY = Math.max(bounds.maxY, v.y);
-          });
-          hasContent = true;
-        } else if (geom.x !== undefined && geom.y !== undefined && geom.width !== undefined && geom.height !== undefined) {
-          // Rectangle or Image geometry
-          bounds.minX = Math.min(bounds.minX, geom.x);
-          bounds.minY = Math.min(bounds.minY, geom.y);
-          bounds.maxX = Math.max(bounds.maxX, geom.x + geom.width);
-          bounds.maxY = Math.max(bounds.maxY, geom.y + geom.height);
-          hasContent = true;
-        }
-      });
-    }
-
-    // If no content, reset zoom
-    if (!hasContent) {
-      logger.info('FIT_TO_SCREEN_NO_CONTENT', { message: 'No shapes or background to fit' });
-      zoom.resetZoom();
-      return;
-    }
-
-    logger.info('FIT_TO_SCREEN_BOUNDS', {
-      bounds,
-      shapesCount: shapes.length,
-      hasBackground: !!background.image
-    });
-
-    zoom.zoomToFit(
-      {
-        x: bounds.minX,
-        y: bounds.minY,
-        width: bounds.maxX - bounds.minX,
-        height: bounds.maxY - bounds.minY,
-      },
-      viewportWidth,
-      viewportHeight,
-      50 // padding
-    );
-  }, [zoom, shapes, viewportWidth, viewportHeight, background]);
-
-  const handleToggleGrid = useCallback(() => {
-    setGridConfig(prev => ({ ...prev, visible: !prev.visible }));
-  }, []);
-
-  const handleToggleSnapToGrid = useCallback(() => {
-    setGridConfig(prev => ({ ...prev, snapToGrid: !prev.snapToGrid }));
-  }, []);
-
-  // ===== UNIFIED EVENT HANDLERS =====
-  // Route events to the appropriate hook based on current tool
-
-  const handleStageClick = useCallback((e: any) => {
-    if (currentTool === 'select') {
-      selection.handleStageClick(e);
-    } else if (currentTool === 'polygon') {
-      polygonDrawing.handleClick(e);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTool]);
-
-  const handleStageMouseDown = useCallback((e: any) => {
-    // Pan tool or spacebar pressed - enable panning
-    if (currentTool === 'pan' || isSpacebarPressed) {
-      pan.handleMouseDown(e);
-    } else if (currentTool === 'select') {
-      selection.handleMouseDown(e);
-    } else if (currentTool === 'rect') {
-      // Handle both interactive and collision rectangle drawing
-      if (collisionDrawingMode && pendingCollisionAreaData?.drawingMode === 'rectangle') {
-        logger.info('RECT_DRAWING_MOUSE_DOWN_COLLISION', {
-          collisionDrawingMode,
-          pendingCollisionAreaData
-        });
-        collisionRectDrawing.handleMouseDown(e);
-      } else {
-        logger.info('RECT_DRAWING_MOUSE_DOWN_INTERACTIVE', {
-          drawingMode,
-          pendingAreaData,
-          currentTool
-        });
-        rectDrawing.handleMouseDown(e);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTool, isSpacebarPressed, collisionDrawingMode, pendingCollisionAreaData, drawingMode, pendingAreaData]);
-
-  const handleStageMouseMove = useCallback((e: any) => {
-    // Pan tool or spacebar pressed - enable panning
-    if (currentTool === 'pan' || isSpacebarPressed) {
-      pan.handleMouseMove(e);
-    } else if (currentTool === 'select') {
-      selection.handleMouseMove(e);
-    } else if (currentTool === 'polygon') {
-      polygonDrawing.handleMouseMove(e);
-    } else if (currentTool === 'rect') {
-      // Handle both interactive and collision rectangle drawing
-      if (collisionDrawingMode && pendingCollisionAreaData?.drawingMode === 'rectangle') {
-        collisionRectDrawing.handleMouseMove(e);
-      } else {
-        rectDrawing.handleMouseMove(e);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTool, isSpacebarPressed, collisionDrawingMode, pendingCollisionAreaData]);
-
-  const handleStageMouseUp = useCallback(() => {
-    // Always call pan.handleMouseUp to ensure panning state is cleared
-    // This is important when spacebar is released while dragging
-    pan.handleMouseUp();
-
-    if (currentTool === 'select') {
-      selection.handleMouseUp();
-    } else if (currentTool === 'rect') {
-      // Handle both interactive and collision rectangle drawing
-      if (collisionDrawingMode && pendingCollisionAreaData?.drawingMode === 'rectangle') {
-        logger.info('RECT_DRAWING_MOUSE_UP_COLLISION', {
-          collisionDrawingMode,
-          pendingCollisionAreaData
-        });
-        collisionRectDrawing.handleMouseUp();
-      } else {
-        logger.info('RECT_DRAWING_MOUSE_UP_INTERACTIVE', {
-          drawingMode,
-          pendingAreaData,
-          currentTool
-        });
-        rectDrawing.handleMouseUp();
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTool, collisionDrawingMode, pendingCollisionAreaData, drawingMode, pendingAreaData]);
-
-  const handleStageDoubleClick = useCallback(() => {
-    if (currentTool === 'polygon') {
-      polygonDrawing.handleDoubleClick();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTool]);
-
-  const handleUndo = useCallback(() => {
-    history.undo();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleRedo = useCallback(() => {
-    history.redo();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ===== AREA HANDLERS =====
-  const handleCreateArea = useCallback(() => {
-    setEditingArea(null);
-    setShowAreaModal(true);
-  }, []);
-
-  const handleEditArea = useCallback((area: InteractiveArea) => {
-    setEditingArea(area);
-    setShowAreaModal(true);
-  }, []);
-
-  const handleDeleteArea = useCallback((area: InteractiveArea) => {
-    setAreaToDelete(area);
-    setShowDeleteConfirm(true);
-  }, []);
-
-  const handleConfirmDeleteArea = useCallback(() => {
-    if (areaToDelete) {
-      removeInteractiveArea(areaToDelete.id);
-      markDirty();
-      setAreaToDelete(null);
-      setShowDeleteConfirm(false);
-    }
-  }, [areaToDelete, removeInteractiveArea, markDirty]);
-
-  const handleAreaFormSubmit = useCallback((data: Partial<InteractiveArea>) => {
-    if (editingArea) {
-      // Update existing area
-      logger.info('AREA_UPDATE_START', { areaId: editingArea.id, data });
-      updateInteractiveArea(editingArea.id, data);
-      markDirty();
-      setShowAreaModal(false);
-      setEditingArea(null);
-      logger.info('AREA_UPDATE_COMPLETE', { areaId: editingArea.id });
-    } else {
-      // For new areas, save the data and enter drawing mode
-      logger.info('AREA_CREATE_START', { data });
-      setPendingAreaData(data);
-      setShowAreaModal(false);
-      setDrawingMode(true);
-      setCurrentTool('rect');
-      logger.info('AREA_CREATE_DRAWING_MODE_ENABLED', {
-        pendingData: data,
-        drawingMode: true,
-        currentTool: 'rect'
-      });
-    }
-  }, [editingArea, updateInteractiveArea, markDirty]);
-
-  // ===== COLLISION AREA HANDLERS =====
-  const handleCreateCollisionArea = useCallback(() => {
-    setEditingCollisionArea(null);
-    setShowCollisionAreaModal(true);
-  }, []);
-
-  const handleEditCollisionArea = useCallback((area: any) => {
-    setEditingCollisionArea(area);
-    setShowCollisionAreaModal(true);
-  }, []);
-
-  const handleDeleteCollisionArea = useCallback((area: any) => {
-    setCollisionAreaToDelete(area);
-    setShowCollisionDeleteConfirm(true);
-  }, []);
-
-  const handleConfirmDeleteCollisionArea = useCallback(() => {
-    if (collisionAreaToDelete) {
-      removeCollisionArea(collisionAreaToDelete.id);
-      markDirty();
-      setCollisionAreaToDelete(null);
-      setShowCollisionDeleteConfirm(false);
-    }
-  }, [collisionAreaToDelete, removeCollisionArea, markDirty]);
-
-  const handleCollisionAreaFormSubmit = useCallback((data: any) => {
-    console.log('[KonvaMapEditor] Collision area form submitted:', data);
-
-    if (editingCollisionArea) {
-      // Update existing collision area
-      console.log('[KonvaMapEditor] Updating existing collision area:', editingCollisionArea.id);
-      updateCollisionArea(editingCollisionArea.id, data);
-      markDirty();
-      setShowCollisionAreaModal(false);
-      setEditingCollisionArea(null);
-    } else {
-      // For new collision areas, save the data and enter drawing mode
-      console.log('[KonvaMapEditor] Setting pending collision area data and entering drawing mode');
-      console.log('[KonvaMapEditor] Drawing mode:', data.drawingMode);
-      setPendingCollisionAreaData(data);
-      setShowCollisionAreaModal(false);
-      setCollisionDrawingMode(true);
-      // Set tool based on drawing mode from the form
-      if (data.drawingMode === 'rectangle') {
-        console.log('[KonvaMapEditor] Setting tool to rect');
-        setCurrentTool('rect');
-      } else {
-        console.log('[KonvaMapEditor] Setting tool to polygon');
-        setCurrentTool('polygon');
-      }
-    }
-  }, [editingCollisionArea, updateCollisionArea, markDirty]);
-
-  // ===== LAYERS PANEL HANDLERS =====
-
-  const handleShapeSelect = useCallback((shapeId: string) => {
-    setSelectedIds([shapeId]);
-    setCurrentTool('select');
-  }, []);
-
-  const handleShapeVisibilityToggle = useCallback((shapeId: string) => {
-    setShapes(prev => prev.map(s => {
-      if (s.id === shapeId) {
-        // For collision layers, toggle opacity instead of visibility
-        if (s.category === 'collision') {
-          const currentOpacity = s.style.opacity ?? 0.7;
-          const newOpacity = currentOpacity > 0.3 ? 0.15 : 0.7;
-          return {
-            ...s,
-            style: {
-              ...s.style,
-              opacity: newOpacity
-            }
-          };
-        }
-        // For other layers, toggle visibility as before
-        return { ...s, visible: !s.visible };
-      }
-      return s;
-    }));
-    history.pushState('Toggle shape visibility');
-  }, [history]);
-
-  const handleShapeDelete = useCallback((shapeId: string) => {
-    const shape = shapes.find(s => s.id === shapeId);
-    if (!shape) return;
-
-    if (shape.category === 'interactive') {
-      const area = areas.find(a => a.id === shapeId);
-      if (area) {
-        setAreaToDelete(area);
-        setShowDeleteConfirm(true);
-      }
-    } else if (shape.category === 'collision') {
-      const area = impassableAreas.find(a => a.id === shapeId);
-      if (area) {
-        setCollisionAreaToDelete(area);
-        setShowCollisionDeleteConfirm(true);
-      }
-    } else if (shape.category === 'asset') {
-      // Delete asset shapes directly without confirmation
-      setShapes(prev => prev.filter(s => s.id !== shapeId));
-      setSelectedIds(prev => prev.filter(id => id !== shapeId));
-      markDirty();
-      history.pushState('Delete asset');
-      logger.info('ASSET DELETED', { id: shapeId, name: shape.name });
-    }
-  }, [shapes, areas, impassableAreas, setShapes, setSelectedIds, markDirty, history]);
-
+  // Helper function for zoom to shape (used by sidebar)
   const handleZoomToShape = useCallback((shape: Shape) => {
     if (!mainRef.current) return;
 
@@ -1132,16 +823,30 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     );
 
     setViewport(newViewport);
-  }, []);
+  }, [mainRef, setViewport]);
 
   // ===== RENDER =====
 
-  // Create EditorState for toolbar
+  // Create EditorState for toolbar (Fabric.js compatibility layer)
   // When spacebar is pressed, show 'pan' tool in the status bar
   const effectiveTool = isSpacebarPressed ? 'pan' : currentTool;
 
+  // Map Konva tool to Fabric tool for legacy components
+  const mapKonvaToFabricTool = (tool: typeof currentTool): import('./types/editor.types').EditorTool => {
+    switch (tool) {
+      case 'polygon':
+        return 'draw-polygon';
+      case 'rect':
+      case 'edit-vertex':
+      case 'delete':
+        return 'select'; // Map unsupported tools to select
+      default:
+        return tool as import('./types/editor.types').EditorTool;
+    }
+  };
+
   const fabricEditorState: import('./types/editor.types').EditorState = {
-    tool: konvaToFabricTool(effectiveTool),
+    tool: mapKonvaToFabricTool(effectiveTool),
     zoom: viewport.zoom * 100, // Convert to percentage
     mousePosition: { x: 0, y: 0 },
     saveStatus: 'saved',
@@ -1159,6 +864,80 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     snapToGrid: gridConfig.snapToGrid || false,
   };
 
+  // ===== HANDLERS =====
+
+  // Wrapper for tool change to convert Fabric tool to Konva tool
+  const handleToolChangeWrapper = useCallback((fabricTool: import('./types/editor.types').EditorTool) => {
+    // Map Fabric tool to Konva tool
+    const konvaTool: KonvaEditorTool = fabricTool === 'draw-polygon' ? 'polygon' : fabricTool as KonvaEditorTool;
+    toolbarHandlers.handleToolChange(konvaTool);
+  }, [toolbarHandlers]);
+
+  // Handle asset placement from AssetsTab
+  const handlePlaceAsset = useCallback((fileData: string, fileName: string, width: number, height: number) => {
+    logger.info('PLACE ASSET CALLED', {
+      fileName,
+      dimensions: { width, height },
+      viewport: {
+        pan: viewport.pan,
+        zoom: viewport.zoom,
+        viewportSize: { width: viewportWidth, height: viewportHeight }
+      }
+    });
+
+    // Calculate center of viewport in screen coordinates
+    const screenCenter = {
+      x: viewportWidth / 2,
+      y: viewportHeight / 2
+    };
+
+    // Convert screen coordinates to world coordinates
+    const worldCenter = screenToWorld(screenCenter.x, screenCenter.y, viewport);
+
+    // Create image shape at viewport center
+    const imageShape = createImageShape({
+      x: worldCenter.x - width / 2,
+      y: worldCenter.y - height / 2,
+      width,
+      height,
+      imageData: fileData,
+      fileName,
+    });
+
+    // Add shape to map
+    setShapes(prev => [...prev, imageShape]);
+
+    // Select the new shape
+    selection.selectShape(imageShape.id);
+
+    // Zoom to the placed asset
+    handleZoomToShape(imageShape);
+
+    // Mark as dirty
+    markDirty();
+
+    logger.info('ASSET PLACED ON MAP', {
+      id: imageShape.id,
+      fileName,
+      position: { x: imageShape.geometry.x, y: imageShape.geometry.y },
+      dimensions: { width, height }
+    });
+  }, [viewport, viewportWidth, viewportHeight, setShapes, selection, handleZoomToShape, markDirty]);
+
+  // Handle grid config change from SettingsTab (Fabric.js format)
+  const handleGridConfigChange = useCallback((newConfig: Partial<import('./types/editor.types').GridConfig>) => {
+    // Convert Fabric.js GridConfig back to Konva GridConfig
+    setGridConfig({
+      visible: newConfig.visible ?? gridConfig.visible,
+      spacing: newConfig.spacing ?? gridConfig.spacing,
+      pattern: gridConfig.pattern, // Keep current pattern
+      color: gridConfig.color,
+      opacity: newConfig.opacity ?? gridConfig.opacity,
+    });
+  }, [gridConfig, setGridConfig]);
+
+  // ===== RENDER =====
+
   return (
     <div className={`map-editor-module ${className}`}>
       {/* Toolbar */}
@@ -1168,15 +947,15 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
           gridConfig={fabricGridConfig}
           previewMode={previewMode.isPreviewMode}
           zoom={Math.round(viewport.zoom * 100)}
-          onToolChange={handleToolChange}
-          onZoomIn={handleZoomIn}
-          onZoomOut={handleZoomOut}
-          onFitToScreen={handleFitToScreen}
-          onResetZoom={handleZoomReset}
-          onToggleGrid={handleToggleGrid}
-          onToggleSnapToGrid={handleToggleSnapToGrid}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
+          onToolChange={handleToolChangeWrapper}
+          onZoomIn={toolbarHandlers.handleZoomIn}
+          onZoomOut={toolbarHandlers.handleZoomOut}
+          onFitToScreen={toolbarHandlers.handleFitToScreen}
+          onResetZoom={toolbarHandlers.handleZoomReset}
+          onToggleGrid={toolbarHandlers.handleToggleGrid}
+          onToggleSnapToGrid={toolbarHandlers.handleToggleSnapToGrid}
+          onUndo={toolbarHandlers.handleUndo}
+          onRedo={toolbarHandlers.handleRedo}
           onTogglePreview={previewMode.togglePreview}
         />
       </header>
@@ -1191,22 +970,20 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
           viewportWidth={viewportWidth}
           viewportHeight={viewportHeight}
           impassableAreas={impassableAreas}
-          onShapeSelect={handleShapeSelect}
-          onShapeVisibilityToggle={handleShapeVisibilityToggle}
-          onShapeDelete={handleShapeDelete}
+          onShapeSelect={layersHandlers.handleShapeSelect}
+          onShapeVisibilityToggle={layersHandlers.handleShapeVisibilityToggle}
+          onShapeDelete={layersHandlers.handleShapeDelete}
           onZoomToShape={handleZoomToShape}
           onEditInteractiveArea={(areaId) => {
             const area = areas.find(a => a.id === areaId);
             if (area) {
-              setEditingArea(area);
-              setShowAreaModal(true);
+              areaHandlers.interactive.handleEditArea(area);
             }
           }}
           onEditCollisionArea={(areaId) => {
             const area = impassableAreas.find(a => a.id === areaId);
             if (area) {
-              setEditingCollisionArea(area);
-              setShowCollisionAreaModal(true);
+              areaHandlers.collision.handleEditCollisionArea(area);
             }
           }}
         />
@@ -1222,11 +999,11 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
               scaleY={viewport.zoom}
               x={viewport.pan.x}
               y={viewport.pan.y}
-              onClick={handleStageClick}
-              onMouseDown={handleStageMouseDown}
-              onMouseMove={handleStageMouseMove}
-              onMouseUp={handleStageMouseUp}
-              onDblClick={handleStageDoubleClick}
+              onClick={stageEventHandlers.handleStageClick}
+              onMouseDown={stageEventHandlers.handleStageMouseDown}
+              onMouseMove={stageEventHandlers.handleStageMouseMove}
+              onMouseUp={stageEventHandlers.handleStageMouseUp}
+              onDblClick={stageEventHandlers.handleStageDoubleClick}
               onWheel={zoom.handleWheel}
             >
             {/* Background Layer - Render first (bottom) */}
@@ -1427,144 +1204,23 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
         </main>
 
         {/* Sidebar */}
-        <aside className="editor-sidebar">
-          <div className="editor-panel-tabs">
-            {EDITOR_TABS.map(tab => (
-              <button
-                key={tab.id}
-                className={`editor-panel-tab ${activeTab === tab.id ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
-                role="tab"
-                aria-selected={activeTab === tab.id}
-              >
-                <span className="tab-icon">
-                  {tab.icon}
-                </span>
-                <span className="tab-label">{tab.label}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="sidebar-content">
-            <div className="tab-content-container">
-              {activeTab === 'areas' && (
-                <AreasTab
-                  areas={areas}
-                  onCreateNewArea={handleCreateArea}
-                  onEditArea={handleEditArea}
-                  onDeleteArea={handleDeleteArea}
-                />
-              )}
-              {activeTab === 'terrain' && <TerrainTab />}
-              {activeTab === 'assets' && (
-                <AssetsTab
-                  onPlaceAsset={(fileData, fileName, width, height) => {
-                    console.log('[KonvaMapEditor] onPlaceAsset called:', {
-                      fileName,
-                      dimensions: { width, height },
-                      imageDataLength: fileData?.length || 0,
-                      imageDataPrefix: fileData?.substring(0, 30) || 'N/A',
-                      viewport: {
-                        pan: viewport.pan,
-                        zoom: viewport.zoom,
-                        viewportSize: { width: viewportWidth, height: viewportHeight }
-                      }
-                    });
-
-                    // Calculate center of viewport in screen coordinates
-                    const screenCenter = {
-                      x: viewportWidth / 2,
-                      y: viewportHeight / 2
-                    };
-
-                    // Convert screen coordinates to world coordinates
-                    const worldCenter = screenToWorld(screenCenter.x, screenCenter.y, viewport);
-
-                    console.log('[KonvaMapEditor] Calculated position:', {
-                      screenCenter,
-                      worldCenter,
-                      finalX: worldCenter.x - width / 2,
-                      finalY: worldCenter.y - height / 2
-                    });
-
-                    // Create image shape at viewport center
-                    const imageShape = createImageShape({
-                      x: worldCenter.x - width / 2,
-                      y: worldCenter.y - height / 2,
-                      width,
-                      height,
-                      imageData: fileData,
-                      fileName,
-                    });
-
-                    console.log('[KonvaMapEditor] Created image shape:', {
-                      id: imageShape.id,
-                      category: imageShape.category,
-                      geometry: imageShape.geometry,
-                      style: imageShape.style,
-                      metadata: imageShape.metadata
-                    });
-
-                    // Add shape to map
-                    setShapes(prev => {
-                      const newShapes = [...prev, imageShape];
-                      console.log('[KonvaMapEditor] Updated shapes array:', {
-                        previousCount: prev.length,
-                        newCount: newShapes.length,
-                        imageShapes: newShapes.filter(s => s.geometry.type === 'image').length
-                      });
-                      return newShapes;
-                    });
-
-                    // Select the new shape
-                    selection.selectShape(imageShape.id);
-                    console.log('[KonvaMapEditor] Selected shape:', imageShape.id);
-
-                    // Zoom to the placed asset
-                    handleZoomToShape(imageShape);
-                    console.log('[KonvaMapEditor] Zoomed to placed asset');
-
-                    // Mark as dirty
-                    markDirty();
-
-                    logger.info('ASSET PLACED ON MAP', {
-                      id: imageShape.id,
-                      fileName,
-                      position: { x: imageShape.geometry.x, y: imageShape.geometry.y },
-                      dimensions: { width, height }
-                    });
-                  }}
-                />
-              )}
-              {activeTab === 'collision' && (
-                <CollisionTab
-                  impassableAreas={impassableAreas}
-                  onCreateNewCollisionArea={handleCreateCollisionArea}
-                  onEditCollisionArea={handleEditCollisionArea}
-                  onDeleteCollisionArea={handleDeleteCollisionArea}
-                />
-              )}
-              {activeTab === 'jitsi' && <JitsiTab />}
-              {activeTab === 'settings' && (
-                <SettingsTab
-                  gridConfig={fabricGridConfig}
-                  onGridConfigChange={(newConfig) => {
-                    // Convert Fabric.js GridConfig back to Konva GridConfig
-                    setGridConfig({
-                      visible: newConfig.visible ?? gridConfig.visible,
-                      spacing: newConfig.spacing ?? gridConfig.spacing,
-                      pattern: gridConfig.pattern, // Keep current pattern
-                      color: gridConfig.color,
-                      opacity: newConfig.opacity ?? gridConfig.opacity,
-                    });
-                  }}
-                  previewMode={previewMode.isPreviewMode}
-                  onPreviewModeChange={previewMode.togglePreview}
-                />
-              )}
-            </div>
-          </div>
-        </aside>
+        <EditorSidebar
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          areas={areas}
+          onCreateNewArea={areaHandlers.interactive.handleCreateArea}
+          onEditArea={areaHandlers.interactive.handleEditArea}
+          onDeleteArea={areaHandlers.interactive.handleDeleteArea}
+          onPlaceAsset={handlePlaceAsset}
+          impassableAreas={impassableAreas}
+          onCreateNewCollisionArea={areaHandlers.collision.handleCreateCollisionArea}
+          onEditCollisionArea={areaHandlers.collision.handleEditCollisionArea}
+          onDeleteCollisionArea={areaHandlers.collision.handleDeleteCollisionArea}
+          gridConfig={fabricGridConfig}
+          onGridConfigChange={handleGridConfigChange}
+          previewMode={previewMode.isPreviewMode}
+          onPreviewModeChange={previewMode.togglePreview}
+        />
       </div>
 
       {/* Status Bar */}
@@ -1578,28 +1234,22 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
       <AreaFormModal
         isOpen={showAreaModal}
         editingArea={editingArea}
-        onSave={handleAreaFormSubmit}
-        onClose={() => {
-          setShowAreaModal(false);
-          setEditingArea(null);
-        }}
+        onSave={areaHandlers.interactive.handleAreaFormSubmit}
+        onClose={areaHandlers.interactive.handleAreaFormCancel}
       />
 
       <CollisionAreaFormModal
         isOpen={showCollisionAreaModal}
         editingArea={editingCollisionArea}
-        onSave={handleCollisionAreaFormSubmit}
-        onClose={() => {
-          setShowCollisionAreaModal(false);
-          setEditingCollisionArea(null);
-        }}
+        onSave={areaHandlers.collision.handleCollisionAreaFormSubmit}
+        onClose={areaHandlers.collision.handleCollisionAreaFormCancel}
       />
 
       <ConfirmationDialog
         isOpen={showDeleteConfirm}
         title="Delete Interactive Area"
         message={`Are you sure you want to delete "${areaToDelete?.name}"?`}
-        onConfirm={handleConfirmDeleteArea}
+        onConfirm={areaHandlers.interactive.handleConfirmDeleteArea}
         onClose={() => {
           setShowDeleteConfirm(false);
           setAreaToDelete(null);
@@ -1610,7 +1260,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
         isOpen={showCollisionDeleteConfirm}
         title="Delete Collision Area"
         message={`Are you sure you want to delete this collision area?`}
-        onConfirm={handleConfirmDeleteCollisionArea}
+        onConfirm={areaHandlers.collision.handleConfirmDeleteCollisionArea}
         onClose={() => {
           setShowCollisionDeleteConfirm(false);
           setCollisionAreaToDelete(null);
@@ -1623,11 +1273,8 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
         message={`Are you sure you want to delete ${shapesToDelete.length} selected shape${shapesToDelete.length > 1 ? 's' : ''}?`}
         confirmText="Delete"
         type="danger"
-        onConfirm={handleConfirmKeyboardDelete}
-        onClose={() => {
-          setShowKeyboardDeleteConfirm(false);
-          setShapesToDelete([]);
-        }}
+        onConfirm={areaHandlers.handleConfirmKeyboardDelete}
+        onClose={areaHandlers.handleCancelKeyboardDelete}
       />
     </div>
   );

@@ -207,6 +207,29 @@ export type {
 } from './hooks.types';
 
 // ============================================================================
+// HANDLER TYPES (for refactored hooks)
+// ============================================================================
+
+export type {
+  // Editor State Hook
+  EditorStateReturn,
+
+  // Toolbar Handlers Hook
+  ToolbarHandlersReturn,
+
+  // Area Handlers Hook
+  InteractiveAreaHandlers,
+  CollisionAreaHandlers,
+  AreaHandlersReturn,
+
+  // Layers Handlers Hook
+  LayersHandlersReturn,
+
+  // Stage Event Handlers Hook
+  StageEventHandlersReturn,
+} from './handlers.types';
+
+// ============================================================================
 // RE-EXPORTS FROM EXTERNAL LIBRARIES
 // ============================================================================
 
@@ -216,4 +239,11 @@ export type {
   ImpassableArea,
   MapData,
 } from '../../../shared/MapDataContext';
+
+// Re-export types from editor.types.ts
+export type {
+  TabId,
+  EditorTab,
+  MapEditorModuleProps,
+} from './editor.types';
 
