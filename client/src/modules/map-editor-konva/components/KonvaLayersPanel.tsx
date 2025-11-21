@@ -20,9 +20,11 @@ import {
   Square,
   Shield,
   TreePine,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Pentagon
 } from 'lucide-react';
 import type { Shape, Viewport } from '../types';
+import type { ImpassableArea } from '../../../shared/MapDataContext';
 
 const { Sider } = Layout;
 const { Text } = Typography;
@@ -52,6 +54,7 @@ interface KonvaLayersPanelProps {
   viewport: Viewport;
   viewportWidth: number;
   viewportHeight: number;
+  impassableAreas: ImpassableArea[];
   onShapeSelect?: (shapeId: string) => void;
   onShapeVisibilityToggle?: (shapeId: string) => void;
   onShapeDelete?: (shapeId: string) => void;
@@ -66,6 +69,7 @@ export const KonvaLayersPanel: React.FC<KonvaLayersPanelProps> = ({
   viewport,
   viewportWidth,
   viewportHeight,
+  impassableAreas,
   onShapeSelect,
   onShapeVisibilityToggle,
   onShapeDelete,
@@ -97,11 +101,19 @@ export const KonvaLayersPanel: React.FC<KonvaLayersPanelProps> = ({
         };
         interactiveObjects.push(layerObj);
       } else if (shape.category === 'collision') {
+        // Look up the collision area by shape ID to get the correct name
+        const collisionArea = impassableAreas.find(area => area.id === shape.id);
+        const collisionName = collisionArea?.name || shape.metadata?.name || `Collision Layer ${collisionObjects.length + 1}`;
+
+        // For collision layers, visibility is based on opacity (> 0.3 means visible)
+        const currentOpacity = shape.style.opacity ?? 0.7;
+        const isVisible = currentOpacity > 0.3;
+
         layerObj = {
           id: shape.id,
-          name: shape.name || `Collision Area ${collisionObjects.length + 1}`,
+          name: collisionName,
           type: 'collision',
-          visible: shape.visible !== false,
+          visible: isVisible,
           shape
         };
         collisionObjects.push(layerObj);
@@ -164,7 +176,7 @@ export const KonvaLayersPanel: React.FC<KonvaLayersPanelProps> = ({
         visible: true
       }
     ];
-  }, [shapes]);
+  }, [shapes, impassableAreas]);
 
   // Handle layer selection
   const handleLayerSelect = useCallback((layerObject: LayerObject) => {
@@ -223,6 +235,11 @@ export const KonvaLayersPanel: React.FC<KonvaLayersPanelProps> = ({
                     border: `1px solid ${token.colorBorder}`
                   }}
                 />
+              )}
+              {obj.type === 'collision' && (
+                obj.shape.geometry.type === 'rectangle'
+                  ? <Square size={14} style={{ color: token.colorError }} />
+                  : <Pentagon size={14} style={{ color: token.colorError }} />
               )}
               <Text
                 ellipsis

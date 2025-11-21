@@ -14,7 +14,9 @@ import {
   Tooltip,
   message,
   Upload,
-  Modal
+  Modal,
+  Alert,
+  Badge
 } from 'antd';
 import { UploadOutlined, InfoCircleOutlined, ExpandOutlined } from '@ant-design/icons';
 import { GridConfig } from '../../types/editor.types';
@@ -23,6 +25,7 @@ import { MapDataManager } from '../../../../components/MapDataManager';
 import { useMapData } from '../../../../shared/MapDataContext';
 import { useSharedMap } from '../../../../shared/useSharedMap';
 import { useWorldDimensions } from '../../../../shared/useWorldDimensions';
+import { useAnimatedGifSettings } from '../../hooks/useAnimatedGifSettings';
 
 const { Option } = Select;
 
@@ -63,6 +66,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     height: mapData.worldDimensions.height
   });
   const [selectedPreset, setSelectedPreset] = useState<string>('custom');
+
+  // Animated GIF settings
+  const gifSettings = useAnimatedGifSettings();
 
   // Determine current preset based on map dimensions
   React.useEffect(() => {
@@ -539,6 +545,153 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               }}
             />
           </Form.Item>
+        </Form>
+      </Card>
+
+      {/* Animated GIF Settings */}
+      <Card
+        title={
+          <Space>
+            Animated GIF Settings
+            {gifSettings.stats.showWarning && (
+              <Badge status="warning" text={`${gifSettings.stats.totalGifs} GIFs`} />
+            )}
+            {gifSettings.stats.limitReached && (
+              <Badge status="error" text="Limit Reached" />
+            )}
+          </Space>
+        }
+        size="small"
+      >
+        <Form layout="vertical">
+          {/* Performance Warning */}
+          {gifSettings.stats.showWarning && !gifSettings.stats.limitReached && (
+            <Alert
+              message="Performance Warning"
+              description={`You have ${gifSettings.stats.totalGifs} animated GIFs on the map. Consider reducing the number for better performance.`}
+              type="warning"
+              showIcon
+              closable
+              style={{ marginBottom: 16 }}
+            />
+          )}
+
+          {/* Limit Reached Error */}
+          {gifSettings.stats.limitReached && (
+            <Alert
+              message="GIF Limit Reached"
+              description={`Maximum of ${gifSettings.settings.maxGifsLimit} animated GIFs allowed. Remove some GIFs before adding more.`}
+              type="error"
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
+          )}
+
+          {/* Enable/Disable All Animations */}
+          <Form.Item
+            label={
+              <Space>
+                Enable Animations
+                <Tooltip title="Toggle all GIF animations on/off globally">
+                  <InfoCircleOutlined style={{ color: 'var(--color-text-secondary)' }} />
+                </Tooltip>
+              </Space>
+            }
+          >
+            <Switch
+              checked={gifSettings.settings.enabled}
+              onChange={gifSettings.toggleEnabled}
+            />
+          </Form.Item>
+
+          {/* Max GIFs Warning Threshold */}
+          <Form.Item
+            label={
+              <Space>
+                Performance Warning Threshold
+                <Tooltip title="Show warning when this many GIFs are on the map">
+                  <InfoCircleOutlined style={{ color: 'var(--color-text-secondary)' }} />
+                </Tooltip>
+              </Space>
+            }
+          >
+            <InputNumber
+              min={1}
+              max={gifSettings.settings.maxGifsLimit}
+              value={gifSettings.settings.maxGifsWarningThreshold}
+              onChange={(value) =>
+                gifSettings.updateSettings({ maxGifsWarningThreshold: value || 5 })
+              }
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+
+          {/* Max GIFs Limit */}
+          <Form.Item
+            label={
+              <Space>
+                Maximum GIFs Allowed
+                <Tooltip title="Hard limit on number of animated GIFs">
+                  <InfoCircleOutlined style={{ color: 'var(--color-text-secondary)' }} />
+                </Tooltip>
+              </Space>
+            }
+          >
+            <InputNumber
+              min={1}
+              max={50}
+              value={gifSettings.settings.maxGifsLimit}
+              onChange={(value) =>
+                gifSettings.updateSettings({ maxGifsLimit: value || 10 })
+              }
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+
+          {/* Auto-pause on Overload */}
+          <Form.Item
+            label={
+              <Space>
+                Auto-Pause on Overload
+                <Tooltip title="Automatically pause GIFs when too many are active">
+                  <InfoCircleOutlined style={{ color: 'var(--color-text-secondary)' }} />
+                </Tooltip>
+              </Space>
+            }
+          >
+            <Switch
+              checked={gifSettings.settings.autoPauseOnOverload}
+              onChange={(checked) =>
+                gifSettings.updateSettings({ autoPauseOnOverload: checked })
+              }
+            />
+          </Form.Item>
+
+          {/* Reset to Defaults */}
+          <Form.Item>
+            <Button onClick={gifSettings.resetToDefaults} type="default">
+              Reset to Defaults
+            </Button>
+          </Form.Item>
+
+          {/* Stats Display */}
+          <div style={{
+            marginTop: 16,
+            padding: 12,
+            background: 'var(--color-bg-container)',
+            borderRadius: 4,
+            border: '1px solid var(--color-border)'
+          }}>
+            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+              <strong>Current Stats:</strong>
+              <br />
+              Total GIFs: {gifSettings.stats.totalGifs} / {gifSettings.settings.maxGifsLimit}
+              <br />
+              Playing: {gifSettings.stats.playingGifs}
+              <br />
+              Status: {gifSettings.stats.limitReached ? '🔴 Limit Reached' : gifSettings.stats.showWarning ? '⚠️ Warning' : '✅ Normal'}
+            </div>
+          </div>
         </Form>
       </Card>
     </Space>

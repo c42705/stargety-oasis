@@ -206,16 +206,17 @@ export function useKonvaLayers(): UseKonvaLayersReturn {
 
 /**
  * Ensure correct layer ordering
- * 
+ * Grid is rendered on top of background for visibility
+ *
  * @param layers - Layer references
  */
 export function ensureLayerOrder(layers: LayerRefs): void {
   const layerOrder: Array<keyof LayerRefs> = [
-    'gridLayer',
-    'backgroundLayer',
-    'shapesLayer',
-    'selectionLayer',
-    'uiLayer',
+    'backgroundLayer',  // Bottom - background image
+    'gridLayer',        // On top of background for visibility
+    'shapesLayer',      // Shapes on top of grid
+    'selectionLayer',   // Selection indicators
+    'uiLayer',          // UI elements on top
   ];
 
   layerOrder.forEach((layerName, index) => {

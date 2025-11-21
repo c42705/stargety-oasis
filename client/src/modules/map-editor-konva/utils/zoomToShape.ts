@@ -1,10 +1,10 @@
 /**
  * Zoom to Shape Utility
- * 
+ *
  * Calculates viewport zoom and pan to fit a shape in the viewport with padding.
  */
 
-import type { Shape, Viewport, RectangleGeometry, PolygonGeometry } from '../types';
+import type { Shape, Viewport, RectangleGeometry, PolygonGeometry, ImageGeometry } from '../types';
 
 interface ShapeBounds {
   left: number;
@@ -55,6 +55,14 @@ export function getShapeBounds(shape: Shape): ShapeBounds {
       top: minY,
       width: maxX - minX,
       height: maxY - minY
+    };
+  } else if (geom.type === 'image') {
+    const imageGeom = geom as ImageGeometry;
+    return {
+      left: imageGeom.x,
+      top: imageGeom.y,
+      width: imageGeom.width,
+      height: imageGeom.height
     };
   }
 

@@ -51,6 +51,7 @@ import { useKonvaVertexEdit } from './hooks/useKonvaVertexEdit';
 import { PolygonDrawingPreview } from './components/PolygonDrawingPreview';
 import { RectangleDrawingPreview } from './components/RectangleDrawingPreview';
 import { TransformablePolygon, TransformableRect, TransformableImage, TransformerComponent } from './components/TransformableShape';
+import { AnimatedGifImage } from './components/AnimatedGifImage';
 import { KonvaLayersPanel } from './components/KonvaLayersPanel';
 import { SelectionRect } from './components/SelectionRect';
 import { PolygonEditor } from './components/PolygonEditor';
@@ -65,6 +66,7 @@ import { VIEWPORT_DEFAULTS, GRID_DEFAULTS } from './constants/konvaConstants';
 import { mapDataToShapes, shapeToInteractiveArea, shapeToImpassableArea } from './utils/mapDataAdapter';
 import { calculateZoomToShape } from './utils/zoomToShape';
 import { duplicateShape, groupShapes, ungroupShapes, createImageShape } from './utils/shapeFactories';
+import { screenToWorld } from './utils/coordinateTransform';
 
 // Import shared types
 import type { TabId } from './types/editor.types';
@@ -354,35 +356,67 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
         currentTool
       });
 
-      // If we have pending collision area data, create the collision area
-      if (pendingCollisionAreaData && shape.geometry.type === 'polygon') {
+      // Create collision area for polygon shapes
+      if (shape.geometry.type === 'polygon') {
         const polygon = shape.geometry;
+
+        // Convert flat points array to array of point objects
+        const points: Array<{ x: number; y: number }> = [];
+        for (let i = 0; i < polygon.points.length; i += 2) {
+          points.push({
+            x: polygon.points[i],
+            y: polygon.points[i + 1],
+          });
+        }
+
+        // Calculate bounding box for AABB collision detection
+        const xs = points.map((p) => p.x);
+        const ys = points.map((p) => p.y);
+        const minX = Math.min(...xs);
+        const minY = Math.min(...ys);
+        const maxX = Math.max(...xs);
+        const maxY = Math.max(...ys);
+
+        // Auto-generate name if no pending data
+        const defaultName = `Collision Layer ${impassableAreas.length + 1}`;
+
         const newCollisionArea = {
           id: shape.id,
-          name: pendingCollisionAreaData.name || 'New Collision Area',
-          type: 'impassable-polygon',
-          color: pendingCollisionAreaData.color || '#ff0000',
-          points: polygon.points.reduce((acc: any[], val: number, idx: number) => {
-            if (idx % 2 === 0) {
-              acc.push({ x: val, y: polygon.points[idx + 1] });
-            }
-            return acc;
-          }, []),
+          name: pendingCollisionAreaData?.name || defaultName,
+          type: 'impassable-polygon' as const,
+          color: pendingCollisionAreaData?.color || '#ff0000',
+          points,
+          // Bounding box required for AABB collision detection
+          x: minX,
+          y: minY,
+          width: maxX - minX,
+          height: maxY - minY,
         };
 
-        console.log('[KonvaMapEditor] Adding collision area:', newCollisionArea);
+        logger.info('POLYGON_COLLISION_AREA_CREATED', {
+          id: newCollisionArea.id,
+          name: newCollisionArea.name,
+          type: newCollisionArea.type,
+          pointsCount: newCollisionArea.points.length,
+          boundingBox: {
+            x: newCollisionArea.x,
+            y: newCollisionArea.y,
+            width: newCollisionArea.width,
+            height: newCollisionArea.height
+          },
+          allPoints: newCollisionArea.points
+        });
+
         addCollisionArea(newCollisionArea);
         setPendingCollisionAreaData(null);
         markDirty();
 
-        console.log('[KonvaMapEditor] Collision area added, shapes will be synced via useEffect');
-      } else {
-        console.log('[KonvaMapEditor] No pending collision area data, polygon not saved');
-      }
+        logger.info('POLYGON_COLLISION_AREA_ADDED_TO_MAP', { areaId: newCollisionArea.id });
 
-      history.pushState('Draw polygon');
-      setCurrentTool('select');
-      setCollisionDrawingMode(false);
+        history.pushState('Draw polygon');
+        setCurrentTool('select');
+        setCollisionDrawingMode(false);
+      }
     },
     minVertices: 3,
   });
@@ -395,6 +429,13 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     enabled: currentTool === 'rect' || (drawingMode && !collisionDrawingMode),
     snapToGrid: grid.snapToGrid,
     onShapeCreate: (shape: Shape) => {
+      logger.info('RECT_DRAWING_SHAPE_CREATED', {
+        shapeId: shape.id,
+        geometry: shape.geometry,
+        hasPendingAreaData: !!pendingAreaData,
+        pendingAreaData
+      });
+
       // If we have pending area data, create the interactive area
       if (pendingAreaData && shape.geometry.type === 'rectangle') {
         const rect = shape.geometry;
@@ -409,14 +450,24 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
           width: rect.width,
           height: rect.height,
         };
+
+        logger.info('AREA_CREATING_INTERACTIVE_AREA', { newArea });
         addInteractiveArea(newArea);
         setPendingAreaData(null);
         markDirty();
+        logger.info('AREA_CREATED_SUCCESSFULLY', { areaId: newArea.id, areaName: newArea.name });
+      } else {
+        logger.error('AREA_CREATE_FAILED', {
+          reason: !pendingAreaData ? 'No pending area data' : 'Shape geometry is not rectangle',
+          shapeGeometryType: shape.geometry.type,
+          hasPendingAreaData: !!pendingAreaData
+        });
       }
 
       history.pushState('Draw rectangle');
       setDrawingMode(false);
       setCurrentTool('select');
+      logger.info('RECT_DRAWING_COMPLETE', { drawingMode: false, currentTool: 'select' });
     },
     minSize: 10,
   });
@@ -432,9 +483,10 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
       // If we have pending collision area data, create the collision area
       if (pendingCollisionAreaData && shape.geometry.type === 'rectangle') {
         const rect = shape.geometry;
+        const defaultName = `Collision Layer ${impassableAreas.length + 1}`;
         const newCollisionArea = {
           id: shape.id,
-          name: pendingCollisionAreaData.name || 'New Collision Area',
+          name: pendingCollisionAreaData.name || defaultName,
           type: 'rectangle',
           color: pendingCollisionAreaData.color || '#ff0000',
           x: rect.x,
@@ -736,31 +788,58 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
   }, [zoom]);
 
   const handleFitToScreen = useCallback(() => {
-    // Calculate bounds of all shapes
-    if (shapes.length === 0) {
+    // Initialize bounds
+    let bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    let hasContent = false;
+
+    // Include background image in bounds if it exists
+    if (background.image && background.dimensions) {
+      bounds.minX = 0;
+      bounds.minY = 0;
+      bounds.maxX = background.dimensions.width;
+      bounds.maxY = background.dimensions.height;
+      hasContent = true;
+      logger.info('FIT_TO_SCREEN_BACKGROUND', {
+        backgroundDimensions: background.dimensions
+      });
+    }
+
+    // Include all shapes in bounds
+    if (shapes.length > 0) {
+      shapes.forEach(shape => {
+        const geom = shape.geometry as any;
+        if (geom.vertices) {
+          // Polygon geometry
+          geom.vertices.forEach((v: any) => {
+            bounds.minX = Math.min(bounds.minX, v.x);
+            bounds.minY = Math.min(bounds.minY, v.y);
+            bounds.maxX = Math.max(bounds.maxX, v.x);
+            bounds.maxY = Math.max(bounds.maxY, v.y);
+          });
+          hasContent = true;
+        } else if (geom.x !== undefined && geom.y !== undefined && geom.width !== undefined && geom.height !== undefined) {
+          // Rectangle or Image geometry
+          bounds.minX = Math.min(bounds.minX, geom.x);
+          bounds.minY = Math.min(bounds.minY, geom.y);
+          bounds.maxX = Math.max(bounds.maxX, geom.x + geom.width);
+          bounds.maxY = Math.max(bounds.maxY, geom.y + geom.height);
+          hasContent = true;
+        }
+      });
+    }
+
+    // If no content, reset zoom
+    if (!hasContent) {
+      logger.info('FIT_TO_SCREEN_NO_CONTENT', { message: 'No shapes or background to fit' });
       zoom.resetZoom();
       return;
     }
 
-    const bounds = shapes.reduce((acc, shape) => {
-      const geom = shape.geometry as any;
-      if (geom.vertices) {
-        // Polygon geometry
-        geom.vertices.forEach((v: any) => {
-          acc.minX = Math.min(acc.minX, v.x);
-          acc.minY = Math.min(acc.minY, v.y);
-          acc.maxX = Math.max(acc.maxX, v.x);
-          acc.maxY = Math.max(acc.maxY, v.y);
-        });
-      } else if (geom.x !== undefined && geom.y !== undefined && geom.width !== undefined && geom.height !== undefined) {
-        // Rectangle geometry
-        acc.minX = Math.min(acc.minX, geom.x);
-        acc.minY = Math.min(acc.minY, geom.y);
-        acc.maxX = Math.max(acc.maxX, geom.x + geom.width);
-        acc.maxY = Math.max(acc.maxY, geom.y + geom.height);
-      }
-      return acc;
-    }, { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
+    logger.info('FIT_TO_SCREEN_BOUNDS', {
+      bounds,
+      shapesCount: shapes.length,
+      hasBackground: !!background.image
+    });
 
     zoom.zoomToFit(
       {
@@ -773,7 +852,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
       viewportHeight,
       50 // padding
     );
-  }, [zoom, shapes, viewportWidth, viewportHeight]);
+  }, [zoom, shapes, viewportWidth, viewportHeight, background]);
 
   const handleToggleGrid = useCallback(() => {
     setGridConfig(prev => ({ ...prev, visible: !prev.visible }));
@@ -796,26 +875,37 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
   }, [currentTool]);
 
   const handleStageMouseDown = useCallback((e: any) => {
-    if (currentTool === 'select') {
-      selection.handleMouseDown(e);
-    } else if (currentTool === 'pan') {
+    // Pan tool or spacebar pressed - enable panning
+    if (currentTool === 'pan' || isSpacebarPressed) {
       pan.handleMouseDown(e);
+    } else if (currentTool === 'select') {
+      selection.handleMouseDown(e);
     } else if (currentTool === 'rect') {
       // Handle both interactive and collision rectangle drawing
       if (collisionDrawingMode && pendingCollisionAreaData?.drawingMode === 'rectangle') {
+        logger.info('RECT_DRAWING_MOUSE_DOWN_COLLISION', {
+          collisionDrawingMode,
+          pendingCollisionAreaData
+        });
         collisionRectDrawing.handleMouseDown(e);
       } else {
+        logger.info('RECT_DRAWING_MOUSE_DOWN_INTERACTIVE', {
+          drawingMode,
+          pendingAreaData,
+          currentTool
+        });
         rectDrawing.handleMouseDown(e);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTool, collisionDrawingMode, pendingCollisionAreaData]);
+  }, [currentTool, isSpacebarPressed, collisionDrawingMode, pendingCollisionAreaData, drawingMode, pendingAreaData]);
 
   const handleStageMouseMove = useCallback((e: any) => {
-    if (currentTool === 'select') {
-      selection.handleMouseMove(e);
-    } else if (currentTool === 'pan') {
+    // Pan tool or spacebar pressed - enable panning
+    if (currentTool === 'pan' || isSpacebarPressed) {
       pan.handleMouseMove(e);
+    } else if (currentTool === 'select') {
+      selection.handleMouseMove(e);
     } else if (currentTool === 'polygon') {
       polygonDrawing.handleMouseMove(e);
     } else if (currentTool === 'rect') {
@@ -827,23 +917,34 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTool, collisionDrawingMode, pendingCollisionAreaData]);
+  }, [currentTool, isSpacebarPressed, collisionDrawingMode, pendingCollisionAreaData]);
 
   const handleStageMouseUp = useCallback(() => {
+    // Always call pan.handleMouseUp to ensure panning state is cleared
+    // This is important when spacebar is released while dragging
+    pan.handleMouseUp();
+
     if (currentTool === 'select') {
       selection.handleMouseUp();
-    } else if (currentTool === 'pan') {
-      pan.handleMouseUp();
     } else if (currentTool === 'rect') {
       // Handle both interactive and collision rectangle drawing
       if (collisionDrawingMode && pendingCollisionAreaData?.drawingMode === 'rectangle') {
+        logger.info('RECT_DRAWING_MOUSE_UP_COLLISION', {
+          collisionDrawingMode,
+          pendingCollisionAreaData
+        });
         collisionRectDrawing.handleMouseUp();
       } else {
+        logger.info('RECT_DRAWING_MOUSE_UP_INTERACTIVE', {
+          drawingMode,
+          pendingAreaData,
+          currentTool
+        });
         rectDrawing.handleMouseUp();
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTool, collisionDrawingMode, pendingCollisionAreaData]);
+  }, [currentTool, collisionDrawingMode, pendingCollisionAreaData, drawingMode, pendingAreaData]);
 
   const handleStageDoubleClick = useCallback(() => {
     if (currentTool === 'polygon') {
@@ -890,16 +991,24 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
   const handleAreaFormSubmit = useCallback((data: Partial<InteractiveArea>) => {
     if (editingArea) {
       // Update existing area
+      logger.info('AREA_UPDATE_START', { areaId: editingArea.id, data });
       updateInteractiveArea(editingArea.id, data);
       markDirty();
       setShowAreaModal(false);
       setEditingArea(null);
+      logger.info('AREA_UPDATE_COMPLETE', { areaId: editingArea.id });
     } else {
       // For new areas, save the data and enter drawing mode
+      logger.info('AREA_CREATE_START', { data });
       setPendingAreaData(data);
       setShowAreaModal(false);
       setDrawingMode(true);
       setCurrentTool('rect');
+      logger.info('AREA_CREATE_DRAWING_MODE_ENABLED', {
+        pendingData: data,
+        drawingMode: true,
+        currentTool: 'rect'
+      });
     }
   }, [editingArea, updateInteractiveArea, markDirty]);
 
@@ -964,9 +1073,25 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
   }, []);
 
   const handleShapeVisibilityToggle = useCallback((shapeId: string) => {
-    setShapes(prev => prev.map(s =>
-      s.id === shapeId ? { ...s, visible: !s.visible } : s
-    ));
+    setShapes(prev => prev.map(s => {
+      if (s.id === shapeId) {
+        // For collision layers, toggle opacity instead of visibility
+        if (s.category === 'collision') {
+          const currentOpacity = s.style.opacity ?? 0.7;
+          const newOpacity = currentOpacity > 0.3 ? 0.15 : 0.7;
+          return {
+            ...s,
+            style: {
+              ...s.style,
+              opacity: newOpacity
+            }
+          };
+        }
+        // For other layers, toggle visibility as before
+        return { ...s, visible: !s.visible };
+      }
+      return s;
+    }));
     history.pushState('Toggle shape visibility');
   }, [history]);
 
@@ -1012,8 +1137,11 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
   // ===== RENDER =====
 
   // Create EditorState for toolbar
+  // When spacebar is pressed, show 'pan' tool in the status bar
+  const effectiveTool = isSpacebarPressed ? 'pan' : currentTool;
+
   const fabricEditorState: import('./types/editor.types').EditorState = {
-    tool: konvaToFabricTool(currentTool),
+    tool: konvaToFabricTool(effectiveTool),
     zoom: viewport.zoom * 100, // Convert to percentage
     mousePosition: { x: 0, y: 0 },
     saveStatus: 'saved',
@@ -1039,7 +1167,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
           editorState={fabricEditorState}
           gridConfig={fabricGridConfig}
           previewMode={previewMode.isPreviewMode}
-          zoom={viewport.zoom}
+          zoom={Math.round(viewport.zoom * 100)}
           onToolChange={handleToolChange}
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
@@ -1062,6 +1190,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
           viewport={viewport}
           viewportWidth={viewportWidth}
           viewportHeight={viewportHeight}
+          impassableAreas={impassableAreas}
           onShapeSelect={handleShapeSelect}
           onShapeVisibilityToggle={handleShapeVisibilityToggle}
           onShapeDelete={handleShapeDelete}
@@ -1100,21 +1229,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
               onDblClick={handleStageDoubleClick}
               onWheel={zoom.handleWheel}
             >
-            {/* Grid Layer */}
-            <Layer ref={layerRefs.gridLayer}>
-              {grid.shouldRenderGrid && grid.gridLines.map((line, index) => (
-                <Line
-                  key={`grid-line-${index}`}
-                  points={line.points}
-                  stroke={line.stroke}
-                  strokeWidth={line.strokeWidth}
-                  opacity={line.opacity}
-                  listening={line.listening}
-                />
-              ))}
-            </Layer>
-
-            {/* Background Layer */}
+            {/* Background Layer - Render first (bottom) */}
             <Layer ref={layerRefs.backgroundLayer}>
               {background.image && (
                 <KonvaImage
@@ -1126,6 +1241,38 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
                   listening={false}
                 />
               )}
+            </Layer>
+
+            {/* Grid Layer - Render on top of background */}
+            <Layer ref={layerRefs.gridLayer}>
+              {(() => {
+                // Debug logging for grid rendering
+                if (grid.shouldRenderGrid && grid.gridLines.length > 0) {
+                  logger.debug('GRID_RENDERING', {
+                    gridLinesCount: grid.gridLines.length,
+                    gridConfig: gridConfig,
+                    firstLine: grid.gridLines[0],
+                    viewport: viewport
+                  });
+                } else if (!grid.shouldRenderGrid) {
+                  logger.debug('GRID_NOT_RENDERING', {
+                    shouldRenderGrid: grid.shouldRenderGrid,
+                    gridVisible: gridConfig.visible,
+                    zoom: viewport.zoom
+                  });
+                }
+                return null;
+              })()}
+              {grid.shouldRenderGrid && grid.gridLines.map((line, index) => (
+                <Line
+                  key={`grid-line-${index}`}
+                  points={line.points}
+                  stroke={line.stroke}
+                  strokeWidth={line.strokeWidth}
+                  opacity={line.opacity}
+                  listening={line.listening}
+                />
+              ))}
             </Layer>
 
             {/* Shapes Layer */}
@@ -1169,17 +1316,34 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
                     />
                   );
                 } else if (geom.type === 'image') {
-                  // Image geometry
-                  return (
-                    <TransformableImage
-                      key={shape.id}
-                      shape={shape}
-                      isSelected={selectedIds.includes(shape.id)}
-                      onSelect={(e) => selection.handleShapeClick(shape.id, e)}
-                      onDragEnd={(e) => transform.handleDragEnd(shape.id, e)}
-                      onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
-                    />
-                  );
+                  // Image geometry - detect if it's a GIF
+                  const isGif = geom.imageData?.startsWith('data:image/gif');
+
+                  if (isGif) {
+                    // Render animated GIF
+                    return (
+                      <AnimatedGifImage
+                        key={shape.id}
+                        shape={shape}
+                        isSelected={selectedIds.includes(shape.id)}
+                        onSelect={() => selection.selectShape(shape.id)}
+                        onDragEnd={(e) => transform.handleDragEnd(shape.id, e)}
+                        onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
+                      />
+                    );
+                  } else {
+                    // Render static image
+                    return (
+                      <TransformableImage
+                        key={shape.id}
+                        shape={shape}
+                        isSelected={selectedIds.includes(shape.id)}
+                        onSelect={(e) => selection.handleShapeClick(shape.id, e)}
+                        onDragEnd={(e) => transform.handleDragEnd(shape.id, e)}
+                        onTransformEnd={(node) => transform.handleTransformEnd(shape.id, node)}
+                      />
+                    );
+                  }
                 }
                 return null;
               })}
@@ -1307,21 +1471,26 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
                       }
                     });
 
-                    // Calculate center of viewport
-                    const centerX = -viewport.pan.x + (viewportWidth / 2) / viewport.zoom;
-                    const centerY = -viewport.pan.y + (viewportHeight / 2) / viewport.zoom;
+                    // Calculate center of viewport in screen coordinates
+                    const screenCenter = {
+                      x: viewportWidth / 2,
+                      y: viewportHeight / 2
+                    };
+
+                    // Convert screen coordinates to world coordinates
+                    const worldCenter = screenToWorld(screenCenter.x, screenCenter.y, viewport);
 
                     console.log('[KonvaMapEditor] Calculated position:', {
-                      centerX,
-                      centerY,
-                      finalX: centerX - width / 2,
-                      finalY: centerY - height / 2
+                      screenCenter,
+                      worldCenter,
+                      finalX: worldCenter.x - width / 2,
+                      finalY: worldCenter.y - height / 2
                     });
 
                     // Create image shape at viewport center
                     const imageShape = createImageShape({
-                      x: centerX - width / 2,
-                      y: centerY - height / 2,
+                      x: worldCenter.x - width / 2,
+                      y: worldCenter.y - height / 2,
                       width,
                       height,
                       imageData: fileData,
@@ -1350,6 +1519,10 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
                     // Select the new shape
                     selection.selectShape(imageShape.id);
                     console.log('[KonvaMapEditor] Selected shape:', imageShape.id);
+
+                    // Zoom to the placed asset
+                    handleZoomToShape(imageShape);
+                    console.log('[KonvaMapEditor] Zoomed to placed asset');
 
                     // Mark as dirty
                     markDirty();

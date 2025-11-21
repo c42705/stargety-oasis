@@ -1,11 +1,12 @@
 /**
  * Konva Map Editor - Pan Hook
- * 
+ *
  * Handles canvas panning with middle mouse button or pan tool.
  * Supports both mouse and touch input.
  */
 
 import { useCallback, useState, useRef } from 'react';
+import { logger } from '../../../shared/logger';
 import type { Viewport, UseKonvaPanParams, UseKonvaPanReturn } from '../types';
 
 /**
@@ -112,9 +113,18 @@ export function useKonvaPan(params: UseKonvaPanParams): UseKonvaPanReturn {
     (e: any) => {
       // Check if middle mouse button
       const isMiddleButton = e.evt.button === 1;
-      
+
       // Check if left click with pan tool enabled
       const isLeftClickWithPanTool = e.evt.button === 0 && enabled;
+
+      logger.info('PAN_MOUSE_DOWN', {
+        enabled,
+        enableMiddleButton,
+        button: e.evt.button,
+        isMiddleButton,
+        isLeftClickWithPanTool,
+        willStartPanning: (isMiddleButton && enableMiddleButton) || isLeftClickWithPanTool
+      });
 
       // Start panning if conditions are met
       if ((isMiddleButton && enableMiddleButton) || isLeftClickWithPanTool) {
@@ -124,6 +134,7 @@ export function useKonvaPan(params: UseKonvaPanParams): UseKonvaPanReturn {
           x: e.evt.clientX,
           y: e.evt.clientY,
         };
+        logger.info('PAN_STARTED', { x: e.evt.clientX, y: e.evt.clientY });
       }
     },
     [enabled, enableMiddleButton]
@@ -134,13 +145,29 @@ export function useKonvaPan(params: UseKonvaPanParams): UseKonvaPanReturn {
    */
   const handleMouseMove = useCallback(
     (e: any) => {
-      if (!isPanning) return;
+      if (!isPanning) {
+        // Only log occasionally to avoid spam
+        if (Math.random() < 0.01) {
+          logger.debug('PAN_MOUSE_MOVE_NOT_PANNING', { isPanning });
+        }
+        return;
+      }
 
       e.evt.preventDefault();
 
       // Calculate delta
       const dx = e.evt.clientX - lastPosRef.current.x;
       const dy = e.evt.clientY - lastPosRef.current.y;
+
+      // Only log if there's actual movement
+      if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
+        logger.debug('PAN_MOUSE_MOVE_PANNING', {
+          isPanning,
+          delta: { dx, dy },
+          currentPan: viewport.pan,
+          newPan: { x: viewport.pan.x + dx, y: viewport.pan.y + dy }
+        });
+      }
 
       // Update viewport
       onViewportChange({
@@ -164,8 +191,11 @@ export function useKonvaPan(params: UseKonvaPanParams): UseKonvaPanReturn {
    * Handle mouse up - stop panning
    */
   const handleMouseUp = useCallback(() => {
+    if (isPanning) {
+      logger.info('PAN_STOPPED');
+    }
     setIsPanning(false);
-  }, []);
+  }, [isPanning]);
 
   /**
    * Handle mouse leave - stop panning if mouse leaves canvas

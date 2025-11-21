@@ -53,7 +53,7 @@ export const CollisionTab: React.FC<CollisionTabProps> = ({
                     <Space size={6} align="center">
                       <Avatar size={18} style={{ backgroundColor: 'var(--ant-color-error)' }} icon={<Shield size={12} />} />
                       <Text strong style={{ fontSize: '13px' }} ellipsis>
-                        {area.name || `Collision Area ${area.id}`}
+                        {area.name || 'Unnamed Collision Area'}
                       </Text>
                       <Tag color="red" style={{ marginLeft: 4, fontSize: 10, padding: '0 4px', lineHeight: '16px' }}>Impassable</Tag>
                     </Space>

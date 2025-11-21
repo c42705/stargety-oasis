@@ -70,13 +70,14 @@ export const ZOOM_CONFIG = {
 
 /**
  * Default grid configuration
+ * Using lighter color and higher opacity for better visibility on dark backgrounds
  */
 export const GRID_DEFAULTS: GridConfig = {
   visible: true,
   spacing: 32,
   pattern: 'dots',
-  color: '#333333',
-  opacity: 0.5,
+  color: '#888888', // Lighter gray for better visibility
+  opacity: 0.8, // Higher opacity for better visibility
   snapToGrid: false,
 };
 
@@ -310,12 +311,13 @@ export const HISTORY = {
 
 /**
  * Layer names and z-index order
+ * Grid is rendered on top of background for visibility
  */
 export const LAYERS = {
-  /** Grid layer (bottom) */
-  GRID: 'grid',
-  /** Background image layer */
+  /** Background image layer (bottom) */
   BACKGROUND: 'background',
+  /** Grid layer (on top of background) */
+  GRID: 'grid',
   /** Shapes layer */
   SHAPES: 'shapes',
   /** Selection and UI layer (top) */
@@ -324,10 +326,11 @@ export const LAYERS = {
 
 /**
  * Layer z-index values
+ * Grid is rendered on top of background for visibility
  */
 export const LAYER_Z_INDEX = {
-  GRID: 0,
-  BACKGROUND: 1,
+  BACKGROUND: 0,
+  GRID: 1,
   SHAPES: 2,
   UI: 3,
 } as const;
