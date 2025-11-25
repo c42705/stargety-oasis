@@ -19,7 +19,7 @@ import {
   Badge
 } from 'antd';
 import { UploadOutlined, InfoCircleOutlined, ExpandOutlined } from '@ant-design/icons';
-import { GridConfig } from '../../types/editor.types';
+import { GridConfig } from '../../types/ui.types';
 import { GRID_PATTERNS } from '../../constants/editorConstants';
 import { MapDataManager } from '../../../../components/MapDataManager';
 import { useMapData } from '../../../../shared/MapDataContext';

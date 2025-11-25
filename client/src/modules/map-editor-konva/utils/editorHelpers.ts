@@ -1,15 +1,12 @@
 /**
  * Editor Helper Functions
- * 
+ *
  * Utility functions for the map editor including:
  * - Asset placement
- * - Grid config conversion
- * - Tool conversion
  */
 
 import { logger } from '../../../shared/logger';
-import type { Shape, Viewport, GridConfig as KonvaGridConfig } from '../types';
-import type { GridConfig as FabricGridConfig } from '../types/editor.types';
+import type { Shape, Viewport } from '../types';
 import { createImageShape } from './shapeFactories';
 import { screenToWorld } from './coordinateTransform';
 
@@ -91,20 +88,3 @@ export const placeAsset = ({
     dimensions: { width, height }
   });
 };
-
-/**
- * Convert Fabric.js GridConfig to Konva GridConfig
- */
-export const convertFabricToKonvaGridConfig = (
-  fabricConfig: Partial<FabricGridConfig>,
-  currentKonvaConfig: KonvaGridConfig
-): KonvaGridConfig => {
-  return {
-    visible: fabricConfig.visible ?? currentKonvaConfig.visible,
-    spacing: fabricConfig.spacing ?? currentKonvaConfig.spacing,
-    pattern: currentKonvaConfig.pattern, // Keep current pattern
-    color: currentKonvaConfig.color,
-    opacity: fabricConfig.opacity ?? currentKonvaConfig.opacity,
-  };
-};
-

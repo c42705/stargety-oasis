@@ -16,18 +16,18 @@ import {
   Pentagon,
   Magnet
 } from 'lucide-react';
-import { EditorState, GridConfig } from '../../types/editor.types';
+import { ToolbarState, GridConfig } from '../../types/ui.types';
 import { SaveStatusIndicator } from '../../../../components/SaveStatusIndicator';
 
 
 const { Text } = Typography;
 
 interface EditorToolbarProps {
-  editorState: EditorState;
+  toolbarState: ToolbarState;
   gridConfig: GridConfig;
   previewMode: boolean;
   zoom?: number;
-  onToolChange: (tool: EditorState['tool']) => void;
+  onToolChange: (tool: ToolbarState['tool']) => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onFitToScreen: () => void;
@@ -42,7 +42,7 @@ interface EditorToolbarProps {
 }
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({
-  editorState,
+  toolbarState,
   gridConfig,
   previewMode,
   zoom,
@@ -82,9 +82,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       justify="space-between"
       align="center"
       style={{
-        
+
         backgroundColor: 'var(--color-bg-secondary)',
-        
+
         gap: '16px'
       }}
     >
@@ -93,9 +93,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           <Text type="secondary" style={{ fontSize: '12px' }}>Tools:</Text>
           <Segmented
             options={toolOptions}
-            value={editorState.tool}
+            value={toolbarState.tool}
             onChange={(value) => {
-              onToolChange(value as EditorState['tool']);
+              onToolChange(value as ToolbarState['tool']);
             }}
             size="small"
           />
@@ -122,7 +122,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             </Tooltip>
           </Space.Compact>
           <Text strong style={{ minWidth: '50px', textAlign: 'center' }}>
-            {typeof zoom === 'number' ? zoom : editorState.zoom}%
+            {typeof zoom === 'number' ? zoom : toolbarState.zoom}%
           </Text>
         </Space>
 
@@ -154,14 +154,14 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             <Button
               icon={<Undo size={16} />}
               onClick={onUndo}
-              disabled={!editorState.canUndo}
+              disabled={!toolbarState.canUndo}
             />
           </Tooltip>
           <Tooltip title="Redo (Ctrl+Y)">
             <Button
               icon={<Redo size={16} />}
               onClick={onRedo}
-              disabled={!editorState.canRedo}
+              disabled={!toolbarState.canRedo}
             />
           </Tooltip>
         </Space.Compact>

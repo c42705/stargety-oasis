@@ -240,10 +240,15 @@ export type {
   MapData,
 } from '../../../shared/MapDataContext';
 
-// Re-export types from editor.types.ts
+// Re-export types from ui.types.ts (UI component types)
 export type {
   TabId,
   EditorTab,
   MapEditorModuleProps,
-} from './editor.types';
+  ToolbarState,
+  ToolbarTool,
+  GridConfig as UIGridConfig,
+  GridPattern,
+  SaveStatus,
+} from './ui.types';
 

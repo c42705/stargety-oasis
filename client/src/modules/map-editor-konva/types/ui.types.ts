@@ -1,15 +1,31 @@
+/**
+ * UI Types for Map Editor Components
+ *
+ * These types are used by UI components (toolbar, status bar, settings)
+ * and represent simplified state for display purposes.
+ *
+ * Note: These are separate from the internal Konva editor types in konva.types.ts
+ */
+
 export interface MapEditorModuleProps {
   className?: string;
 }
 
+/**
+ * Grid configuration for UI components
+ * Used by SettingsTab and EditorToolbar
+ */
 export interface GridConfig {
   spacing: number;
-  opacity: number;
+  opacity: number; // 0-100 percentage
   pattern: 'pattern-8px' | 'pattern-16px' | 'pattern-32px' | 'pattern-64px' | 'pattern-128px';
   visible: boolean;
   snapToGrid: boolean;
 }
 
+/**
+ * Grid pattern definition for UI selection
+ */
 export interface GridPattern {
   id: string;
   name: string;
@@ -18,8 +34,12 @@ export interface GridPattern {
   thumbnail: string;
 }
 
-export interface EditorState {
-  tool: EditorTool;
+/**
+ * Toolbar state for EditorToolbar and EditorStatusBar
+ * Simplified state representation for UI display
+ */
+export interface ToolbarState {
+  tool: ToolbarTool;
   zoom: number; // Zoom percentage (100 = 1.0x)
   mousePosition: { x: number; y: number };
   saveStatus: SaveStatus;
@@ -28,7 +48,10 @@ export interface EditorState {
   isPanning: boolean;
 }
 
-export type EditorTool = 'select' | 'pan' | 'draw-polygon';
+/**
+ * Tools available in the toolbar
+ */
+export type ToolbarTool = 'select' | 'pan' | 'draw-polygon';
 
 export type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error';
 

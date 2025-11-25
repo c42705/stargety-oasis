@@ -7,7 +7,7 @@ import {
   TreePine,
   Video
 } from 'lucide-react';
-import { EditorTab, GridConfig, EditorState, GridPattern } from '../types/editor.types';
+import { EditorTab, GridConfig, ToolbarState, GridPattern } from '../types/ui.types';
 
 export const EDITOR_TABS: EditorTab[] = [
   { id: 'areas', label: 'Interactive Areas', icon: React.createElement(Grid, { size: 16 }) },
@@ -64,7 +64,7 @@ export const DEFAULT_GRID_CONFIG: GridConfig = {
   snapToGrid: false
 };
 
-export const DEFAULT_EDITOR_STATE: EditorState = {
+export const DEFAULT_TOOLBAR_STATE: ToolbarState = {
   tool: 'select',
   zoom: 100,
   mousePosition: { x: 0, y: 0 },

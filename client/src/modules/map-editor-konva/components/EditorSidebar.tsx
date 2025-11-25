@@ -7,7 +7,7 @@
 
 import React from 'react';
 import type { TabId, InteractiveArea } from '../types';
-import type { GridConfig } from '../types/editor.types'; // Use Fabric.js GridConfig for SettingsTab
+import type { GridConfig } from '../types/ui.types';
 import { EDITOR_TABS } from '../constants/editorConstants';
 import { AreasTab } from './tabs/AreasTab';
 import { TerrainTab } from './tabs/TerrainTab';

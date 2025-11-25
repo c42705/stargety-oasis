@@ -42,7 +42,6 @@ import { useToolbarHandlers } from './hooks/useToolbarHandlers';
 import { useAreaHandlers } from './hooks/useAreaHandlers';
 import { useLayersHandlers } from './hooks/useLayersHandlers';
 import { useStageEventHandlers } from './hooks/useStageEventHandlers';
-import { useRenderPreparation } from './hooks/useRenderPreparation';
 
 // Import Konva components
 import { KonvaLayersPanel } from './components/KonvaLayersPanel';
@@ -60,7 +59,7 @@ import type { EditorTool as KonvaEditorTool } from './types';
 import { mapDataToShapes, shapeToInteractiveArea, shapeToImpassableArea } from './utils/mapDataAdapter';
 import { calculateZoomToShape } from './utils/zoomToShape';
 import { duplicateShape, groupShapes, ungroupShapes } from './utils/shapeFactories';
-import { placeAsset, convertFabricToKonvaGridConfig } from './utils/editorHelpers';
+import { placeAsset } from './utils/editorHelpers';
 
 
 
@@ -811,24 +810,34 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     setViewport(newViewport);
   }, [mainRef, setViewport]);
 
-  // ===== RENDER PREPARATION =====
+  // ===== UI STATE PREPARATION =====
 
-  // Prepare data for rendering (convert Konva types to Fabric.js types for legacy components)
-  const { fabricEditorState, fabricGridConfig } = useRenderPreparation({
-    currentTool,
-    isSpacebarPressed,
-    viewport,
-    gridConfig,
+  // Create toolbar state for UI components (EditorToolbar, EditorStatusBar)
+  const toolbarState: import('./types/ui.types').ToolbarState = {
+    tool: currentTool === 'polygon' ? 'draw-polygon' : currentTool as import('./types/ui.types').ToolbarTool,
+    zoom: viewport.zoom * 100, // Convert to percentage
+    mousePosition: { x: 0, y: 0 }, // TODO: Track actual mouse position
+    saveStatus: 'saved', // TODO: Connect to actual save status
     canUndo: history.canUndo,
     canRedo: history.canRedo,
-  });
+    isPanning: isSpacebarPressed || currentTool === 'pan',
+  };
+
+  // Create UI grid config (convert opacity from 0-1 to 0-100)
+  const uiGridConfig: import('./types/ui.types').GridConfig = {
+    visible: gridConfig.visible,
+    spacing: gridConfig.spacing,
+    opacity: Math.round(gridConfig.opacity * 100), // Convert 0-1 to 0-100
+    pattern: 'pattern-32px', // Default pattern for UI
+    snapToGrid: gridConfig.snapToGrid ?? false,
+  };
 
   // ===== HANDLERS =====
 
-  // Wrapper for tool change to convert Fabric tool to Konva tool
-  const handleToolChangeWrapper = useCallback((fabricTool: import('./types/editor.types').EditorTool) => {
-    // Map Fabric tool to Konva tool
-    const konvaTool: KonvaEditorTool = fabricTool === 'draw-polygon' ? 'polygon' : fabricTool as KonvaEditorTool;
+  // Handle tool change from toolbar
+  const handleToolChange = useCallback((tool: import('./types/ui.types').ToolbarTool) => {
+    // Map toolbar tool to Konva tool
+    const konvaTool: KonvaEditorTool = tool === 'draw-polygon' ? 'polygon' : tool as KonvaEditorTool;
     toolbarHandlers.handleToolChange(konvaTool);
   }, [toolbarHandlers]);
 
@@ -849,10 +858,17 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     });
   }, [viewport, viewportWidth, viewportHeight, setShapes, selection.selectShape, handleZoomToShape, markDirty]);
 
-  // Handle grid config change from SettingsTab (Fabric.js format)
-  const handleGridConfigChange = useCallback((newConfig: Partial<import('./types/editor.types').GridConfig>) => {
-    const konvaConfig = convertFabricToKonvaGridConfig(newConfig, gridConfig);
-    setGridConfig(konvaConfig);
+  // Handle grid config change from SettingsTab
+  const handleGridConfigChange = useCallback((newConfig: Partial<import('./types/ui.types').GridConfig>) => {
+    // Convert UI grid config (0-100 opacity) to Konva grid config (0-1 opacity)
+    const updates: Partial<typeof gridConfig> = {};
+
+    if (newConfig.visible !== undefined) updates.visible = newConfig.visible;
+    if (newConfig.spacing !== undefined) updates.spacing = newConfig.spacing;
+    if (newConfig.opacity !== undefined) updates.opacity = newConfig.opacity / 100; // Convert 0-100 to 0-1
+    if (newConfig.snapToGrid !== undefined) updates.snapToGrid = newConfig.snapToGrid;
+
+    setGridConfig({ ...gridConfig, ...updates });
   }, [gridConfig, setGridConfig]);
 
   // ===== RENDER =====
@@ -862,11 +878,11 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
       {/* Toolbar */}
       <header className="editor-header">
         <EditorToolbar
-          editorState={fabricEditorState}
-          gridConfig={fabricGridConfig}
+          toolbarState={toolbarState}
+          gridConfig={uiGridConfig}
           previewMode={previewMode.isPreviewMode}
           zoom={Math.round(viewport.zoom * 100)}
-          onToolChange={handleToolChangeWrapper}
+          onToolChange={handleToolChange}
           onZoomIn={toolbarHandlers.handleZoomIn}
           onZoomOut={toolbarHandlers.handleZoomOut}
           onFitToScreen={toolbarHandlers.handleFitToScreen}
@@ -952,7 +968,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
           onCreateNewCollisionArea={areaHandlers.collision.handleCreateCollisionArea}
           onEditCollisionArea={areaHandlers.collision.handleEditCollisionArea}
           onDeleteCollisionArea={areaHandlers.collision.handleDeleteCollisionArea}
-          gridConfig={fabricGridConfig}
+          gridConfig={uiGridConfig}
           onGridConfigChange={handleGridConfigChange}
           previewMode={previewMode.isPreviewMode}
           onPreviewModeChange={previewMode.togglePreview}
@@ -961,7 +977,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
 
       {/* Status Bar */}
       <EditorStatusBar
-        editorState={fabricEditorState}
+        toolbarState={toolbarState}
         areasCount={areas.length}
         collisionAreasCount={impassableAreas.length}
       />

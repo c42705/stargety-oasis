@@ -7,18 +7,18 @@ import {
   AppstoreOutlined,
   StopOutlined
 } from '@ant-design/icons';
-import { EditorState } from '../../types/editor.types';
+import { ToolbarState } from '../../types/ui.types';
 
 const { Text } = Typography;
 
 interface EditorStatusBarProps {
-  editorState: EditorState;
+  toolbarState: ToolbarState;
   areasCount: number;
   collisionAreasCount: number;
 }
 
 export const EditorStatusBar: React.FC<EditorStatusBarProps> = ({
-  editorState,
+  toolbarState,
   areasCount,
   collisionAreasCount
 }) => {
@@ -50,8 +50,8 @@ export const EditorStatusBar: React.FC<EditorStatusBarProps> = ({
         <Space size="small">
           <ToolOutlined />
           <Text type="secondary">Tool:</Text>
-          <Tag color={getToolColor(editorState.tool)}>
-            {editorState.tool.replace('-', ' ').toUpperCase()}
+          <Tag color={getToolColor(toolbarState.tool)}>
+            {toolbarState.tool.replace('-', ' ').toUpperCase()}
           </Tag>
         </Space>
 
@@ -59,14 +59,14 @@ export const EditorStatusBar: React.FC<EditorStatusBarProps> = ({
           <EnvironmentOutlined />
           <Text type="secondary">Position:</Text>
           <Text code>
-            ({editorState.mousePosition.x}, {editorState.mousePosition.y})
+            ({toolbarState.mousePosition.x}, {toolbarState.mousePosition.y})
           </Text>
         </Space>
 
         <Space size="small">
           <ZoomInOutlined />
           <Text type="secondary">Zoom:</Text>
-          <Text strong>{Math.round(editorState.zoom)}%</Text>
+          <Text strong>{Math.round(toolbarState.zoom)}%</Text>
         </Space>
       </Space>
 
