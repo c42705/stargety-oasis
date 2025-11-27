@@ -1,0 +1,22 @@
+# Development Dockerfile for Client with hot reload
+FROM node:18-alpine
+
+WORKDIR /app/client
+
+# Copy package files
+COPY client/package*.json ./
+
+# Install all dependencies
+RUN npm install
+
+# Copy source code (will be overwritten by volume mount)
+COPY client/public ./public
+COPY client/src ./src
+COPY client/tsconfig.json ./
+
+# Expose port
+EXPOSE 3000
+
+# Start React development server with hot reload
+CMD ["npm", "start"]
+

@@ -1,0 +1,33 @@
+# Development Dockerfile for Server with hot reload
+FROM node:18-alpine
+
+WORKDIR /app/server
+
+# Install dependencies for Prisma and native modules
+RUN apk add --no-cache openssl libc6-compat
+
+# Copy package files
+COPY server/package*.json ./
+
+# Install all dependencies (including devDependencies for hot reload)
+RUN npm install
+
+# Copy Prisma schema
+COPY server/prisma ./prisma/
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Copy source code (will be overwritten by volume mount)
+COPY server/src ./src
+COPY server/tsconfig.json ./
+
+# Create uploads directory
+RUN mkdir -p /tmp/uploads
+
+# Expose port
+EXPOSE 3001
+
+# Start with hot reload using nodemon
+CMD ["npm", "run", "dev"]
+

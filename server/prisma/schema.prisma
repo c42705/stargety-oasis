@@ -1,0 +1,79 @@
+// Prisma Schema for Stargety Oasis
+// PostgreSQL with PostGIS support
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  password  String   // hashed password
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  messages   Message[]
+  ownedRooms ChatRoom[] @relation("RoomOwner")
+  
+  @@map("users")
+}
+
+// Map model with JSONB data for flexible map storage
+model Map {
+  id        String   @id @default(cuid())
+  roomId    String   @unique
+  name      String
+  data      Json     // JSONB - stores full map data structure
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("maps")
+}
+
+// ChatRoom model for persistent chat rooms
+model ChatRoom {
+  id          String    @id @default(cuid())
+  name        String
+  roomId      String    @unique  // matches map area ID
+  description String?
+  sessionId   String?   // for session-based rooms
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  expiresAt   DateTime? // for TTL cleanup (8hr)
+
+  // Relations
+  messages Message[]
+  owner    User?     @relation("RoomOwner", fields: [ownerId], references: [id])
+  ownerId  String?
+
+  @@map("chat_rooms")
+}
+
+// Message model with JSONB content for rich messages
+model Message {
+  id        String   @id @default(cuid())
+  content   Json     // JSONB - text, mentions, attachments, etc.
+  createdAt DateTime @default(now())
+  expiresAt DateTime // for 8hr TTL cleanup
+
+  // Relations
+  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomId    String
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorId  String?
+
+  @@index([roomId, createdAt])
+  @@index([expiresAt])
+  @@map("messages")
+}
+

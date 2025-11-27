@@ -17,10 +17,15 @@
     "clean:client": "cd client && rm -rf build",
     "docker:build": "docker build -t stargety-oasis .",
     "docker:run": "docker run -p 3001:3001 stargety-oasis",
-    "docker:dev": "docker-compose up --build",
+    "docker:dev": "docker-compose --profile dev up --build",
+    "docker:dev:down": "docker-compose --profile dev down",
     "docker:prod": "docker-compose --profile production up -d",
     "docker:stop": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
+    "docker:logs:server": "docker-compose logs -f server",
+    "docker:logs:client": "docker-compose logs -f client",
+    "prisma:dev": "cd server && npm run prisma:migrate:dev",
+    "prisma:studio": "cd server && npm run prisma:studio",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
