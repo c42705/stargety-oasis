@@ -153,7 +153,8 @@ export class MapDataService {
           width: 200,
           height: 50
         }
-      ]
+      ],
+      assets: [] // Initialize with empty assets array
     };
 
     // Save the default map
@@ -185,7 +186,8 @@ export class MapDataService {
         height: data.worldDimensions?.height || 600
       },
       interactiveAreas: Array.isArray(data.interactiveAreas) ? data.interactiveAreas : [],
-      impassableAreas: Array.isArray(data.impassableAreas) ? data.impassableAreas : []
+      impassableAreas: Array.isArray(data.impassableAreas) ? data.impassableAreas : [],
+      assets: Array.isArray(data.assets) ? data.assets : [] // Include assets
     };
 
     return sanitized;
@@ -372,6 +374,7 @@ export class MapDataService {
       lastModified: data.lastModified,
       interactiveAreasCount: data.interactiveAreas.length,
       collisionAreasCount: data.impassableAreas.length,
+      assetsCount: data.assets?.length || 0,
       hasBackgroundImage: !!data.backgroundImage,
       worldSize: `${data.worldDimensions.width} × ${data.worldDimensions.height}`,
       dataSize: JSON.stringify(data).length

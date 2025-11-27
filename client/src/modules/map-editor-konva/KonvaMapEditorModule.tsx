@@ -56,7 +56,7 @@ import type { Shape, EditorState } from './types';
 import type { EditorTool as KonvaEditorTool } from './types';
 
 // Import utilities
-import { mapDataToShapes, shapeToInteractiveArea, shapeToImpassableArea } from './utils/mapDataAdapter';
+import { mapDataToShapes, shapeToInteractiveArea, shapeToImpassableArea, shapeToAsset } from './utils/mapDataAdapter';
 import { calculateZoomToShape } from './utils/zoomToShape';
 import { duplicateShape, groupShapes, ungroupShapes } from './utils/shapeFactories';
 import { placeAsset } from './utils/editorHelpers';
@@ -79,7 +79,7 @@ export interface KonvaMapEditorModuleProps {
 export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
   className = ''
 }) => {
-  const { mapData } = useMapData();
+  const { mapData, updateAsset, addAsset, removeAsset } = useMapData();
   
   // Initialize the map store
   useMapStoreInit({ autoLoad: true, source: 'editor' });
@@ -502,6 +502,11 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
           const collisionArea = shapeToImpassableArea(mergedShape);
           updateCollisionArea(id, collisionArea);
           markDirty();
+        } else if (mergedShape.category === 'asset') {
+          // Update asset in store
+          const asset = shapeToAsset(mergedShape);
+          updateAsset(id, asset);
+          markDirty();
         }
       }
 
@@ -536,6 +541,11 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
           // Update collision area in store
           const collisionArea = shapeToImpassableArea(mergedShape);
           updateCollisionArea(id, collisionArea);
+          markDirty();
+        } else if (mergedShape.category === 'asset') {
+          // Update asset in store
+          const asset = shapeToAsset(mergedShape);
+          updateAsset(id, asset);
           markDirty();
         }
       }
@@ -705,13 +715,14 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
 
   // ===== SYNC SHAPES WITH MAP DATA =====
   useEffect(() => {
-    // Convert MapData to Konva shapes
+    // Convert MapData to Konva shapes (including assets)
     const konvaShapes = mapDataToShapes(
       mapData.interactiveAreas || [],
-      mapData.impassableAreas || []
+      mapData.impassableAreas || [],
+      mapData.assets || []
     );
     setShapes(konvaShapes);
-  }, [mapData.interactiveAreas, mapData.impassableAreas]);
+  }, [mapData.interactiveAreas, mapData.impassableAreas, mapData.assets]);
 
   // ===== HANDLER HOOKS (REFACTORED) =====
 
@@ -777,6 +788,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     mainRef,
     markDirty,
     history,
+    removeAsset,
   });
 
   // Stage event handlers
@@ -809,6 +821,43 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
 
     setViewport(newViewport);
   }, [mainRef, setViewport]);
+
+  // Handle grouping selected shapes
+  const handleGroupShapes = useCallback((shapeIds: string[]) => {
+    const shapesToGroup = shapes.filter(s => shapeIds.includes(s.id));
+    if (shapesToGroup.length < 2) return;
+
+    const groupedShapes = groupShapes(shapesToGroup);
+    const updatedShapes = shapes.map(s =>
+      groupedShapes.find(gs => gs.id === s.id) || s
+    );
+
+    setShapes(updatedShapes);
+    markDirty();
+    history.pushState('Group shapes');
+    logger.info(`Grouped ${shapeIds.length} shapes`);
+  }, [shapes, setShapes, markDirty, history]);
+
+  // Handle ungrouping selected shapes
+  const handleUngroupShapes = useCallback((shapeIds: string[]) => {
+    const shapesToUngroup = shapes.filter(s => shapeIds.includes(s.id));
+    if (shapesToUngroup.length === 0) return;
+
+    const ungroupedShapes = ungroupShapes(shapesToUngroup);
+    const updatedShapes = shapes.map(s =>
+      ungroupedShapes.find(us => us.id === s.id) || s
+    );
+
+    setShapes(updatedShapes);
+    markDirty();
+    history.pushState('Ungroup shapes');
+    logger.info(`Ungrouped ${shapeIds.length} shapes`);
+  }, [shapes, setShapes, markDirty, history]);
+
+  // Handle multi-select from layers panel
+  const handleMultiSelect = useCallback((shapeIds: string[]) => {
+    setSelectedIds(shapeIds);
+  }, [setSelectedIds]);
 
   // ===== UI STATE PREPARATION =====
 
@@ -851,12 +900,22 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
       viewport,
       viewportWidth,
       viewportHeight,
-      onShapeCreated: (shape) => setShapes(prev => [...prev, shape]),
+      onShapeCreated: (shape) => {
+        // Add to local shapes state
+        setShapes(prev => [...prev, shape]);
+
+        // Save to map data store if it's an asset
+        if (shape.category === 'asset') {
+          const asset = shapeToAsset(shape);
+          addAsset(asset);
+          markDirty();
+        }
+      },
       onSelectShape: selection.selectShape,
       onZoomToShape: handleZoomToShape,
       onMarkDirty: markDirty,
     });
-  }, [viewport, viewportWidth, viewportHeight, setShapes, selection.selectShape, handleZoomToShape, markDirty]);
+  }, [viewport, viewportWidth, viewportHeight, setShapes, selection.selectShape, handleZoomToShape, markDirty, addAsset]);
 
   // Handle grid config change from SettingsTab
   const handleGridConfigChange = useCallback((newConfig: Partial<import('./types/ui.types').GridConfig>) => {
@@ -921,6 +980,9 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
               areaHandlers.collision.handleEditCollisionArea(area);
             }
           }}
+          onGroupShapes={handleGroupShapes}
+          onUngroupShapes={handleUngroupShapes}
+          onMultiSelect={handleMultiSelect}
         />
 
         {/* Canvas Container */}

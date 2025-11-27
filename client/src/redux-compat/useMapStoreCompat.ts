@@ -31,6 +31,10 @@ import {
   updateCollisionArea,
   removeCollisionArea,
   setCollisionAreas,
+  addAsset,
+  updateAsset,
+  removeAsset,
+  setAssets,
 } from '../redux/slices/mapSlice';
 import { MapDataService } from '../stores/MapDataService';
 
@@ -83,6 +87,12 @@ export const useMapStoreCompat = () => {
     updateCollisionArea: (id: string, updates: any) => dispatch(updateCollisionArea({ id, updates })),
     removeCollisionArea: (id: string) => dispatch(removeCollisionArea(id)),
     setCollisionAreas: (areas: any[]) => dispatch(setCollisionAreas(areas)),
+
+    // Assets
+    addAsset: (asset: any) => dispatch(addAsset(asset)),
+    updateAsset: (id: string, updates: any) => dispatch(updateAsset({ id, updates })),
+    removeAsset: (id: string) => dispatch(removeAsset(id)),
+    setAssets: (assets: any[]) => dispatch(setAssets(assets)),
 
     // Utility
     clearError: () => dispatch(clearError()),

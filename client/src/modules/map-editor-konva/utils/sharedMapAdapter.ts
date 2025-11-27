@@ -395,10 +395,11 @@ export function sharedMapToKonvaShapes(sharedMap: any): Shape[] {
     return [];
   }
 
-  // Use the mapDataAdapter to convert
+  // Use the mapDataAdapter to convert (including assets)
   return mapDataToShapes(
     mapData.interactiveAreas || [],
-    mapData.impassableAreas || []
+    mapData.impassableAreas || [],
+    mapData.assets || []
   );
 }
 
@@ -412,12 +413,13 @@ export function konvaShapesToSharedMap(
   shapes: Shape[],
   worldDimensions: { width: number; height: number } = { width: 800, height: 600 }
 ): MapData {
-  // Use the mapDataAdapter to convert
-  const { interactiveAreas, impassableAreas } = shapesToMapData(shapes);
+  // Use the mapDataAdapter to convert (including assets)
+  const { interactiveAreas, impassableAreas, assets } = shapesToMapData(shapes);
 
   return {
     interactiveAreas,
     impassableAreas,
+    assets,
     worldDimensions,
   };
 }

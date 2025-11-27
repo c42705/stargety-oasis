@@ -14,7 +14,7 @@
 
 import Phaser from 'phaser';
 import { SharedMapSystem, SharedMapData } from '../../shared/SharedMapSystem';
-import { InteractiveArea, ImpassableArea } from '../../shared/MapDataContext';
+import { InteractiveArea, ImpassableArea, Asset } from '../../shared/MapDataContext';
 import { shouldBlockBackgroundInteractions } from '../../shared/ModalStateManager';
 import { logger } from '../../shared/logger';
 
@@ -34,6 +34,7 @@ export class PhaserMapRenderer {
   private interactiveAreasGroup!: Phaser.GameObjects.Group;
   private collisionAreasGroup!: Phaser.GameObjects.Group;
   private backgroundGroup!: Phaser.GameObjects.Group;
+  private assetsGroup!: Phaser.GameObjects.Group;
 
   // Configuration
   private enablePhysics: boolean;
@@ -43,6 +44,7 @@ export class PhaserMapRenderer {
   // Map element tracking
   private interactiveAreaObjects: Map<string, Phaser.GameObjects.GameObject> = new Map();
   private collisionAreaObjects: Map<string, Phaser.GameObjects.GameObject> = new Map();
+  private assetObjects: Map<string, Phaser.GameObjects.GameObject> = new Map();
 
   // Event listeners
   private eventListeners: (() => void)[] = [];
@@ -68,11 +70,14 @@ export class PhaserMapRenderer {
   private initializeGroups(): void {
     try {
       this.backgroundGroup = this.scene.add.group();
+      this.assetsGroup = this.scene.add.group();
       this.interactiveAreasGroup = this.scene.add.group();
       this.collisionAreasGroup = this.scene.add.group();
 
       // Set depth for proper layering
+      // Background at 0, Assets at 2 (above background, below areas), collision at 5, interactive at 10
       this.backgroundGroup.setDepth(0);
+      this.assetsGroup.setDepth(2);
       this.interactiveAreasGroup.setDepth(10);
       this.collisionAreasGroup.setDepth(5);
 
@@ -167,9 +172,10 @@ export class PhaserMapRenderer {
 
     this.clearMap();
     this.renderBackground();
+    this.renderAssets();
     this.renderInteractiveAreas();
     this.renderCollisionAreas();
-    
+
     if (this.debugMode) {
       this.renderDebugInfo();
     }
@@ -183,6 +189,9 @@ export class PhaserMapRenderer {
     if (this.backgroundGroup) {
       this.backgroundGroup.clear(true, true);
     }
+    if (this.assetsGroup) {
+      this.assetsGroup.clear(true, true);
+    }
     if (this.interactiveAreasGroup) {
       this.interactiveAreasGroup.clear(true, true);
     }
@@ -192,6 +201,7 @@ export class PhaserMapRenderer {
 
     this.interactiveAreaObjects.clear();
     this.collisionAreaObjects.clear();
+    this.assetObjects.clear();
   }
 
 
@@ -303,6 +313,90 @@ export class PhaserMapRenderer {
     } catch (error) {
       logger.error('Error in createSimpleBackground', error);
       this.renderDefaultBackground();
+    }
+  }
+
+  /**
+   * Render all assets (images placed on the map)
+   */
+  private renderAssets(): void {
+    if (!this.mapData || !this.mapData.assets) return;
+
+    logger.debug('Rendering assets', { count: this.mapData.assets.length });
+
+    this.mapData.assets.forEach(asset => {
+      this.addAsset(asset);
+    });
+  }
+
+  /**
+   * Add a single asset to the scene
+   */
+  private addAsset(asset: Asset): void {
+    try {
+      // Create unique texture key for this asset
+      const textureKey = `asset_${asset.id}_${Date.now()}`;
+
+      // Check if it's a data URL (base64)
+      if (asset.imageData && asset.imageData.startsWith('data:')) {
+        // Create texture from base64 data URL
+        this.scene.textures.addBase64(textureKey, asset.imageData);
+
+        // Wait for texture to be ready, then create the image
+        setTimeout(() => {
+          if (this.scene.textures.exists(textureKey)) {
+            this.createAssetImage(asset, textureKey);
+          } else {
+            logger.warn('Asset texture not ready', { assetId: asset.id });
+          }
+        }, 50);
+      } else {
+        logger.warn('Asset has no valid image data', { assetId: asset.id });
+      }
+    } catch (error) {
+      logger.error('Failed to add asset', { assetId: asset.id, error });
+    }
+  }
+
+  /**
+   * Create the Phaser image for an asset
+   */
+  private createAssetImage(asset: Asset, textureKey: string): void {
+    try {
+      // Create the image at the asset's position
+      const image = this.scene.add.image(asset.x, asset.y, textureKey);
+
+      // Set origin to top-left to match editor behavior
+      image.setOrigin(0, 0);
+
+      // Apply scale to match the asset's dimensions
+      const texture = this.scene.textures.get(textureKey);
+      const frame = texture.get();
+      if (frame && frame.width > 0 && frame.height > 0) {
+        const scaleX = asset.width / frame.width;
+        const scaleY = asset.height / frame.height;
+        image.setScale(scaleX * (asset.scaleX || 1), scaleY * (asset.scaleY || 1));
+      }
+
+      // Apply rotation if specified
+      if (asset.rotation) {
+        image.setRotation(Phaser.Math.DegToRad(asset.rotation));
+      }
+
+      // Set depth to be above background but below interactive/collision areas
+      image.setDepth(2);
+
+      // Add to assets group and track
+      this.assetsGroup.add(image);
+      this.assetObjects.set(asset.id, image);
+
+      logger.debug('Asset image created', {
+        assetId: asset.id,
+        position: { x: asset.x, y: asset.y },
+        size: { width: asset.width, height: asset.height }
+      });
+    } catch (error) {
+      logger.error('Failed to create asset image', { assetId: asset.id, error });
     }
   }
 

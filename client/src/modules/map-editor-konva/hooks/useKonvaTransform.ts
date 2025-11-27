@@ -136,17 +136,34 @@ export function useKonvaTransform(
   // ==========================================================================
 
   /**
+   * Check if selected shapes are grouped
+   */
+  const isGrouped = useCallback((): boolean => {
+    if (selectedIds.length === 0) return false;
+    const groupIds = selectedIds
+      .map(id => shapes.find(s => s.id === id)?.metadata.groupId)
+      .filter(Boolean);
+    return groupIds.length > 0 && new Set(groupIds).size === 1;
+  }, [selectedIds, shapes]);
+
+  /**
    * Handle transform end - update shape size/rotation
+   * For grouped shapes, maintains aspect ratio and relative positioning
    */
   const handleTransformEnd = useCallback(
     (shapeId: string, node: any) => {
       const shape = getShape(shapeId);
       if (!shape || !canTransform(shapeId)) return;
 
-      if (shape.geometry.type === 'rectangle') {
-        const scaleX = node.scaleX();
-        const scaleY = node.scaleY();
+      const scaleX = node.scaleX();
+      const scaleY = node.scaleY();
 
+      // For grouped shapes, lock aspect ratio to maintain proportions
+      const lockAspectRatio = isGrouped();
+      const finalScaleX = lockAspectRatio ? Math.min(scaleX, scaleY) : scaleX;
+      const finalScaleY = lockAspectRatio ? Math.min(scaleX, scaleY) : scaleY;
+
+      if (shape.geometry.type === 'rectangle') {
         // Reset scale to 1 and adjust width/height instead
         node.scaleX(1);
         node.scaleY(1);
@@ -154,27 +171,23 @@ export function useKonvaTransform(
         const updates: Partial<RectangleGeometry> = {
           x: node.x(),
           y: node.y(),
-          width: Math.max(5, node.width() * scaleX),
-          height: Math.max(5, node.height() * scaleY),
+          width: Math.max(5, node.width() * finalScaleX),
+          height: Math.max(5, node.height() * finalScaleY),
           rotation: node.rotation(),
         };
 
         onShapeUpdate?.(shapeId, { geometry: { ...shape.geometry, ...updates } });
       } else if (shape.geometry.type === 'polygon') {
-        // For polygons, we keep the scale and rotation
+        // For polygons, apply scale to points
         const updates: Partial<PolygonGeometry> = {
           points: shape.geometry.points,
         };
 
-        // Apply scale to points
-        const scaleX = node.scaleX();
-        const scaleY = node.scaleY();
-
-        if (scaleX !== 1 || scaleY !== 1) {
+        if (finalScaleX !== 1 || finalScaleY !== 1) {
           const newPoints = [...shape.geometry.points];
           for (let i = 0; i < newPoints.length; i += 2) {
-            newPoints[i] *= scaleX;
-            newPoints[i + 1] *= scaleY;
+            newPoints[i] *= finalScaleX;
+            newPoints[i + 1] *= finalScaleY;
           }
           updates.points = newPoints;
 
@@ -186,25 +199,21 @@ export function useKonvaTransform(
         onShapeUpdate?.(shapeId, { geometry: { ...shape.geometry, ...updates } });
       } else if (shape.geometry.type === 'image') {
         // For images, update dimensions and rotation
-        const scaleX = node.scaleX();
-        const scaleY = node.scaleY();
-
-        // Reset scale to 1 and adjust width/height instead
         node.scaleX(1);
         node.scaleY(1);
 
         const updates: Partial<ImageGeometry> = {
           x: node.x(),
           y: node.y(),
-          width: Math.max(5, node.width() * scaleX),
-          height: Math.max(5, node.height() * scaleY),
+          width: Math.max(5, node.width() * finalScaleX),
+          height: Math.max(5, node.height() * finalScaleY),
           rotation: node.rotation(),
         };
 
         onShapeUpdate?.(shapeId, { geometry: { ...shape.geometry, ...updates } });
       }
     },
-    [getShape, canTransform, onShapeUpdate]
+    [getShape, canTransform, onShapeUpdate, isGrouped]
   );
 
   // ==========================================================================

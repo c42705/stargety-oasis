@@ -27,7 +27,7 @@ export interface SharedMapData extends MapData {
     isPublic: boolean;
   };
   layers: MapLayer[];
-  assets: MapAsset[];
+  resources: MapResource[]; // Renamed from assets to avoid conflict with MapData.assets
 }
 
 export interface MapLayer {
@@ -53,7 +53,8 @@ export interface MapElement {
   layerId: string;
 }
 
-export interface MapAsset {
+// Renamed from MapAsset to MapResource to avoid confusion with Asset (placed images)
+export interface MapResource {
   id: string;
   name: string;
   type: 'image' | 'sprite' | 'tileset' | 'audio';
@@ -1260,7 +1261,7 @@ export class SharedMapSystem {
           elements: []
         }
       ],
-      assets: []
+      resources: [] // Renamed from assets to avoid conflict
     };
 
     await this.saveMapData(defaultMap);
@@ -1299,7 +1300,7 @@ export class SharedMapSystem {
       interactiveAreasCount: this.mapData.interactiveAreas.length,
       collisionAreasCount: this.mapData.impassableAreas.length,
       layersCount: this.mapData.layers.length,
-      assetsCount: this.mapData.assets.length,
+      assetsCount: this.mapData.assets?.length || 0,
       version: this.mapData.version,
       lastModified: this.mapData.lastModified,
       totalElements: this.mapData.layers.reduce((sum, layer) => sum + layer.elements.length, 0)

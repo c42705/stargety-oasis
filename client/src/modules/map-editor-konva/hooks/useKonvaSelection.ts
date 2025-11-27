@@ -5,7 +5,7 @@
  * and drag-to-select rectangle.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import type {
   UseKonvaSelectionParams,
   UseKonvaSelectionReturn,
@@ -26,8 +26,10 @@ interface SelectionRect {
  * Selection start position
  */
 interface SelectionStart {
-  x: number;
-  y: number;
+  screenX: number;
+  screenY: number;
+  worldX: number;
+  worldY: number;
 }
 
 /**
@@ -70,10 +72,44 @@ export function useKonvaSelection(
   const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);
   const [isDrawingSelection, setIsDrawingSelection] = useState(false);
   const [selectionStart, setSelectionStart] = useState<SelectionStart | null>(null);
+  const [ctrlPressed, setCtrlPressed] = useState(false);
+
+  // Refs to track selection state (for use in event handlers where state is stale)
+  const selectionStateRef = useRef({
+    isDrawing: false,
+    rect: null as SelectionRect | null,
+    start: null as SelectionStart | null,
+  });
 
   // ==========================================================================
   // SELECTION UTILITIES
   // ==========================================================================
+
+  /**
+   * Expand selection to include all group members
+   * If a shape is part of a group, include all shapes in that group
+   */
+  const expandSelectionWithGroups = useCallback(
+    (ids: string[]): string[] => {
+      const expanded = new Set<string>();
+
+      ids.forEach(id => {
+        const shape = shapes.find(s => s.id === id);
+        if (shape?.metadata.groupId) {
+          // Add all shapes in this group
+          shapes
+            .filter(s => s.metadata.groupId === shape.metadata.groupId)
+            .forEach(s => expanded.add(s.id));
+        } else {
+          // Add the shape itself
+          expanded.add(id);
+        }
+      });
+
+      return Array.from(expanded);
+    },
+    [shapes]
+  );
 
   /**
    * Update selection and notify parent
@@ -224,8 +260,13 @@ export function useKonvaSelection(
     (e: any) => {
       if (!enabled) return;
 
+      // Track Ctrl/Cmd key for multi-select
+      const isCtrlPressed = e.evt.ctrlKey || e.evt.metaKey;
+      setCtrlPressed(isCtrlPressed);
+
       // Only start selection rectangle if clicking on stage (not on a shape)
       const clickedOnEmpty = e.target === e.target.getStage();
+
       if (!clickedOnEmpty) return;
 
       const stage = e.target.getStage();
@@ -237,11 +278,18 @@ export function useKonvaSelection(
       const transform = stage.getAbsoluteTransform().copy().invert();
       const pos = transform.point(pointerPosition);
 
-      // Store the starting position
-      setSelectionStart({
-        x: pos.x,
-        y: pos.y,
-      });
+      // Store both screen and world coordinates for threshold checking
+      const newStart = {
+        screenX: pointerPosition.x,
+        screenY: pointerPosition.y,
+        worldX: pos.x,
+        worldY: pos.y,
+      };
+
+      setSelectionStart(newStart);
+
+      // Update ref immediately so handleMouseMove can access the latest value
+      selectionStateRef.current.start = newStart;
     },
     [enabled]
   );
@@ -258,37 +306,55 @@ export function useKonvaSelection(
 
       if (!pointerPosition) return;
 
-      // Convert screen coordinates to world coordinates
-      const transform = stage.getAbsoluteTransform().copy().invert();
-      const pos = transform.point(pointerPosition);
-
       // If we have a selection start but haven't started drawing yet
-      if (selectionStart && !isDrawingSelection) {
-        // Check if we've moved more than threshold from the start position
-        const dx = Math.abs(pos.x - selectionStart.x);
-        const dy = Math.abs(pos.y - selectionStart.y);
+      // Use ref values instead of state to avoid stale closures
+      if (selectionStateRef.current.start && !selectionStateRef.current.isDrawing) {
+        const selectionStart = selectionStateRef.current.start;
+
+        // Check if we've moved more than threshold from the start position (in screen pixels)
+        const dx = Math.abs(pointerPosition.x - selectionStart.screenX);
+        const dy = Math.abs(pointerPosition.y - selectionStart.screenY);
 
         if (dx > SELECTION.MIN_DRAG_DISTANCE || dy > SELECTION.MIN_DRAG_DISTANCE) {
           // Start drawing the selection rectangle
+          // Convert screen coordinates to world coordinates
+          const transform = stage.getAbsoluteTransform().copy().invert();
+          const pos = transform.point(pointerPosition);
+
+          const newRect = {
+            x: selectionStart.worldX,
+            y: selectionStart.worldY,
+            width: pos.x - selectionStart.worldX,
+            height: pos.y - selectionStart.worldY,
+          };
+
           setIsDrawingSelection(true);
-          setSelectionRect({
-            x: selectionStart.x,
-            y: selectionStart.y,
-            width: pos.x - selectionStart.x,
-            height: pos.y - selectionStart.y,
-          });
+          setSelectionRect(newRect);
+
+          // Update ref immediately so handleMouseUp can access the latest value
+          selectionStateRef.current.isDrawing = true;
+          selectionStateRef.current.rect = newRect;
         }
-      } else if (isDrawingSelection && selectionRect) {
+      } else if (isDrawingSelection && selectionStart) {
         // Continue drawing the selection rectangle
-        setSelectionRect({
-          x: selectionRect.x,
-          y: selectionRect.y,
-          width: pos.x - selectionRect.x,
-          height: pos.y - selectionRect.y,
-        });
+        // Convert screen coordinates to world coordinates
+        const transform = stage.getAbsoluteTransform().copy().invert();
+        const pos = transform.point(pointerPosition);
+
+        const newRect = {
+          x: selectionStart.worldX,
+          y: selectionStart.worldY,
+          width: pos.x - selectionStart.worldX,
+          height: pos.y - selectionStart.worldY,
+        };
+
+        setSelectionRect(newRect);
+
+        // Update ref immediately so handleMouseUp can access the latest value
+        selectionStateRef.current.rect = newRect;
       }
     },
-    [enabled, isDrawingSelection, selectionRect, selectionStart]
+    [enabled, isDrawingSelection, selectionStart]
   );
 
   /**
@@ -301,7 +367,9 @@ export function useKonvaSelection(
     setSelectionStart(null);
 
     // If we were drawing a selection rectangle, process it
-    if (isDrawingSelection && selectionRect) {
+    // Use ref values instead of state to avoid stale closures
+    if (selectionStateRef.current.isDrawing && selectionStateRef.current.rect) {
+      const selectionRect = selectionStateRef.current.rect;
       setIsDrawingSelection(false);
 
       // Calculate normalized selection rectangle (handle negative width/height)
@@ -361,10 +429,22 @@ export function useKonvaSelection(
         }
       });
 
-      updateSelection(selected);
+      // If Ctrl is pressed, add to existing selection; otherwise replace
+      const baseSelection = ctrlPressed ? [...selectedIds, ...selected] : selected;
+
+      // Expand selection to include all group members
+      const finalSelection = expandSelectionWithGroups(baseSelection);
+
+      updateSelection(finalSelection);
       setSelectionRect(null);
+      setCtrlPressed(false);
     }
-  }, [enabled, isDrawingSelection, selectionRect, shapes, updateSelection]);
+
+    // Clear ref state
+    selectionStateRef.current.isDrawing = false;
+    selectionStateRef.current.rect = null;
+    selectionStateRef.current.start = null;
+  }, [enabled, shapes, updateSelection, ctrlPressed, selectedIds, expandSelectionWithGroups]);
 
   // ==========================================================================
   // RETURN

@@ -6,8 +6,8 @@
  */
 
 import type { Shape, ShapeCategory } from '../types';
-import type { InteractiveArea, ImpassableArea } from '../../../shared/MapDataContext';
-import { isPolygonGeometry, isRectangleGeometry } from '../types';
+import type { InteractiveArea, ImpassableArea, Asset } from '../../../shared/MapDataContext';
+import { isPolygonGeometry, isRectangleGeometry, isImageGeometry } from '../types';
 
 // ============================================================================
 // SHAPE TO MAPDATA CONVERSION
@@ -41,7 +41,7 @@ export function shapeToInteractiveArea(shape: Shape): InteractiveArea {
 
 /**
  * Convert Konva shape to ImpassableArea
- * 
+ *
  * @param shape - Konva shape (can be rectangle or polygon)
  * @returns ImpassableArea for MapDataContext
  */
@@ -94,6 +94,31 @@ export function shapeToImpassableArea(shape: Shape): ImpassableArea {
 }
 
 /**
+ * Convert Konva shape to Asset
+ *
+ * @param shape - Konva shape (must be image geometry)
+ * @returns Asset for MapDataContext
+ */
+export function shapeToAsset(shape: Shape): Asset {
+  if (!isImageGeometry(shape.geometry)) {
+    throw new Error('Assets must be image geometry');
+  }
+
+  return {
+    id: shape.id,
+    x: shape.geometry.x,
+    y: shape.geometry.y,
+    width: shape.geometry.width,
+    height: shape.geometry.height,
+    imageData: shape.geometry.imageData,
+    fileName: shape.geometry.fileName,
+    rotation: shape.geometry.rotation,
+    scaleX: shape.geometry.scaleX,
+    scaleY: shape.geometry.scaleY,
+  };
+}
+
+/**
  * Convert Konva shape to MapData format based on category
  * 
  * @param shape - Konva shape
@@ -109,16 +134,18 @@ export function shapeToMapData(shape: Shape): InteractiveArea | ImpassableArea {
 
 /**
  * Convert array of shapes to MapData format
- * 
+ *
  * @param shapes - Array of Konva shapes
- * @returns Object with interactiveAreas and impassableAreas arrays
+ * @returns Object with interactiveAreas, impassableAreas, and assets arrays
  */
 export function shapesToMapData(shapes: Shape[]): {
   interactiveAreas: InteractiveArea[];
   impassableAreas: ImpassableArea[];
+  assets: Asset[];
 } {
   const interactiveAreas: InteractiveArea[] = [];
   const impassableAreas: ImpassableArea[] = [];
+  const assets: Asset[] = [];
 
   shapes.forEach((shape) => {
     try {
@@ -126,13 +153,15 @@ export function shapesToMapData(shapes: Shape[]): {
         interactiveAreas.push(shapeToInteractiveArea(shape));
       } else if (shape.category === 'collision') {
         impassableAreas.push(shapeToImpassableArea(shape));
+      } else if (shape.category === 'asset') {
+        assets.push(shapeToAsset(shape));
       }
     } catch (error) {
       console.error(`Failed to convert shape ${shape.id}:`, error);
     }
   });
 
-  return { interactiveAreas, impassableAreas };
+  return { interactiveAreas, impassableAreas, assets };
 }
 
 // ============================================================================
@@ -234,15 +263,54 @@ export function impassableAreaToShape(area: ImpassableArea): Shape {
 }
 
 /**
+ * Convert Asset to Konva shape
+ *
+ * @param asset - Asset from MapDataContext
+ * @returns Konva shape
+ */
+export function assetToShape(asset: Asset): Shape {
+  return {
+    id: asset.id,
+    category: 'asset',
+    geometry: {
+      type: 'image',
+      x: asset.x,
+      y: asset.y,
+      width: asset.width,
+      height: asset.height,
+      imageData: asset.imageData,
+      fileName: asset.fileName,
+      rotation: asset.rotation,
+      scaleX: asset.scaleX,
+      scaleY: asset.scaleY,
+    },
+    style: {
+      fill: 'transparent',
+      stroke: 'transparent',
+      strokeWidth: 0,
+      opacity: 1,
+    },
+    metadata: {
+      name: asset.fileName || 'Asset',
+      createdAt: new Date(),
+      modifiedAt: new Date(),
+    },
+    visible: true,
+  };
+}
+
+/**
  * Convert MapData areas to Konva shapes
- * 
+ *
  * @param interactiveAreas - Array of InteractiveArea
  * @param impassableAreas - Array of ImpassableArea
+ * @param assets - Array of Asset (optional for backward compatibility)
  * @returns Array of Konva shapes
  */
 export function mapDataToShapes(
   interactiveAreas: InteractiveArea[],
-  impassableAreas: ImpassableArea[]
+  impassableAreas: ImpassableArea[],
+  assets?: Asset[]
 ): Shape[] {
   const shapes: Shape[] = [];
 
@@ -261,6 +329,17 @@ export function mapDataToShapes(
       console.error(`Failed to convert impassable area ${area.id}:`, error);
     }
   });
+
+  // Convert assets to shapes if provided
+  if (assets && assets.length > 0) {
+    assets.forEach((asset) => {
+      try {
+        shapes.push(assetToShape(asset));
+      } catch (error) {
+        console.error(`Failed to convert asset ${asset.id}:`, error);
+      }
+    });
+  }
 
   return shapes;
 }

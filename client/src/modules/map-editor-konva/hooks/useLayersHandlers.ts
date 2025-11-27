@@ -22,18 +22,19 @@ interface UseLayersHandlersParams {
   setCollisionAreaToDelete: (area: any | null) => void;
   setShowCollisionDeleteConfirm: (show: boolean) => void;
   setViewport: (viewport: Viewport | ((prev: Viewport) => Viewport)) => void;
-  
+
   // State values
   shapes: Shape[];
   areas: InteractiveArea[];
   impassableAreas: any[];
-  
+
   // Refs
   mainRef: RefObject<HTMLDivElement | null>;
-  
+
   // Other dependencies
   markDirty: () => void;
   history: UseKonvaHistoryReturn;
+  removeAsset?: (id: string) => void; // Optional for asset deletion
 }
 
 export function useLayersHandlers(params: UseLayersHandlersParams): LayersHandlersReturn {
@@ -48,6 +49,7 @@ export function useLayersHandlers(params: UseLayersHandlersParams): LayersHandle
     setViewport,
     shapes,
     areas,
+    removeAsset,
     impassableAreas,
     mainRef,
     markDirty,
@@ -102,11 +104,15 @@ export function useLayersHandlers(params: UseLayersHandlersParams): LayersHandle
       // Delete asset shapes directly without confirmation
       setShapes(prev => prev.filter(s => s.id !== shapeId));
       setSelectedIds(prev => prev.filter(id => id !== shapeId));
+      // Remove from map data store
+      if (removeAsset) {
+        removeAsset(shapeId);
+      }
       markDirty();
       history.pushState('Delete asset');
       logger.info('ASSET_DELETED', { id: shapeId, name: shape.name });
     }
-  }, [shapes, areas, impassableAreas, setShapes, setSelectedIds, setAreaToDelete, setShowDeleteConfirm, setCollisionAreaToDelete, setShowCollisionDeleteConfirm, markDirty, history]);
+  }, [shapes, areas, impassableAreas, setShapes, setSelectedIds, setAreaToDelete, setShowDeleteConfirm, setCollisionAreaToDelete, setShowCollisionDeleteConfirm, markDirty, history, removeAsset]);
 
   const handleZoomToShape = useCallback((shapeId: string) => {
     const shape = shapes.find(s => s.id === shapeId);

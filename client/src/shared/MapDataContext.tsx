@@ -29,9 +29,27 @@ export interface ImpassableArea {
   color?: string;
 }
 
+/**
+ * Asset interface for image assets placed on the map
+ * Represents decorative or functional images (sprites, objects, etc.)
+ */
+export interface Asset {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  imageData: string; // Base64 encoded image data
+  fileName?: string;
+  rotation?: number; // Rotation in degrees
+  scaleX?: number; // Horizontal scale (default: 1)
+  scaleY?: number; // Vertical scale (default: 1)
+}
+
 export interface MapData {
   interactiveAreas: InteractiveArea[];
   impassableAreas: ImpassableArea[];
+  assets?: Asset[];
   worldDimensions: {
     width: number;
     height: number;
@@ -53,6 +71,10 @@ interface MapDataContextType {
   removeImpassableArea: (id: string) => void;
   updateInteractiveArea: (id: string, updates: Partial<InteractiveArea>) => void;
   updateImpassableArea: (id: string, updates: Partial<ImpassableArea>) => void;
+  updateAssets: (assets: Asset[]) => void;
+  addAsset: (asset: Asset) => void;
+  removeAsset: (id: string) => void;
+  updateAsset: (id: string, updates: Partial<Asset>) => void;
 }
 
 const MapDataContext = createContext<MapDataContextType | undefined>(undefined);
@@ -144,9 +166,13 @@ export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     addCollisionArea: storeAddCollisionArea,
     updateCollisionArea: storeUpdateCollisionArea,
     removeCollisionArea: storeRemoveCollisionArea,
+    addAsset: storeAddAsset,
+    updateAsset: storeUpdateAsset,
+    removeAsset: storeRemoveAsset,
+    setAssets: storeSetAssets,
     markDirty
   } = useMapStore();
-  
+
   const [mapData, setMapData] = useState<MapData>(defaultMapData);
 
   // Sync with map store
@@ -155,6 +181,7 @@ export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       setMapData({
         interactiveAreas: storeMapData.interactiveAreas || [],
         impassableAreas: storeMapData.impassableAreas || [],
+        assets: storeMapData.assets || [],
         worldDimensions: storeMapData.worldDimensions || { width: 800, height: 600 },
         backgroundImage: storeMapData.backgroundImage,
         backgroundImageDimensions: storeMapData.backgroundImageDimensions
@@ -263,6 +290,58 @@ export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   }, [storeUpdateCollisionArea, markDirty]);
 
+  // Asset management functions
+  const updateAssets = useCallback(async (assets: Asset[]) => {
+    try {
+      storeSetAssets(assets);
+      markDirty();
+    } catch (error) {
+      console.error('Failed to update assets:', error);
+      setMapData(prev => ({ ...prev, assets }));
+    }
+  }, [storeSetAssets, markDirty]);
+
+  const addAsset = useCallback(async (asset: Asset) => {
+    try {
+      storeAddAsset(asset);
+      markDirty();
+    } catch (error) {
+      console.error('Failed to add asset:', error);
+      setMapData(prev => ({
+        ...prev,
+        assets: [...(prev.assets || []), asset]
+      }));
+    }
+  }, [storeAddAsset, markDirty]);
+
+  const removeAsset = useCallback(async (id: string) => {
+    try {
+      storeRemoveAsset(id);
+      markDirty();
+    } catch (error) {
+      console.error('Failed to remove asset:', error);
+      setMapData(prev => ({
+        ...prev,
+        assets: (prev.assets || []).filter(asset => asset.id !== id)
+      }));
+    }
+  }, [storeRemoveAsset, markDirty]);
+
+  const updateAsset = useCallback(async (id: string, updates: Partial<Asset>) => {
+    try {
+      storeUpdateAsset(id, updates);
+      markDirty();
+    } catch (error) {
+      console.error('Failed to update asset:', error);
+      setMapData(prev => ({
+        ...prev,
+        assets: (prev.assets || []).map(asset =>
+          asset.id === id ? { ...asset, ...updates } : asset
+        )
+      }));
+    }
+  }, [storeUpdateAsset, markDirty]);
+
   const value: MapDataContextType = {
     mapData,
     updateInteractiveAreas,
@@ -272,7 +351,11 @@ export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     addImpassableArea,
     removeImpassableArea,
     updateInteractiveArea,
-    updateImpassableArea
+    updateImpassableArea,
+    updateAssets,
+    addAsset,
+    removeAsset,
+    updateAsset
   };
 
   return (

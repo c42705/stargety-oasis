@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { MapDataService, ExtendedMapData } from '../../stores/MapDataService';
-import { InteractiveArea, ImpassableArea } from '../../shared/MapDataContext';
+import { InteractiveArea, ImpassableArea, Asset } from '../../shared/MapDataContext';
 
 export interface MapState {
   mapData: ExtendedMapData | null;
@@ -145,6 +145,35 @@ const mapSlice = createSlice({
       state.mapData.impassableAreas = action.payload;
       state.isDirty = true;
     },
+
+    // Asset management actions
+    addAsset(state, action: PayloadAction<Asset>) {
+      if (state.mapData) {
+        if (!state.mapData.assets) {
+          state.mapData.assets = [];
+        }
+        state.mapData.assets.push(action.payload);
+        state.isDirty = true;
+      }
+    },
+    updateAsset(state, action: PayloadAction<{ id: string; updates: Partial<Asset> }>) {
+      if (!state.mapData || !state.mapData.assets) return;
+      const idx = state.mapData.assets.findIndex(a => a.id === action.payload.id);
+      if (idx !== -1) {
+        Object.assign(state.mapData.assets[idx], action.payload.updates);
+        state.isDirty = true;
+      }
+    },
+    removeAsset(state, action: PayloadAction<string>) {
+      if (!state.mapData || !state.mapData.assets) return;
+      state.mapData.assets = state.mapData.assets.filter(a => a.id !== action.payload);
+      state.isDirty = true;
+    },
+    setAssets(state, action: PayloadAction<Asset[]>) {
+      if (!state.mapData) return;
+      state.mapData.assets = action.payload;
+      state.isDirty = true;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -259,6 +288,10 @@ export const {
   updateCollisionArea,
   removeCollisionArea,
   setCollisionAreas,
+  addAsset,
+  updateAsset,
+  removeAsset,
+  setAssets,
 } = mapSlice.actions;
 
 export default mapSlice.reducer;
