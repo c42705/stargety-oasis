@@ -63,12 +63,12 @@ export function useKonvaSelection(
   const {
     enabled = false,
     shapes,
+    selectedIds,
     onSelectionChange,
-    initialSelection = [],
   } = params;
 
-  // Selection state
-  const [selectedIds, setSelectedIds] = useState<string[]>(initialSelection);
+  // Note: selectedIds is now controlled by the parent component
+  // We use onSelectionChange to update the parent's state
   const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);
   const [isDrawingSelection, setIsDrawingSelection] = useState(false);
   const [selectionStart, setSelectionStart] = useState<SelectionStart | null>(null);
@@ -112,12 +112,11 @@ export function useKonvaSelection(
   );
 
   /**
-   * Update selection and notify parent
+   * Update selection by notifying parent (controlled component pattern)
    */
   const updateSelection = useCallback(
     (ids: string[]) => {
-      setSelectedIds(ids);
-      onSelectionChange?.(ids);
+      onSelectionChange(ids);
     },
     [onSelectionChange]
   );

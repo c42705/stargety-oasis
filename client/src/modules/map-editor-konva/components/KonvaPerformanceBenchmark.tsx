@@ -72,6 +72,7 @@ export const KonvaPerformanceBenchmark: React.FC = () => {
   const selection = useKonvaSelection({
     enabled: true,
     shapes,
+    selectedIds,
     onSelectionChange: setSelectedIds,
   });
 

@@ -470,9 +470,10 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     minSize: 10,
   });
 
-  // Selection
+  // Selection (controlled - selectedIds is managed by useEditorState)
   const selection = useKonvaSelection({
     shapes,
+    selectedIds,
     onSelectionChange: setSelectedIds,
     enabled: currentTool === 'select' && !previewMode.isPreviewMode,
     viewport,

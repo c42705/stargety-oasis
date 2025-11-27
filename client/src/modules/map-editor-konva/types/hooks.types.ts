@@ -308,10 +308,10 @@ export interface UseKonvaSelectionParams {
   shapes: Shape[];
   /** Current viewport (optional) */
   viewport?: Viewport;
+  /** Currently selected IDs (controlled) */
+  selectedIds: string[];
   /** Callback when selection changes */
   onSelectionChange: (selectedIds: string[]) => void;
-  /** Initial selection */
-  initialSelection?: string[];
   /** Whether multi-select is allowed */
   allowMultiSelect?: boolean;
 }

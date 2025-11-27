@@ -40,6 +40,7 @@ export const KonvaPhase4Test: React.FC = () => {
   const [viewport, setViewport] = useState<Viewport>(VIEWPORT_DEFAULTS);
   const [gridConfig, setGridConfig] = useState<GridConfig>(GRID_DEFAULTS);
   const [shapes, setShapes] = useState<Shape[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // ==========================================================================
   // HOOKS
@@ -66,16 +67,17 @@ export const KonvaPhase4Test: React.FC = () => {
     viewport,
   });
 
-  // Selection hook
+  // Selection hook (controlled by local selectedIds state)
   const selection = useKonvaSelection({
     enabled: true,
     shapes,
-    onSelectionChange: (ids) => console.log('Selection changed:', ids),
+    selectedIds,
+    onSelectionChange: setSelectedIds,
   });
 
   // Transform hook
   const transform = useKonvaTransform({
-    selectedIds: selection.selectedIds,
+    selectedIds,
     shapes,
     onShapeUpdate: (id, updates) => {
       setShapes((prev) =>
