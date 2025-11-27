@@ -3,7 +3,6 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import multer from 'multer';
 import path from 'path';
 import { ChatController } from './chat/chatController';
 import { WorldController } from './world/worldController';
@@ -11,23 +10,21 @@ import { VideoCallController } from './video-call/videoCallController';
 import { MapController } from './map/mapController';
 import { initializeDatabase, prisma } from './utils/prisma';
 import { logger } from './utils/logger';
+import {
+  ensureUploadDirs,
+  uploadMapAsset,
+  uploadCharacterAsset,
+  uploadGenericAsset,
+  UPLOAD_BASE_DIR,
+  getRelativePath,
+  getFileUrl
+} from './utils/uploadMiddleware';
 
 // Load environment variables
 dotenv.config();
 
-// Configure multer for file uploads
-const upload = multer({
-  dest: '/tmp/uploads',
-  limits: { fileSize: 40 * 1024 * 1024 }, // 40MB limit
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.'));
-    }
-  },
-});
+// Ensure upload directories exist on startup
+ensureUploadDirs();
 
 const app = express();
 const server = createServer(app);
@@ -46,8 +43,21 @@ app.use(cors({
   origin: process.env.CLIENT_URL || "http://localhost:3000",
   credentials: true
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Static file serving for uploads
+app.use('/uploads', express.static(UPLOAD_BASE_DIR, {
+  maxAge: '1d', // Cache for 1 day
+  etag: true,
+  setHeaders: (res, filePath) => {
+    // Set proper content-type for images
+    if (filePath.endsWith('.png')) res.setHeader('Content-Type', 'image/png');
+    else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) res.setHeader('Content-Type', 'image/jpeg');
+    else if (filePath.endsWith('.gif')) res.setHeader('Content-Type', 'image/gif');
+    else if (filePath.endsWith('.webp')) res.setHeader('Content-Type', 'image/webp');
+  }
+}));
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -154,17 +164,63 @@ app.put('/api/maps/:roomId', async (req, res) => {
   }
 });
 
-// File upload endpoint
-app.post('/api/uploads', upload.single('file'), (req, res) => {
+// File upload endpoints
+// Generic file upload
+app.post('/api/uploads', uploadGenericAsset.single('file'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, error: 'No file uploaded' });
   }
+  const relativePath = getRelativePath(req.file.path);
   res.json({
     success: true,
     data: {
+      id: req.file.filename.split('.')[0],
       filename: req.file.filename,
       originalname: req.file.originalname,
-      path: req.file.path,
+      path: relativePath,
+      url: getFileUrl(relativePath),
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+    }
+  });
+});
+
+// Map asset upload
+app.post('/api/maps/:roomId/assets', uploadMapAsset.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, error: 'No file uploaded' });
+  }
+  const relativePath = getRelativePath(req.file.path);
+  res.json({
+    success: true,
+    data: {
+      id: req.file.filename.split('.')[0],
+      mapId: req.params.roomId,
+      filename: req.file.filename,
+      originalname: req.file.originalname,
+      path: relativePath,
+      url: getFileUrl(relativePath),
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+    }
+  });
+});
+
+// Character asset upload (thumbnail, texture)
+app.post('/api/characters/:userId/upload', uploadCharacterAsset.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, error: 'No file uploaded' });
+  }
+  const relativePath = getRelativePath(req.file.path);
+  res.json({
+    success: true,
+    data: {
+      id: req.file.filename.split('.')[0],
+      userId: req.params.userId,
+      filename: req.file.filename,
+      originalname: req.file.originalname,
+      path: relativePath,
+      url: getFileUrl(relativePath),
       size: req.file.size,
       mimetype: req.file.mimetype,
     }
