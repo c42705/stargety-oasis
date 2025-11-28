@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { Button, Card, Space, Typography, Tooltip } from 'antd';
 import { BuildOutlined, UserOutlined } from '@ant-design/icons';
 import { AvatarBuilderModal } from './AvatarBuilderModal';
-import { AvatarBuilderStorage } from './AvatarBuilderStorage';
+import { CharacterStorage } from './v2/CharacterStorage';
+import type { CharacterSlot } from './v2/types';
+import { isEmptySlot } from './v2/types';
 import { SpriteSheetDefinition } from './AvatarBuilderTypes';
 
 const { Text } = Typography;
@@ -38,7 +40,8 @@ export const AvatarBuilderLauncher: React.FC<AvatarBuilderLauncherProps> = ({
   };
 
   // Check if user has existing avatar
-  const hasExistingAvatar = AvatarBuilderStorage.loadCharacterDefinition(username).success;
+  const activeResult = CharacterStorage.getActiveCharacterSlot(username || 'player');
+  const hasExistingAvatar = activeResult.success && activeResult.data && !isEmptySlot(activeResult.data as any);
 
   if (type === 'card') {
     return (

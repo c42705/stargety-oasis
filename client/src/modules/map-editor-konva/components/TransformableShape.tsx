@@ -9,6 +9,7 @@ import { Rect, Line, Transformer, Image as KonvaImage } from 'react-konva';
 import Konva from 'konva';
 import type { Shape } from '../types';
 import { SELECTION_STYLE } from '../constants/konvaConstants';
+import { logger } from '../../../shared/logger';
 
 // ==========================================================================
 // TRANSFORMABLE RECTANGLE
@@ -206,54 +207,27 @@ export const TransformableImage: React.FC<TransformableImageProps> = ({
   // Load image from base64 data - must be before early return
   useEffect(() => {
     if (shape.geometry.type !== 'image') {
-      console.warn('[TransformableImage] Shape geometry is not image type:', shape.geometry.type);
       return;
     }
 
     const geometry = shape.geometry;
-    console.log('[TransformableImage] Loading image:', {
-      id: shape.id,
-      fileName: geometry.fileName,
-      position: { x: geometry.x, y: geometry.y },
-      size: { width: geometry.width, height: geometry.height },
-      imageDataLength: geometry.imageData?.length || 0,
-      imageDataPrefix: geometry.imageData?.substring(0, 30) || 'N/A'
-    });
-
     const img = new window.Image();
     img.onload = () => {
-      console.log('[TransformableImage] ✅ Image loaded successfully:', {
-        id: shape.id,
-        fileName: geometry.fileName,
-        naturalSize: { width: img.naturalWidth, height: img.naturalHeight }
-      });
       setImage(img);
     };
-    img.onerror = (error) => {
-      console.error('[TransformableImage] ❌ Failed to load image:', {
-        id: shape.id,
-        fileName: geometry.fileName,
-        error
-      });
+    img.onerror = () => {
+      logger.error('[TransformableImage] Failed to load image', { id: shape.id, fileName: geometry.fileName });
     };
     img.src = geometry.imageData;
   }, [shape.geometry, shape.id]);
 
   if (shape.geometry.type !== 'image') {
-    console.warn('[TransformableImage] Early return: geometry type is not image');
     return null;
   }
 
   const geometry = shape.geometry;
 
   if (!image) {
-    console.log('[TransformableImage] Rendering placeholder (image not loaded yet):', {
-      id: shape.id,
-      fileName: geometry.fileName,
-      position: { x: geometry.x, y: geometry.y },
-      size: { width: geometry.width, height: geometry.height }
-    });
-
     // Show placeholder while loading
     return (
       <Rect
@@ -268,17 +242,6 @@ export const TransformableImage: React.FC<TransformableImageProps> = ({
       />
     );
   }
-
-  console.log('[TransformableImage] Rendering image:', {
-    id: shape.id,
-    fileName: geometry.fileName,
-    position: { x: geometry.x, y: geometry.y },
-    size: { width: geometry.width, height: geometry.height },
-    rotation: geometry.rotation || 0,
-    scale: { x: geometry.scaleX || 1, y: geometry.scaleY || 1 },
-    opacity: shape.style.opacity,
-    isSelected
-  });
 
   return (
     <KonvaImage

@@ -276,14 +276,43 @@ export async function processImageFile(
 }
 
 // ============================================================================
-// STORAGE
+// STORAGE (API + localStorage fallback)
 // ============================================================================
 
+import { MapApiService } from '../../../services/api/MapApiService';
+
 const STORAGE_KEY_PREFIX = 'map_asset_';
+const DEFAULT_ROOM_ID = 'default';
 
 /**
- * Store image in localStorage
- * TODO: Migrate to database storage in the future
+ * Store image via API (with localStorage fallback)
+ */
+export async function storeImage(
+  assetId: string,
+  imageData: string,
+  fileName: string = 'asset.png',
+  roomId: string = DEFAULT_ROOM_ID
+): Promise<boolean> {
+  try {
+    // Convert data URL to File for API upload
+    const blob = await dataUrlToBlob(imageData);
+    const file = new File([blob], fileName, { type: blob.type });
+
+    const result = await MapApiService.uploadAsset(roomId, file, { assetId });
+
+    if (result.success) {
+      logger.info('IMAGE STORED VIA API', { assetId, roomId });
+      return true;
+    }
+    throw new Error(result.error || 'API upload failed');
+  } catch (error) {
+    logger.warn('API UPLOAD FAILED, FALLING BACK TO LOCALSTORAGE', error);
+    return storeImageInLocalStorage(assetId, imageData);
+  }
+}
+
+/**
+ * Store image in localStorage (fallback)
  */
 export function storeImageInLocalStorage(
   assetId: string,
@@ -326,5 +355,12 @@ export function removeImageFromLocalStorage(assetId: string): boolean {
     logger.error('FAILED TO REMOVE IMAGE FROM LOCALSTORAGE', error);
     return false;
   }
+}
+
+/**
+ * Convert data URL to Blob
+ */
+function dataUrlToBlob(dataUrl: string): Promise<Blob> {
+  return fetch(dataUrl).then(res => res.blob());
 }
 

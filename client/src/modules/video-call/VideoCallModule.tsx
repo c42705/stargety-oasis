@@ -36,6 +36,9 @@ export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
   // Clean room ID (remove special characters)
   const cleanRoomId = roomId.replace(/[^a-zA-Z0-9]/g, '');
 
+  // Extract domain from serverUrl (strip http:// or https:// if present)
+  const cleanServerUrl = serverUrl.replace(/^https?:\/\//, '');
+
   useEffect(() => {
     console.log('🎥 VideoCallModule mounted - Room:', cleanRoomId, 'User:', userName);
 
@@ -47,7 +50,7 @@ export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
       }
 
       const script = document.createElement('script');
-      script.src = `https://${serverUrl}/external_api.js`;
+      script.src = `https://${cleanServerUrl}/external_api.js`;
       script.async = true;
       script.onload = () => {
         console.log('✅ Jitsi script loaded');
@@ -69,7 +72,7 @@ export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
       console.log('🎬 Initializing Jitsi for room:', cleanRoomId);
 
       const toolbarButtons = hideToolbar
-        ? ['microphone', 'camera', 'desktop', 'fullscreen', 'settings']
+        ? ['microphone', 'camera', 'desktop', 'fullscreen']
         : ['microphone', 'camera', 'desktop', 'fullscreen', 'hangup', 'chat', 'settings', 'tileview'];
 
       const options = {
@@ -85,7 +88,14 @@ export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
           startWithVideoMuted: false,
           enableWelcomePage: false,
           prejoinPageEnabled: false,
+          prejoinConfig: {
+            enabled: false,
+          },
           disableDeepLinking: true,
+          // Additional settings to skip prejoin
+          requireDisplayName: false,
+          enableInsecureRoomNameWarning: false,
+          disableInitialGUM: false,
         },
         interfaceConfigOverwrite: {
           TOOLBAR_BUTTONS: toolbarButtons,
@@ -93,11 +103,14 @@ export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
           SHOW_WATERMARK_FOR_GUESTS: true,
           DISABLE_JOIN_LEAVE_NOTIFICATIONS: false,
           FILM_STRIP_MAX_HEIGHT: 120,
+          // Skip prejoin screen
+          DISABLE_FOCUS_INDICATOR: true,
+          MOBILE_APP_PROMO: false,
         },
       };
 
       try {
-        apiRef.current = new window.JitsiMeetExternalAPI(serverUrl, options);
+        apiRef.current = new window.JitsiMeetExternalAPI(cleanServerUrl, options);
         console.log('✅ Jitsi initialized successfully');
       } catch (error) {
         console.error('❌ Jitsi initialization error:', error);
@@ -114,7 +127,7 @@ export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
         apiRef.current = null;
       }
     };
-  }, [cleanRoomId, userName, serverUrl, hideToolbar]);
+  }, [cleanRoomId, userName, cleanServerUrl, hideToolbar]);
 
   return (
     <div

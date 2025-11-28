@@ -183,18 +183,28 @@ export const CharacterSelector: React.FC<CharacterSelectorProps> = ({
   const [previewCharacter, setPreviewCharacter] = useState<CharacterSlot | null>(null);
 
   /**
-   * Load character slots
+   * Load character slots (async - API first, localStorage fallback)
    */
-  const loadSlots = useCallback(() => {
+  const loadSlots = useCallback(async () => {
     setLoading(true);
-    const result = CharacterStorage.listCharacterSlots(username);
-    
-    if (result.success && result.data) {
-      setSlots(result.data);
-    } else {
-      message.error(result.error || 'Failed to load character slots');
+    try {
+      // Try async API-first loading
+      const result = await CharacterStorage.listCharacterSlotsAsync(username);
+
+      if (result.success && result.data) {
+        setSlots(result.data);
+      } else {
+        message.error(result.error || 'Failed to load character slots');
+      }
+    } catch (error) {
+      // Fallback to sync localStorage
+      const result = CharacterStorage.listCharacterSlots(username);
+      if (result.success && result.data) {
+        setSlots(result.data);
+      } else {
+        message.error(result.error || 'Failed to load character slots');
+      }
     }
-    
     setLoading(false);
   }, [username]);
 
@@ -204,17 +214,28 @@ export const CharacterSelector: React.FC<CharacterSelectorProps> = ({
   }, [loadSlots]);
 
   /**
-   * Handle character switch - show preview first
+   * Handle character switch - show preview first (async - API first)
    */
-  const handleSwitch = useCallback((slotNumber: number) => {
-    // Load character for preview
-    const result = CharacterStorage.loadCharacterSlot(username, slotNumber);
+  const handleSwitch = useCallback(async (slotNumber: number) => {
+    try {
+      // Try async API-first loading
+      const result = await CharacterStorage.loadCharacterSlotAsync(username, slotNumber);
 
-    if (result.success && result.data && !isEmptySlot(result.data)) {
-      setPreviewCharacter(result.data);
-      setIsPreviewOpen(true);
-    } else {
-      message.error(result.error || 'Failed to load character for preview');
+      if (result.success && result.data && !isEmptySlot(result.data)) {
+        setPreviewCharacter(result.data);
+        setIsPreviewOpen(true);
+      } else {
+        message.error(result.error || 'Failed to load character for preview');
+      }
+    } catch (error) {
+      // Fallback to sync localStorage
+      const result = CharacterStorage.loadCharacterSlot(username, slotNumber);
+      if (result.success && result.data && !isEmptySlot(result.data)) {
+        setPreviewCharacter(result.data);
+        setIsPreviewOpen(true);
+      } else {
+        message.error(result.error || 'Failed to load character for preview');
+      }
     }
   }, [username]);
 

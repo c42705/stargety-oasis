@@ -63,6 +63,8 @@ export interface MapData {
 
 interface MapDataContextType {
   mapData: MapData;
+  isLoading: boolean;
+  error: string | null;
   updateInteractiveAreas: (areas: InteractiveArea[]) => void;
   updateImpassableAreas: (areas: ImpassableArea[]) => void;
   addInteractiveArea: (area: InteractiveArea) => void;
@@ -156,10 +158,12 @@ const defaultMapData: MapData = {
 export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Initialize the map store
   useMapStoreInit({ autoLoad: true, source: 'editor' });
-  
+
   // Get map store state and actions
   const {
     mapData: storeMapData,
+    isLoading: storeIsLoading,
+    error: storeError,
     addInteractiveArea: storeAddInteractiveArea,
     updateInteractiveArea: storeUpdateInteractiveArea,
     removeInteractiveArea: storeRemoveInteractiveArea,
@@ -174,6 +178,14 @@ export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   } = useMapStore();
 
   const [mapData, setMapData] = useState<MapData>(defaultMapData);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Sync loading state with store
+  useEffect(() => {
+    setIsLoading(storeIsLoading ?? false);
+    setError(storeError ?? null);
+  }, [storeIsLoading, storeError]);
 
   // Sync with map store
   useEffect(() => {
@@ -344,6 +356,8 @@ export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const value: MapDataContextType = {
     mapData,
+    isLoading,
+    error,
     updateInteractiveAreas,
     updateImpassableAreas,
     addInteractiveArea,

@@ -7,9 +7,9 @@
  * This component mirrors the structure of MapEditorModule.tsx but uses Konva instead of Fabric.js.
  */
 
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useMemo } from 'react';
 import { logger } from '../../shared/logger';
-import { useMapData, InteractiveArea } from '../../shared/MapDataContext';
+import { useMapData } from '../../shared/MapDataContext';
 import { useMapStore } from '../../stores/useMapStore';
 import { useMapStoreInit } from '../../stores/useMapStoreInit';
 import { useWorldDimensions } from '../../shared/useWorldDimensions';
@@ -37,11 +37,15 @@ import { useKonvaKeyboardShortcuts } from './hooks/useKonvaKeyboardShortcuts';
 import { useKonvaVertexEdit } from './hooks/useKonvaVertexEdit';
 
 // Import refactored hooks
-import { useEditorState } from './hooks/useEditorState';
+import { useEditorCoreState } from './hooks/useEditorCoreState';
 import { useToolbarHandlers } from './hooks/useToolbarHandlers';
 import { useAreaHandlers } from './hooks/useAreaHandlers';
 import { useLayersHandlers } from './hooks/useLayersHandlers';
 import { useStageEventHandlers } from './hooks/useStageEventHandlers';
+import { useShapeCreationHandlers } from './hooks/useShapeCreationHandlers';
+
+// Import config
+import { createKeyboardShortcuts } from './config/keyboardShortcutsConfig';
 
 // Import Konva components
 import { KonvaLayersPanel } from './components/KonvaLayersPanel';
@@ -58,7 +62,7 @@ import type { EditorTool as KonvaEditorTool } from './types';
 // Import utilities
 import { mapDataToShapes, shapeToInteractiveArea, shapeToImpassableArea, shapeToAsset } from './utils/mapDataAdapter';
 import { calculateZoomToShape } from './utils/zoomToShape';
-import { duplicateShape, groupShapes, ungroupShapes } from './utils/shapeFactories';
+import { groupShapes, ungroupShapes } from './utils/shapeFactories';
 import { placeAsset } from './utils/editorHelpers';
 
 
@@ -99,66 +103,45 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
   } = useMapStore();
 
   // ===== STATE (REFACTORED) =====
-  // All state management extracted to useEditorState hook
+  // All state management extracted to useEditorCoreState hook
   const {
     // Tab state
     activeTab,
     setActiveTab,
     // Shape state
-    shapes,
-    setShapes,
-    selectedIds,
-    setSelectedIds,
+    shapes, setShapes,
+    selectedIds, setSelectedIds,
     // Viewport state
-    viewport,
-    setViewport,
+    viewport, setViewport,
     viewportWidth,
     viewportHeight,
     // Grid state
-    gridConfig,
-    setGridConfig,
+    gridConfig, setGridConfig,
     // Tool state
-    currentTool,
-    setCurrentTool,
+    currentTool, setCurrentTool,
     // Interaction state
-    isSpacebarPressed,
-    setIsSpacebarPressed,
-    cursorStyle,
-    setCursorStyle,
+    isSpacebarPressed, setIsSpacebarPressed,
+    cursorStyle, setCursorStyle,
     // Modal states
-    showAreaModal,
-    setShowAreaModal,
-    editingArea,
-    setEditingArea,
-    areaToDelete,
-    setAreaToDelete,
-    showDeleteConfirm,
-    setShowDeleteConfirm,
-    showCollisionAreaModal,
-    setShowCollisionAreaModal,
-    editingCollisionArea,
-    setEditingCollisionArea,
-    collisionAreaToDelete,
-    setCollisionAreaToDelete,
-    showCollisionDeleteConfirm,
-    setShowCollisionDeleteConfirm,
-    showKeyboardDeleteConfirm,
-    setShowKeyboardDeleteConfirm,
-    shapesToDelete,
-    setShapesToDelete,
+    showAreaModal, setShowAreaModal,
+    editingArea, setEditingArea,
+    areaToDelete, setAreaToDelete,
+    showDeleteConfirm, setShowDeleteConfirm,
+    showCollisionAreaModal, setShowCollisionAreaModal,
+    editingCollisionArea, setEditingCollisionArea,
+    collisionAreaToDelete, setCollisionAreaToDelete,
+    showCollisionDeleteConfirm, setShowCollisionDeleteConfirm,
+    showKeyboardDeleteConfirm, setShowKeyboardDeleteConfirm,
+    shapesToDelete, setShapesToDelete,
     // Drawing mode states
-    drawingMode,
-    setDrawingMode,
-    pendingAreaData,
-    setPendingAreaData,
-    collisionDrawingMode,
-    setCollisionDrawingMode,
-    pendingCollisionAreaData,
-    setPendingCollisionAreaData,
+    drawingMode, setDrawingMode,
+    pendingAreaData, setPendingAreaData,
+    collisionDrawingMode, setCollisionDrawingMode,
+    pendingCollisionAreaData, setPendingCollisionAreaData,
     // Refs
     stageRef,
     mainRef,
-  } = useEditorState();
+  } = useEditorCoreState();
 
   // Use shared map data
   const { interactiveAreas: areas, impassableAreas } = mapData;
@@ -305,6 +288,22 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     enabled: true,
   });
 
+  // Shape creation handlers (extracted for cleaner code)
+  const shapeCreationHandlers = useShapeCreationHandlers({
+    pendingAreaData,
+    pendingCollisionAreaData,
+    impassableAreas,
+    setPendingAreaData,
+    setPendingCollisionAreaData,
+    setDrawingMode,
+    setCollisionDrawingMode,
+    setCurrentTool,
+    addInteractiveArea,
+    addCollisionArea,
+    markDirty,
+    history,
+  });
+
   // Polygon drawing
   const polygonDrawing = useKonvaPolygonDrawing({
     viewport,
@@ -312,76 +311,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     category: 'collision',
     enabled: currentTool === 'polygon' || collisionDrawingMode,
     snapToGrid: grid.snapToGrid,
-    onShapeCreate: (shape: Shape) => {
-      console.log('[KonvaMapEditor] Polygon shape created:', shape);
-      console.log('[KonvaMapEditor] Current state:', {
-        pendingCollisionAreaData,
-        collisionDrawingMode,
-        currentTool
-      });
-
-      // Create collision area for polygon shapes
-      if (shape.geometry.type === 'polygon') {
-        const polygon = shape.geometry;
-
-        // Convert flat points array to array of point objects
-        const points: Array<{ x: number; y: number }> = [];
-        for (let i = 0; i < polygon.points.length; i += 2) {
-          points.push({
-            x: polygon.points[i],
-            y: polygon.points[i + 1],
-          });
-        }
-
-        // Calculate bounding box for AABB collision detection
-        const xs = points.map((p) => p.x);
-        const ys = points.map((p) => p.y);
-        const minX = Math.min(...xs);
-        const minY = Math.min(...ys);
-        const maxX = Math.max(...xs);
-        const maxY = Math.max(...ys);
-
-        // Auto-generate name if no pending data
-        const defaultName = `Collision Layer ${impassableAreas.length + 1}`;
-
-        const newCollisionArea = {
-          id: shape.id,
-          name: pendingCollisionAreaData?.name || defaultName,
-          type: 'impassable-polygon' as const,
-          color: pendingCollisionAreaData?.color || '#ff0000',
-          points,
-          // Bounding box required for AABB collision detection
-          x: minX,
-          y: minY,
-          width: maxX - minX,
-          height: maxY - minY,
-        };
-
-        logger.info('POLYGON_COLLISION_AREA_CREATED', {
-          id: newCollisionArea.id,
-          name: newCollisionArea.name,
-          type: newCollisionArea.type,
-          pointsCount: newCollisionArea.points.length,
-          boundingBox: {
-            x: newCollisionArea.x,
-            y: newCollisionArea.y,
-            width: newCollisionArea.width,
-            height: newCollisionArea.height
-          },
-          allPoints: newCollisionArea.points
-        });
-
-        addCollisionArea(newCollisionArea);
-        setPendingCollisionAreaData(null);
-        markDirty();
-
-        logger.info('POLYGON_COLLISION_AREA_ADDED_TO_MAP', { areaId: newCollisionArea.id });
-
-        history.pushState('Draw polygon');
-        setCurrentTool('select');
-        setCollisionDrawingMode(false);
-      }
-    },
+    onShapeCreate: shapeCreationHandlers.handlePolygonShapeCreate,
     minVertices: 3,
   });
 
@@ -392,47 +322,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     category: 'interactive',
     enabled: currentTool === 'rect' || (drawingMode && !collisionDrawingMode),
     snapToGrid: grid.snapToGrid,
-    onShapeCreate: (shape: Shape) => {
-      logger.info('RECT_DRAWING_SHAPE_CREATED', {
-        shapeId: shape.id,
-        geometry: shape.geometry,
-        hasPendingAreaData: !!pendingAreaData,
-        pendingAreaData
-      });
-
-      // If we have pending area data, create the interactive area
-      if (pendingAreaData && shape.geometry.type === 'rectangle') {
-        const rect = shape.geometry;
-        const newArea: InteractiveArea = {
-          id: shape.id,
-          name: pendingAreaData.name || 'New Area',
-          description: pendingAreaData.description || '',
-          type: pendingAreaData.type || 'custom',
-          color: pendingAreaData.color || '#4A90E2',
-          x: rect.x,
-          y: rect.y,
-          width: rect.width,
-          height: rect.height,
-        };
-
-        logger.info('AREA_CREATING_INTERACTIVE_AREA', { newArea });
-        addInteractiveArea(newArea);
-        setPendingAreaData(null);
-        markDirty();
-        logger.info('AREA_CREATED_SUCCESSFULLY', { areaId: newArea.id, areaName: newArea.name });
-      } else {
-        logger.error('AREA_CREATE_FAILED', {
-          reason: !pendingAreaData ? 'No pending area data' : 'Shape geometry is not rectangle',
-          shapeGeometryType: shape.geometry.type,
-          hasPendingAreaData: !!pendingAreaData
-        });
-      }
-
-      history.pushState('Draw rectangle');
-      setDrawingMode(false);
-      setCurrentTool('select');
-      logger.info('RECT_DRAWING_COMPLETE', { drawingMode: false, currentTool: 'select' });
-    },
+    onShapeCreate: shapeCreationHandlers.handleRectShapeCreate,
     minSize: 10,
   });
 
@@ -443,30 +333,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     category: 'collision',
     enabled: collisionDrawingMode && pendingCollisionAreaData?.drawingMode === 'rectangle',
     snapToGrid: grid.snapToGrid,
-    onShapeCreate: (shape: Shape) => {
-      // If we have pending collision area data, create the collision area
-      if (pendingCollisionAreaData && shape.geometry.type === 'rectangle') {
-        const rect = shape.geometry;
-        const defaultName = `Collision Layer ${impassableAreas.length + 1}`;
-        const newCollisionArea = {
-          id: shape.id,
-          name: pendingCollisionAreaData.name || defaultName,
-          type: 'rectangle',
-          color: pendingCollisionAreaData.color || '#ff0000',
-          x: rect.x,
-          y: rect.y,
-          width: rect.width,
-          height: rect.height,
-        };
-        addCollisionArea(newCollisionArea);
-        setPendingCollisionAreaData(null);
-        markDirty();
-      }
-
-      history.pushState('Draw collision rectangle');
-      setCollisionDrawingMode(false);
-      setCurrentTool('select');
-    },
+    onShapeCreate: shapeCreationHandlers.handleCollisionRectShapeCreate,
     minSize: 10,
   });
 
@@ -574,144 +441,32 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     enabled: true,
   });
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts - configuration extracted to keyboardShortcutsConfig.ts
+  const keyboardShortcuts = useMemo(() => createKeyboardShortcuts({
+    shapes,
+    selectedIds,
+    currentTool,
+    setShapes,
+    setSelectedIds,
+    setGridConfig,
+    setCurrentTool,
+    setShapesToDelete,
+    setShowKeyboardDeleteConfirm,
+    addInteractiveArea,
+    addCollisionArea,
+    markDirty,
+    history,
+  }), [
+    shapes, selectedIds, currentTool,
+    setShapes, setSelectedIds, setGridConfig, setCurrentTool,
+    setShapesToDelete, setShowKeyboardDeleteConfirm,
+    addInteractiveArea, addCollisionArea, markDirty, history,
+  ]);
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const shortcuts = useKonvaKeyboardShortcuts({
     enabled: true,
-    shortcuts: [
-      {
-        key: 'ctrl+z',
-        description: 'Undo',
-        handler: () => history.undo(),
-      },
-      {
-        key: 'ctrl+y',
-        description: 'Redo',
-        handler: () => history.redo(),
-      },
-      {
-        key: 'Delete',
-        description: 'Delete selected shapes',
-        handler: () => {
-          // Show confirmation dialog before deleting
-          if (selectedIds.length > 0) {
-            setShapesToDelete(selectedIds);
-            setShowKeyboardDeleteConfirm(true);
-          }
-        },
-      },
-      {
-        key: 'Backspace',
-        description: 'Delete selected shapes (alternative)',
-        handler: () => {
-          // Show confirmation dialog before deleting
-          if (selectedIds.length > 0) {
-            setShapesToDelete(selectedIds);
-            setShowKeyboardDeleteConfirm(true);
-          }
-        },
-      },
-      {
-        key: 'ctrl+d',
-        description: 'Duplicate selected shapes',
-        handler: () => {
-          if (selectedIds.length === 0) return;
-
-          const newShapes: Shape[] = [];
-          const newIds: string[] = [];
-
-          selectedIds.forEach((id) => {
-            const shape = shapes.find((s) => s.id === id);
-            if (shape) {
-              const duplicated = duplicateShape(shape, { x: 20, y: 20 });
-              newShapes.push(duplicated);
-              newIds.push(duplicated.id);
-
-              // Sync to map data store
-              if (duplicated.category === 'interactive') {
-                const interactiveArea = shapeToInteractiveArea(duplicated);
-                addInteractiveArea(interactiveArea);
-              } else if (duplicated.category === 'collision') {
-                const collisionArea = shapeToImpassableArea(duplicated);
-                addCollisionArea(collisionArea);
-              }
-            }
-          });
-
-          setShapes(prev => [...prev, ...newShapes]);
-          setSelectedIds(newIds);
-          markDirty();
-          history.pushState('Duplicate shapes');
-        },
-      },
-      {
-        key: 'ctrl+g',
-        description: 'Group selected shapes',
-        handler: (e) => {
-          e?.preventDefault(); // Prevent browser default
-          if (selectedIds.length < 2) return; // Need at least 2 shapes to group
-
-          const selectedShapes = shapes.filter(s => selectedIds.includes(s.id));
-          const grouped = groupShapes(selectedShapes);
-
-          setShapes(prev => prev.map(shape => {
-            const groupedShape = grouped.find(g => g.id === shape.id);
-            return groupedShape || shape;
-          }));
-
-          markDirty();
-          history.pushState('Group shapes');
-        },
-      },
-      {
-        key: 'ctrl+shift+g',
-        description: 'Ungroup selected shapes',
-        handler: (e) => {
-          e?.preventDefault(); // Prevent browser default
-          if (selectedIds.length === 0) return;
-
-          const selectedShapes = shapes.filter(s => selectedIds.includes(s.id));
-          const ungrouped = ungroupShapes(selectedShapes);
-
-          setShapes(prev => prev.map(shape => {
-            const ungroupedShape = ungrouped.find(u => u.id === shape.id);
-            return ungroupedShape || shape;
-          }));
-
-          markDirty();
-          history.pushState('Ungroup shapes');
-        },
-      },
-      {
-        key: 'g',
-        description: 'Toggle grid',
-        handler: () => setGridConfig(prev => ({ ...prev, visible: !prev.visible })),
-      },
-      {
-        key: 'v',
-        description: 'Enter vertex edit mode (for selected polygon)',
-        handler: () => {
-          // Only allow vertex edit if a single polygon is selected
-          if (selectedIds.length === 1) {
-            const shape = shapes.find(s => s.id === selectedIds[0]);
-            if (shape && shape.geometry.type === 'polygon') {
-              setCurrentTool('edit-vertex');
-            }
-          }
-        },
-      },
-      {
-        key: 'Escape',
-        description: 'Exit vertex edit mode / Clear selection',
-        handler: () => {
-          if (currentTool === 'edit-vertex') {
-            setCurrentTool('select');
-          } else {
-            setSelectedIds([]);
-          }
-        },
-      },
-    ],
+    shortcuts: keyboardShortcuts,
   });
 
   // ===== SYNC SHAPES WITH MAP DATA =====

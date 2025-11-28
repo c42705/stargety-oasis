@@ -1,19 +1,23 @@
 /**
  * Shared Map System - Unified map data management for both WorldModule and Map Editor
- * 
+ *
  * This system provides a centralized way to manage map data that can be accessed
  * and modified from both the Phaser.js game canvas and the Fabric.js Map Editor.
- * 
- * TODO: Future Migration Plans
- * - Replace localStorage with a proper database solution (PostgreSQL, MongoDB)
- * - Implement real-time synchronization via WebSocket for multi-user editing
- * - Add cloud storage integration for map data backup and sharing
- * - Implement version control for map changes and rollback functionality
- * - Add conflict resolution for concurrent editing scenarios
+ *
+ * Features:
+ * - PostgreSQL persistence via MapApiService (primary)
+ * - localStorage fallback for offline support
+ * - Real-time synchronization via Socket.IO for multi-user editing
+ * - Data validation and sanitization
+ * - Version control for map changes
  */
 
-import { InteractiveArea, ImpassableArea, MapData } from './MapDataContext';
+import { InteractiveArea, ImpassableArea, MapData, Asset } from './MapDataContext';
 import { worldDimensionsManager } from './WorldDimensionsManager';
+import { MapApiService } from '../services/api/MapApiService';
+import { logger } from './logger';
+import { io, Socket } from 'socket.io-client';
+import { API_CONFIG } from './constants';
 
 // Extended map data structure for shared system
 export interface SharedMapData extends MapData {
@@ -121,9 +125,11 @@ export class SharedMapSystem {
   private changeHistory: MapChange[] = [];
   private maxHistorySize = 50;
 
-  // Constants for default map creation - Updated to match actual map dimensions
-  private static readonly DEFAULT_WORLD_WIDTH = 7603;
-  private static readonly DEFAULT_WORLD_HEIGHT = 3679;
+  // Default room ID for API calls
+  private currentRoomId: string = 'default';
+
+  // Socket.IO connection for real-time sync
+  private socket: Socket | null = null;
 
   // Maximum world dimensions for performance
   private static readonly MAX_WORLD_WIDTH = 8000;
@@ -139,6 +145,67 @@ export class SharedMapSystem {
 
   private constructor() {
     this.initializeEventListeners();
+    this.initializeSocketConnection();
+  }
+
+  /**
+   * Initialize Socket.IO connection for real-time sync
+   */
+  private initializeSocketConnection(): void {
+    try {
+      this.socket = io(API_CONFIG.SOCKET_URL, {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+      });
+
+      // Listen for map updates from other clients
+      this.socket.on('map:updated', (data: { roomId: string; mapData: SharedMapData }) => {
+        if (data.roomId === this.currentRoomId && data.mapData) {
+          logger.info('RECEIVED MAP UPDATE VIA SOCKET', { roomId: data.roomId });
+          // Update local data without saving (already saved by sender)
+          this.mapData = data.mapData;
+          this.emit('map:changed', { mapData: data.mapData, source: 'socket' });
+        }
+      });
+
+      this.socket.on('map:asset:added', (data: { roomId: string; asset: any }) => {
+        if (data.roomId === this.currentRoomId) {
+          logger.info('RECEIVED ASSET ADDED VIA SOCKET', { assetId: data.asset?.id });
+          this.emit('map:element:added', { element: data.asset, type: 'asset', source: 'socket' });
+        }
+      });
+
+      this.socket.on('connect', () => {
+        logger.info('SOCKET CONNECTED FOR MAP SYNC');
+        // Join the current room
+        this.socket?.emit('map:join', { roomId: this.currentRoomId });
+      });
+
+      this.socket.on('disconnect', () => {
+        logger.warn('SOCKET DISCONNECTED');
+      });
+
+    } catch (error) {
+      logger.error('FAILED TO INITIALIZE SOCKET CONNECTION', error);
+    }
+  }
+
+  /**
+   * Set the current room ID and join Socket.IO room
+   */
+  public setRoomId(roomId: string): void {
+    if (this.currentRoomId !== roomId) {
+      // Leave old room
+      this.socket?.emit('map:leave', { roomId: this.currentRoomId });
+
+      this.currentRoomId = roomId;
+
+      // Join new room
+      this.socket?.emit('map:join', { roomId });
+      logger.info('SWITCHED TO ROOM', { roomId });
+    }
   }
 
   public static getInstance(): SharedMapSystem {
@@ -162,113 +229,110 @@ export class SharedMapSystem {
   }
 
   /**
-   * Load map data from localStorage
-   * TODO: Replace with database query when migrating to server-side storage
+   * Load map data from PostgreSQL (with localStorage fallback)
    */
   public async loadMapData(): Promise<SharedMapData> {
     try {
-      const storedData = localStorage.getItem(STORAGE_KEYS.MAP_DATA);
-      if (storedData) {
-        // 📥 [Polygon Load] Log raw data retrieved from localStorage
-        console.info('📥 [Polygon Load] RAW DATA FROM LOCALSTORAGE', {
-          timestamp: new Date().toISOString(),
-          dataSize: storedData.length,
-          storageKey: STORAGE_KEYS.MAP_DATA
-        });
+      // Try to load from API first
+      let parsedData: SharedMapData | null = null;
 
-        const parsedData = JSON.parse(storedData);
+      try {
+        const result = await MapApiService.loadMap(this.currentRoomId);
 
-        // Check if this is an old map without background image
-        if (!parsedData.backgroundImage) {
-          return await this.createDefaultMap();
-        }
+        if (result.success && result.data) {
+          logger.info('MAP LOADED FROM DATABASE', { roomId: this.currentRoomId });
 
-        // 📥 [Polygon Load] Log deserialized polygon data
-        const polygonAreas = parsedData.impassableAreas?.filter((area: any) => area.type === 'impassable-polygon') || [];
-        console.info('📥 [Polygon Load] DESERIALIZED POLYGON DATA', {
-          timestamp: new Date().toISOString(),
-          totalImpassableAreas: parsedData.impassableAreas?.length || 0,
-          polygonCount: polygonAreas.length,
-          polygons: polygonAreas.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            type: p.type,
-            pointsCount: p.points?.length || 0,
-            allPoints: p.points,
-            boundingBox: {
-              x: p.x,
-              y: p.y,
-              width: p.width,
-              height: p.height
+          // Convert API response to SharedMapData (cast types for compatibility)
+          const apiMetadata = result.data.metadata || {};
+          parsedData = {
+            interactiveAreas: (result.data.interactiveAreas || []) as InteractiveArea[],
+            impassableAreas: (result.data.impassableAreas || []) as ImpassableArea[],
+            assets: (result.data.assets || []) as unknown as Asset[],
+            worldDimensions: result.data.worldDimensions || { width: 7603, height: 3679 },
+            backgroundImage: result.data.backgroundImage || undefined,
+            backgroundImageDimensions: result.data.backgroundImageDimensions,
+            version: result.data.version || 1,
+            lastModified: result.data.updatedAt ? new Date(result.data.updatedAt) : new Date(),
+            createdBy: 'system',
+            metadata: {
+              name: apiMetadata.name || 'Stargety Oasis',
+              description: apiMetadata.description || '',
+              tags: apiMetadata.tags || [],
+              isPublic: false,
             },
-            color: p.color
-          }))
-        });
-
-        // 🔧 FIX: Recalculate invalid bounding boxes for polygons
-        // This fixes polygons created with older code that didn't save bounding box correctly
-        let fixedPolygonCount = 0;
-        if (parsedData.impassableAreas) {
-          parsedData.impassableAreas = parsedData.impassableAreas.map((area: any) => {
-            if (area.type === 'impassable-polygon' && area.points && area.points.length > 0) {
-              // Check if bounding box is invalid (0 or missing)
-              if (!area.width || !area.height || area.width === 0 || area.height === 0) {
-                // Calculate correct bounding box from points
-                const xs = area.points.map((p: any) => p.x);
-                const ys = area.points.map((p: any) => p.y);
-                const minX = Math.min(...xs);
-                const minY = Math.min(...ys);
-                const maxX = Math.max(...xs);
-                const maxY = Math.max(...ys);
-
-                console.warn('⚠️ [Polygon Load] Invalid bounding box detected, recalculating...', {
-                  id: area.id,
-                  oldBoundingBox: { x: area.x, y: area.y, width: area.width, height: area.height },
-                  newBoundingBox: { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
-                });
-
-                fixedPolygonCount++;
-
-                // Return new object with corrected bounding box
-                return {
-                  ...area,
-                  x: minX,
-                  y: minY,
-                  width: maxX - minX,
-                  height: maxY - minY
-                };
-              }
-            }
-            return area;
-          });
+            layers: [],
+            resources: [],
+          };
         }
+      } catch (apiError) {
+        logger.warn('API LOAD FAILED, FALLING BACK TO LOCALSTORAGE', apiError);
+      }
 
-        if (fixedPolygonCount > 0) {
-          console.info(`✅ [Polygon Load] Fixed ${fixedPolygonCount} polygon(s) with invalid bounding boxes`);
-          // Save the corrected data back to localStorage
-          localStorage.setItem(STORAGE_KEYS.MAP_DATA, JSON.stringify(parsedData));
+      // Fallback to localStorage if API failed
+      if (!parsedData) {
+        const storedData = localStorage.getItem(STORAGE_KEYS.MAP_DATA);
+        if (storedData) {
+          logger.info('MAP LOADED FROM LOCALSTORAGE', { dataSize: storedData.length });
+          parsedData = JSON.parse(storedData);
         }
+      }
 
-        // Convert date strings back to Date objects
-        parsedData.lastModified = new Date(parsedData.lastModified);
-        this.mapData = parsedData;
-
-        // 📥 [Polygon Load] Log final state after reconstruction
-        console.info('📥 [Polygon Load] FINAL STATE AFTER RECONSTRUCTION', {
-          timestamp: new Date().toISOString(),
-          polygonCount: polygonAreas.length,
-          mapDataVersion: parsedData.version,
-          lastModified: parsedData.lastModified
-        });
-
-        return parsedData;
-      } else {
+      if (!parsedData) {
         return await this.createDefaultMap();
       }
+
+      // Check if this is an old map without background image
+      if (!parsedData.backgroundImage) {
+        return await this.createDefaultMap();
+      }
+
+      // Fix invalid polygon bounding boxes
+      parsedData = this.fixPolygonBoundingBoxes(parsedData);
+
+      // Convert date strings back to Date objects
+      if (typeof parsedData.lastModified === 'string') {
+        parsedData.lastModified = new Date(parsedData.lastModified);
+      }
+
+      this.mapData = parsedData;
+      return parsedData;
+
     } catch (error) {
-      console.error('❌ FAILED TO LOAD MAP DATA, CREATING DEFAULT:', error);
+      logger.error('FAILED TO LOAD MAP DATA, CREATING DEFAULT', error);
       return await this.createDefaultMap();
     }
+  }
+
+  /**
+   * Fix invalid polygon bounding boxes (helper method)
+   */
+  private fixPolygonBoundingBoxes(data: SharedMapData): SharedMapData {
+    let fixedCount = 0;
+
+    if (data.impassableAreas) {
+      data.impassableAreas = data.impassableAreas.map((area: any) => {
+        if (area.type === 'impassable-polygon' && area.points && area.points.length > 0) {
+          if (!area.width || !area.height || area.width === 0 || area.height === 0) {
+            const xs = area.points.map((p: any) => p.x);
+            const ys = area.points.map((p: any) => p.y);
+            const minX = Math.min(...xs);
+            const minY = Math.min(...ys);
+            const maxX = Math.max(...xs);
+            const maxY = Math.max(...ys);
+
+            fixedCount++;
+            return { ...area, x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+          }
+        }
+        return area;
+      });
+    }
+
+    if (fixedCount > 0) {
+      logger.info('FIXED POLYGON BOUNDING BOXES', { count: fixedCount });
+    }
+
+    return data;
   }
 
   /**
@@ -322,50 +386,55 @@ export class SharedMapSystem {
       dataToSave.lastModified = new Date();
       dataToSave.version += 1;
 
-      // Save to localStorage with error handling and cleanup
+      // Try to save to API first
+      let apiSaveSuccess = false;
       try {
-        const jsonString = JSON.stringify(dataToSave);
-        localStorage.setItem(STORAGE_KEYS.MAP_DATA, jsonString);
+        // Cast to API-compatible types
+        const apiData = {
+          worldDimensions: dataToSave.worldDimensions,
+          backgroundImage: dataToSave.backgroundImage || null,
+          backgroundImageDimensions: dataToSave.backgroundImageDimensions,
+          interactiveAreas: dataToSave.interactiveAreas as unknown as import('../services/api/MapApiService').InteractiveArea[],
+          impassableAreas: dataToSave.impassableAreas as unknown as import('../services/api/MapApiService').ImpassableArea[],
+          assets: dataToSave.assets as unknown as import('../services/api/MapApiService').MapAsset[],
+          metadata: dataToSave.metadata,
+        };
 
-        // 💾 [Polygon Save] Log serialized data written to localStorage
-        const serializedPolygons = JSON.parse(jsonString).impassableAreas?.filter((area: any) => area.type === 'impassable-polygon') || [];
-        console.info('💾 [Polygon Save] AFTER SERIALIZATION - WRITTEN TO LOCALSTORAGE', {
-          timestamp: new Date().toISOString(),
-          dataSize: jsonString.length,
-          storageKey: STORAGE_KEYS.MAP_DATA,
-          polygonCount: serializedPolygons.length,
-          polygons: serializedPolygons.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            type: p.type,
-            pointsCount: p.points?.length || 0,
-            allPoints: p.points,
-            boundingBox: {
-              x: p.x,
-              y: p.y,
-              width: p.width,
-              height: p.height
-            }
-          })),
-          dataIntegrityCheck: {
-            originalPolygonCount: polygonAreas.length,
-            serializedPolygonCount: serializedPolygons.length,
-            countsMatch: polygonAreas.length === serializedPolygons.length
-          }
-        });
-      } catch (storageError) {
-        if (storageError instanceof Error && storageError.name === 'QuotaExceededError') {
-          console.warn('⚠️ STORAGE QUOTA EXCEEDED DURING MAP SAVE, ATTEMPTING CLEANUP');
-          this.cleanupStorage();
+        const result = await MapApiService.saveMap(this.currentRoomId, apiData as any);
 
-          // Try saving again after cleanup
-          try {
-            localStorage.setItem(STORAGE_KEYS.MAP_DATA, JSON.stringify(dataToSave));
-          } catch (retryError) {
-            throw new Error('Storage quota exceeded - unable to save map data even after cleanup. Please use smaller background images or clear browser data.');
-          }
+        if (result.success) {
+          logger.info('MAP SAVED TO DATABASE', { roomId: this.currentRoomId, version: dataToSave.version });
+          apiSaveSuccess = true;
+
+          // Notify other clients via Socket.IO
+          this.socket?.emit('map:update', { roomId: this.currentRoomId, mapData: dataToSave });
         } else {
-          throw storageError;
+          throw new Error(result.error || 'API save failed');
+        }
+      } catch (apiError) {
+        logger.warn('API SAVE FAILED, FALLING BACK TO LOCALSTORAGE', apiError);
+      }
+
+      // Fallback to localStorage if API failed
+      if (!apiSaveSuccess) {
+        try {
+          const jsonString = JSON.stringify(dataToSave);
+          localStorage.setItem(STORAGE_KEYS.MAP_DATA, jsonString);
+          logger.info('MAP SAVED TO LOCALSTORAGE', { dataSize: jsonString.length });
+        } catch (storageError) {
+          if (storageError instanceof Error && storageError.name === 'QuotaExceededError') {
+            logger.warn('STORAGE QUOTA EXCEEDED, ATTEMPTING CLEANUP');
+            this.cleanupStorage();
+
+            // Try saving again after cleanup
+            try {
+              localStorage.setItem(STORAGE_KEYS.MAP_DATA, JSON.stringify(dataToSave));
+            } catch (retryError) {
+              throw new Error('Storage quota exceeded - unable to save map data even after cleanup.');
+            }
+          } else {
+            throw storageError;
+          }
         }
       }
 

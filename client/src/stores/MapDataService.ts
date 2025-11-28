@@ -1,19 +1,22 @@
 /**
  * Map Data Service - Centralized data management for the hybrid architecture
- * 
+ *
  * This service replaces the SharedMapSystem with a cleaner, more focused approach
  * that handles persistence, validation, and background image management without
  * the complexity of the event-driven singleton pattern.
- * 
+ *
  * Key Features:
- * - localStorage persistence with backward compatibility
+ * - PostgreSQL persistence via MapApiService (primary)
+ * - localStorage fallback for offline support
  * - Data validation and sanitization
  * - Background image handling
  * - Simple event system for save notifications
  * - No singleton pattern - stateless service functions
  */
 
-import { MapData } from '../shared/MapDataContext';
+import { MapData, InteractiveArea, ImpassableArea, Asset } from '../shared/MapDataContext';
+import { MapApiService } from '../services/api/MapApiService';
+import { logger } from '../shared/logger';
 
 // Extended map data structure for the new system
 export interface ExtendedMapData extends MapData {
@@ -26,7 +29,7 @@ export interface ExtendedMapData extends MapData {
   };
 }
 
-// Storage keys for localStorage (maintaining compatibility)
+// Storage keys for localStorage (maintained for fallback)
 const STORAGE_KEYS = {
   MAP_DATA: 'stargety_shared_map_data',
   MAP_BACKUP: 'stargety_map_backup',
@@ -34,17 +37,19 @@ const STORAGE_KEYS = {
   MAP_HISTORY: 'stargety_map_history'
 } as const;
 
+// Default room ID for the map
+const DEFAULT_ROOM_ID = 'default';
+
 // Event system for save notifications
 type MapEventCallback = (data: ExtendedMapData) => void;
 const eventListeners: Map<string, MapEventCallback[]> = new Map();
 
 export class MapDataService {
   /**
-   * Save map data to localStorage
+   * Save map data to PostgreSQL (with localStorage fallback)
    */
-  static async saveMapData(data: ExtendedMapData): Promise<void> {
+  static async saveMapData(data: ExtendedMapData, roomId: string = DEFAULT_ROOM_ID): Promise<void> {
     try {
-
       // Update metadata
       const dataToSave = {
         ...data,
@@ -52,35 +57,86 @@ export class MapDataService {
         version: data.version + 1
       };
 
-      // Save to localStorage
-      localStorage.setItem(STORAGE_KEYS.MAP_DATA, JSON.stringify(dataToSave));
-      
-      // Create backup
-      localStorage.setItem(STORAGE_KEYS.MAP_BACKUP, JSON.stringify(dataToSave));
+      // Try to save to API first
+      try {
+        // Cast to API-compatible types
+        const apiData = {
+          worldDimensions: dataToSave.worldDimensions,
+          backgroundImage: dataToSave.backgroundImage || null,
+          backgroundImageDimensions: dataToSave.backgroundImageDimensions,
+          interactiveAreas: dataToSave.interactiveAreas as any,
+          impassableAreas: dataToSave.impassableAreas as any,
+          assets: dataToSave.assets as any,
+          metadata: dataToSave.metadata,
+        };
 
+        const result = await MapApiService.saveMap(roomId, apiData as any);
+
+        if (result.success) {
+          logger.info('MAP SAVED TO DATABASE', { roomId, version: dataToSave.version });
+        } else {
+          throw new Error(result.error || 'API save failed');
+        }
+      } catch (apiError) {
+        logger.warn('API SAVE FAILED, FALLING BACK TO LOCALSTORAGE', apiError);
+        // Fallback to localStorage
+        localStorage.setItem(STORAGE_KEYS.MAP_DATA, JSON.stringify(dataToSave));
+        localStorage.setItem(STORAGE_KEYS.MAP_BACKUP, JSON.stringify(dataToSave));
+      }
 
       // Emit save event
       this.emit('map:saved', dataToSave);
 
     } catch (error) {
-      console.error('❌ FAILED TO SAVE MAP DATA:', error);
+      logger.error('FAILED TO SAVE MAP DATA', error);
       throw new Error('Failed to save map data');
     }
   }
 
   /**
-   * Load map data from localStorage
+   * Load map data from PostgreSQL (with localStorage fallback)
    */
-  static async loadMapData(): Promise<ExtendedMapData | null> {
+  static async loadMapData(roomId: string = DEFAULT_ROOM_ID): Promise<ExtendedMapData | null> {
     try {
+      // Try to load from API first
+      try {
+        const result = await MapApiService.loadMap(roomId);
+
+        if (result.success && result.data) {
+          logger.info('MAP LOADED FROM DATABASE', { roomId });
+
+          // Convert API response to ExtendedMapData (cast types for compatibility)
+          const mapData: ExtendedMapData = {
+            interactiveAreas: (result.data.interactiveAreas || []) as InteractiveArea[],
+            impassableAreas: (result.data.impassableAreas || []) as ImpassableArea[],
+            assets: (result.data.assets || []) as unknown as Asset[],
+            worldDimensions: result.data.worldDimensions || { width: 7603, height: 3679 },
+            backgroundImage: result.data.backgroundImage || undefined,
+            backgroundImageDimensions: result.data.backgroundImageDimensions,
+            version: result.data.version || 1,
+            lastModified: result.data.updatedAt ? new Date(result.data.updatedAt) : new Date(),
+            metadata: result.data.metadata as ExtendedMapData['metadata'] || {
+              name: 'Stargety Oasis',
+              description: '',
+              tags: [],
+            },
+          };
+
+          return this.validateAndSanitizeMapData(mapData);
+        }
+      } catch (apiError) {
+        logger.warn('API LOAD FAILED, FALLING BACK TO LOCALSTORAGE', apiError);
+      }
+
+      // Fallback to localStorage
       const storedData = localStorage.getItem(STORAGE_KEYS.MAP_DATA);
-      
+
       if (!storedData) {
         return null;
       }
 
       const parsedData = JSON.parse(storedData);
-      
+
       // Convert date strings to Date objects
       if (parsedData.lastModified) {
         parsedData.lastModified = new Date(parsedData.lastModified);
@@ -89,11 +145,10 @@ export class MapDataService {
       // Validate and sanitize data
       const validatedData = this.validateAndSanitizeMapData(parsedData);
 
-
       return validatedData;
 
     } catch (error) {
-      console.error('❌ FAILED TO LOAD MAP DATA:', error);
+      logger.error('FAILED TO LOAD MAP DATA', error);
       return null;
     }
   }
@@ -101,8 +156,7 @@ export class MapDataService {
   /**
    * Create default map with Zep-style background
    */
-  static async createDefaultMap(): Promise<ExtendedMapData> {
-
+  static async createDefaultMap(roomId: string = DEFAULT_ROOM_ID): Promise<ExtendedMapData> {
     const defaultMap: ExtendedMapData = {
       version: 1,
       lastModified: new Date(),
@@ -158,7 +212,7 @@ export class MapDataService {
     };
 
     // Save the default map
-    await this.saveMapData(defaultMap);
+    await this.saveMapData(defaultMap, roomId);
 
     return defaultMap;
   }
@@ -196,15 +250,22 @@ export class MapDataService {
   /**
    * Reset map to default state
    */
-  static async resetToDefault(): Promise<ExtendedMapData> {
+  static async resetToDefault(roomId: string = DEFAULT_ROOM_ID): Promise<ExtendedMapData> {
+    // Try to delete from API
+    try {
+      await MapApiService.deleteMap(roomId);
+      logger.info('MAP DELETED FROM DATABASE', { roomId });
+    } catch (error) {
+      logger.warn('API DELETE FAILED', error);
+    }
 
-    // Clear all storage
+    // Clear all localStorage
     Object.values(STORAGE_KEYS).forEach(key => {
       localStorage.removeItem(key);
     });
 
     // Create new default map
-    return await this.createDefaultMap();
+    return await this.createDefaultMap(roomId);
   }
 
   /**
@@ -217,15 +278,15 @@ export class MapDataService {
   /**
    * Import map data from JSON string
    */
-  static async importMapData(jsonData: string): Promise<ExtendedMapData> {
+  static async importMapData(jsonData: string, roomId: string = DEFAULT_ROOM_ID): Promise<ExtendedMapData> {
     try {
       const parsedData = JSON.parse(jsonData);
       const validatedData = this.validateAndSanitizeMapData(parsedData);
-      
-      await this.saveMapData(validatedData);
+
+      await this.saveMapData(validatedData, roomId);
       return validatedData;
     } catch (error) {
-      console.error('❌ FAILED TO IMPORT MAP DATA:', error);
+      logger.error('FAILED TO IMPORT MAP DATA', error);
       throw new Error('Invalid map data format');
     }
   }
@@ -328,7 +389,7 @@ export class MapDataService {
   }
 
   /**
-   * Get backup data
+   * Get backup data (from localStorage - API has versioned history)
    */
   static async getBackupData(): Promise<ExtendedMapData | null> {
     try {
@@ -342,7 +403,7 @@ export class MapDataService {
 
       return this.validateAndSanitizeMapData(parsedData);
     } catch (error) {
-      console.error('❌ FAILED TO GET BACKUP DATA:', error);
+      logger.error('FAILED TO GET BACKUP DATA', error);
       return null;
     }
   }
@@ -350,17 +411,17 @@ export class MapDataService {
   /**
    * Restore from backup
    */
-  static async restoreFromBackup(): Promise<ExtendedMapData | null> {
+  static async restoreFromBackup(roomId: string = DEFAULT_ROOM_ID): Promise<ExtendedMapData | null> {
     try {
       const backupData = await this.getBackupData();
       if (!backupData) {
         throw new Error('No backup data available');
       }
 
-      await this.saveMapData(backupData);
+      await this.saveMapData(backupData, roomId);
       return backupData;
     } catch (error) {
-      console.error('❌ FAILED TO RESTORE FROM BACKUP:', error);
+      logger.error('FAILED TO RESTORE FROM BACKUP', error);
       throw error;
     }
   }

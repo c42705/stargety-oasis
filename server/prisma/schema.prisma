@@ -77,9 +77,11 @@ model MapAsset {
 // ============================================================================
 
 // Character slot - each user has up to 5 character slots
+// NOTE: userId is a string identifier (username/session) - not a strict FK for now
+// This allows flexible character storage without requiring full auth system
 model Character {
   id            String    @id @default(cuid())
-  userId        String
+  userId        String    // Can be username, session ID, or User.id
   slotNumber    Int       // 1-5
   name          String
   spriteSheet   Json      // Full SpriteSheetDefinition from Avatar Builder
@@ -90,12 +92,14 @@ model Character {
   updatedAt     DateTime  @updatedAt
   lastUsed      DateTime?
 
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Optional relation to User (when auth is implemented)
+  user   User?   @relation(fields: [userFk], references: [id], onDelete: Cascade)
+  userFk String?
 
   // Each user can only have one character per slot number
   @@unique([userId, slotNumber])
   @@index([userId])
+  @@index([userFk])
   @@map("characters")
 }
 
@@ -114,18 +118,21 @@ model ActiveCharacter {
 // ============================================================================
 
 // User settings - theme, preferences, editor config
+// NOTE: userId is a string identifier (username/session) - not a strict FK for now
 model UserSettings {
   id             String   @id @default(cuid())
-  userId         String   @unique
+  userId         String   @unique  // Can be username, session ID, or User.id
   theme          String   @default("dark") // "dark" | "light"
   jitsiServerUrl String?  // Custom Jitsi server URL
   editorPrefs    Json?    // {gridSize, snapToGrid, showGrid, viewportPrefs, toolPrefs}
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Optional relation to User (when auth is implemented)
+  user   User?   @relation(fields: [userFk], references: [id], onDelete: Cascade)
+  userFk String? @unique
 
+  @@index([userFk])
   @@map("user_settings")
 }
 

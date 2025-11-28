@@ -1,9 +1,9 @@
 /**
  * Character Storage System V2
- * Handles localStorage persistence for sprite-sheet-based character slots
- * 
- * @version 2.0.0
- * @date 2025-11-06
+ * Handles character slot persistence via API with localStorage fallback
+ *
+ * @version 2.1.0
+ * @date 2025-11-28
  */
 
 import {
@@ -23,6 +23,8 @@ import {
 } from './types';
 import { AnimationCategory } from '../AvatarBuilderTypes';
 import { PerformanceMonitor } from './PerformanceMonitor';
+import { CharacterApiService } from '../../../services/api/CharacterApiService';
+import { logger } from '../../../shared/logger';
 
 /**
  * Character Storage Manager
@@ -35,7 +37,7 @@ export class CharacterStorage {
   // ============================================================================
   
   /**
-   * Save a character to a specific slot
+   * Save a character to a specific slot (API + localStorage fallback)
    */
   static saveCharacterSlot(username: string, slot: CharacterSlot): StorageResult<CharacterSlot> {
     return PerformanceMonitor.measureSync<StorageResult<CharacterSlot>>('CharacterStorage.saveCharacterSlot', () => {
@@ -50,43 +52,86 @@ export class CharacterStorage {
 
         // Validate character data
         const validation = this.validateSlot(slot);
-      if (!validation.isValid) {
+        if (!validation.isValid) {
+          return {
+            success: false,
+            error: `Validation failed: ${validation.errors.map(e => e.message).join(', ')}`
+          };
+        }
+
+        // Check storage size
+        const data = JSON.stringify(slot);
+        const sizeCheck = this.checkStorageSize(data);
+        if (!sizeCheck.success) {
+          return {
+            success: false,
+            error: sizeCheck.error
+          };
+        }
+
+        // Try to save to API (async, fire and forget for sync interface)
+        this.saveToApiAsync(username, slot);
+
+        // Save to localStorage as primary/backup
+        const key = this.getSlotKey(username, slot.slotNumber);
+        localStorage.setItem(key, data);
+
+        // Update metadata
+        this.updateMetadata(username);
+
+        return { success: true, data: slot };
+
+      } catch (error) {
         return {
           success: false,
-          error: `Validation failed: ${validation.errors.map(e => e.message).join(', ')}`
+          error: `Failed to save character: ${error instanceof Error ? error.message : 'Unknown error'}`
         };
       }
-      
-      // Check storage size
-      const data = JSON.stringify(slot);
-      const sizeCheck = this.checkStorageSize(data);
-      if (!sizeCheck.success) {
-        return {
-          success: false,
-          error: sizeCheck.error
-        };
-      }
-      
-      // Save to localStorage
-      const key = this.getSlotKey(username, slot.slotNumber);
-      localStorage.setItem(key, data);
-
-      // Update metadata
-      this.updateMetadata(username);
-
-      return { success: true, data: slot };
-
-    } catch (error) {
-      return {
-        success: false,
-        error: `Failed to save character: ${error instanceof Error ? error.message : 'Unknown error'}`
-      };
-    }
     }, { slotNumber: slot.slotNumber, username });
+  }
+
+  /**
+   * Async helper to save to API (called from sync method)
+   */
+  private static async saveToApiAsync(username: string, slot: CharacterSlot): Promise<void> {
+    try {
+      // Extract frame dimensions from first frame's outputRect or use defaults
+      const firstFrame = slot.spriteSheet?.frames?.[0];
+      const frameWidth = firstFrame?.outputRect?.width || 32;
+      const frameHeight = firstFrame?.outputRect?.height || 32;
+
+      const result = await CharacterApiService.saveSlot(username, slot.slotNumber, {
+        name: slot.name,
+        spriteSheet: {
+          layers: slot.spriteSheet?.frames?.map((frame, idx) => ({
+            id: frame.id,
+            src: slot.cachedTexture || '', // Use cached texture as source
+            zIndex: idx,
+            visible: true,
+          })) || [],
+          animations: slot.spriteSheet?.animations?.reduce((acc, anim) => {
+            acc[anim.category] = {
+              frames: anim.sequence?.frameIds?.map((_, i) => i) || [],
+              frameRate: anim.sequence?.frameRate || 8,
+            };
+            return acc;
+          }, {} as Record<string, { frames: number[]; frameRate: number }>),
+          frameWidth,
+          frameHeight,
+        },
+      });
+
+      if (result.success) {
+        logger.info('CHARACTER SAVED TO API', { username, slotNumber: slot.slotNumber });
+      }
+    } catch (error) {
+      logger.warn('API SAVE FAILED FOR CHARACTER', { username, slotNumber: slot.slotNumber, error });
+    }
   }
   
   /**
-   * Load a character from a specific slot
+   * Load a character from a specific slot (sync - localStorage only)
+   * Use loadCharacterSlotAsync for API-first loading
    */
   static loadCharacterSlot(username: string, slotNumber: number): StorageResult<CharacterSlot | EmptyCharacterSlot> {
     return PerformanceMonitor.measureSync('CharacterStorage.loadCharacterSlot', () => {
@@ -101,32 +146,91 @@ export class CharacterStorage {
 
         const key = this.getSlotKey(username, slotNumber);
         const data = localStorage.getItem(key);
-      
-      // Return empty slot if no data
-      if (!data) {
-        const emptySlot: EmptyCharacterSlot = {
-          slotNumber,
-          username,
-          isEmpty: true,
-          name: '',
-          thumbnailUrl: '',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        
+
+        // Return empty slot if no data
+        if (!data) {
+          const emptySlot: EmptyCharacterSlot = {
+            slotNumber,
+            username,
+            isEmpty: true,
+            name: '',
+            thumbnailUrl: '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+
+          return {
+            success: true,
+            data: emptySlot
+          };
+        }
+
+        // Parse and return character slot
+        const slot: CharacterSlot = JSON.parse(data);
+
         return {
           success: true,
-          data: emptySlot
+          data: slot
+        };
+
+      } catch (error) {
+        return {
+          success: false,
+          error: `Failed to load character: ${error instanceof Error ? error.message : 'Unknown error'}`
         };
       }
-      
-      // Parse and return character slot
-      const slot: CharacterSlot = JSON.parse(data);
-      
-      return {
-        success: true,
-        data: slot
-      };
+    }, { slotNumber, username });
+  }
+
+  /**
+   * Load a character from a specific slot (async - API first, localStorage fallback)
+   */
+  static async loadCharacterSlotAsync(username: string, slotNumber: number): Promise<StorageResult<CharacterSlot | EmptyCharacterSlot>> {
+    try {
+      // Validate slot number
+      if (!isValidSlotNumber(slotNumber)) {
+        return {
+          success: false,
+          error: `Invalid slot number: ${slotNumber}. Must be 1-5.`
+        };
+      }
+
+      // Try API first
+      try {
+        const result = await CharacterApiService.getSlot(username, slotNumber);
+        if (result.success && result.data) {
+          logger.info('CHARACTER LOADED FROM API', { username, slotNumber });
+
+          // Convert API response to CharacterSlot
+          const apiSlot = result.data;
+          if (apiSlot.isEmpty) {
+            return {
+              success: true,
+              data: {
+                slotNumber,
+                username,
+                isEmpty: true,
+                name: '',
+                thumbnailUrl: '',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              } as EmptyCharacterSlot
+            };
+          }
+
+          // Return as CharacterSlot - sync to localStorage for offline use
+          const localData = localStorage.getItem(this.getSlotKey(username, slotNumber));
+          if (localData) {
+            const localSlot: CharacterSlot = JSON.parse(localData);
+            return { success: true, data: localSlot };
+          }
+        }
+      } catch (apiError) {
+        logger.warn('API LOAD FAILED, FALLING BACK TO LOCALSTORAGE', { username, slotNumber, error: apiError });
+      }
+
+      // Fallback to localStorage
+      return this.loadCharacterSlot(username, slotNumber);
 
     } catch (error) {
       return {
@@ -134,11 +238,10 @@ export class CharacterStorage {
         error: `Failed to load character: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
-    }, { slotNumber, username });
   }
   
   /**
-   * Delete a character from a specific slot
+   * Delete a character from a specific slot (API + localStorage)
    */
   static deleteCharacterSlot(username: string, slotNumber: number): StorageResult<void> {
     try {
@@ -149,31 +252,34 @@ export class CharacterStorage {
           error: `Invalid slot number: ${slotNumber}. Must be 1-5.`
         };
       }
-      
+
       const key = this.getSlotKey(username, slotNumber);
-      
-      // Check if slot exists
+
+      // Check if slot exists in localStorage
       if (!localStorage.getItem(key)) {
         return {
           success: false,
           error: 'Character slot is already empty'
         };
       }
-      
+
+      // Try to delete from API (async, fire and forget)
+      this.deleteFromApiAsync(username, slotNumber);
+
       // Remove from localStorage
       localStorage.removeItem(key);
-      
+
       // Update metadata
       this.updateMetadata(username);
-      
+
       // If this was the active character, switch to slot 1
       const activeState = this.getActiveCharacter(username);
       if (activeState.success && activeState.data?.activeSlotNumber === slotNumber) {
         this.setActiveCharacter(username, 1);
       }
-      
+
       return { success: true };
-      
+
     } catch (error) {
       return {
         success: false,
@@ -181,23 +287,37 @@ export class CharacterStorage {
       };
     }
   }
+
+  /**
+   * Async helper to delete from API (called from sync method)
+   */
+  private static async deleteFromApiAsync(username: string, slotNumber: number): Promise<void> {
+    try {
+      const result = await CharacterApiService.clearSlot(username, slotNumber);
+      if (result.success) {
+        logger.info('CHARACTER DELETED FROM API', { username, slotNumber });
+      }
+    } catch (error) {
+      logger.warn('API DELETE FAILED FOR CHARACTER', { username, slotNumber, error });
+    }
+  }
   
   /**
-   * List all character slots for a user
+   * List all character slots for a user (sync - localStorage only)
    */
   static listCharacterSlots(username: string): StorageResult<CharacterSlotSummary[]> {
     try {
       const summaries: CharacterSlotSummary[] = [];
       const activeState = this.getActiveCharacter(username);
       const activeSlot = activeState.success && activeState.data ? activeState.data.activeSlotNumber : 1;
-      
+
       // Load all 5 slots
       for (let slotNumber = 1; slotNumber <= AVATAR_SYSTEM_CONSTANTS.MAX_SLOTS; slotNumber++) {
         const result = this.loadCharacterSlot(username, slotNumber);
-        
+
         if (result.success && result.data) {
           const slot = result.data;
-          
+
           summaries.push({
             slotNumber,
             name: slot.name,
@@ -208,12 +328,52 @@ export class CharacterStorage {
           });
         }
       }
-      
+
       return {
         success: true,
         data: summaries
       };
-      
+
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to list characters: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+
+  /**
+   * List all character slots for a user (async - API first, localStorage fallback)
+   */
+  static async listCharacterSlotsAsync(username: string): Promise<StorageResult<CharacterSlotSummary[]>> {
+    try {
+      // Try API first
+      try {
+        const result = await CharacterApiService.getSlots(username);
+        if (result.success && result.data) {
+          logger.info('CHARACTER SLOTS LOADED FROM API', { username, count: result.data.length });
+
+          const activeState = this.getActiveCharacter(username);
+          const activeSlot = activeState.success && activeState.data ? activeState.data.activeSlotNumber : 1;
+
+          const summaries: CharacterSlotSummary[] = result.data.map(slot => ({
+            slotNumber: slot.slotNumber,
+            name: slot.name || '',
+            thumbnailUrl: slot.thumbnailUrl || '',
+            isEmpty: slot.isEmpty,
+            lastUsed: slot.lastModified,
+            isActive: slot.slotNumber === activeSlot
+          }));
+
+          return { success: true, data: summaries };
+        }
+      } catch (apiError) {
+        logger.warn('API LIST SLOTS FAILED, FALLING BACK TO LOCALSTORAGE', { username, error: apiError });
+      }
+
+      // Fallback to localStorage
+      return this.listCharacterSlots(username);
+
     } catch (error) {
       return {
         success: false,
@@ -227,7 +387,7 @@ export class CharacterStorage {
   // ============================================================================
   
   /**
-   * Set the active character slot
+   * Set the active character slot (API + localStorage)
    */
   static setActiveCharacter(username: string, slotNumber: number): StorageResult<void> {
     try {
@@ -238,16 +398,20 @@ export class CharacterStorage {
           error: `Invalid slot number: ${slotNumber}. Must be 1-5.`
         };
       }
-      
+
       const activeState: ActiveCharacterState = {
         username,
         activeSlotNumber: slotNumber,
         lastSwitched: new Date().toISOString()
       };
-      
+
+      // Save to localStorage
       const key = this.getActiveKey(username);
       localStorage.setItem(key, JSON.stringify(activeState));
-      
+
+      // Sync to API (async, fire and forget)
+      this.setActiveToApiAsync(username, slotNumber);
+
       // Update lastUsed timestamp on the character slot
       const slotResult = this.loadCharacterSlot(username, slotNumber);
       if (slotResult.success && slotResult.data && !isEmptySlot(slotResult.data)) {
@@ -255,9 +419,9 @@ export class CharacterStorage {
         slot.lastUsed = new Date().toISOString();
         this.saveCharacterSlot(username, slot);
       }
-      
+
       return { success: true };
-      
+
     } catch (error) {
       return {
         success: false,
@@ -265,15 +429,29 @@ export class CharacterStorage {
       };
     }
   }
-  
+
   /**
-   * Get the active character state
+   * Async helper to set active character on API
+   */
+  private static async setActiveToApiAsync(username: string, slotNumber: number): Promise<void> {
+    try {
+      const result = await CharacterApiService.setActiveCharacter(username, slotNumber);
+      if (result.success) {
+        logger.info('ACTIVE CHARACTER SET ON API', { username, slotNumber });
+      }
+    } catch (error) {
+      logger.warn('API SET ACTIVE FAILED', { username, slotNumber, error });
+    }
+  }
+
+  /**
+   * Get the active character state (localStorage first, API fallback)
    */
   static getActiveCharacter(username: string): StorageResult<ActiveCharacterState> {
     try {
       const key = this.getActiveKey(username);
       const data = localStorage.getItem(key);
-      
+
       // Default to slot 1 if no active character set
       if (!data) {
         const defaultState: ActiveCharacterState = {
@@ -281,20 +459,58 @@ export class CharacterStorage {
           activeSlotNumber: 1,
           lastSwitched: new Date().toISOString()
         };
-        
+
         return {
           success: true,
           data: defaultState
         };
       }
-      
+
       const activeState: ActiveCharacterState = JSON.parse(data);
-      
+
       return {
         success: true,
         data: activeState
       };
-      
+
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to get active character: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+
+  /**
+   * Get the active character state (async - API first, localStorage fallback)
+   */
+  static async getActiveCharacterAsync(username: string): Promise<StorageResult<ActiveCharacterState>> {
+    try {
+      // Try API first
+      try {
+        const result = await CharacterApiService.getActiveCharacter(username);
+        if (result.success && result.data) {
+          logger.info('ACTIVE CHARACTER LOADED FROM API', { username, slot: result.data.activeSlot });
+
+          const activeState: ActiveCharacterState = {
+            username,
+            activeSlotNumber: result.data.activeSlot,
+            lastSwitched: new Date().toISOString()
+          };
+
+          // Sync to localStorage
+          const key = this.getActiveKey(username);
+          localStorage.setItem(key, JSON.stringify(activeState));
+
+          return { success: true, data: activeState };
+        }
+      } catch (apiError) {
+        logger.warn('API GET ACTIVE FAILED, FALLING BACK TO LOCALSTORAGE', { username, error: apiError });
+      }
+
+      // Fallback to localStorage
+      return this.getActiveCharacter(username);
+
     } catch (error) {
       return {
         success: false,

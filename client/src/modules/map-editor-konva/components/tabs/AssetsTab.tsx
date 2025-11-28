@@ -1,8 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Upload, Image, message, Card, Typography, Space, Button, List, Checkbox } from 'antd';
-import { PlusOutlined, EnvironmentOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Upload, Image, message, Card, Typography, Space, Button, List, Checkbox, Spin } from 'antd';
+import { PlusOutlined, EnvironmentOutlined, DeleteOutlined, CloudOutlined } from '@ant-design/icons';
 import type { UploadFile, UploadProps } from 'antd';
 import ImgCrop from 'antd-img-crop';
+import { MapApiService } from '../../../../services/api/MapApiService';
+import { logger } from '../../../../shared/logger';
 
 const { Text } = Typography;
 
@@ -15,14 +17,18 @@ interface AssetItem {
   width: number;
   height: number;
   uploadedAt: number;
+  isFromApi?: boolean; // Track if asset is from API
+  url?: string; // API asset URL
 }
 
 interface AssetsTabProps {
   onAssetUpload?: (file: UploadFile) => void;
   onPlaceAsset?: (fileData: string, fileName: string, width: number, height: number) => void;
+  roomId?: string;
 }
 
 const ASSETS_STORAGE_KEY = 'map_editor_uploaded_assets';
+const DEFAULT_ROOM_ID = 'default';
 
 const getBase64 = (file: FileType): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -32,53 +38,65 @@ const getBase64 = (file: FileType): Promise<string> =>
     reader.onerror = (error) => reject(error);
   });
 
-export const AssetsTab: React.FC<AssetsTabProps> = ({ onAssetUpload, onPlaceAsset }) => {
+export const AssetsTab: React.FC<AssetsTabProps> = ({ onAssetUpload, onPlaceAsset, roomId = DEFAULT_ROOM_ID }) => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState('');
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [savedAssets, setSavedAssets] = useState<AssetItem[]>([]);
-  const [autoPlace, setAutoPlace] = useState(true); // Auto-place uploaded images on map
+  const [autoPlace, setAutoPlace] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Debug log whenever savedAssets changes
+  // Load saved assets from API (with localStorage fallback)
   useEffect(() => {
-    console.log('[AssetsTab] savedAssets state changed:', {
-      count: savedAssets.length,
-      assets: savedAssets.map(a => ({ id: a.id, fileName: a.fileName }))
-    });
-  }, [savedAssets]);
+    const loadAssets = async () => {
+      setIsLoading(true);
+      logger.info('LOADING ASSETS', { roomId });
 
-  // Load saved assets from localStorage on mount
-  // TODO: Migrate to database storage in the future
-  useEffect(() => {
-    console.log('[AssetsTab] Component mounted, loading assets from localStorage...');
-    console.log('[AssetsTab] Storage key:', ASSETS_STORAGE_KEY);
+      try {
+        // Try API first
+        const result = await MapApiService.getAssets(roomId);
 
-    try {
-      const saved = localStorage.getItem(ASSETS_STORAGE_KEY);
-      console.log('[AssetsTab] Raw localStorage data:', saved ? `${saved.substring(0, 100)}...` : 'null');
+        if (result.success && result.data) {
+          const apiAssets: AssetItem[] = result.data.map(asset => ({
+            id: asset.id,
+            fileName: asset.originalName,
+            imageData: asset.url, // Use URL for API assets
+            width: (asset.metadata as any)?.width || 100,
+            height: (asset.metadata as any)?.height || 100,
+            uploadedAt: new Date(asset.uploadedAt).getTime(),
+            isFromApi: true,
+            url: asset.url,
+          }));
 
-      if (saved) {
-        const assets = JSON.parse(saved) as AssetItem[];
-        console.log(`[AssetsTab] Successfully parsed ${assets.length} assets from localStorage:`,
-          assets.map(a => ({ id: a.id, fileName: a.fileName, size: `${a.width}x${a.height}` }))
-        );
-        setSavedAssets(assets);
-        console.log('[AssetsTab] State updated with loaded assets');
-      } else {
-        console.log('[AssetsTab] No saved assets found in localStorage (key does not exist or is null)');
+          logger.info('ASSETS LOADED FROM API', { count: apiAssets.length });
+          setSavedAssets(apiAssets);
+          setIsLoading(false);
+          return;
+        }
+      } catch (error) {
+        logger.warn('API ASSET LOAD FAILED, FALLING BACK TO LOCALSTORAGE', error);
       }
-    } catch (error) {
-      console.error('[AssetsTab] Failed to load saved assets:', error);
-      console.error('[AssetsTab] Error details:', {
-        name: error instanceof Error ? error.name : 'Unknown',
-        message: error instanceof Error ? error.message : String(error)
-      });
-    }
-  }, []);
 
-  // Save asset to library
-  // TODO: Migrate to database storage in the future
-  const saveAssetToLibrary = useCallback((imageData: string, fileName: string, width: number, height: number) => {
+      // Fallback to localStorage
+      try {
+        const saved = localStorage.getItem(ASSETS_STORAGE_KEY);
+        if (saved) {
+          const assets = JSON.parse(saved) as AssetItem[];
+          logger.info('ASSETS LOADED FROM LOCALSTORAGE', { count: assets.length });
+          setSavedAssets(assets);
+        }
+      } catch (error) {
+        logger.error('FAILED TO LOAD ASSETS FROM LOCALSTORAGE', error);
+      }
+
+      setIsLoading(false);
+    };
+
+    loadAssets();
+  }, [roomId]);
+
+  // Save asset to library (API + localStorage fallback)
+  const saveAssetToLibrary = useCallback(async (imageData: string, fileName: string, width: number, height: number) => {
     const newAsset: AssetItem = {
       id: `asset_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
       fileName,
@@ -88,38 +106,70 @@ export const AssetsTab: React.FC<AssetsTabProps> = ({ onAssetUpload, onPlaceAsse
       uploadedAt: Date.now(),
     };
 
+    // Try to upload to API
+    try {
+      const blob = await fetch(imageData).then(r => r.blob());
+      const file = new File([blob], fileName, { type: blob.type });
+
+      const result = await MapApiService.uploadAsset(roomId, file, {
+        width: String(width),
+        height: String(height)
+      });
+
+      if (result.success && result.data) {
+        newAsset.id = result.data.id;
+        newAsset.isFromApi = true;
+        newAsset.url = result.data.url;
+        logger.info('ASSET UPLOADED TO API', { id: result.data.id, fileName });
+      }
+    } catch (error) {
+      logger.warn('API UPLOAD FAILED, SAVING TO LOCALSTORAGE', error);
+    }
+
     setSavedAssets(prev => {
       const updatedAssets = [...prev, newAsset];
 
+      // Also save to localStorage as backup
       try {
-        localStorage.setItem(ASSETS_STORAGE_KEY, JSON.stringify(updatedAssets));
-        console.log(`[AssetsTab] Saved asset "${fileName}" to library. Total assets: ${updatedAssets.length}`);
+        const localAssets = updatedAssets.filter(a => !a.isFromApi);
+        localStorage.setItem(ASSETS_STORAGE_KEY, JSON.stringify(localAssets));
       } catch (error) {
-        console.error('[AssetsTab] Failed to save asset to library:', error);
+        logger.error('FAILED TO SAVE ASSET TO LOCALSTORAGE', error);
         message.error('Failed to save asset to library. Storage quota may be exceeded.');
       }
 
       return updatedAssets;
     });
-  }, []);
+  }, [roomId]);
 
   // Delete asset from library
-  // TODO: Migrate to database storage in the future
-  const deleteAssetFromLibrary = useCallback((assetId: string) => {
+  const deleteAssetFromLibrary = useCallback(async (assetId: string) => {
+    const asset = savedAssets.find(a => a.id === assetId);
+
+    // Try to delete from API if it's an API asset
+    if (asset?.isFromApi) {
+      try {
+        await MapApiService.deleteAsset(roomId, assetId);
+        logger.info('ASSET DELETED FROM API', { assetId });
+      } catch (error) {
+        logger.warn('API DELETE FAILED', error);
+      }
+    }
+
     setSavedAssets(prev => {
       const updatedAssets = prev.filter(a => a.id !== assetId);
 
       try {
-        localStorage.setItem(ASSETS_STORAGE_KEY, JSON.stringify(updatedAssets));
-        console.log(`[AssetsTab] Deleted asset ${assetId}. Remaining assets: ${updatedAssets.length}`);
+        const localAssets = updatedAssets.filter(a => !a.isFromApi);
+        localStorage.setItem(ASSETS_STORAGE_KEY, JSON.stringify(localAssets));
         message.success('Asset removed from library');
       } catch (error) {
-        console.error('[AssetsTab] Failed to delete asset from library:', error);
+        logger.error('FAILED TO DELETE ASSET FROM LOCALSTORAGE', error);
       }
 
       return updatedAssets;
     });
-  }, []);
+  }, [roomId, savedAssets]);
 
   const handlePreview = async (file: UploadFile) => {
     if (!file.url && !file.preview) {
@@ -220,11 +270,24 @@ export const AssetsTab: React.FC<AssetsTabProps> = ({ onAssetUpload, onPlaceAsse
     autoPlace
   });
 
+  if (isLoading) {
+    return (
+      <div className="editor-tab-content" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
+        <Spin tip="Loading assets..." />
+      </div>
+    );
+  }
+
   return (
     <div className="editor-tab-content">
       {/* Asset Library - Always Visible */}
       <Card
-        title={`Asset Library (${savedAssets.length})`}
+        title={
+          <Space>
+            <span>Asset Library ({savedAssets.length})</span>
+            {savedAssets.some(a => a.isFromApi) && <CloudOutlined style={{ color: '#1890ff' }} title="Synced with server" />}
+          </Space>
+        }
         size="small"
         extra={
           <Checkbox

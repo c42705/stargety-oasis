@@ -1,7 +1,11 @@
 /**
  * Konva Map Editor - Persistence Hook
- * 
- * Handles save/load functionality with localStorage and error recovery.
+ *
+ * Handles save/load functionality with localStorage and API sync.
+ * Editor preferences (grid, viewport, tools) are synced to UserSettings API.
+ *
+ * @version 2.0.0
+ * @date 2025-11-28
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -12,6 +16,8 @@ import type {
   UseKonvaPersistenceReturn,
 } from '../types';
 import { PERSISTENCE } from '../constants/konvaConstants';
+import { SettingsApiService, EditorPreferences } from '../../../services/api/SettingsApiService';
+import { logger } from '../../../shared/logger';
 
 /**
  * Persisted data structure
@@ -78,11 +84,36 @@ export function useKonvaPersistence(
   // ==========================================================================
 
   /**
-   * Save current state to localStorage
+   * Sync editor preferences to API (async, fire and forget)
+   * Only syncs lightweight preferences, not shapes/content
+   */
+  const syncPrefsToApiAsync = useCallback(async () => {
+    try {
+      // Extract editor preferences from current state
+      const editorPrefs: EditorPreferences = {
+        gridSize: currentState.grid?.spacing || 32,
+        gridVisible: currentState.grid?.visible ?? true,
+        snapToGrid: currentState.grid?.spacing ? true : false,
+        zoomLevel: currentState.viewport?.zoom || 1,
+        panPosition: currentState.viewport?.pan || { x: 0, y: 0 },
+        selectedTool: currentState.tool?.current || 'select',
+      };
+
+      // Get userId from localStorage (or use 'anonymous' as fallback)
+      const userId = localStorage.getItem('stargety_current_user') || 'anonymous';
+
+      await SettingsApiService.updateSettings(userId, { editorPrefs });
+      logger.debug('EDITOR PREFS SYNCED TO API', { userId });
+    } catch (error) {
+      logger.warn('FAILED TO SYNC EDITOR PREFS TO API', { error });
+    }
+  }, [currentState]);
+
+  /**
+   * Save current state to localStorage (with API sync for preferences)
    *
-   * TODO: Migrate to database storage for better scalability and to avoid localStorage quota limits.
    * Image assets stored as base64 can quickly consume localStorage space (typically 5-10MB limit).
-   * Consider storing images separately in IndexedDB or on a server.
+   * Editor preferences are also synced to the API for cross-device persistence.
    */
   const save = useCallback(async (): Promise<boolean> => {
     if (!enabled) return false;
@@ -108,9 +139,11 @@ export function useKonvaPersistence(
         );
       }
 
-      // Save to localStorage
-      // TODO: Replace with database storage to handle larger datasets
+      // Save to localStorage (fast, for content)
       localStorage.setItem(storageKey, serialized);
+
+      // Sync preferences to API (fire and forget, for cross-device sync)
+      syncPrefsToApiAsync();
 
       setLastSaved(Date.now());
       setIsSaving(false);
@@ -119,10 +152,10 @@ export function useKonvaPersistence(
       const errorMessage = err instanceof Error ? err.message : 'Failed to save';
       setError(errorMessage);
       setIsSaving(false);
-      console.error('Save failed:', err);
+      logger.error('SAVE FAILED', { error: err });
       return false;
     }
-  }, [enabled, currentState, storageKey]);
+  }, [enabled, currentState, storageKey, syncPrefsToApiAsync]);
 
   // ==========================================================================
   // LOAD FUNCTIONALITY

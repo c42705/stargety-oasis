@@ -5,9 +5,12 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { ChatController } from './chat/chatController';
+import { initChatDbController, ChatDbController } from './chat/chatDbController';
 import { WorldController } from './world/worldController';
 import { VideoCallController } from './video-call/videoCallController';
 import { MapController } from './map/mapController';
+import { characterController } from './character/characterController';
+import { settingsController } from './settings/settingsController';
 import { initializeDatabase, prisma } from './utils/prisma';
 import { logger } from './utils/logger';
 import {
@@ -120,20 +123,42 @@ app.get('/api/video/rooms', (req, res) => {
 });
 
 // Map API Routes
+// List all maps
+app.get('/api/maps', async (req, res) => {
+  try {
+    const maps = await mapController.listMaps();
+    res.json({ success: true, data: maps });
+  } catch (error) {
+    logger.error('Error listing maps:', error);
+    res.status(500).json({ success: false, error: 'Failed to list maps' });
+  }
+});
+
+// Get map by roomId
 app.get('/api/maps/:roomId', async (req, res) => {
   const { roomId } = req.params;
+  const includeMeta = req.query.meta === 'true';
   try {
-    const mapData = await mapController.getMap(roomId);
-    if (!mapData) {
-      return res.status(404).json({ success: false, error: 'Map not found' });
+    if (includeMeta) {
+      const map = await mapController.getMapWithMeta(roomId);
+      if (!map) {
+        return res.status(404).json({ success: false, error: 'Map not found' });
+      }
+      res.json({ success: true, data: map });
+    } else {
+      const mapData = await mapController.getMap(roomId);
+      if (!mapData) {
+        return res.status(404).json({ success: false, error: 'Map not found' });
+      }
+      res.json({ success: true, data: mapData });
     }
-    res.json({ success: true, data: mapData });
   } catch (error) {
     logger.error('Error fetching map:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch map' });
   }
 });
 
+// Create map
 app.post('/api/maps/:roomId', async (req, res) => {
   const { roomId } = req.params;
   const mapData = req.body;
@@ -149,6 +174,7 @@ app.post('/api/maps/:roomId', async (req, res) => {
   }
 });
 
+// Update map
 app.put('/api/maps/:roomId', async (req, res) => {
   const { roomId } = req.params;
   const mapData = req.body;
@@ -164,7 +190,393 @@ app.put('/api/maps/:roomId', async (req, res) => {
   }
 });
 
-// File upload endpoints
+// Delete map
+app.delete('/api/maps/:roomId', async (req, res) => {
+  const { roomId } = req.params;
+  try {
+    const deleted = await mapController.deleteMap(roomId);
+    if (!deleted) {
+      return res.status(404).json({ success: false, error: 'Map not found' });
+    }
+    res.json({ success: true, message: `Map ${roomId} deleted` });
+  } catch (error) {
+    logger.error('Error deleting map:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete map' });
+  }
+});
+
+// Get map assets
+app.get('/api/maps/:roomId/assets', async (req, res) => {
+  const { roomId } = req.params;
+  try {
+    const assets = await mapController.getMapAssets(roomId);
+    res.json({ success: true, data: assets });
+  } catch (error) {
+    logger.error('Error fetching map assets:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch assets' });
+  }
+});
+
+// Delete map asset
+app.delete('/api/maps/:roomId/assets/:assetId', async (req, res) => {
+  const { roomId, assetId } = req.params;
+  try {
+    const deleted = await mapController.deleteMapAsset(roomId, assetId);
+    if (!deleted) {
+      return res.status(404).json({ success: false, error: 'Asset not found' });
+    }
+    res.json({ success: true, message: 'Asset deleted' });
+  } catch (error) {
+    logger.error('Error deleting asset:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete asset' });
+  }
+});
+
+// ============================================================================
+// CHARACTER API ROUTES
+// ============================================================================
+
+// List all character slots for a user
+app.get('/api/characters/:userId/slots', async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const slots = await characterController.listCharacterSlots(userId);
+    res.json({ success: true, data: slots });
+  } catch (error) {
+    logger.error('Error listing character slots:', error);
+    res.status(500).json({ success: false, error: 'Failed to list character slots' });
+  }
+});
+
+// Get a specific character slot
+app.get('/api/characters/:userId/slots/:slotNumber', async (req, res) => {
+  const { userId, slotNumber } = req.params;
+  try {
+    const slot = await characterController.getCharacterSlot(userId, parseInt(slotNumber, 10));
+    if (!slot) {
+      return res.status(404).json({ success: false, error: 'Character slot not found' });
+    }
+    res.json({ success: true, data: slot });
+  } catch (error) {
+    logger.error('Error getting character slot:', error);
+    res.status(500).json({ success: false, error: 'Failed to get character slot' });
+  }
+});
+
+// Save/update a character slot
+app.put('/api/characters/:userId/slots/:slotNumber', async (req, res) => {
+  const { userId, slotNumber } = req.params;
+  const { name, spriteSheet, thumbnailPath, texturePath } = req.body;
+  try {
+    const slot = await characterController.saveCharacterSlot(
+      userId,
+      parseInt(slotNumber, 10),
+      { name, spriteSheet, thumbnailPath, texturePath }
+    );
+    if (!slot) {
+      return res.status(500).json({ success: false, error: 'Failed to save character slot' });
+    }
+    res.json({ success: true, data: slot });
+  } catch (error) {
+    logger.error('Error saving character slot:', error);
+    res.status(500).json({ success: false, error: 'Failed to save character slot' });
+  }
+});
+
+// Delete/clear a character slot
+app.delete('/api/characters/:userId/slots/:slotNumber', async (req, res) => {
+  const { userId, slotNumber } = req.params;
+  try {
+    const deleted = await characterController.deleteCharacterSlot(userId, parseInt(slotNumber, 10));
+    if (!deleted) {
+      return res.status(500).json({ success: false, error: 'Failed to delete character slot' });
+    }
+    res.json({ success: true, message: `Character slot ${slotNumber} cleared` });
+  } catch (error) {
+    logger.error('Error deleting character slot:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete character slot' });
+  }
+});
+
+// Get active character for a user
+app.get('/api/characters/:userId/active', async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const active = await characterController.getActiveCharacter(userId);
+    res.json({ success: true, data: active });
+  } catch (error) {
+    logger.error('Error getting active character:', error);
+    res.status(500).json({ success: false, error: 'Failed to get active character' });
+  }
+});
+
+// Set active character for a user
+app.put('/api/characters/:userId/active', async (req, res) => {
+  const { userId } = req.params;
+  const { slotNumber } = req.body;
+  try {
+    const active = await characterController.setActiveCharacter(userId, slotNumber);
+    if (!active) {
+      return res.status(400).json({ success: false, error: 'Invalid slot number (must be 1-5)' });
+    }
+    res.json({ success: true, data: active });
+  } catch (error) {
+    logger.error('Error setting active character:', error);
+    res.status(500).json({ success: false, error: 'Failed to set active character' });
+  }
+});
+
+// ============================================================================
+// SETTINGS API ROUTES
+// ============================================================================
+
+// Get user settings
+app.get('/api/settings/:userId', async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const settings = await settingsController.getUserSettings(userId);
+    res.json({ success: true, data: settings });
+  } catch (error) {
+    logger.error('Error getting user settings:', error);
+    res.status(500).json({ success: false, error: 'Failed to get user settings' });
+  }
+});
+
+// Update user settings
+app.put('/api/settings/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const { theme, jitsiServerUrl, editorPrefs } = req.body;
+  try {
+    const settings = await settingsController.updateUserSettings(userId, {
+      theme,
+      jitsiServerUrl,
+      editorPrefs,
+    });
+    if (!settings) {
+      return res.status(500).json({ success: false, error: 'Failed to update settings' });
+    }
+    res.json({ success: true, data: settings });
+  } catch (error) {
+    logger.error('Error updating user settings:', error);
+    res.status(500).json({ success: false, error: 'Failed to update user settings' });
+  }
+});
+
+// ============================================================================
+// JITSI MAPPING API ROUTES
+// ============================================================================
+
+// List all Jitsi mappings
+app.get('/api/jitsi-mappings', async (_req, res) => {
+  try {
+    const mappings = await settingsController.listJitsiMappings();
+    res.json({ success: true, data: mappings });
+  } catch (error) {
+    logger.error('Error listing Jitsi mappings:', error);
+    res.status(500).json({ success: false, error: 'Failed to list Jitsi mappings' });
+  }
+});
+
+// Get Jitsi mapping by area ID
+app.get('/api/jitsi-mappings/:areaId', async (req, res) => {
+  const { areaId } = req.params;
+  try {
+    const mapping = await settingsController.getJitsiMappingByArea(areaId);
+    if (!mapping) {
+      return res.status(404).json({ success: false, error: 'Mapping not found' });
+    }
+    res.json({ success: true, data: mapping });
+  } catch (error) {
+    logger.error('Error getting Jitsi mapping:', error);
+    res.status(500).json({ success: false, error: 'Failed to get Jitsi mapping' });
+  }
+});
+
+// Create or update Jitsi mapping
+app.put('/api/jitsi-mappings/:areaId', async (req, res) => {
+  const { areaId } = req.params;
+  const { jitsiRoomName, displayName, isCustom } = req.body;
+  try {
+    const mapping = await settingsController.upsertJitsiMapping({
+      areaId,
+      jitsiRoomName,
+      displayName,
+      isCustom,
+    });
+    if (!mapping) {
+      return res.status(500).json({ success: false, error: 'Failed to save mapping' });
+    }
+    res.json({ success: true, data: mapping });
+  } catch (error) {
+    logger.error('Error upserting Jitsi mapping:', error);
+    res.status(500).json({ success: false, error: 'Failed to save Jitsi mapping' });
+  }
+});
+
+// Delete Jitsi mapping
+app.delete('/api/jitsi-mappings/:areaId', async (req, res) => {
+  const { areaId } = req.params;
+  try {
+    const deleted = await settingsController.deleteJitsiMapping(areaId);
+    if (!deleted) {
+      return res.status(404).json({ success: false, error: 'Mapping not found' });
+    }
+    res.json({ success: true, message: 'Mapping deleted' });
+  } catch (error) {
+    logger.error('Error deleting Jitsi mapping:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete Jitsi mapping' });
+  }
+});
+
+// ============================================================================
+// PLAYER POSITION API ROUTES
+// ============================================================================
+
+// Get player position
+app.get('/api/position/:sessionId', async (req, res) => {
+  const { sessionId } = req.params;
+  try {
+    const position = await settingsController.getPlayerPosition(sessionId);
+    res.json({ success: true, data: position });
+  } catch (error) {
+    logger.error('Error getting player position:', error);
+    res.status(500).json({ success: false, error: 'Failed to get player position' });
+  }
+});
+
+// Update player position
+app.put('/api/position/:sessionId', async (req, res) => {
+  const { sessionId } = req.params;
+  const { userId, roomId, x, y, direction } = req.body;
+  try {
+    const position = await settingsController.updatePlayerPosition(sessionId, {
+      userId,
+      roomId,
+      x,
+      y,
+      direction,
+    });
+    if (!position) {
+      return res.status(500).json({ success: false, error: 'Failed to update position' });
+    }
+    res.json({ success: true, data: position });
+  } catch (error) {
+    logger.error('Error updating player position:', error);
+    res.status(500).json({ success: false, error: 'Failed to update player position' });
+  }
+});
+
+// Delete player position (on disconnect)
+app.delete('/api/position/:sessionId', async (req, res) => {
+  const { sessionId } = req.params;
+  try {
+    await settingsController.deletePlayerPosition(sessionId);
+    res.json({ success: true, message: 'Position deleted' });
+  } catch (error) {
+    logger.error('Error deleting player position:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete player position' });
+  }
+});
+
+// Get all players in a room
+app.get('/api/rooms/:roomId/players', async (req, res) => {
+  const { roomId } = req.params;
+  try {
+    const players = await settingsController.getPlayersInRoom(roomId);
+    res.json({ success: true, data: players });
+  } catch (error) {
+    logger.error('Error getting players in room:', error);
+    res.status(500).json({ success: false, error: 'Failed to get players' });
+  }
+});
+
+// ============================================================================
+// CHAT API ROUTES
+// ============================================================================
+
+// Chat controller will be initialized after io is created
+let chatDbController: ChatDbController;
+
+// List all chat rooms
+app.get('/api/chat/rooms', async (_req, res) => {
+  try {
+    if (!chatDbController) {
+      return res.status(503).json({ success: false, error: 'Chat service not initialized' });
+    }
+    const rooms = await chatDbController.listRooms();
+    res.json({ success: true, data: rooms });
+  } catch (error) {
+    logger.error('Error listing chat rooms:', error);
+    res.status(500).json({ success: false, error: 'Failed to list chat rooms' });
+  }
+});
+
+// Get messages for a room (with pagination)
+app.get('/api/chat/:roomId/messages', async (req, res) => {
+  const { roomId } = req.params;
+  const { limit, before, after } = req.query;
+
+  try {
+    if (!chatDbController) {
+      return res.status(503).json({ success: false, error: 'Chat service not initialized' });
+    }
+    const result = await chatDbController.getMessages(roomId, {
+      limit: limit ? parseInt(limit as string, 10) : 50,
+      before: before as string | undefined,
+      after: after as string | undefined,
+    });
+    res.json({ success: true, data: result });
+  } catch (error) {
+    logger.error('Error getting chat messages:', error);
+    res.status(500).json({ success: false, error: 'Failed to get messages' });
+  }
+});
+
+// Post a new message (REST alternative to Socket.IO)
+app.post('/api/chat/:roomId/messages', async (req, res) => {
+  const { roomId } = req.params;
+  const { text, authorName, authorId } = req.body;
+
+  try {
+    if (!chatDbController) {
+      return res.status(503).json({ success: false, error: 'Chat service not initialized' });
+    }
+    if (!text || !authorName) {
+      return res.status(400).json({ success: false, error: 'text and authorName are required' });
+    }
+    const message = await chatDbController.createMessage(roomId, {
+      text,
+      authorName,
+      authorId,
+    });
+    if (!message) {
+      return res.status(500).json({ success: false, error: 'Failed to create message' });
+    }
+    res.json({ success: true, data: message });
+  } catch (error) {
+    logger.error('Error creating chat message:', error);
+    res.status(500).json({ success: false, error: 'Failed to create message' });
+  }
+});
+
+// Manually trigger TTL cleanup (for testing/admin)
+app.post('/api/chat/cleanup', async (_req, res) => {
+  try {
+    if (!chatDbController) {
+      return res.status(503).json({ success: false, error: 'Chat service not initialized' });
+    }
+    const result = await chatDbController.cleanupExpiredContent();
+    res.json({ success: true, data: result });
+  } catch (error) {
+    logger.error('Error during chat cleanup:', error);
+    res.status(500).json({ success: false, error: 'Failed to cleanup' });
+  }
+});
+
+// ============================================================================
+// FILE UPLOAD ENDPOINTS
+// ============================================================================
+
 // Generic file upload
 app.post('/api/uploads', uploadGenericAsset.single('file'), (req, res) => {
   if (!req.file) {
@@ -185,50 +597,85 @@ app.post('/api/uploads', uploadGenericAsset.single('file'), (req, res) => {
   });
 });
 
-// Map asset upload
-app.post('/api/maps/:roomId/assets', uploadMapAsset.single('file'), (req, res) => {
+// Map asset upload - saves to filesystem AND database
+app.post('/api/maps/:roomId/assets', uploadMapAsset.single('file'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, error: 'No file uploaded' });
   }
-  const relativePath = getRelativePath(req.file.path);
-  res.json({
-    success: true,
-    data: {
-      id: req.file.filename.split('.')[0],
-      mapId: req.params.roomId,
-      filename: req.file.filename,
-      originalname: req.file.originalname,
-      path: relativePath,
-      url: getFileUrl(relativePath),
-      size: req.file.size,
-      mimetype: req.file.mimetype,
+
+  const { roomId } = req.params;
+  const { width, height } = req.body; // Optional dimensions from client
+
+  try {
+    // Create database record for the asset
+    const asset = await mapController.createMapAsset(roomId, {
+      name: req.file.originalname,
+      filePath: req.file.path,
+      fileSize: req.file.size,
+      mimeType: req.file.mimetype,
+      width: width ? parseInt(width, 10) : undefined,
+      height: height ? parseInt(height, 10) : undefined,
+      metadata: {
+        originalFilename: req.file.originalname,
+        uploadedAt: new Date().toISOString(),
+      },
+    });
+
+    if (!asset) {
+      return res.status(500).json({ success: false, error: 'Failed to save asset to database' });
     }
-  });
+
+    res.json({ success: true, data: asset });
+  } catch (error) {
+    logger.error('Error uploading map asset:', error);
+    res.status(500).json({ success: false, error: 'Failed to upload asset' });
+  }
 });
 
-// Character asset upload (thumbnail, texture)
-app.post('/api/characters/:userId/upload', uploadCharacterAsset.single('file'), (req, res) => {
+// Character asset upload (thumbnail, texture) with optional slot update
+app.post('/api/characters/:userId/upload', uploadCharacterAsset.single('file'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, error: 'No file uploaded' });
   }
+
+  const { userId } = req.params;
+  const { slotNumber, type } = req.body; // type: 'thumbnail' | 'texture'
   const relativePath = getRelativePath(req.file.path);
-  res.json({
-    success: true,
-    data: {
-      id: req.file.filename.split('.')[0],
-      userId: req.params.userId,
-      filename: req.file.filename,
-      originalname: req.file.originalname,
-      path: relativePath,
-      url: getFileUrl(relativePath),
-      size: req.file.size,
-      mimetype: req.file.mimetype,
+  const fileUrl = getFileUrl(relativePath);
+
+  try {
+    // If slot number provided, update the character record
+    if (slotNumber && type) {
+      const slot = parseInt(slotNumber, 10);
+      if (type === 'thumbnail') {
+        await characterController.updateCharacterFiles(userId, slot, { thumbnailPath: req.file.path });
+      } else if (type === 'texture') {
+        await characterController.updateCharacterFiles(userId, slot, { texturePath: req.file.path });
+      }
     }
-  });
+
+    res.json({
+      success: true,
+      data: {
+        id: req.file.filename.split('.')[0],
+        userId,
+        filename: req.file.filename,
+        originalname: req.file.originalname,
+        path: relativePath,
+        url: fileUrl,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+      }
+    });
+  } catch (error) {
+    logger.error('Error uploading character asset:', error);
+    res.status(500).json({ success: false, error: 'Failed to upload character asset' });
+  }
 });
 
 // Initialize controllers
 const chatController = new ChatController(io);
+chatDbController = initChatDbController(io); // DB-backed chat controller
 const worldController = new WorldController(io);
 const videoCallController = new VideoCallController(io);
 const mapController = new MapController(io);
@@ -237,10 +684,15 @@ const mapController = new MapController(io);
 io.on('connection', (socket) => {
   logger.info(`User connected: ${socket.id}`);
 
-  // Chat events
+  // Chat events (legacy in-memory controller)
   socket.on('join-room', (data) => chatController.handleJoinRoom(socket, data));
   socket.on('send-message', (data) => chatController.handleSendMessage(socket, data));
   socket.on('typing', (data) => chatController.handleTyping(socket, data));
+
+  // Chat events (DB-backed controller) - use 'chat:' prefix for new events
+  socket.on('chat:join', (data) => chatDbController.handleJoinRoom(socket, data));
+  socket.on('chat:message', (data) => chatDbController.handleSendMessage(socket, data));
+  socket.on('chat:typing', (data) => chatDbController.handleTyping(socket, data));
 
   // World events
   socket.on('player-joined-world', (data) => worldController.handlePlayerJoinedWorld(socket, data));
@@ -254,15 +706,36 @@ io.on('connection', (socket) => {
   socket.on('join-map', (roomId: string) => mapController.handleJoinMapRoom(socket, roomId));
   socket.on('leave-map', (roomId: string) => mapController.handleLeaveMapRoom(socket, roomId));
   socket.on('map:update', (data) => mapController.handleMapUpdate(socket, data));
+  socket.on('map:partial:update', (data) => mapController.handlePartialUpdate(socket, data));
 
   // Handle disconnection
   socket.on('disconnect', () => {
     logger.info(`User disconnected: ${socket.id}`);
     chatController.handleDisconnect(socket);
+    chatDbController.handleDisconnect(socket);
     worldController.handleDisconnect(socket);
     videoCallController.handleDisconnect(socket);
   });
 });
+
+// TTL Cleanup Scheduler - runs every hour
+let cleanupInterval: NodeJS.Timeout | null = null;
+
+function startCleanupScheduler() {
+  // Run cleanup every hour
+  cleanupInterval = setInterval(async () => {
+    try {
+      // Cleanup chat messages/rooms
+      await chatDbController.cleanupExpiredContent();
+      // Cleanup stale player positions
+      await settingsController.cleanupStalePositions();
+    } catch (error) {
+      logger.error('Error during scheduled cleanup:', error);
+    }
+  }, 60 * 60 * 1000); // 1 hour
+
+  logger.info('📅 TTL cleanup scheduler started (runs every hour)');
+}
 
 // Start server with database initialization
 async function startServer() {
@@ -271,6 +744,11 @@ async function startServer() {
     const dbConnected = await initializeDatabase();
     if (!dbConnected) {
       logger.warn('⚠️ Database not available - running in localStorage fallback mode');
+    }
+
+    // Start TTL cleanup scheduler
+    if (dbConnected) {
+      startCleanupScheduler();
     }
 
     server.listen(PORT, () => {

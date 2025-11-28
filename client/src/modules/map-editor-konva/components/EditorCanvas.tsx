@@ -176,17 +176,6 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
             {shapes.map(shape => {
               const geom = shape.geometry;
 
-              // Debug logging for image shapes
-              if (geom.type === 'image') {
-                console.log('[EditorCanvas] Rendering image shape:', {
-                  id: shape.id,
-                  fileName: geom.fileName,
-                  position: { x: geom.x, y: geom.y },
-                  size: { width: geom.width, height: geom.height },
-                  isSelected: selectedIds.includes(shape.id)
-                });
-              }
-
               if (geom.type === 'polygon') {
                 // Polygon geometry
                 return (

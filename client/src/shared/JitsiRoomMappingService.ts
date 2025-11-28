@@ -1,18 +1,24 @@
 /**
  * Jitsi Room Mapping Service
- * 
+ *
  * Manages the mapping between interactive area IDs and Jitsi room names.
  * Provides a centralized service for converting map areas to video conference rooms.
- * 
- * Storage: localStorage (TODO: Migrate to database when backend is ready)
- * 
+ *
+ * Storage: API-first with localStorage fallback
+ *
  * @example
  * ```typescript
  * const service = jitsiRoomMappingService;
  * const roomName = service.getJitsiRoomForArea('meeting-room');
  * // Returns: 'stargety-meeting-room' or custom mapping
  * ```
+ *
+ * @version 2.0.0
+ * @date 2025-11-28
  */
+
+import { JitsiMappingApiService } from '../services/api/JitsiMappingApiService';
+import { logger } from './logger';
 
 export interface JitsiRoomMapping {
   areaId: string;
@@ -35,18 +41,19 @@ class JitsiRoomMappingService {
   
   constructor() {
     this.loadMappings();
+    // Also try to load from API asynchronously
+    this.loadMappingsFromApiAsync();
   }
-  
+
   /**
-   * Load mappings from localStorage
-   * TODO: Replace with API call when backend is ready
+   * Load mappings from localStorage (sync)
    */
   private loadMappings(): void {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        
+
         // Convert plain objects back to Map with Date objects
         Object.entries(parsed).forEach(([key, value]: [string, any]) => {
           this.mappings.set(key, {
@@ -55,25 +62,78 @@ class JitsiRoomMappingService {
             updatedAt: new Date(value.updatedAt)
           });
         });
-        
-        console.log(`✅ Loaded ${this.mappings.size} Jitsi room mappings from localStorage`);
+
+        logger.info('JITSI MAPPINGS LOADED FROM LOCALSTORAGE', { count: this.mappings.size });
       }
     } catch (error) {
-      console.error('❌ Failed to load Jitsi room mappings:', error);
+      logger.error('FAILED TO LOAD JITSI MAPPINGS FROM LOCALSTORAGE', { error });
     }
   }
-  
+
   /**
-   * Save mappings to localStorage
-   * TODO: Replace with API call when backend is ready
+   * Load mappings from API (async, updates local cache)
    */
-  private saveMappings(): void {
+  private async loadMappingsFromApiAsync(): Promise<void> {
+    try {
+      const result = await JitsiMappingApiService.getAllMappings();
+      if (result.success && result.data) {
+        // Update local cache with API data
+        result.data.forEach((mapping) => {
+          this.mappings.set(mapping.areaId, {
+            areaId: mapping.areaId,
+            jitsiRoomName: mapping.jitsiRoomName,
+            displayName: mapping.displayName,
+            isCustom: mapping.isCustom,
+            createdAt: new Date(mapping.createdAt || Date.now()),
+            updatedAt: new Date(mapping.updatedAt || Date.now()),
+          });
+        });
+        // Sync to localStorage
+        this.saveMappingsToLocalStorage();
+        logger.info('JITSI MAPPINGS SYNCED FROM API', { count: result.data.length });
+      }
+    } catch (error) {
+      logger.warn('FAILED TO LOAD JITSI MAPPINGS FROM API', { error });
+    }
+  }
+
+  /**
+   * Save mappings to localStorage (sync backup)
+   */
+  private saveMappingsToLocalStorage(): void {
     try {
       const obj = Object.fromEntries(this.mappings);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
-      console.log(`✅ Saved ${this.mappings.size} Jitsi room mappings to localStorage`);
     } catch (error) {
-      console.error('❌ Failed to save Jitsi room mappings:', error);
+      logger.error('FAILED TO SAVE JITSI MAPPINGS TO LOCALSTORAGE', { error });
+    }
+  }
+
+  /**
+   * Save mapping to API (async, fire and forget)
+   */
+  private async saveMappingToApiAsync(mapping: JitsiRoomMapping): Promise<void> {
+    try {
+      await JitsiMappingApiService.setMapping(mapping.areaId, {
+        jitsiRoomName: mapping.jitsiRoomName,
+        displayName: mapping.displayName,
+        isCustom: mapping.isCustom,
+      });
+      logger.info('JITSI MAPPING SAVED TO API', { areaId: mapping.areaId });
+    } catch (error) {
+      logger.warn('FAILED TO SAVE JITSI MAPPING TO API', { areaId: mapping.areaId, error });
+    }
+  }
+
+  /**
+   * Delete mapping from API (async, fire and forget)
+   */
+  private async deleteMappingFromApiAsync(areaId: string): Promise<void> {
+    try {
+      await JitsiMappingApiService.deleteMapping(areaId);
+      logger.info('JITSI MAPPING DELETED FROM API', { areaId });
+    } catch (error) {
+      logger.warn('FAILED TO DELETE JITSI MAPPING FROM API', { areaId, error });
     }
   }
   
@@ -96,8 +156,8 @@ class JitsiRoomMappingService {
   }
   
   /**
-   * Set custom Jitsi room name for an area
-   * 
+   * Set custom Jitsi room name for an area (syncs to API + localStorage)
+   *
    * @param areaId - The interactive area ID
    * @param jitsiRoomName - Custom Jitsi room name
    * @param displayName - Optional human-readable display name
@@ -115,22 +175,26 @@ class JitsiRoomMappingService {
     };
 
     this.mappings.set(areaId, mapping);
-    this.saveMappings();
+    this.saveMappingsToLocalStorage();
+    // Sync to API (fire and forget)
+    this.saveMappingToApiAsync(mapping);
 
-    console.log(`✅ Set Jitsi room mapping: ${areaId} → ${mapping.jitsiRoomName}`);
+    logger.info('JITSI ROOM MAPPING SET', { areaId, jitsiRoomName: mapping.jitsiRoomName });
   }
-  
+
   /**
-   * Remove mapping for an area
+   * Remove mapping for an area (syncs to API + localStorage)
    * After removal, the area will use the default generated room name
-   * 
+   *
    * @param areaId - The interactive area ID
    */
   removeMappingForArea(areaId: string): void {
     const existed = this.mappings.delete(areaId);
     if (existed) {
-      this.saveMappings();
-      console.log(`✅ Removed Jitsi room mapping for area: ${areaId}`);
+      this.saveMappingsToLocalStorage();
+      // Sync delete to API (fire and forget)
+      this.deleteMappingFromApiAsync(areaId);
+      logger.info('JITSI ROOM MAPPING REMOVED', { areaId });
     }
   }
   
@@ -189,27 +253,32 @@ class JitsiRoomMappingService {
   
   /**
    * Set Jitsi server URL
-   * 
+   *
    * @param url - The Jitsi server URL (e.g., 'meet.stargety.com')
    */
   setJitsiServerUrl(url: string): void {
     this.jitsiServerUrl = url;
-    // TODO: Persist to localStorage or settings when settings integration is added
-    console.log(`✅ Set Jitsi server URL: ${url}`);
+    logger.info('JITSI SERVER URL SET', { url });
   }
-  
+
   /**
-   * Clear all mappings
+   * Clear all mappings (syncs to API + localStorage)
    * Useful for testing or reset functionality
    */
   clearAllMappings(): void {
+    // Delete each mapping from API
+    const areaIds = Array.from(this.mappings.keys());
+    areaIds.forEach(areaId => {
+      this.deleteMappingFromApiAsync(areaId);
+    });
+
     this.mappings.clear();
-    this.saveMappings();
-    console.log('✅ Cleared all Jitsi room mappings');
+    this.saveMappingsToLocalStorage();
+    logger.info('CLEARED ALL JITSI ROOM MAPPINGS');
   }
-  
+
   /**
-   * Import mappings from JSON
+   * Import mappings from JSON (syncs to API + localStorage)
    * Useful for bulk import or migration
    *
    * @param mappingsJson - JSON string or object containing mappings
@@ -220,18 +289,21 @@ class JitsiRoomMappingService {
       const data = typeof mappingsJson === 'string' ? JSON.parse(mappingsJson) : mappingsJson;
 
       Object.entries(data).forEach(([key, value]: [string, any]) => {
-        this.mappings.set(key, {
+        const mapping: JitsiRoomMapping = {
           ...value,
           createdAt: new Date(value.createdAt),
           updatedAt: new Date(value.updatedAt)
-        });
+        };
+        this.mappings.set(key, mapping);
+        // Sync each to API
+        this.saveMappingToApiAsync(mapping);
       });
 
-      this.saveMappings();
-      console.log(`✅ Imported ${Object.keys(data).length} Jitsi room mappings`);
+      this.saveMappingsToLocalStorage();
+      logger.info('JITSI MAPPINGS IMPORTED', { count: Object.keys(data).length });
       return true;
     } catch (error) {
-      console.error('❌ Failed to import Jitsi room mappings:', error);
+      logger.error('FAILED TO IMPORT JITSI ROOM MAPPINGS', { error });
       return false;
     }
   }
