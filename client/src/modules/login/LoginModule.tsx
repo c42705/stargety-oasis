@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Input, Button, Checkbox, Alert, Collapse, Space, Typography, Divider } from 'antd';
-import { UserOutlined, LockOutlined, RocketOutlined, BulbOutlined } from '@ant-design/icons';
+import { Card, Form, Input, Button, Checkbox, Alert, Collapse, Space, Typography, Divider, Select } from 'antd';
+import { UserOutlined, LockOutlined, RocketOutlined, BulbOutlined, GlobalOutlined } from '@ant-design/icons';
 import { useAuth } from '../../shared/AuthContext';
+import { WORLD_ROOMS, WorldRoomId } from '../../shared/WorldRoomContext';
 import appLogo from '../../assets/app-logo.png';
 import magicalBg from '../../assets/magical_bg.png';
 
@@ -12,7 +13,7 @@ interface LoginModuleProps {
 interface FormData {
   username: string;
   password: string;
-  roomId: string;
+  worldRoomId: WorldRoomId;
   rememberMe: boolean;
 }
 
@@ -46,7 +47,7 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
       const success = await login(
         values.username.trim(),
         values.password.trim(),
-        values.roomId?.trim() || 'general'
+        values.worldRoomId || 'Stargety-Oasis-1'
       );
 
       if (!success) {
@@ -68,7 +69,7 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
     form.setFieldsValue({
       username: testAccount.username,
       password: testAccount.password,
-      roomId: 'general',
+      worldRoomId: 'Stargety-Oasis-1',
       rememberMe: rememberUsername
     });
     setLoginError('');
@@ -200,7 +201,7 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
             initialValues={{
               username: savedUsername || '',
               password: '',
-              roomId: 'general',
+              worldRoomId: 'Stargety-Oasis-1' as WorldRoomId,
               rememberMe: rememberUsername
             }}
           >
@@ -238,22 +239,27 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
               />
             </Form.Item>
 
-            {/* Room ID Field */}
+            {/* World Room Selector */}
             <Form.Item
-              name="roomId"
-              label="Room ID (optional)"
-              rules={[
-                { pattern: /^[a-zA-Z0-9._-]*$/, message: 'Room ID can only contain letters, numbers, dots, hyphens, and underscores' }
-              ]}
+              name="worldRoomId"
+              label={
+                <Space>
+                  <GlobalOutlined />
+                  <span>World Room</span>
+                </Space>
+              }
             >
-              <Input
-                placeholder="general"
+              <Select
+                options={WORLD_ROOMS.map(room => ({
+                  value: room.id,
+                  label: room.label,
+                }))}
                 disabled={isSubmitting || isLoading}
-                autoComplete="off"
+                placeholder="Select a world room"
               />
             </Form.Item>
             <Typography.Text type="secondary" style={{ fontSize: '12px', marginTop: '-16px', display: 'block', marginBottom: '16px' }}>
-              Leave empty or use "general" for the default room
+              Select which world room to join. Players in the same room can see each other.
             </Typography.Text>
 
             {/* Remember Username */}

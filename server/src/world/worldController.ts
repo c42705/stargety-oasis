@@ -1,5 +1,5 @@
 import { Socket, Server } from 'socket.io';
-import { WorldPlayer, Room } from '../types';
+import { WorldPlayer, Room, AvatarSyncData } from '../types';
 
 // In-memory storage for world state
 const worldRooms: Map<string, Room> = new Map();
@@ -14,8 +14,8 @@ export class WorldController {
   }
 
   // Handle player joining world
-  handlePlayerJoinedWorld(socket: Socket, data: { playerId: string; x: number; y: number; roomId: string }) {
-    const { playerId, x, y, roomId } = data;
+  handlePlayerJoinedWorld(socket: Socket, data: { playerId: string; x: number; y: number; roomId: string; avatarData?: AvatarSyncData }) {
+    const { playerId, x, y, roomId, avatarData } = data;
 
     // Create world room if it doesn't exist
     if (!worldRooms.has(roomId)) {
@@ -30,14 +30,15 @@ export class WorldController {
       roomPlayers.set(roomId, new Set());
     }
 
-    // Create or update player
+    // Create or update player with avatar data
     const player: WorldPlayer = {
       id: playerId,
       name: playerId,
       x: this.clampPosition(x, 'x'),
       y: this.clampPosition(y, 'y'),
       roomId,
-      lastMoved: new Date()
+      lastMoved: new Date(),
+      avatarData: avatarData
     };
 
     players.set(playerId, player);
@@ -52,15 +53,16 @@ export class WorldController {
     // Join socket room
     socket.join(roomId);
 
-    // Notify other players
+    // Notify other players with avatar data
     socket.to(roomId).emit('player-joined', {
       playerId,
       x: player.x,
       y: player.y,
-      name: player.name
+      name: player.name,
+      avatarData: player.avatarData
     });
 
-    // Send current players to new player
+    // Send current players to new player (with their avatar data)
     const currentPlayers = Array.from(roomPlayers.get(roomId)!)
       .filter(id => id !== playerId)
       .map(id => players.get(id))

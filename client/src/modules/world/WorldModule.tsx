@@ -132,7 +132,8 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
       return;
     }
 
-    const gameScene = new GameScene(eventBus, user?.username || playerId, handleAreaClick);
+    const worldRoomId = user?.worldRoomId || 'Stargety-Oasis-1';
+    const gameScene = new GameScene(eventBus, user?.username || playerId, worldRoomId, handleAreaClick);
     gameSceneRef.current = gameScene;
 
     const config: Phaser.Types.Core.GameConfig = {

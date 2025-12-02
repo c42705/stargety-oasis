@@ -7,6 +7,8 @@ import { PlayerManager } from './PlayerManager';
 import { MovementController } from './MovementController';
 import { CameraController } from './CameraController';
 import { DebugDiagnostics } from './DebugDiagnostics';
+import { RemotePlayerManager } from './RemotePlayerManager';
+import { WorldSocketService } from '../../services/WorldSocketService';
 import { shouldBlockBackgroundInteractions } from '../../shared/ModalStateManager';
 import { logger } from '../../shared/logger';
 
@@ -26,8 +28,9 @@ console.log('🎮🎮🎮 GameScene.ts FILE LOADED 🎮🎮🎮');
 export class GameScene extends Phaser.Scene {
   private eventBus: any;
   private playerId: string;
+  private worldRoomId: string;
   private onAreaClick: (areaId: string) => void;
-  
+
   // Core systems
   private mapRenderer!: PhaserMapRenderer;
   private sharedMapSystem!: SharedMapSystem;
@@ -37,6 +40,10 @@ export class GameScene extends Phaser.Scene {
   private movementController!: MovementController;
   private cameraController!: CameraController;
   private debugDiagnostics!: DebugDiagnostics;
+
+  // Multiplayer systems
+  private remotePlayerManager!: RemotePlayerManager;
+  private worldSocketService!: WorldSocketService;
 
   // Movement tracking
   private lastPlayerX: number = 0;
@@ -48,27 +55,18 @@ export class GameScene extends Phaser.Scene {
   private lastClickPosition: { x: number; y: number } = { x: 0, y: 0 };
   private doubleClickTolerance: number = 10;
 
-  constructor(eventBus: any, playerId: string, onAreaClick: (areaId: string) => void) {
+  constructor(eventBus: any, playerId: string, worldRoomId: string, onAreaClick: (areaId: string) => void) {
     super({ key: 'GameScene' });
-    console.log('🎮🎮🎮 GameScene CONSTRUCTOR called for player:', playerId);
+    console.log('🎮🎮🎮 GameScene CONSTRUCTOR called for player:', playerId, 'in room:', worldRoomId);
     this.eventBus = eventBus;
     this.playerId = playerId;
+    this.worldRoomId = worldRoomId;
     this.onAreaClick = onAreaClick;
     this.sharedMapSystem = SharedMapSystem.getInstance();
   }
 
   preload(): void {
-    // Ensure we never have a stale texture for the player-sheet key
-    if (this.textures.exists('player-sheet')) {
-      this.textures.remove('player-sheet');
-    }
-
-    // Load player sprite sheet
-    this.load.spritesheet('player-sheet', '/assets/sprites/player-sheet.png', {
-      frameWidth: 32,
-      frameHeight: 32
-    });
-
+    // V1 player-sheet removed - now using Avatar V2 system only
     // Initialize map renderer
     this.mapRenderer = new PhaserMapRenderer({
       scene: this,
@@ -104,18 +102,7 @@ export class GameScene extends Phaser.Scene {
     // Set camera background color to transparent
     this.cameras.main.setBackgroundColor('transparent');
 
-    // Create player idle animation (only if sprite sheet loaded successfully)
-    if (this.textures.exists('player-sheet') && !this.anims.exists('player_idle')) {
-      this.anims.create({
-        key: 'player_idle',
-        frames: this.anims.generateFrameNumbers('player-sheet', { start: 0, end: 3 }),
-        frameRate: 8,
-        repeat: -1
-      });
-      logger.debug('Created player_idle animation');
-    } else if (!this.textures.exists('player-sheet')) {
-      logger.warn('player-sheet texture not loaded, skipping animation creation');
-    }
+    // V1 player_idle animation removed - now using Avatar V2 system only
 
     // Initialize world bounds manager
     this.worldBoundsManager = new WorldBoundsManager(this, () => {
@@ -162,6 +149,70 @@ export class GameScene extends Phaser.Scene {
 
     // Set up resize observer
     this.setupResizeObserver();
+
+    // Initialize multiplayer systems
+    this.initializeMultiplayer();
+  }
+
+  /**
+   * Initialize multiplayer systems (RemotePlayerManager + WorldSocketService)
+   */
+  private initializeMultiplayer(): void {
+    logger.info('[GameScene] Initializing multiplayer for room:', this.worldRoomId);
+
+    // Initialize remote player manager
+    this.remotePlayerManager = new RemotePlayerManager(this);
+
+    // Get WorldSocketService singleton
+    this.worldSocketService = WorldSocketService.getInstance();
+
+    // Initialize socket with callbacks
+    this.worldSocketService.initialize({
+      onPlayerJoined: (player) => {
+        if (player.playerId !== this.playerId) {
+          this.remotePlayerManager.addPlayer(player);
+        }
+      },
+      onPlayerMoved: (data) => {
+        if (data.playerId !== this.playerId) {
+          this.remotePlayerManager.updatePlayerPosition(data.playerId, data.x, data.y);
+        }
+      },
+      onPlayerLeft: (data) => {
+        this.remotePlayerManager.removePlayer(data.playerId);
+      },
+      onWorldState: (data) => {
+        // Add all existing players except self
+        const otherPlayers = data.players.filter(p => p.id !== this.playerId);
+        this.remotePlayerManager.handleWorldState(
+          otherPlayers.map(p => ({
+            playerId: p.id,
+            x: p.x,
+            y: p.y,
+            name: p.name,
+            avatarData: p.avatarData
+          }))
+        );
+      },
+      onError: (error) => {
+        logger.error('[GameScene] Socket error:', error);
+      }
+    });
+
+    // Join world room with initial position
+    const worldBounds = this.worldBoundsManager.getWorldBounds();
+    const initialX = worldBounds.width / 2;
+    const initialY = worldBounds.height / 2;
+
+    // Wait a short time for socket to connect, then join
+    setTimeout(() => {
+      this.worldSocketService.joinWorld(
+        this.playerId,
+        this.worldRoomId,
+        initialX,
+        initialY
+      );
+    }, 500);
   }
 
   update(): void {
@@ -217,16 +268,24 @@ export class GameScene extends Phaser.Scene {
       this.playerManager.playAnimation('idle');
     }
 
-    // Publish movement events
+    // Publish movement events (local + network)
     if (player.x !== this.lastPlayerX || player.y !== this.lastPlayerY) {
+      // Local event bus
       this.eventBus.publish('world:playerMoved', {
         playerId: this.playerId,
         x: player.x,
         y: player.y,
       });
+
+      // Network: emit position to server for other players
+      this.worldSocketService?.emitMove(player.x, player.y);
+
       this.lastPlayerX = player.x;
       this.lastPlayerY = player.y;
     }
+
+    // Update remote players (smooth interpolation)
+    this.remotePlayerManager?.update();
 
     // Check area collisions
     this.collisionSystem.checkAreaCollisions(player);

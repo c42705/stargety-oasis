@@ -15,7 +15,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { App, Alert, Button, Card, Space, Typography, Upload } from 'antd';
-import { UploadOutlined, DownloadOutlined, InboxOutlined, CopyOutlined, UndoOutlined } from '@ant-design/icons';
+import { UploadOutlined, DownloadOutlined, InboxOutlined, CopyOutlined } from '@ant-design/icons';
 import { useMapStore } from '../stores/useMapStore';
 import { useMapStoreInit } from '../stores/useMapStoreInit';
 import { SharedMapSystem } from '../shared/SharedMapSystem';
@@ -46,7 +46,6 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
 
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [isRestoring, setIsRestoring] = useState(false);
 
   /**
    * Export map data to JSON file
@@ -115,25 +114,7 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
    * Trigger file input click
    */
 
-  /**
-   * Restore from backup
-   */
-  const handleRestoreBackup = useCallback(async () => {
-    try {
-      setIsRestoring(true);
-      
-      const mapSystem = SharedMapSystem.getInstance();
-      await mapSystem.restoreFromBackup();
-      
-      onMapLoaded?.();
-      
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to restore from backup';
-      onError?.(errorMessage);
-    } finally {
-      setIsRestoring(false);
-    }
-  }, [onMapLoaded, onError]);
+
 
   /**
    * Copy map data to clipboard
@@ -184,12 +165,6 @@ export const MapDataManager: React.FC<MapDataManagerProps> = ({
               Import Map
             </Button>
           </Upload>
-          <Button danger icon={<UndoOutlined />} loading={isRestoring} disabled={isLoading} onClick={handleRestoreBackup}>
-            Restore Backup
-          </Button>
-          <Typography.Text type="secondary">
-            Restores the last automatically saved backup. This will overwrite current changes.
-          </Typography.Text>
       </Space>
           
       

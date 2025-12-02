@@ -1,119 +1,18 @@
 /**
- * Shared Map System - Unified map data management for both WorldModule and Map Editor
- *
- * This system provides a centralized way to manage map data that can be accessed
- * and modified from both the Phaser.js game canvas and the Fabric.js Map Editor.
- *
- * Features:
- * - PostgreSQL persistence via MapApiService (primary)
- * - localStorage fallback for offline support
- * - Real-time synchronization via Socket.IO for multi-user editing
- * - Data validation and sanitization
- * - Version control for map changes
+ * SharedMapSystem - Unified map data management for WorldModule and Map Editor
+ * Features: PostgreSQL persistence, Socket.IO sync, data validation, version control
  */
-
-import { InteractiveArea, ImpassableArea, MapData, Asset } from './MapDataContext';
-import { worldDimensionsManager } from './WorldDimensionsManager';
-import { MapApiService } from '../services/api/MapApiService';
+import { InteractiveArea, ImpassableArea } from './MapDataContext';
 import { logger } from './logger';
-import { io, Socket } from 'socket.io-client';
-import { API_CONFIG } from './constants';
+import { SharedMapData, MapEventType, MapChange, MapEventCallback } from './mapSystem/types';
+import { MapPersistenceService } from './mapSystem/MapPersistenceService';
+import { MapSocketService } from './mapSystem/MapSocketService';
+import { MapHistoryManager } from './mapSystem/MapHistoryManager';
+import { MapAreaService } from './mapSystem/MapAreaService';
+import { MapDimensionService } from './mapSystem/MapDimensionService';
+import { MapEventEmitter } from './mapSystem/MapEventEmitter';
 
-// Extended map data structure for shared system
-export interface SharedMapData extends MapData {
-  version: number;
-  lastModified: Date;
-  createdBy: string;
-  metadata: {
-    name: string;
-    description: string;
-    tags: string[];
-    isPublic: boolean;
-  };
-  layers: MapLayer[];
-  resources: MapResource[]; // Renamed from assets to avoid conflict with MapData.assets
-}
-
-export interface MapLayer {
-  id: string;
-  name: string;
-  type: 'background' | 'interactive' | 'collision' | 'decoration' | 'overlay';
-  visible: boolean;
-  locked: boolean;
-  opacity: number;
-  zIndex: number;
-  elements: MapElement[];
-}
-
-export interface MapElement {
-  id: string;
-  type: 'area' | 'collision' | 'decoration' | 'spawn' | 'trigger';
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  rotation: number;
-  properties: Record<string, any>;
-  layerId: string;
-}
-
-// Renamed from MapAsset to MapResource to avoid confusion with Asset (placed images)
-export interface MapResource {
-  id: string;
-  name: string;
-  type: 'image' | 'sprite' | 'tileset' | 'audio';
-  url: string;
-  metadata: {
-    width?: number;
-    height?: number;
-    frameCount?: number;
-    duration?: number;
-  };
-}
-
-// Storage keys for localStorage
-const STORAGE_KEYS = {
-  MAP_DATA: 'stargety_shared_map_data',
-  MAP_BACKUP: 'stargety_map_backup',
-  MAP_SETTINGS: 'stargety_map_settings',
-  MAP_HISTORY: 'stargety_map_history'
-} as const;
-
-// Event types for map system
-export type MapEventType =
-  | 'map:loaded'
-  | 'map:saved'
-  | 'map:saving'
-  | 'map:save:error'
-  | 'map:changed'
-  | 'map:element:added'
-  | 'map:element:updated'
-  | 'map:element:removed'
-  | 'map:layer:added'
-  | 'map:layer:updated'
-  | 'map:layer:removed'
-  | 'map:sync:started'
-  | 'map:sync:completed'
-  | 'map:sync:error'
-  | 'map:dimensionsChanged';
-
-export interface MapEvent {
-  type: MapEventType;
-  data: any;
-  timestamp: Date;
-  source: 'world' | 'editor';
-}
-
-// Map change history for undo/redo functionality
-export interface MapChange {
-  id: string;
-  type: 'add' | 'update' | 'remove';
-  elementType: 'area' | 'collision' | 'layer' | 'asset' | 'worldDimensions';
-  before: any;
-  after: any;
-  timestamp: Date;
-  userId: string;
-}
+export type { SharedMapData, MapEventType, MapChange, MapLayer, MapElement, MapResource, MapEvent } from './mapSystem/types';
 
 /**
  * SharedMapSystem - Core class for managing shared map data
@@ -121,19 +20,14 @@ export interface MapChange {
 export class SharedMapSystem {
   private static instance: SharedMapSystem;
   private mapData: SharedMapData | null = null;
-  private eventListeners: Map<MapEventType, Function[]> = new Map();
-  private changeHistory: MapChange[] = [];
-  private maxHistorySize = 50;
+  private eventEmitter = new MapEventEmitter();
 
-  // Default room ID for API calls
-  private currentRoomId: string = 'default';
-
-  // Socket.IO connection for real-time sync
-  private socket: Socket | null = null;
-
-  // Maximum world dimensions for performance
-  private static readonly MAX_WORLD_WIDTH = 8000;
-  private static readonly MAX_WORLD_HEIGHT = 4000;
+  // Services
+  private persistenceService: MapPersistenceService;
+  private socketService: MapSocketService;
+  private historyManager: MapHistoryManager;
+  private areaService: MapAreaService;
+  private dimensionService: MapDimensionService;
 
   // Save state tracking
   private isSaving = false;
@@ -141,71 +35,37 @@ export class SharedMapSystem {
   private lastSaveTime: Date | null = null;
   private saveError: string | null = null;
   private autoSaveTimeout: NodeJS.Timeout | null = null;
-  private autoSaveDelay = 2000; // 2 seconds
+  private autoSaveDelay = 2000;
 
   private constructor() {
-    this.initializeEventListeners();
-    this.initializeSocketConnection();
+    this.persistenceService = new MapPersistenceService();
+    this.socketService = new MapSocketService();
+    this.historyManager = new MapHistoryManager();
+    this.areaService = new MapAreaService(this.historyManager);
+    this.dimensionService = new MapDimensionService(this.historyManager, this.persistenceService);
+    this.initializeSocketCallbacks();
   }
 
   /**
-   * Initialize Socket.IO connection for real-time sync
+   * Initialize socket callbacks for real-time sync
    */
-  private initializeSocketConnection(): void {
-    try {
-      this.socket = io(API_CONFIG.SOCKET_URL, {
-        transports: ['websocket', 'polling'],
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-      });
-
-      // Listen for map updates from other clients
-      this.socket.on('map:updated', (data: { roomId: string; mapData: SharedMapData }) => {
-        if (data.roomId === this.currentRoomId && data.mapData) {
-          logger.info('RECEIVED MAP UPDATE VIA SOCKET', { roomId: data.roomId });
-          // Update local data without saving (already saved by sender)
-          this.mapData = data.mapData;
-          this.emit('map:changed', { mapData: data.mapData, source: 'socket' });
-        }
-      });
-
-      this.socket.on('map:asset:added', (data: { roomId: string; asset: any }) => {
-        if (data.roomId === this.currentRoomId) {
-          logger.info('RECEIVED ASSET ADDED VIA SOCKET', { assetId: data.asset?.id });
-          this.emit('map:element:added', { element: data.asset, type: 'asset', source: 'socket' });
-        }
-      });
-
-      this.socket.on('connect', () => {
-        logger.info('SOCKET CONNECTED FOR MAP SYNC');
-        // Join the current room
-        this.socket?.emit('map:join', { roomId: this.currentRoomId });
-      });
-
-      this.socket.on('disconnect', () => {
-        logger.warn('SOCKET DISCONNECTED');
-      });
-
-    } catch (error) {
-      logger.error('FAILED TO INITIALIZE SOCKET CONNECTION', error);
-    }
+  private initializeSocketCallbacks(): void {
+    this.socketService.setCallbacks({
+      onMapUpdated: (data) => {
+        this.mapData = data.mapData;
+        this.emit('map:changed', { mapData: data.mapData, source: 'socket' });
+      },
+      onAssetAdded: (data) => {
+        this.emit('map:element:added', { element: data.asset, type: 'asset', source: 'socket' });
+      },
+    });
   }
 
   /**
-   * Set the current room ID and join Socket.IO room
+   * Set the current room ID
    */
   public setRoomId(roomId: string): void {
-    if (this.currentRoomId !== roomId) {
-      // Leave old room
-      this.socket?.emit('map:leave', { roomId: this.currentRoomId });
-
-      this.currentRoomId = roomId;
-
-      // Join new room
-      this.socket?.emit('map:join', { roomId });
-      logger.info('SWITCHED TO ROOM', { roomId });
-    }
+    this.socketService.setRoomId(roomId);
   }
 
   public static getInstance(): SharedMapSystem {
@@ -223,124 +83,37 @@ export class SharedMapSystem {
       await this.loadMapData();
       this.emit('map:loaded', { mapData: this.mapData });
     } catch (error) {
-      console.error('Failed to initialize SharedMapSystem:', error);
-      await this.createDefaultMap();
+      logger.error('[SharedMapSystem] Failed to initialize', error);
+      this.mapData = await this.persistenceService.createDefaultMap();
     }
   }
 
   /**
-   * Load map data from PostgreSQL (with localStorage fallback)
+   * Load map data from PostgreSQL
    */
   public async loadMapData(): Promise<SharedMapData> {
-    try {
-      // Try to load from API first
-      let parsedData: SharedMapData | null = null;
+    const roomId = this.socketService.getRoomId();
+    const result = await this.persistenceService.loadMap(roomId);
 
-      try {
-        const result = await MapApiService.loadMap(this.currentRoomId);
-
-        if (result.success && result.data) {
-          logger.info('MAP LOADED FROM DATABASE', { roomId: this.currentRoomId });
-
-          // Convert API response to SharedMapData (cast types for compatibility)
-          const apiMetadata = result.data.metadata || {};
-          parsedData = {
-            interactiveAreas: (result.data.interactiveAreas || []) as InteractiveArea[],
-            impassableAreas: (result.data.impassableAreas || []) as ImpassableArea[],
-            assets: (result.data.assets || []) as unknown as Asset[],
-            worldDimensions: result.data.worldDimensions || { width: 7603, height: 3679 },
-            backgroundImage: result.data.backgroundImage || undefined,
-            backgroundImageDimensions: result.data.backgroundImageDimensions,
-            version: result.data.version || 1,
-            lastModified: result.data.updatedAt ? new Date(result.data.updatedAt) : new Date(),
-            createdBy: 'system',
-            metadata: {
-              name: apiMetadata.name || 'Stargety Oasis',
-              description: apiMetadata.description || '',
-              tags: apiMetadata.tags || [],
-              isPublic: false,
-            },
-            layers: [],
-            resources: [],
-          };
-        }
-      } catch (apiError) {
-        logger.warn('API LOAD FAILED, FALLING BACK TO LOCALSTORAGE', apiError);
+    if (result.success && result.data) {
+      // Check if map has background image
+      if (!result.data.backgroundImage) {
+        this.mapData = await this.persistenceService.createDefaultMap();
+        return this.mapData;
       }
-
-      // Fallback to localStorage if API failed
-      if (!parsedData) {
-        const storedData = localStorage.getItem(STORAGE_KEYS.MAP_DATA);
-        if (storedData) {
-          logger.info('MAP LOADED FROM LOCALSTORAGE', { dataSize: storedData.length });
-          parsedData = JSON.parse(storedData);
-        }
-      }
-
-      if (!parsedData) {
-        return await this.createDefaultMap();
-      }
-
-      // Check if this is an old map without background image
-      if (!parsedData.backgroundImage) {
-        return await this.createDefaultMap();
-      }
-
-      // Fix invalid polygon bounding boxes
-      parsedData = this.fixPolygonBoundingBoxes(parsedData);
-
-      // Convert date strings back to Date objects
-      if (typeof parsedData.lastModified === 'string') {
-        parsedData.lastModified = new Date(parsedData.lastModified);
-      }
-
-      this.mapData = parsedData;
-      return parsedData;
-
-    } catch (error) {
-      logger.error('FAILED TO LOAD MAP DATA, CREATING DEFAULT', error);
-      return await this.createDefaultMap();
+      this.mapData = result.data;
+      return result.data;
     }
+
+    // Create default map if load failed
+    this.mapData = await this.persistenceService.createDefaultMap();
+    return this.mapData;
   }
 
   /**
-   * Fix invalid polygon bounding boxes (helper method)
-   */
-  private fixPolygonBoundingBoxes(data: SharedMapData): SharedMapData {
-    let fixedCount = 0;
-
-    if (data.impassableAreas) {
-      data.impassableAreas = data.impassableAreas.map((area: any) => {
-        if (area.type === 'impassable-polygon' && area.points && area.points.length > 0) {
-          if (!area.width || !area.height || area.width === 0 || area.height === 0) {
-            const xs = area.points.map((p: any) => p.x);
-            const ys = area.points.map((p: any) => p.y);
-            const minX = Math.min(...xs);
-            const minY = Math.min(...ys);
-            const maxX = Math.max(...xs);
-            const maxY = Math.max(...ys);
-
-            fixedCount++;
-            return { ...area, x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-          }
-        }
-        return area;
-      });
-    }
-
-    if (fixedCount > 0) {
-      logger.info('FIXED POLYGON BOUNDING BOXES', { count: fixedCount });
-    }
-
-    return data;
-  }
-
-  /**
-   * Save map data to localStorage with enhanced state tracking
-   * TODO: Replace with database save operation when migrating to server-side storage
+   * Save map data to PostgreSQL
    */
   public async saveMapData(data?: SharedMapData, force = false): Promise<void> {
-    // Prevent concurrent saves
     if (this.isSaving && !force) {
       return;
     }
@@ -355,30 +128,8 @@ export class SharedMapSystem {
         throw new Error('No map data to save');
       }
 
-      // 💾 [Polygon Save] Log polygon data structure BEFORE serialization
-      const polygonAreas = dataToSave.impassableAreas?.filter((area: any) => area.type === 'impassable-polygon') || [];
-      console.info('💾 [Polygon Save] BEFORE SERIALIZATION', {
-        timestamp: new Date().toISOString(),
-        totalImpassableAreas: dataToSave.impassableAreas?.length || 0,
-        polygonCount: polygonAreas.length,
-        polygons: polygonAreas.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          type: p.type,
-          pointsCount: p.points?.length || 0,
-          allPoints: p.points,
-          boundingBox: {
-            x: p.x,
-            y: p.y,
-            width: p.width,
-            height: p.height
-          },
-          color: p.color
-        }))
-      });
-
       // Validate data before saving
-      if (!this.validateMapData(dataToSave)) {
+      if (!this.persistenceService.validateMapData(dataToSave)) {
         throw new Error('Invalid map data structure - save aborted');
       }
 
@@ -386,86 +137,39 @@ export class SharedMapSystem {
       dataToSave.lastModified = new Date();
       dataToSave.version += 1;
 
-      // Try to save to API first
-      let apiSaveSuccess = false;
-      try {
-        // Cast to API-compatible types
-        const apiData = {
-          worldDimensions: dataToSave.worldDimensions,
-          backgroundImage: dataToSave.backgroundImage || null,
-          backgroundImageDimensions: dataToSave.backgroundImageDimensions,
-          interactiveAreas: dataToSave.interactiveAreas as unknown as import('../services/api/MapApiService').InteractiveArea[],
-          impassableAreas: dataToSave.impassableAreas as unknown as import('../services/api/MapApiService').ImpassableArea[],
-          assets: dataToSave.assets as unknown as import('../services/api/MapApiService').MapAsset[],
-          metadata: dataToSave.metadata,
-        };
+      // Save to PostgreSQL
+      const roomId = this.socketService.getRoomId();
+      const result = await this.persistenceService.saveMap(roomId, dataToSave);
 
-        const result = await MapApiService.saveMap(this.currentRoomId, apiData as any);
-
-        if (result.success) {
-          logger.info('MAP SAVED TO DATABASE', { roomId: this.currentRoomId, version: dataToSave.version });
-          apiSaveSuccess = true;
-
-          // Notify other clients via Socket.IO
-          this.socket?.emit('map:update', { roomId: this.currentRoomId, mapData: dataToSave });
-        } else {
-          throw new Error(result.error || 'API save failed');
-        }
-      } catch (apiError) {
-        logger.warn('API SAVE FAILED, FALLING BACK TO LOCALSTORAGE', apiError);
+      if (!result.success) {
+        throw new Error(result.error || 'Save failed');
       }
 
-      // Fallback to localStorage if API failed
-      if (!apiSaveSuccess) {
-        try {
-          const jsonString = JSON.stringify(dataToSave);
-          localStorage.setItem(STORAGE_KEYS.MAP_DATA, jsonString);
-          logger.info('MAP SAVED TO LOCALSTORAGE', { dataSize: jsonString.length });
-        } catch (storageError) {
-          if (storageError instanceof Error && storageError.name === 'QuotaExceededError') {
-            logger.warn('STORAGE QUOTA EXCEEDED, ATTEMPTING CLEANUP');
-            this.cleanupStorage();
-
-            // Try saving again after cleanup
-            try {
-              localStorage.setItem(STORAGE_KEYS.MAP_DATA, JSON.stringify(dataToSave));
-            } catch (retryError) {
-              throw new Error('Storage quota exceeded - unable to save map data even after cleanup.');
-            }
-          } else {
-            throw storageError;
-          }
-        }
-      }
-
-      // Create backup
-      this.createBackup(dataToSave);
+      // Notify other clients via Socket.IO
+      this.socketService.emitMapUpdate(dataToSave);
 
       // Update state
       this.mapData = dataToSave;
       this.hasUnsavedChanges = false;
       this.lastSaveTime = new Date();
 
-      // Emit success event
       this.emit('map:saved', {
         mapData: dataToSave,
         timestamp: this.lastSaveTime,
-        version: dataToSave.version
+        version: dataToSave.version,
       });
 
-      // Trigger synchronization across all connected interfaces
       this.emit('map:sync:completed', {
         mapData: dataToSave,
-        source: 'save_operation'
+        source: 'save_operation',
       });
-
     } catch (error) {
       this.saveError = error instanceof Error ? error.message : 'Unknown save error';
-      console.error('Failed to save map data:', error);
+      logger.error('[SharedMapSystem] Save failed', error);
 
       this.emit('map:save:error', {
         error: this.saveError,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
 
       throw error;
@@ -490,7 +194,7 @@ export class SharedMapSystem {
       hasUnsavedChanges: this.hasUnsavedChanges,
       lastSaveTime: this.lastSaveTime,
       saveError: this.saveError,
-      autoSaveEnabled: this.autoSaveDelay > 0
+      autoSaveEnabled: this.autoSaveDelay > 0,
     };
   }
 
@@ -549,15 +253,9 @@ export class SharedMapSystem {
     this.mapData = { ...this.mapData, ...updates };
 
     // Record change for history
-    this.recordChange({
-      id: `change_${Date.now()}`,
-      type: 'update',
-      elementType: 'area', // This would be determined based on the update
-      before: previousData,
-      after: this.mapData,
-      timestamp: new Date(),
-      userId: 'current_user' // TODO: Get from auth context
-    });
+    this.historyManager.recordChange(
+      MapHistoryManager.createChange('update', 'area', previousData, this.mapData)
+    );
 
     // Mark as changed and schedule auto-save
     this.markAsChanged();
@@ -570,32 +268,10 @@ export class SharedMapSystem {
    */
 
   /**
-   * Get the current effective dimensions from WorldDimensionsManager (authoritative source)
-   * UPDATED: Now delegates to WorldDimensionsManager for consistency
+   * Get the current effective dimensions
    */
   public getEffectiveDimensions(): { width: number; height: number } {
-    try {
-      // Use WorldDimensionsManager as the authoritative source
-      return worldDimensionsManager.getEffectiveDimensions();
-    } catch (error) {
-      console.warn('⚠️ SharedMapSystem: Failed to get dimensions from WorldDimensionsManager, using fallback', error);
-
-      // Fallback to local map data if WorldDimensionsManager fails
-      if (!this.mapData) {
-        return { width: 7603, height: 3679 }; // Updated to match actual map dimensions
-      }
-
-      // Priority: backgroundImageDimensions > worldDimensions > fallback
-      if (this.mapData.backgroundImageDimensions) {
-        return { ...this.mapData.backgroundImageDimensions };
-      }
-
-      if (this.mapData.worldDimensions) {
-        return { ...this.mapData.worldDimensions };
-      }
-
-      return { width: 7603, height: 3679 }; // Updated to match actual map dimensions
-    }
+    return this.dimensionService.getEffectiveDimensions(this.mapData);
   }
 
   /**
@@ -606,147 +282,38 @@ export class SharedMapSystem {
     imageDimensions: { width: number; height: number },
     source: 'upload' | 'load' | 'default' = 'load'
   ): Promise<void> {
-    if (!this.mapData) {
-      throw new Error('Map data not initialized');
-    }
-
-    // Validate dimensions
-    const validatedDimensions = this.validateAndScaleImageDimensions(imageDimensions.width, imageDimensions.height);
+    if (!this.mapData) throw new Error('Map data not initialized');
 
     const previousDimensions = this.getEffectiveDimensions();
+    const result = this.dimensionService.updateFromBackgroundImage(this.mapData, imageUrl, imageDimensions);
 
-    // UPDATED: Sync background dimensions with WorldDimensionsManager
-    try {
-      const backgroundUpdateResult = worldDimensionsManager.updateBackgroundDimensions(validatedDimensions, {
-        source: 'background',
-        skipPersistence: true // We handle persistence here
-      });
-
-      if (!backgroundUpdateResult.isValid) {
-        throw new Error('WorldDimensionsManager background validation failed: ' + backgroundUpdateResult.errors.join(', '));
-      }
-
-      // Update local map data with validated dimensions
-      this.mapData.backgroundImage = imageUrl;
-      this.mapData.backgroundImageDimensions = backgroundUpdateResult.dimensions;
-      this.mapData.worldDimensions = backgroundUpdateResult.dimensions; // Keep in sync
-
-    } catch (error) {
-      console.error('❌ SharedMapSystem: Failed to sync background with WorldDimensionsManager', error);
-
-      // Fallback to direct update
-      this.mapData.backgroundImage = imageUrl;
-      this.mapData.backgroundImageDimensions = validatedDimensions;
-      this.mapData.worldDimensions = validatedDimensions;
-
-    }
-
-    // Record change for history
-    this.recordChange({
-      id: `change_${Date.now()}`,
-      type: 'update',
-      elementType: 'worldDimensions',
-      before: {
-        worldDimensions: previousDimensions,
-        backgroundImageDimensions: this.mapData.backgroundImageDimensions
-      },
-      after: {
-        worldDimensions: validatedDimensions,
-        backgroundImageDimensions: validatedDimensions
-      },
-      timestamp: new Date(),
-      userId: 'current_user'
-    });
-
-    // Mark as changed and schedule auto-save
     this.markAsChanged();
-
-    // Emit unified dimension change event
     this.emit('map:dimensionsChanged', {
-      dimensions: validatedDimensions,
+      dimensions: result.dimensions,
       previousDimensions,
       mapData: this.mapData,
-      source: `background-${source}`
+      source: `background-${source}`,
     });
-
-    // Also emit general map changed event
     this.emit('map:changed', { mapData: this.mapData, source: `background-${source}` });
   }
 
   /**
-   * Update world dimensions manually (legacy support, syncs with background dimensions)
+   * Update world dimensions manually (syncs with background dimensions)
    */
   public async updateWorldDimensions(dimensions: { width: number; height: number }, source: 'world' | 'editor' | 'migration' = 'editor'): Promise<void> {
-    if (!this.mapData) {
-      throw new Error('Map data not initialized');
-    }
-
-    // Validate dimensions
-    if (dimensions.width <= 0 || dimensions.height <= 0) {
-      throw new Error('World dimensions must be positive numbers');
-    }
-
-    if (dimensions.width > SharedMapSystem.MAX_WORLD_WIDTH || dimensions.height > SharedMapSystem.MAX_WORLD_HEIGHT) {
-      throw new Error(`World dimensions exceed maximum allowed size (${SharedMapSystem.MAX_WORLD_WIDTH}×${SharedMapSystem.MAX_WORLD_HEIGHT})`);
-    }
-
-    if (dimensions.width < 400 || dimensions.height < 300) {
-      throw new Error('World dimensions are below minimum required size (400×300)');
-    }
+    if (!this.mapData) throw new Error('Map data not initialized');
 
     const previousDimensions = this.getEffectiveDimensions();
+    const result = this.dimensionService.updateWorldDimensions(this.mapData, dimensions, source);
 
-    // UPDATED: Sync with WorldDimensionsManager first (authoritative source)
-    try {
-      const updateResult = worldDimensionsManager.updateDimensions(dimensions, {
-        source: source === 'world' ? 'world' : 'editor',
-        syncBackground: true,
-        skipPersistence: true // We handle persistence here
-      });
+    if (!result.success) throw new Error(result.error);
 
-      if (!updateResult.isValid) {
-        throw new Error('WorldDimensionsManager validation failed: ' + updateResult.errors.join(', '));
-      }
-
-      // Use validated dimensions from WorldDimensionsManager
-      const validatedDimensions = updateResult.dimensions;
-
-      // Update local map data with validated dimensions
-      this.mapData.worldDimensions = validatedDimensions;
-      this.mapData.backgroundImageDimensions = validatedDimensions;
-
-    } catch (error) {
-      console.error('❌ SharedMapSystem: Failed to sync with WorldDimensionsManager', error);
-
-      // Fallback to direct update (backward compatibility)
-      this.mapData.worldDimensions = dimensions;
-      this.mapData.backgroundImageDimensions = dimensions;
-
-    }
-
-    // Record change for history
-    this.recordChange({
-      id: `change_${Date.now()}`,
-      type: 'update',
-      elementType: 'worldDimensions',
-      before: { worldDimensions: previousDimensions },
-      after: { worldDimensions: dimensions },
-      timestamp: new Date(),
-      userId: 'current_user'
-    });
-
-    // Mark as changed and schedule auto-save
     this.markAsChanged();
-
-    // REDUCED EVENT EMISSIONS: Only emit for backward compatibility
-    // WorldDimensionsManager handles the primary dimension updates
-
-    // Emit general map changed event (reduced from two events to one)
     this.emit('map:changed', {
       mapData: this.mapData,
       source,
       dimensionsChanged: true,
-      previousDimensions
+      previousDimensions,
     });
   }
 
@@ -754,22 +321,8 @@ export class SharedMapSystem {
    * Add interactive area to the map
    */
   public async addInteractiveArea(area: InteractiveArea, source: 'world' | 'editor' = 'editor'): Promise<void> {
-    if (!this.mapData) {
-      throw new Error('Map data not initialized');
-    }
-
-    this.mapData.interactiveAreas.push(area);
-    
-    this.recordChange({
-      id: `add_area_${Date.now()}`,
-      type: 'add',
-      elementType: 'area',
-      before: null,
-      after: area,
-      timestamp: new Date(),
-      userId: 'current_user'
-    });
-
+    if (!this.mapData) throw new Error('Map data not initialized');
+    this.areaService.addInteractiveArea(this.mapData, area);
     this.markAsChanged();
     this.emit('map:element:added', { element: area, type: 'interactive', source });
     this.emit('map:changed', { mapData: this.mapData, source });
@@ -779,34 +332,12 @@ export class SharedMapSystem {
    * Update interactive area
    */
   public async updateInteractiveArea(id: string, updates: Partial<InteractiveArea>, source: 'world' | 'editor' = 'editor'): Promise<void> {
-    if (!this.mapData) {
-      throw new Error('Map data not initialized');
-    }
-
-    const areaIndex = this.mapData.interactiveAreas.findIndex(area => area.id === id);
-    if (areaIndex === -1) {
-      throw new Error(`Interactive area with id ${id} not found`);
-    }
-
-    const previousArea = { ...this.mapData.interactiveAreas[areaIndex] };
-    this.mapData.interactiveAreas[areaIndex] = { ...previousArea, ...updates };
-
-    this.recordChange({
-      id: `update_area_${Date.now()}`,
-      type: 'update',
-      elementType: 'area',
-      before: previousArea,
-      after: this.mapData.interactiveAreas[areaIndex],
-      timestamp: new Date(),
-      userId: 'current_user'
-    });
-
+    if (!this.mapData) throw new Error('Map data not initialized');
+    const result = this.areaService.updateInteractiveArea(this.mapData, id, updates);
+    if (!result.success) throw new Error(result.error);
+    const updatedArea = this.areaService.getInteractiveArea(this.mapData, id);
     this.markAsChanged();
-    this.emit('map:element:updated', {
-      element: this.mapData.interactiveAreas[areaIndex],
-      type: 'interactive',
-      source
-    });
+    this.emit('map:element:updated', { element: updatedArea, type: 'interactive', source });
     this.emit('map:changed', { mapData: this.mapData, source });
   }
 
@@ -814,30 +345,11 @@ export class SharedMapSystem {
    * Remove interactive area
    */
   public async removeInteractiveArea(id: string, source: 'world' | 'editor' = 'editor'): Promise<void> {
-    if (!this.mapData) {
-      throw new Error('Map data not initialized');
-    }
-
-    const areaIndex = this.mapData.interactiveAreas.findIndex(area => area.id === id);
-    if (areaIndex === -1) {
-      throw new Error(`Interactive area with id ${id} not found`);
-    }
-
-    const removedArea = this.mapData.interactiveAreas[areaIndex];
-    this.mapData.interactiveAreas.splice(areaIndex, 1);
-
-    this.recordChange({
-      id: `remove_area_${Date.now()}`,
-      type: 'remove',
-      elementType: 'area',
-      before: removedArea,
-      after: null,
-      timestamp: new Date(),
-      userId: 'current_user'
-    });
-
+    if (!this.mapData) throw new Error('Map data not initialized');
+    const result = this.areaService.removeInteractiveArea(this.mapData, id);
+    if (!result.success) throw new Error(result.error);
     this.markAsChanged();
-    this.emit('map:element:removed', { element: removedArea, type: 'interactive', source });
+    this.emit('map:element:removed', { element: result.removedArea, type: 'interactive', source });
     this.emit('map:changed', { mapData: this.mapData, source });
   }
 
@@ -845,22 +357,8 @@ export class SharedMapSystem {
    * Add collision area to the map
    */
   public async addCollisionArea(area: ImpassableArea, source: 'world' | 'editor' = 'editor'): Promise<void> {
-    if (!this.mapData) {
-      throw new Error('Map data not initialized');
-    }
-
-    this.mapData.impassableAreas.push(area);
-    
-    this.recordChange({
-      id: `add_collision_${Date.now()}`,
-      type: 'add',
-      elementType: 'collision',
-      before: null,
-      after: area,
-      timestamp: new Date(),
-      userId: 'current_user'
-    });
-
+    if (!this.mapData) throw new Error('Map data not initialized');
+    this.areaService.addCollisionArea(this.mapData, area);
     this.markAsChanged();
     this.emit('map:element:added', { element: area, type: 'collision', source });
   }
@@ -869,492 +367,101 @@ export class SharedMapSystem {
    * Update collision area
    */
   public async updateCollisionArea(id: string, updates: Partial<ImpassableArea>, source: 'world' | 'editor' = 'editor'): Promise<void> {
-    if (!this.mapData) {
-      throw new Error('Map data not initialized');
-    }
-
-    const areaIndex = this.mapData.impassableAreas.findIndex(area => area.id === id);
-    if (areaIndex === -1) {
-      throw new Error(`Collision area with id ${id} not found`);
-    }
-
-    const previousArea = { ...this.mapData.impassableAreas[areaIndex] };
-    this.mapData.impassableAreas[areaIndex] = { ...previousArea, ...updates };
-
-    this.recordChange({
-      id: `update_collision_${Date.now()}`,
-      type: 'update',
-      elementType: 'collision',
-      before: previousArea,
-      after: this.mapData.impassableAreas[areaIndex],
-      timestamp: new Date(),
-      userId: 'current_user'
-    });
-
+    if (!this.mapData) throw new Error('Map data not initialized');
+    const result = this.areaService.updateCollisionArea(this.mapData, id, updates);
+    if (!result.success) throw new Error(result.error);
+    const updatedArea = this.areaService.getCollisionArea(this.mapData, id);
     this.markAsChanged();
-    this.emit('map:element:updated', {
-      element: this.mapData.impassableAreas[areaIndex],
-      type: 'collision',
-      source
-    });
+    this.emit('map:element:updated', { element: updatedArea, type: 'collision', source });
   }
 
   /**
    * Remove collision area
    */
   public async removeCollisionArea(id: string, source: 'world' | 'editor' = 'editor'): Promise<void> {
-    if (!this.mapData) {
-      throw new Error('Map data not initialized');
-    }
-
-    const areaIndex = this.mapData.impassableAreas.findIndex(area => area.id === id);
-    if (areaIndex === -1) {
-      throw new Error(`Collision area with id ${id} not found`);
-    }
-
-    const removedArea = this.mapData.impassableAreas[areaIndex];
-    this.mapData.impassableAreas.splice(areaIndex, 1);
-
-    this.recordChange({
-      id: `remove_collision_${Date.now()}`,
-      type: 'remove',
-      elementType: 'collision',
-      before: removedArea,
-      after: null,
-      timestamp: new Date(),
-      userId: 'current_user'
-    });
-
+    if (!this.mapData) throw new Error('Map data not initialized');
+    const result = this.areaService.removeCollisionArea(this.mapData, id);
+    if (!result.success) throw new Error(result.error);
     this.markAsChanged();
-    this.emit('map:element:removed', { element: removedArea, type: 'collision', source });
+    this.emit('map:element:removed', { element: result.removedArea, type: 'collision', source });
   }
 
   /**
    * Validate and scale background image dimensions for user uploads
    */
   public validateBackgroundImageDimensions(width: number, height: number): { width: number; height: number; scaled: boolean } {
-    return this.validateAndScaleImageDimensions(width, height);
+    return this.persistenceService.validateAndScaleDimensions(width, height);
   }
 
   /**
    * Get maximum allowed world dimensions
    */
   public static getMaxWorldDimensions(): { width: number; height: number } {
-    return {
-      width: SharedMapSystem.MAX_WORLD_WIDTH,
-      height: SharedMapSystem.MAX_WORLD_HEIGHT
-    };
+    return MapPersistenceService.getMaxDimensions();
   }
 
   /**
    * Detect and update dimensions from actual loaded image
-   * This fixes mismatches between stored and actual dimensions
    */
   public async detectAndUpdateImageDimensions(imageUrl?: string): Promise<void> {
-    if (!this.mapData) {
-      throw new Error('Map data not initialized');
-    }
-
-    const targetImageUrl = imageUrl || this.mapData.backgroundImage;
-    if (!targetImageUrl) {
-      console.warn('🔍 DIMENSION DETECTION: No background image to detect dimensions from');
-      return;
-    }
-
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-
-      img.onload = async () => {
-        const actualDimensions = { width: img.width, height: img.height };
-        const storedDimensions = this.getEffectiveDimensions();
-
-
-        // If there's a mismatch, update to actual dimensions
-        if (actualDimensions.width !== storedDimensions.width || actualDimensions.height !== storedDimensions.height) {
-          await this.updateDimensionsFromBackgroundImage(targetImageUrl, actualDimensions, 'load');
-        }
-
-        resolve();
-      };
-
-      img.onerror = (error) => {
-        console.error('❌ DIMENSION DETECTION FAILED:', error);
-        reject(new Error(`Failed to load image for dimension detection: ${targetImageUrl}`));
-      };
-
-      img.src = targetImageUrl;
-    });
-  }
-
-  /**
-   * Event system for map synchronization
-   */
-  public on(eventType: MapEventType, callback: Function): void {
-    if (!this.eventListeners.has(eventType)) {
-      this.eventListeners.set(eventType, []);
-    }
-    this.eventListeners.get(eventType)!.push(callback);
-  }
-
-  public off(eventType: MapEventType, callback: Function): void {
-    const listeners = this.eventListeners.get(eventType);
-    if (listeners) {
-      const index = listeners.indexOf(callback);
-      if (index > -1) {
-        listeners.splice(index, 1);
-      }
+    if (!this.mapData) throw new Error('Map data not initialized');
+    const result = await this.dimensionService.detectAndUpdateFromImage(this.mapData, imageUrl);
+    if (result.updated) {
+      this.markAsChanged();
+      this.emit('map:dimensionsChanged', { dimensions: result.dimensions, mapData: this.mapData, source: 'detection' });
     }
   }
 
-  public emit(eventType: MapEventType, data: any): void {
-    const listeners = this.eventListeners.get(eventType);
-    if (listeners) {
-      listeners.forEach(callback => {
-        try {
-          callback(data);
-        } catch (error) {
-          console.error(`Error in map event listener for ${eventType}:`, error);
-        }
-      });
-    }
+  /** Subscribe to an event */
+  public on(eventType: MapEventType, callback: MapEventCallback): void {
+    this.eventEmitter.on(eventType, callback);
+  }
+
+  /** Unsubscribe from an event */
+  public off(eventType: MapEventType, callback: MapEventCallback): void {
+    this.eventEmitter.off(eventType, callback);
+  }
+
+  /** Emit an event */
+  public emit(eventType: MapEventType, data: unknown): void {
+    this.eventEmitter.emit(eventType, data);
   }
 
   /**
    * Export map data for backup or sharing
-   * TODO: Add cloud storage integration for sharing maps between users
    */
   public exportMapData(): string {
     if (!this.mapData) {
       throw new Error('No map data to export');
     }
-    return JSON.stringify(this.mapData, null, 2);
+    return this.persistenceService.exportMap(this.mapData);
   }
 
   /**
    * Import map data from exported JSON
-   * TODO: Add validation and conflict resolution for imported maps
    */
   public async importMapData(jsonData: string, source: 'world' | 'editor' = 'editor'): Promise<void> {
-    try {
-      const importedData: SharedMapData = JSON.parse(jsonData);
-
-      // Validate imported data structure
-      if (!this.validateMapData(importedData)) {
-        throw new Error('Invalid map data structure');
-      }
-
-      // Convert date strings to Date objects
-      importedData.lastModified = new Date(importedData.lastModified);
-
-      await this.saveMapData(importedData);
-      this.emit('map:loaded', { mapData: importedData, source });
-    } catch (error) {
-      console.error('Failed to import map data:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Create backup of current map data
-   * TODO: Implement automatic backup scheduling and cloud backup
-   */
-  private createBackup(data: SharedMapData): void {
-    try {
-      const backupData = {
-        timestamp: new Date().toISOString(),
-        data: data
-      };
-      localStorage.setItem(STORAGE_KEYS.MAP_BACKUP, JSON.stringify(backupData));
-    } catch (error) {
-      console.error('Failed to create backup:', error);
-    }
-  }
-
-  /**
-   * Restore from backup
-   */
-  public async restoreFromBackup(): Promise<void> {
-    try {
-      const backupData = localStorage.getItem(STORAGE_KEYS.MAP_BACKUP);
-      if (!backupData) {
-        throw new Error('No backup data found');
-      }
-
-      const backup = JSON.parse(backupData);
-      await this.saveMapData(backup.data);
-      this.emit('map:loaded', { mapData: backup.data, source: 'backup' });
-    } catch (error) {
-      console.error('Failed to restore from backup:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Clean up localStorage when quota is exceeded
-   */
-  private cleanupStorage(): void {
-    try {
-
-      // Clear old history entries more aggressively
-      this.changeHistory = this.changeHistory.slice(-5); // Keep only last 5 changes
-
-      // Clear other potential large items
-      const keysToCheck = [STORAGE_KEYS.MAP_DATA, STORAGE_KEYS.MAP_BACKUP];
-      keysToCheck.forEach(key => {
-        const item = localStorage.getItem(key);
-        if (item && item.length > 1000000) { // If item is larger than 1MB
-          localStorage.removeItem(key);
-        }
-      });
-
-    } catch (error) {
-      console.error('❌ FAILED TO CLEANUP STORAGE:', error);
-    }
-  }
-
-  /**
-   * Record change for undo/redo functionality
-   */
-  private recordChange(change: MapChange): void {
-    this.changeHistory.push(change);
-
-    // Limit history size
-    if (this.changeHistory.length > this.maxHistorySize) {
-      this.changeHistory.shift();
+    const importedData = this.persistenceService.importMap(jsonData);
+    if (!importedData) {
+      throw new Error('Invalid map data structure');
     }
 
-    // Save to localStorage with quota handling
-    try {
-      localStorage.setItem(STORAGE_KEYS.MAP_HISTORY, JSON.stringify(this.changeHistory));
-    } catch (error) {
-      if (error instanceof Error && error.name === 'QuotaExceededError') {
-        console.warn('⚠️ STORAGE QUOTA EXCEEDED, ATTEMPTING CLEANUP');
-        this.cleanupStorage();
-
-        // Try saving again after cleanup
-        try {
-          localStorage.setItem(STORAGE_KEYS.MAP_HISTORY, JSON.stringify(this.changeHistory));
-        } catch (retryError) {
-          console.error('❌ FAILED TO SAVE HISTORY EVEN AFTER CLEANUP:', retryError);
-          // Clear history entirely as last resort
-          this.changeHistory = [];
-          localStorage.removeItem(STORAGE_KEYS.MAP_HISTORY);
-        }
-      } else {
-        console.error('❌ FAILED TO SAVE MAP HISTORY:', error);
-      }
-    }
+    await this.saveMapData(importedData);
+    this.emit('map:loaded', { mapData: importedData, source });
   }
 
   /**
    * Get change history
    */
   public getChangeHistory(): MapChange[] {
-    return [...this.changeHistory];
+    return this.historyManager.getChangeHistory();
   }
 
   /**
    * Clear change history
    */
   public clearHistory(): void {
-    this.changeHistory = [];
-    localStorage.removeItem(STORAGE_KEYS.MAP_HISTORY);
-  }
-
-  /**
-   * Validate map data structure
-   */
-  private validateMapData(data: any): data is SharedMapData {
-    return (
-      data &&
-      typeof data === 'object' &&
-      Array.isArray(data.interactiveAreas) &&
-      Array.isArray(data.impassableAreas) &&
-      data.worldDimensions &&
-      typeof data.worldDimensions.width === 'number' &&
-      typeof data.worldDimensions.height === 'number' &&
-      typeof data.version === 'number'
-    );
-  }
-
-  /**
-   * Validate and scale image dimensions to fit within maximum limits
-   */
-  private validateAndScaleImageDimensions(width: number, height: number): { width: number; height: number; scaled: boolean } {
-    const maxWidth = SharedMapSystem.MAX_WORLD_WIDTH;
-    const maxHeight = SharedMapSystem.MAX_WORLD_HEIGHT;
-
-    // Check if dimensions exceed limits
-    if (width <= maxWidth && height <= maxHeight) {
-      return { width, height, scaled: false };
-    }
-
-
-    // Calculate scale factor to fit within limits while maintaining aspect ratio
-    const scaleX = maxWidth / width;
-    const scaleY = maxHeight / height;
-    const scale = Math.min(scaleX, scaleY);
-
-    const scaledWidth = Math.floor(width * scale);
-    const scaledHeight = Math.floor(height * scale);
-
-
-    return { width: scaledWidth, height: scaledHeight, scaled: true };
-  }
-
-  /**
-   * Load default background image and get its actual dimensions
-   */
-  private async loadDefaultBackgroundImage(): Promise<{ imageUrl: string; width: number; height: number }> {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-
-        // Return actual dimensions without validation/scaling for default image
-        // The centralized dimension system will handle validation
-        resolve({
-          imageUrl: '/default-background.jpg',
-          width: img.width,
-          height: img.height
-        });
-      };
-
-      img.onerror = () => {
-        console.error('❌ FAILED TO LOAD DEFAULT BACKGROUND IMAGE');
-        reject(new Error('Failed to load default background image'));
-      };
-
-      // Use the static resource URL for loading
-      img.src = '/default-background.jpg';
-    });
-  }
-
-  /**
-   * Create default map data using centralized dimension management
-   */
-  private async createDefaultMap(): Promise<SharedMapData> {
-
-    // Load default background image and get actual dimensions
-    let backgroundImage: string | undefined;
-    let effectiveDimensions = { width: 7603, height: 3679 }; // Updated to match actual map dimensions
-
-    try {
-      const imageData = await this.loadDefaultBackgroundImage();
-      backgroundImage = imageData.imageUrl;
-
-      // Validate and scale dimensions using centralized logic
-      const validatedDimensions = this.validateAndScaleImageDimensions(imageData.width, imageData.height);
-      effectiveDimensions = validatedDimensions;
-
-    } catch (error) {
-      console.warn('⚠️ FAILED TO LOAD DEFAULT BACKGROUND, USING FALLBACK DIMENSIONS:', error);
-      // Continue with fallback dimensions
-    }
-
-    const defaultMap: SharedMapData = {
-      interactiveAreas: [
-        {
-          id: 'meeting-room-default',
-          name: 'Meeting Room',
-          type: 'meeting-room',
-          x: Math.floor(effectiveDimensions.width * 0.2), // 20% from left
-          y: Math.floor(effectiveDimensions.height * 0.25), // 25% from top
-          width: 120,
-          height: 80,
-          color: '#4A90E2',
-          description: 'Join the weekly team sync'
-        },
-        {
-          id: 'coffee-corner-default',
-          name: 'Coffee Corner',
-          type: 'coffee-corner',
-          x: Math.floor(effectiveDimensions.width * 0.6), // 60% from left
-          y: Math.floor(effectiveDimensions.height * 0.7), // 70% from top
-          width: 100,
-          height: 80,
-          color: '#D2691E',
-          description: 'Casual conversations'
-        }
-      ],
-      impassableAreas: [
-        {
-          id: 'wall-default',
-          x: Math.floor(effectiveDimensions.width * 0.3), // 30% from left
-          y: Math.floor(effectiveDimensions.height * 0.15), // 15% from top
-          width: 80,
-          height: 20,
-          name: 'Wall Section'
-        }
-      ],
-      worldDimensions: effectiveDimensions,
-      backgroundImage: backgroundImage,
-      backgroundImageDimensions: effectiveDimensions, // Keep in sync
-      version: 1,
-      lastModified: new Date(),
-      createdBy: 'system',
-      metadata: {
-        name: 'Stargety Oasis',
-        description: 'Default Zep-style virtual office space',
-        tags: ['default', 'office', 'zep-style'],
-        isPublic: true
-      },
-      layers: [
-        {
-          id: 'background-layer',
-          name: 'Background',
-          type: 'background',
-          visible: true,
-          locked: false,
-          opacity: 1,
-          zIndex: 0,
-          elements: []
-        },
-        {
-          id: 'interactive-layer',
-          name: 'Interactive Areas',
-          type: 'interactive',
-          visible: true,
-          locked: false,
-          opacity: 1,
-          zIndex: 1,
-          elements: []
-        },
-        {
-          id: 'collision-layer',
-          name: 'Collision Areas',
-          type: 'collision',
-          visible: true,
-          locked: false,
-          opacity: 0.7,
-          zIndex: 2,
-          elements: []
-        }
-      ],
-      resources: [] // Renamed from assets to avoid conflict
-    };
-
-    await this.saveMapData(defaultMap);
-    return defaultMap;
-  }
-
-  /**
-   * Initialize event listeners for cross-tab communication
-   * TODO: Replace with WebSocket communication when migrating to server-side
-   */
-  private initializeEventListeners(): void {
-    // Listen for localStorage changes from other tabs
-    window.addEventListener('storage', (event) => {
-      if (event.key === STORAGE_KEYS.MAP_DATA && event.newValue) {
-        try {
-          const newData = JSON.parse(event.newValue);
-          newData.lastModified = new Date(newData.lastModified);
-          this.mapData = newData;
-          this.emit('map:changed', { mapData: newData, source: 'external' });
-        } catch (error) {
-          console.error('Failed to parse map data from storage event:', error);
-        }
-      }
-    });
+    this.historyManager.clearHistory();
   }
 
   /**
@@ -1372,7 +479,7 @@ export class SharedMapSystem {
       assetsCount: this.mapData.assets?.length || 0,
       version: this.mapData.version,
       lastModified: this.mapData.lastModified,
-      totalElements: this.mapData.layers.reduce((sum, layer) => sum + layer.elements.length, 0)
+      totalElements: this.mapData.layers.reduce((sum, layer) => sum + layer.elements.length, 0),
     };
   }
 }

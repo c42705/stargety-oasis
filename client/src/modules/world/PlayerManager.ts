@@ -44,35 +44,21 @@ export class PlayerManager {
     this.avatarRendererV2 = new AvatarRendererV2(this.scene);
     console.log('[PlayerManager] ✅ AvatarRendererV2 created');
 
-    // Create player from sprite sheet and play idle animation
-    // Check if sprite sheet exists, otherwise create a simple rectangle as placeholder
-    if (this.scene.textures.exists('player-sheet')) {
-      this.player = this.scene.add.sprite(initialX, initialY, 'player-sheet', 0);
-      this.player.setDisplaySize(32, 32); // Use native sprite frame size for crisp animation
-      this.player.setOrigin(0.5, 0.5); // Ensure sprite is centered on its position
-      this.player.setDepth(10);
-      this.originalY = this.player.y;
+    // Create placeholder sprite (V1 player-sheet removed - now V2 only)
+    // This placeholder will be replaced by V2 avatar when loaded
+    const graphics = this.scene.add.graphics();
+    graphics.fillStyle(0x4a90d9, 1); // Blue placeholder
+    graphics.fillCircle(16, 16, 14);
+    graphics.lineStyle(2, 0xffffff, 1);
+    graphics.strokeCircle(16, 16, 14);
+    graphics.generateTexture('player-placeholder', 32, 32);
+    graphics.destroy();
 
-      // Only play animation if it exists
-      if (this.scene.anims.exists('player_idle')) {
-        this.player.anims.play('player_idle');
-      }
-      console.log('[PlayerManager] ✅ Default player sprite created from sprite sheet');
-    } else {
-      // Fallback: create a simple colored rectangle as placeholder
-      console.warn('[PlayerManager] ⚠️ player-sheet texture not found, creating placeholder');
-      const graphics = this.scene.add.graphics();
-      graphics.fillStyle(0x00ff00, 1);
-      graphics.fillRect(-16, -16, 32, 32);
-      graphics.generateTexture('player-placeholder', 32, 32);
-      graphics.destroy();
-
-      this.player = this.scene.add.sprite(initialX, initialY, 'player-placeholder');
-      this.player.setOrigin(0.5, 0.5);
-      this.player.setDepth(10);
-      this.originalY = this.player.y;
-      console.log('[PlayerManager] ✅ Default player placeholder created');
-    }
+    this.player = this.scene.add.sprite(initialX, initialY, 'player-placeholder');
+    this.player.setOrigin(0.5, 0.5);
+    this.player.setDepth(10);
+    this.originalY = this.player.y;
+    console.log('[PlayerManager] ✅ Placeholder sprite created (waiting for V2 avatar)');
 
     // Load avatar asynchronously and update sprite when ready
     console.log('[PlayerManager] 🔵 Calling initializePlayerAsync...');
