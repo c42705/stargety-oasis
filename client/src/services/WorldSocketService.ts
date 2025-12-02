@@ -52,11 +52,14 @@ export class WorldSocketService {
   private socket: Socket | null = null;
   private callbacks: WorldSocketCallbacks | null = null;
   private currentPlayerId: string = '';
+  private currentPlayerName: string = '';
   private currentRoomId: string = '';
   private isConnected: boolean = false;
+  private hasJoinedRoom: boolean = false; // Prevent duplicate join events
   private lastEmittedPosition: { x: number; y: number } = { x: 0, y: 0 };
   private moveThrottleMs: number = 50; // Max 20 updates/second
   private lastMoveTime: number = 0;
+  private connectionResolvers: Array<() => void> = [];
 
   private constructor() {
     // Private constructor for singleton
@@ -98,15 +101,25 @@ export class WorldSocketService {
       this.isConnected = true;
       logger.info('[WorldSocket] Connected to server');
 
+      // Resolve any pending connection promises
+      this.connectionResolvers.forEach(resolve => resolve());
+      this.connectionResolvers = [];
+
       // Re-join room if we were in one (reconnection case)
       if (this.currentPlayerId && this.currentRoomId) {
-        this.joinWorld(this.currentPlayerId, this.currentRoomId,
-          this.lastEmittedPosition.x, this.lastEmittedPosition.y);
+        this.joinWorld(
+          this.currentPlayerId,
+          this.currentRoomId,
+          this.lastEmittedPosition.x,
+          this.lastEmittedPosition.y,
+          this.currentPlayerName
+        );
       }
     });
 
     this.socket.on('disconnect', () => {
       this.isConnected = false;
+      this.hasJoinedRoom = false; // Reset so we can rejoin on reconnect
       logger.warn('[WorldSocket] Disconnected from server');
     });
 
@@ -141,27 +154,71 @@ export class WorldSocketService {
   }
 
   /**
+   * Wait for socket connection (with timeout)
+   */
+  public waitForConnection(timeoutMs: number = 5000): Promise<boolean> {
+    return new Promise((resolve) => {
+      if (this.isConnected) {
+        resolve(true);
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        // Remove resolver from array
+        this.connectionResolvers = this.connectionResolvers.filter(r => r !== resolver);
+        logger.warn('[WorldSocket] Connection timeout');
+        resolve(false);
+      }, timeoutMs);
+
+      const resolver = () => {
+        clearTimeout(timeout);
+        resolve(true);
+      };
+
+      this.connectionResolvers.push(resolver);
+    });
+  }
+
+  /**
    * Join a world room
    */
-  public joinWorld(playerId: string, roomId: string, x: number, y: number, avatarData?: AvatarSyncData): void {
+  public joinWorld(
+    playerId: string,
+    roomId: string,
+    x: number,
+    y: number,
+    name?: string,
+    avatarData?: AvatarSyncData
+  ): void {
     if (!this.socket || !this.isConnected) {
       logger.warn('[WorldSocket] Cannot join world - not connected');
       return;
     }
 
+    // Prevent duplicate join if already in the same room with the same player
+    if (this.hasJoinedRoom &&
+        this.currentPlayerId === playerId &&
+        this.currentRoomId === roomId) {
+      logger.info('[WorldSocket] Already joined this room, skipping duplicate join');
+      return;
+    }
+
     this.currentPlayerId = playerId;
+    this.currentPlayerName = name || playerId;
     this.currentRoomId = roomId;
     this.lastEmittedPosition = { x, y };
+    this.hasJoinedRoom = true;
 
     this.socket.emit('player-joined-world', {
       playerId,
+      name: this.currentPlayerName,
       x,
       y,
       roomId,
       avatarData,
     });
 
-    logger.info(`[WorldSocket] Joined world room: ${roomId} at (${x}, ${y})`);
+    logger.info(`[WorldSocket] Joined world room: ${roomId} as ${this.currentPlayerName} at (${x}, ${y})`);
   }
 
   /**

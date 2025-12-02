@@ -169,6 +169,7 @@ export class GameScene extends Phaser.Scene {
     // Initialize socket with callbacks
     this.worldSocketService.initialize({
       onPlayerJoined: (player) => {
+        logger.info(`[GameScene] onPlayerJoined callback: ${player.playerId}, self: ${this.playerId}`);
         if (player.playerId !== this.playerId) {
           this.remotePlayerManager.addPlayer(player);
         }
@@ -179,11 +180,20 @@ export class GameScene extends Phaser.Scene {
         }
       },
       onPlayerLeft: (data) => {
+        logger.info(`[GameScene] onPlayerLeft callback: ${data.playerId}`);
         this.remotePlayerManager.removePlayer(data.playerId);
       },
       onWorldState: (data) => {
+        logger.info(`[GameScene] onWorldState: received ${data.players.length} players, my playerId="${this.playerId}" (type: ${typeof this.playerId})`);
+        // Log all players for debugging with detailed comparison
+        data.players.forEach(p => {
+          const isMe = p.id === this.playerId;
+          const idMatch = `id="${p.id}" === playerId="${this.playerId}" ? ${isMe}`;
+          logger.info(`[GameScene] Player in world-state: ${idMatch}, name="${p.name}", pos=(${p.x}, ${p.y})`);
+        });
         // Add all existing players except self
         const otherPlayers = data.players.filter(p => p.id !== this.playerId);
+        logger.info(`[GameScene] After filtering self: ${otherPlayers.length} other players (filtered out ${data.players.length - otherPlayers.length})`);
         this.remotePlayerManager.handleWorldState(
           otherPlayers.map(p => ({
             playerId: p.id,
@@ -195,24 +205,37 @@ export class GameScene extends Phaser.Scene {
         );
       },
       onError: (error) => {
-        logger.error('[GameScene] Socket error:', error);
+        logger.error(`[GameScene] Socket error: ${error.message}`);
       }
     });
 
-    // Join world room with initial position
+    // Wait for socket connection, then join world room
+    this.joinMultiplayerWorld();
+  }
+
+  /**
+   * Wait for socket connection and join the world
+   */
+  private async joinMultiplayerWorld(): Promise<void> {
     const worldBounds = this.worldBoundsManager.getWorldBounds();
     const initialX = worldBounds.width / 2;
     const initialY = worldBounds.height / 2;
 
-    // Wait a short time for socket to connect, then join
-    setTimeout(() => {
+    // Wait for socket to be connected (with 5 second timeout)
+    const connected = await this.worldSocketService.waitForConnection(5000);
+
+    if (connected) {
+      logger.info('[GameScene] Socket connected, joining world room:', this.worldRoomId);
       this.worldSocketService.joinWorld(
         this.playerId,
         this.worldRoomId,
         initialX,
-        initialY
+        initialY,
+        this.playerId // Use playerId as display name (it's actually the username)
       );
-    }, 500);
+    } else {
+      logger.error('[GameScene] Failed to connect to socket server, multiplayer disabled');
+    }
   }
 
   update(): void {

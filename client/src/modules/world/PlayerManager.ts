@@ -56,9 +56,14 @@ export class PlayerManager {
 
     this.player = this.scene.add.sprite(initialX, initialY, 'player-placeholder');
     this.player.setOrigin(0.5, 0.5);
-    this.player.setDepth(10);
+    this.player.setDepth(500); // High depth to be above all map elements (collision polygons are at 100)
+    this.player.setVisible(true);
+    this.player.setActive(true);
     this.originalY = this.player.y;
-    console.log('[PlayerManager] ✅ Placeholder sprite created (waiting for V2 avatar)');
+    console.log('[PlayerManager] ✅ LOCAL PLAYER sprite created:');
+    console.log(`  - Position: (${this.player.x}, ${this.player.y})`);
+    console.log(`  - Size: ${this.player.width}x${this.player.height}`);
+    console.log(`  - Depth: ${this.player.depth}, Visible: ${this.player.visible}`);
 
     // Load avatar asynchronously and update sprite when ready
     console.log('[PlayerManager] 🔵 Calling initializePlayerAsync...');
@@ -122,7 +127,7 @@ export class PlayerManager {
         this.player = v2Sprite;
         this.player.setPosition(oldX, oldY);
         this.player.setOrigin(0.5, 0.5);
-        this.player.setDepth(10);
+        this.player.setDepth(500); // High depth to be above all map elements
 
         // Play idle animation
         this.avatarRendererV2.playAnimation(this.playerId, AnimationCategory.IDLE);
@@ -261,7 +266,7 @@ export class PlayerManager {
         // Set sprite properties (origin, depth, visibility)
         console.log('[PlayerManager] 🔵 Setting sprite properties...');
         this.player.setOrigin(0.5, 0.5);
-        this.player.setDepth(10);
+        this.player.setDepth(500); // High depth to be above all map elements
         this.player.setVisible(true);
         this.player.setActive(true);
 

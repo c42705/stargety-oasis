@@ -36,24 +36,24 @@ export class RemotePlayerManager {
    */
   public addPlayer(data: RemotePlayerData): void {
     if (this.remotePlayers.has(data.playerId)) {
-      logger.warn('[RemotePlayerManager] Player already exists:', data.playerId);
+      logger.warn(`[RemotePlayerManager] Player already exists: ${data.playerId}`);
       return;
     }
 
-    logger.info('[RemotePlayerManager] Adding remote player:', data.playerId);
+    logger.info(`[RemotePlayerManager] Adding remote player: id=${data.playerId}, name=${data.name}, pos=(${data.x}, ${data.y})`);
 
     // Create sprite based on avatar data
     const sprite = this.createPlayerSprite(data);
 
-    // Create name label
-    const nameLabel = this.scene.add.text(data.x, data.y - 25, data.name || data.playerId, {
-      fontSize: '12px',
+    // Create name label above sprite
+    const nameLabel = this.scene.add.text(data.x, data.y - 35, data.name || data.playerId, {
+      fontSize: '14px',
       color: '#ffffff',
-      backgroundColor: '#333333aa',
-      padding: { x: 4, y: 2 },
+      backgroundColor: '#000000cc',
+      padding: { x: 6, y: 3 },
     });
     nameLabel.setOrigin(0.5, 1);
-    nameLabel.setDepth(11);
+    nameLabel.setDepth(500); // Very high depth to always be visible above everything
 
     const remotePlayer: RemotePlayer = {
       sprite,
@@ -65,6 +65,7 @@ export class RemotePlayerManager {
     };
 
     this.remotePlayers.set(data.playerId, remotePlayer);
+    logger.info(`[RemotePlayerManager] Total remote players: ${this.remotePlayers.size}`);
   }
 
   /**
@@ -82,28 +83,39 @@ export class RemotePlayerManager {
 
         // For now, use placeholder until image loads
         // TODO: Implement async texture loading
-        logger.info('[RemotePlayerManager] Avatar data received for:', data.playerId);
+        logger.info(`[RemotePlayerManager] Avatar data received for: ${data.playerId}`);
       } catch (error) {
-        logger.error('[RemotePlayerManager] Failed to load avatar:', error);
+        logger.error(`[RemotePlayerManager] Failed to load avatar: ${error}`);
       }
     }
 
-    // Create placeholder sprite (colored circle with initial)
+    // Create placeholder sprite (colored circle - larger and more visible)
+    const size = 48; // Increased from 32
+    const radius = 22; // Increased from 14
     const graphics = this.scene.add.graphics();
     const color = this.getPlayerColor(data.playerId);
 
     graphics.fillStyle(color, 1);
-    graphics.fillCircle(16, 16, 14);
-    graphics.lineStyle(2, 0xffffff, 1);
-    graphics.strokeCircle(16, 16, 14);
+    graphics.fillCircle(size / 2, size / 2, radius);
+    graphics.lineStyle(3, 0xffffff, 1);
+    graphics.strokeCircle(size / 2, size / 2, radius);
 
-    const textureKey = `remote_placeholder_${data.playerId}`;
-    graphics.generateTexture(textureKey, 32, 32);
+    const textureKey = `remote_placeholder_${data.playerId}_${Date.now()}`;
+    graphics.generateTexture(textureKey, size, size);
     graphics.destroy();
 
     const sprite = this.scene.add.sprite(data.x, data.y, textureKey);
     sprite.setOrigin(0.5, 0.5);
-    sprite.setDepth(9); // Below local player (10)
+    sprite.setDepth(450); // High depth to be above all map elements (collision polygons are at 100)
+    sprite.setVisible(true);
+    sprite.setActive(true);
+
+    // Debug: Log sprite creation details
+    logger.info(`[RemotePlayerManager] Created sprite for ${data.playerId}:`);
+    logger.info(`  - Position: (${sprite.x}, ${sprite.y})`);
+    logger.info(`  - Size: ${sprite.width}x${sprite.height}, displaySize: ${sprite.displayWidth}x${sprite.displayHeight}`);
+    logger.info(`  - Depth: ${sprite.depth}, Visible: ${sprite.visible}, Active: ${sprite.active}`);
+    logger.info(`  - Texture: ${sprite.texture.key}, Color: 0x${color.toString(16)}`);
 
     return sprite;
   }
