@@ -1,30 +1,31 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { ThemeType } from '../theme/theme-system';
-
-export type VideoServiceType = 'ringcentral' | 'jitsi';
+import { SettingsApiService } from '../services/api/SettingsApiService';
+import { logger } from './logger';
 
 export interface AppSettings {
-  videoService: VideoServiceType;
   adminMode: boolean;
   theme: ThemeType;
+  jitsiServerUrl?: string; // Optional custom Jitsi server URL
 }
 
 interface SettingsContextType {
   settings: AppSettings;
-  updateVideoService: (service: VideoServiceType) => void;
   updateTheme: (theme: ThemeType) => void;
+  updateJitsiServerUrl: (url: string) => void;
   isAdmin: (username: string) => boolean;
   saveSettings: () => void;
   resetSettings: () => void;
+  isLoading: boolean;
 }
 
 const defaultSettings: AppSettings = {
-  videoService: 'ringcentral',
   adminMode: false,
-  theme: 'dark',
+  theme: 'light',
 };
 
 const STORAGE_KEY = 'stargetyOasisSettings';
+const THEME_STORAGE_KEY = 'stargetyOasisTheme'; // ThemeContext's storage key
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
@@ -43,33 +44,8 @@ interface SettingsProviderProps {
 
 export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children, currentUser }) => {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
-
-  // Load settings from localStorage on mount
-  useEffect(() => {
-    try {
-      const savedSettings = localStorage.getItem(STORAGE_KEY);
-      if (savedSettings) {
-        const parsed = JSON.parse(savedSettings);
-        setSettings(prev => ({
-          ...prev,
-          ...parsed,
-          adminMode: isAdmin(currentUser), // Always recalculate admin mode
-        }));
-      } else {
-        // Set default with admin mode
-        setSettings(prev => ({
-          ...prev,
-          adminMode: isAdmin(currentUser),
-        }));
-      }
-    } catch (error) {
-      console.error('Failed to load settings from localStorage:', error);
-      setSettings(prev => ({
-        ...prev,
-        adminMode: isAdmin(currentUser),
-      }));
-    }
-  }, [currentUser]);
+  const [isLoading, setIsLoading] = useState(true);
+  const hasLoadedFromApi = useRef(false);
 
   // Check if user is admin
   const isAdmin = useCallback((username: string): boolean => {
@@ -78,54 +54,174 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children, cu
            username.toLowerCase() === 'root';
   }, []);
 
-  // Update video service preference
-  const updateVideoService = useCallback((service: VideoServiceType) => {
-    setSettings(prev => ({
-      ...prev,
-      videoService: service,
-    }));
-  }, []);
+  // Load settings from API first, fallback to localStorage
+  useEffect(() => {
+    const loadSettings = async () => {
+      setIsLoading(true);
+
+      // Try API first
+      try {
+        const result = await SettingsApiService.getSettings(currentUser);
+        if (result.success && result.data) {
+          hasLoadedFromApi.current = true;
+          setSettings({
+            theme: (result.data.theme || 'dark') as ThemeType,
+            jitsiServerUrl: result.data.jitsiServerUrl,
+            adminMode: isAdmin(currentUser),
+          });
+          logger.info('SETTINGS LOADED FROM API', { userId: currentUser });
+          setIsLoading(false);
+          return;
+        }
+      } catch (error) {
+        logger.warn('API SETTINGS LOAD FAILED, USING LOCALSTORAGE', { error });
+      }
+
+      // Fallback to localStorage
+      try {
+        const savedSettings = localStorage.getItem(STORAGE_KEY);
+        if (savedSettings) {
+          const parsed = JSON.parse(savedSettings);
+          setSettings(prev => ({
+            ...prev,
+            ...parsed,
+            adminMode: isAdmin(currentUser),
+          }));
+        } else {
+          // If no saved settings, try to get theme from ThemeContext's localStorage
+          let initialTheme: ThemeType = 'dark';
+          try {
+            const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+            if (savedTheme) {
+              initialTheme = savedTheme as ThemeType;
+            }
+          } catch (e) {
+            logger.warn('FAILED TO LOAD THEME FROM THEMECONTEXT STORAGE', { error: e });
+          }
+
+          setSettings(prev => ({
+            ...prev,
+            adminMode: isAdmin(currentUser),
+            theme: initialTheme,
+          }));
+        }
+      } catch (error) {
+        logger.error('FAILED TO LOAD SETTINGS FROM LOCALSTORAGE', { error });
+        setSettings(prev => ({
+          ...prev,
+          adminMode: isAdmin(currentUser),
+        }));
+      }
+
+      setIsLoading(false);
+    };
+
+    loadSettings();
+  }, [currentUser, isAdmin]);
+
+  // Async helper to save to API (fire and forget)
+  const saveToApiAsync = useCallback(async (settingsData: { theme: ThemeType; jitsiServerUrl?: string }) => {
+    try {
+      // Map client theme types to API-compatible types
+      // API accepts 'light' | 'dark' | 'system', but client has more themes
+      const apiTheme = (settingsData.theme === 'light' || settingsData.theme === 'dark')
+        ? settingsData.theme
+        : 'dark'; // Default to dark for custom themes
+
+      await SettingsApiService.updateSettings(currentUser, {
+        theme: apiTheme,
+        jitsiServerUrl: settingsData.jitsiServerUrl,
+      });
+      logger.info('SETTINGS SAVED TO API', { userId: currentUser });
+    } catch (error) {
+      logger.warn('API SETTINGS SAVE FAILED', { error });
+    }
+  }, [currentUser]);
 
   // Update theme preference
   const updateTheme = useCallback((theme: ThemeType) => {
-    setSettings(prev => ({
-      ...prev,
-      theme: theme,
-    }));
-  }, []);
+    setSettings(prev => {
+      const newSettings = {
+        ...prev,
+        theme: theme,
+      };
+      // Auto-save settings when theme changes
+      setTimeout(() => {
+        try {
+          const settingsToSave = {
+            theme: newSettings.theme,
+            jitsiServerUrl: newSettings.jitsiServerUrl,
+          };
+          // Save to localStorage
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsToSave));
+          // Sync to API (fire and forget)
+          saveToApiAsync(settingsToSave);
+        } catch (error) {
+          logger.error('FAILED TO AUTO-SAVE THEME SETTINGS', { error });
+        }
+      }, 0);
+      return newSettings;
+    });
+  }, [saveToApiAsync]);
 
-  // Save settings to localStorage
+  // Update Jitsi server URL
+  const updateJitsiServerUrl = useCallback((url: string) => {
+    setSettings(prev => {
+      const newSettings = {
+        ...prev,
+        jitsiServerUrl: url,
+      };
+      // Auto-save when Jitsi URL changes
+      setTimeout(() => {
+        try {
+          const settingsToSave = {
+            theme: newSettings.theme,
+            jitsiServerUrl: newSettings.jitsiServerUrl,
+          };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsToSave));
+          saveToApiAsync(settingsToSave);
+        } catch (error) {
+          logger.error('FAILED TO AUTO-SAVE JITSI SETTINGS', { error });
+        }
+      }, 0);
+      return newSettings;
+    });
+  }, [saveToApiAsync]);
+
+  // Save settings to localStorage and API
   const saveSettings = useCallback(() => {
     try {
       const settingsToSave = {
-        videoService: settings.videoService,
         theme: settings.theme,
-        // Don't save adminMode as it's calculated based on username
+        jitsiServerUrl: settings.jitsiServerUrl,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsToSave));
-      console.log('Settings saved successfully');
+      saveToApiAsync(settingsToSave);
     } catch (error) {
-      console.error('Failed to save settings to localStorage:', error);
+      logger.error('FAILED TO SAVE SETTINGS', { error });
     }
-  }, [settings]);
+  }, [settings, saveToApiAsync]);
 
   // Reset settings to defaults
   const resetSettings = useCallback(() => {
-    const resetSettings = {
+    const resetSettingsData = {
       ...defaultSettings,
       adminMode: isAdmin(currentUser),
     };
-    setSettings(resetSettings);
+    setSettings(resetSettingsData);
     localStorage.removeItem(STORAGE_KEY);
-  }, [currentUser, isAdmin]);
+    // Sync reset to API
+    saveToApiAsync({ theme: defaultSettings.theme, jitsiServerUrl: undefined });
+  }, [currentUser, isAdmin, saveToApiAsync]);
 
   const contextValue: SettingsContextType = {
     settings,
-    updateVideoService,
     updateTheme,
+    updateJitsiServerUrl,
     isAdmin,
     saveSettings,
     resetSettings,
+    isLoading,
   };
 
   return (

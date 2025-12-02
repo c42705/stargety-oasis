@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { useSharedMap } from './useSharedMap';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import { useMapStore } from '../stores/useMapStore';
+import { useMapStoreInit } from '../stores/useMapStoreInit';
 
 // Shared interfaces for map data
 export interface InteractiveArea {
@@ -21,12 +22,40 @@ export interface ImpassableArea {
   width: number;
   height: number;
   name?: string;
+
+  // Extended properties for polygon support
+  type?: 'rectangle' | 'impassable-polygon';
+  points?: { x: number; y: number }[];
+  color?: string;
+}
+
+/**
+ * Asset interface for image assets placed on the map
+ * Represents decorative or functional images (sprites, objects, etc.)
+ */
+export interface Asset {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  imageData: string; // Base64 encoded image data
+  fileName?: string;
+  rotation?: number; // Rotation in degrees
+  scaleX?: number; // Horizontal scale (default: 1)
+  scaleY?: number; // Vertical scale (default: 1)
 }
 
 export interface MapData {
   interactiveAreas: InteractiveArea[];
   impassableAreas: ImpassableArea[];
+  assets?: Asset[];
   worldDimensions: {
+    width: number;
+    height: number;
+  };
+  backgroundImage?: string;
+  backgroundImageDimensions?: {
     width: number;
     height: number;
   };
@@ -34,6 +63,8 @@ export interface MapData {
 
 interface MapDataContextType {
   mapData: MapData;
+  isLoading: boolean;
+  error: string | null;
   updateInteractiveAreas: (areas: InteractiveArea[]) => void;
   updateImpassableAreas: (areas: ImpassableArea[]) => void;
   addInteractiveArea: (area: InteractiveArea) => void;
@@ -42,6 +73,10 @@ interface MapDataContextType {
   removeImpassableArea: (id: string) => void;
   updateInteractiveArea: (id: string, updates: Partial<InteractiveArea>) => void;
   updateImpassableArea: (id: string, updates: Partial<ImpassableArea>) => void;
+  updateAssets: (assets: Asset[]) => void;
+  addAsset: (asset: Asset) => void;
+  removeAsset: (id: string) => void;
+  updateAsset: (id: string, updates: Partial<Asset>) => void;
 }
 
 const MapDataContext = createContext<MapDataContextType | undefined>(undefined);
@@ -115,41 +150,74 @@ const defaultMapData: MapData = {
   worldDimensions: {
     width: 800,
     height: 600
-  }
+  },
+  backgroundImage: undefined,
+  backgroundImageDimensions: undefined
 };
 
 export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Use the shared map system instead of local state
-  const sharedMap = useSharedMap({ source: 'editor', autoSave: true });
-  const [mapData, setMapData] = useState<MapData>(defaultMapData);
+  // Initialize the map store
+  useMapStoreInit({ autoLoad: true, source: 'editor' });
 
-  // Sync with shared map system
+  // Get map store state and actions
+  const {
+    mapData: storeMapData,
+    isLoading: storeIsLoading,
+    error: storeError,
+    addInteractiveArea: storeAddInteractiveArea,
+    updateInteractiveArea: storeUpdateInteractiveArea,
+    removeInteractiveArea: storeRemoveInteractiveArea,
+    addCollisionArea: storeAddCollisionArea,
+    updateCollisionArea: storeUpdateCollisionArea,
+    removeCollisionArea: storeRemoveCollisionArea,
+    addAsset: storeAddAsset,
+    updateAsset: storeUpdateAsset,
+    removeAsset: storeRemoveAsset,
+    setAssets: storeSetAssets,
+    markDirty
+  } = useMapStore();
+
+  const [mapData, setMapData] = useState<MapData>(defaultMapData);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Sync loading state with store
   useEffect(() => {
-    if (sharedMap.mapData) {
+    setIsLoading(storeIsLoading ?? false);
+    setError(storeError ?? null);
+  }, [storeIsLoading, storeError]);
+
+  // Sync with map store
+  useEffect(() => {
+    if (storeMapData) {
       setMapData({
-        interactiveAreas: sharedMap.interactiveAreas,
-        impassableAreas: sharedMap.collisionAreas,
-        worldDimensions: sharedMap.mapData.worldDimensions
+        interactiveAreas: storeMapData.interactiveAreas || [],
+        impassableAreas: storeMapData.impassableAreas || [],
+        assets: storeMapData.assets || [],
+        worldDimensions: storeMapData.worldDimensions || { width: 800, height: 600 },
+        backgroundImage: storeMapData.backgroundImage,
+        backgroundImageDimensions: storeMapData.backgroundImageDimensions
       });
     }
-  }, [sharedMap.mapData, sharedMap.interactiveAreas, sharedMap.collisionAreas]);
+  }, [storeMapData]);
 
-  // Wrapper functions that use the shared map system
-  const updateInteractiveAreas = async (areas: InteractiveArea[]) => {
+  // Wrapper functions that use the map store
+  const updateInteractiveAreas = useCallback(async (areas: InteractiveArea[]) => {
     // For bulk updates, we'll need to handle this differently
-    // For now, update local state and TODO: implement bulk update in shared system
+    // For now, update local state and TODO: implement bulk update in store
     setMapData(prev => ({ ...prev, interactiveAreas: areas }));
-  };
+  }, []);
 
-  const updateImpassableAreas = async (areas: ImpassableArea[]) => {
+  const updateImpassableAreas = useCallback(async (areas: ImpassableArea[]) => {
     // For bulk updates, we'll need to handle this differently
-    // For now, update local state and TODO: implement bulk update in shared system
+    // For now, update local state and TODO: implement bulk update in store
     setMapData(prev => ({ ...prev, impassableAreas: areas }));
-  };
+  }, []);
 
-  const addInteractiveArea = async (area: InteractiveArea) => {
+  const addInteractiveArea = useCallback(async (area: InteractiveArea) => {
     try {
-      await sharedMap.addInteractiveArea(area);
+      storeAddInteractiveArea(area);
+      markDirty();
     } catch (error) {
       console.error('Failed to add interactive area:', error);
       // Fallback to local state update
@@ -158,11 +226,12 @@ export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         interactiveAreas: [...prev.interactiveAreas, area]
       }));
     }
-  };
+  }, [storeAddInteractiveArea, markDirty]);
 
-  const removeInteractiveArea = async (id: string) => {
+  const removeInteractiveArea = useCallback(async (id: string) => {
     try {
-      await sharedMap.removeInteractiveArea(id);
+      storeRemoveInteractiveArea(id);
+      markDirty();
     } catch (error) {
       console.error('Failed to remove interactive area:', error);
       // Fallback to local state update
@@ -171,11 +240,12 @@ export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         interactiveAreas: prev.interactiveAreas.filter(area => area.id !== id)
       }));
     }
-  };
+  }, [storeRemoveInteractiveArea, markDirty]);
 
-  const addImpassableArea = async (area: ImpassableArea) => {
+  const addImpassableArea = useCallback(async (area: ImpassableArea) => {
     try {
-      await sharedMap.addCollisionArea(area);
+      storeAddCollisionArea(area);
+      markDirty();
     } catch (error) {
       console.error('Failed to add collision area:', error);
       // Fallback to local state update
@@ -184,11 +254,12 @@ export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         impassableAreas: [...prev.impassableAreas, area]
       }));
     }
-  };
+  }, [storeAddCollisionArea, markDirty]);
 
-  const removeImpassableArea = async (id: string) => {
+  const removeImpassableArea = useCallback(async (id: string) => {
     try {
-      await sharedMap.removeCollisionArea(id);
+      storeRemoveCollisionArea(id);
+      markDirty();
     } catch (error) {
       console.error('Failed to remove collision area:', error);
       // Fallback to local state update
@@ -197,11 +268,12 @@ export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         impassableAreas: prev.impassableAreas.filter(area => area.id !== id)
       }));
     }
-  };
+  }, [storeRemoveCollisionArea, markDirty]);
 
-  const updateInteractiveArea = async (id: string, updates: Partial<InteractiveArea>) => {
+  const updateInteractiveArea = useCallback(async (id: string, updates: Partial<InteractiveArea>) => {
     try {
-      await sharedMap.updateInteractiveArea(id, updates);
+      storeUpdateInteractiveArea(id, updates);
+      markDirty();
     } catch (error) {
       console.error('Failed to update interactive area:', error);
       // Fallback to local state update
@@ -212,11 +284,12 @@ export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         )
       }));
     }
-  };
+  }, [storeUpdateInteractiveArea, markDirty]);
 
-  const updateImpassableArea = async (id: string, updates: Partial<ImpassableArea>) => {
+  const updateImpassableArea = useCallback(async (id: string, updates: Partial<ImpassableArea>) => {
     try {
-      await sharedMap.updateCollisionArea(id, updates);
+      storeUpdateCollisionArea(id, updates);
+      markDirty();
     } catch (error) {
       console.error('Failed to update collision area:', error);
       // Fallback to local state update
@@ -227,10 +300,64 @@ export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         )
       }));
     }
-  };
+  }, [storeUpdateCollisionArea, markDirty]);
+
+  // Asset management functions
+  const updateAssets = useCallback(async (assets: Asset[]) => {
+    try {
+      storeSetAssets(assets);
+      markDirty();
+    } catch (error) {
+      console.error('Failed to update assets:', error);
+      setMapData(prev => ({ ...prev, assets }));
+    }
+  }, [storeSetAssets, markDirty]);
+
+  const addAsset = useCallback(async (asset: Asset) => {
+    try {
+      storeAddAsset(asset);
+      markDirty();
+    } catch (error) {
+      console.error('Failed to add asset:', error);
+      setMapData(prev => ({
+        ...prev,
+        assets: [...(prev.assets || []), asset]
+      }));
+    }
+  }, [storeAddAsset, markDirty]);
+
+  const removeAsset = useCallback(async (id: string) => {
+    try {
+      storeRemoveAsset(id);
+      markDirty();
+    } catch (error) {
+      console.error('Failed to remove asset:', error);
+      setMapData(prev => ({
+        ...prev,
+        assets: (prev.assets || []).filter(asset => asset.id !== id)
+      }));
+    }
+  }, [storeRemoveAsset, markDirty]);
+
+  const updateAsset = useCallback(async (id: string, updates: Partial<Asset>) => {
+    try {
+      storeUpdateAsset(id, updates);
+      markDirty();
+    } catch (error) {
+      console.error('Failed to update asset:', error);
+      setMapData(prev => ({
+        ...prev,
+        assets: (prev.assets || []).map(asset =>
+          asset.id === id ? { ...asset, ...updates } : asset
+        )
+      }));
+    }
+  }, [storeUpdateAsset, markDirty]);
 
   const value: MapDataContextType = {
     mapData,
+    isLoading,
+    error,
     updateInteractiveAreas,
     updateImpassableAreas,
     addInteractiveArea,
@@ -238,7 +365,11 @@ export const MapDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     addImpassableArea,
     removeImpassableArea,
     updateInteractiveArea,
-    updateImpassableArea
+    updateImpassableArea,
+    updateAssets,
+    addAsset,
+    removeAsset,
+    updateAsset
   };
 
   return (

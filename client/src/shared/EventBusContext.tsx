@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useCallback, useRef, useMemo } from 'react';
 
 // Event types for type safety
 export interface EventMap {
@@ -13,16 +13,13 @@ export interface EventMap {
   'world:playerJoined': { playerId: string; x: number; y: number };
   'world:playerLeft': { playerId: string };
   'world:objectInteraction': { playerId: string; objectId: string };
+  'area-selected': { areaId: string; areaName: string; roomId: string };
+  // Area entry/exit events for Jitsi auto-join/leave
+  'area-entered': { areaId: string; areaName: string; roomId: string };
+  'area-exited': { areaId: string; areaName: string };
   'app:moduleLoaded': { module: string };
   'app:error': { error: string; module?: string };
-  // RingCentral events
-  'ringcentral:callStarted': { meetingId: string; participants: any[] };
-  'ringcentral:callEnded': { meetingId: string; duration: number };
-  'ringcentral:participantJoined': { participant: any };
-  'ringcentral:participantLeft': { participantId: string; participantName: string };
-  'ringcentral:audioToggled': { participantId: string; muted: boolean };
-  'ringcentral:videoToggled': { participantId: string; muted: boolean };
-  'ringcentral:error': { error: string; code?: string };
+
 }
 
 type EventCallback<T = any> = (data: T) => void;
@@ -103,12 +100,14 @@ export const EventBusProvider: React.FC<{ children: React.ReactNode }> = ({
     eventsRef.current.clear();
   }, []);
 
-  const eventBus: EventBusInterface = {
+  // Memoize the eventBus object to prevent unnecessary re-renders
+  // This is critical for components that depend on eventBus (like WorldModuleAlt)
+  const eventBus: EventBusInterface = useMemo(() => ({
     publish,
     subscribe,
     unsubscribe,
     clear,
-  };
+  }), [publish, subscribe, unsubscribe, clear]);
 
   return (
     <EventBusContext.Provider value={eventBus}>

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Input, Button, Checkbox, Alert, Collapse, Space, Typography, Divider } from 'antd';
-import { UserOutlined, LockOutlined, RocketOutlined, DownOutlined, BulbOutlined } from '@ant-design/icons';
-import { Star } from 'lucide-react';
+import { Card, Form, Input, Button, Checkbox, Alert, Collapse, Space, Typography, Divider, Select } from 'antd';
+import { UserOutlined, LockOutlined, RocketOutlined, BulbOutlined, GlobalOutlined } from '@ant-design/icons';
 import { useAuth } from '../../shared/AuthContext';
+import { WORLD_ROOMS, WorldRoomId } from '../../shared/WorldRoomContext';
+import appLogo from '../../assets/app-logo.png';
+import magicalBg from '../../assets/magical_bg.png';
 
 interface LoginModuleProps {
   className?: string;
@@ -11,7 +13,7 @@ interface LoginModuleProps {
 interface FormData {
   username: string;
   password: string;
-  roomId: string;
+  worldRoomId: WorldRoomId;
   rememberMe: boolean;
 }
 
@@ -45,7 +47,7 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
       const success = await login(
         values.username.trim(),
         values.password.trim(),
-        values.roomId?.trim() || 'general'
+        values.worldRoomId || 'Stargety-Oasis-1'
       );
 
       if (!success) {
@@ -62,15 +64,23 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
     }
   };
 
-  // Quick login with test account
-  const handleQuickLogin = (testAccount: typeof testAccounts[0]) => {
+  // Quick login with test account - auto-submit for faster loading
+  const handleQuickLogin = async (testAccount: typeof testAccounts[0]) => {
     form.setFieldsValue({
       username: testAccount.username,
       password: testAccount.password,
-      roomId: 'general',
+      worldRoomId: 'Stargety-Oasis-1',
       rememberMe: rememberUsername
     });
     setLoginError('');
+
+    // Automatically submit the form for faster loading
+    try {
+      await form.validateFields();
+      form.submit();
+    } catch (error) {
+      console.error('Form validation failed:', error);
+    }
   };
 
   return (
@@ -79,24 +89,30 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: '1rem'
+      backgroundImage: `linear-gradient(35deg, #667eea 0%, #764ba2 100%), url(${magicalBg})`,
+      backgroundBlendMode: 'overlay',
+      backgroundSize: 'cover, cover',
+      backgroundPosition: 'center, center',
+      backgroundRepeat: 'no-repeat, no-repeat',
+      padding: '0.5rem'
     }}>
       <Card
         style={{
           width: '100%',
           maxWidth: 480,
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)'
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
+          background: 'rgba(32, 32, 32, 0.27)',          
+          backdropFilter: 'blur(25px)'
         }}
       >
         {/* Header */}
         <div style={{
           textAlign: 'center',
-          marginBottom: '2rem',
+          marginBottom: '1rem',
           padding: '1rem 0'
         }}>
-          <Space direction="vertical" size="small">
-            <Star size={48} style={{ color: '#667eea' }} />
+          <Space direction="vertical" size="small" align="center">
+            <img src={appLogo} alt="Stargety Oasis" width={128} height={128} style={{ borderRadius: 8 }} />
             <Typography.Title level={2} style={{ margin: 0, color: '#667eea' }}>
               Stargety Oasis
             </Typography.Title>
@@ -114,7 +130,6 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
               key: 'demo-accounts',
               label: (
                 <Space>
-                  <DownOutlined />
                   Demo Accounts
                 </Space>
               ),
@@ -186,7 +201,7 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
             initialValues={{
               username: savedUsername || '',
               password: '',
-              roomId: 'general',
+              worldRoomId: 'Stargety-Oasis-1' as WorldRoomId,
               rememberMe: rememberUsername
             }}
           >
@@ -224,22 +239,27 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
               />
             </Form.Item>
 
-            {/* Room ID Field */}
+            {/* World Room Selector */}
             <Form.Item
-              name="roomId"
-              label="Room ID (optional)"
-              rules={[
-                { pattern: /^[a-zA-Z0-9._-]*$/, message: 'Room ID can only contain letters, numbers, dots, hyphens, and underscores' }
-              ]}
+              name="worldRoomId"
+              label={
+                <Space>
+                  <GlobalOutlined />
+                  <span>World Room</span>
+                </Space>
+              }
             >
-              <Input
-                placeholder="general"
+              <Select
+                options={WORLD_ROOMS.map(room => ({
+                  value: room.id,
+                  label: room.label,
+                }))}
                 disabled={isSubmitting || isLoading}
-                autoComplete="off"
+                placeholder="Select a world room"
               />
             </Form.Item>
             <Typography.Text type="secondary" style={{ fontSize: '12px', marginTop: '-16px', display: 'block', marginBottom: '16px' }}>
-              Leave empty or use "general" for the default room
+              Select which world room to join. Players in the same room can see each other.
             </Typography.Text>
 
             {/* Remember Username */}

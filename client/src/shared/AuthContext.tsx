@@ -4,7 +4,8 @@ export interface User {
   id: string;
   username: string;
   displayName: string;
-  roomId: string;
+  roomId: string;       // Legacy chat room ID
+  worldRoomId: string;  // World room ID for multiplayer (e.g., 'Stargety-Oasis-1')
   isAdmin: boolean;
   loginTime: Date;
 }
@@ -86,8 +87,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // Login function
-  const login = useCallback(async (username: string, password: string, roomId: string = 'general'): Promise<boolean> => {
+  // Login function - worldRoomId is used for multiplayer visibility
+  const login = useCallback(async (username: string, password: string, worldRoomId: string = 'Stargety-Oasis-1'): Promise<boolean> => {
     setIsLoading(true);
 
     try {
@@ -118,7 +119,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
           username: username.trim(),
           displayName,
-          roomId: roomId.trim() || 'general',
+          roomId: 'general', // Legacy chat room
+          worldRoomId: worldRoomId || 'Stargety-Oasis-1', // World room for multiplayer
           isAdmin: isAdminUser(username),
           loginTime: new Date(),
         };
@@ -137,10 +139,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setSavedUsername(null);
         }
 
-        console.log('Login successful:', newUser);
         return true;
       } else {
-        console.log('Login failed: Invalid credentials');
         return false;
       }
     } catch (error) {
@@ -155,7 +155,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = useCallback(() => {
     setUser(null);
     sessionStorage.removeItem(SESSION_STORAGE_KEY);
-    console.log('User logged out');
   }, []);
 
   const contextValue: AuthContextType = {

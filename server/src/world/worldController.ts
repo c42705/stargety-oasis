@@ -1,10 +1,13 @@
 import { Socket, Server } from 'socket.io';
-import { WorldPlayer, Room } from '../types';
+import { WorldPlayer, Room, AvatarSyncData } from '../types';
+import { logger } from '../utils/logger';
 
 // In-memory storage for world state
 const worldRooms: Map<string, Room> = new Map();
 const players: Map<string, WorldPlayer> = new Map();
 const roomPlayers: Map<string, Set<string>> = new Map();
+// Socket-to-player mapping for proper disconnect handling
+const socketPlayerMap: Map<string, string> = new Map();
 
 export class WorldController {
   private io: Server;
@@ -14,8 +17,12 @@ export class WorldController {
   }
 
   // Handle player joining world
-  handlePlayerJoinedWorld(socket: Socket, data: { playerId: string; x: number; y: number; roomId: string }) {
-    const { playerId, x, y, roomId } = data;
+  handlePlayerJoinedWorld(socket: Socket, data: { playerId: string; x: number; y: number; roomId: string; name?: string; avatarData?: AvatarSyncData }) {
+    const { playerId, x, y, roomId, name, avatarData } = data;
+
+    // Track socket-to-player mapping for disconnect handling
+    socketPlayerMap.set(socket.id, playerId);
+    logger.info(`[WorldController] Socket ${socket.id} mapped to player ${playerId}`);
 
     // Create world room if it doesn't exist
     if (!worldRooms.has(roomId)) {
@@ -30,14 +37,17 @@ export class WorldController {
       roomPlayers.set(roomId, new Set());
     }
 
-    // Create or update player
+    // Create or update player with avatar data
+    // Use provided display name, or fall back to playerId
+    const displayName = name || playerId;
     const player: WorldPlayer = {
       id: playerId,
-      name: playerId,
+      name: displayName,
       x: this.clampPosition(x, 'x'),
       y: this.clampPosition(y, 'y'),
       roomId,
-      lastMoved: new Date()
+      lastMoved: new Date(),
+      avatarData: avatarData
     };
 
     players.set(playerId, player);
@@ -52,15 +62,16 @@ export class WorldController {
     // Join socket room
     socket.join(roomId);
 
-    // Notify other players
+    // Notify other players with avatar data
     socket.to(roomId).emit('player-joined', {
       playerId,
       x: player.x,
       y: player.y,
-      name: player.name
+      name: player.name,
+      avatarData: player.avatarData
     });
 
-    // Send current players to new player
+    // Send current players to new player (with their avatar data)
     const currentPlayers = Array.from(roomPlayers.get(roomId)!)
       .filter(id => id !== playerId)
       .map(id => players.get(id))
@@ -101,9 +112,14 @@ export class WorldController {
     });
   }
 
-  // Handle player disconnect
-  handleDisconnect(socket: Socket, playerId?: string) {
-    if (!playerId) return;
+  // Handle player disconnect - looks up playerId from socket mapping
+  handleDisconnect(socket: Socket) {
+    // Look up playerId from socket-to-player mapping
+    const playerId = socketPlayerMap.get(socket.id);
+    if (!playerId) {
+      logger.debug(`[WorldController] No player found for socket ${socket.id}`);
+      return;
+    }
 
     const player = players.get(playerId);
     if (player) {
@@ -122,10 +138,13 @@ export class WorldController {
       // Remove player
       players.delete(playerId);
 
+      // Clean up socket-to-player mapping
+      socketPlayerMap.delete(socket.id);
+
       // Notify other players
       socket.to(roomId).emit('player-left', { playerId });
 
-      console.log(`Player ${playerId} left world room: ${roomId}`);
+      logger.info(`[WorldController] Player ${playerId} left world room: ${roomId}`);
     }
   }
 

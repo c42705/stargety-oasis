@@ -1,0 +1,61 @@
+/**
+ * Map Editor - React Konva Implementation
+ * 
+ * This module provides a production-ready map editor using React Konva,
+ * replacing the previous Fabric.js implementation.
+ * 
+ * @module map-editor-konva
+ */
+
+// Main components
+export { KonvaMapCanvas } from './components/KonvaMapCanvas';
+export { KonvaMapEditorModule } from './KonvaMapEditorModule';
+
+// Hooks
+export { useKonvaLayers } from './hooks/useKonvaLayers';
+export { useKonvaZoom } from './hooks/useKonvaZoom';
+export { useKonvaPan } from './hooks/useKonvaPan';
+export { useKonvaGrid } from './hooks/useKonvaGrid';
+export { useKonvaBackground } from './hooks/useKonvaBackground';
+export { useKonvaPolygonDrawing } from './hooks/useKonvaPolygonDrawing';
+export { useKonvaRectDrawing } from './hooks/useKonvaRectDrawing';
+export { useKonvaSelection } from './hooks/useKonvaSelection';
+export { useKonvaTransform } from './hooks/useKonvaTransform';
+export { useKonvaHistory } from './hooks/useKonvaHistory';
+export { useKonvaPersistence } from './hooks/useKonvaPersistence';
+export { useKonvaSharedMap } from './hooks/useKonvaSharedMap';
+export { useKonvaKeyboardShortcuts } from './hooks/useKonvaKeyboardShortcuts';
+export { useKonvaPreviewMode } from './hooks/useKonvaPreviewMode';
+export { useKonvaPerformance } from './hooks/useKonvaPerformance';
+export { useKonvaAccessibility } from './hooks/useKonvaAccessibility';
+
+// Components
+export { PolygonDrawingPreview } from './components/PolygonDrawingPreview';
+export { RectangleDrawingPreview } from './components/RectangleDrawingPreview';
+export { TransformableRect, TransformablePolygon, TransformerComponent } from './components/TransformableShape';
+export { SelectionRect } from './components/SelectionRect';
+export { KonvaPerformanceBenchmark } from './components/KonvaPerformanceBenchmark';
+export { MapEditorSelector } from './components/MapEditorSelector';
+export { EditorComparison } from './components/EditorComparison';
+// export { PolygonEditor } from './components/PolygonEditor';
+
+// Types
+export * from './types';
+
+// Constants
+export * from './constants/konvaConstants';
+
+// Config
+export * from './config/featureFlags';
+
+// Utilities
+export * from './utils/coordinateTransform';
+export * from './utils/shapeFactories';
+export * from './utils/validation';
+export * from './utils/mapDataAdapter';
+export * from './utils/sharedMapAdapter';
+
+// Temporary export to prevent empty module error
+export const MAP_EDITOR_KONVA_VERSION = '0.1.0-alpha';
+export const MAP_EDITOR_KONVA_STATUS = 'In Development - Phase 1: Foundation & Infrastructure';
+

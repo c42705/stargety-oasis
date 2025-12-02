@@ -1,0 +1,211 @@
+// Prisma Schema for Stargety Oasis
+// PostgreSQL with PostGIS support
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USER & AUTH
+// ============================================================================
+
+// User model for authentication
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  password  String   // hashed password
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  messages   Message[]
+  ownedRooms ChatRoom[]    @relation("RoomOwner")
+  characters Character[]
+  settings   UserSettings?
+
+  @@map("users")
+}
+
+// ============================================================================
+// MAP DATA
+// ============================================================================
+
+// Map model with JSONB data for flexible map storage
+model Map {
+  id        String   @id @default(cuid())
+  roomId    String   @unique
+  name      String
+  data      Json     // JSONB - stores full map data structure (areas, collision, dimensions)
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  assets MapAsset[]
+
+  @@map("maps")
+}
+
+// Map asset - images/sprites placed on the map
+model MapAsset {
+  id        String   @id @default(cuid())
+  mapId     String
+  fileName  String
+  filePath  String   // Path in /uploads/maps/{mapId}/{assetId}.{ext}
+  fileSize  Int      // Size in bytes
+  mimeType  String   // image/png, image/jpeg, etc.
+  metadata  Json     // {width, height, x, y, rotation, scaleX, scaleY}
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  map Map @relation(fields: [mapId], references: [id], onDelete: Cascade)
+
+  @@index([mapId])
+  @@map("map_assets")
+}
+
+// ============================================================================
+// CHARACTER / AVATAR SYSTEM
+// ============================================================================
+
+// Character slot - each user has up to 5 character slots
+// NOTE: userId is a string identifier (username/session) - not a strict FK for now
+// This allows flexible character storage without requiring full auth system
+model Character {
+  id            String    @id @default(cuid())
+  userId        String    // Can be username, session ID, or User.id
+  slotNumber    Int       // 1-5
+  name          String
+  spriteSheet   Json      // Full SpriteSheetDefinition from Avatar Builder
+  thumbnailPath String?   // Path to thumbnail image
+  texturePath   String?   // Path to cached composite texture
+  isEmpty       Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastUsed      DateTime?
+
+  // Optional relation to User (when auth is implemented)
+  user   User?   @relation(fields: [userFk], references: [id], onDelete: Cascade)
+  userFk String?
+
+  // Each user can only have one character per slot number
+  @@unique([userId, slotNumber])
+  @@index([userId])
+  @@index([userFk])
+  @@map("characters")
+}
+
+// Active character state - tracks which character slot is active per user
+model ActiveCharacter {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  activeSlotNumber Int      @default(1) // 1-5
+  lastSwitched     DateTime @default(now())
+
+  @@map("active_characters")
+}
+
+// ============================================================================
+// USER SETTINGS & PREFERENCES
+// ============================================================================
+
+// User settings - theme, preferences, editor config
+// NOTE: userId is a string identifier (username/session) - not a strict FK for now
+model UserSettings {
+  id             String   @id @default(cuid())
+  userId         String   @unique  // Can be username, session ID, or User.id
+  theme          String   @default("dark") // "dark" | "light"
+  jitsiServerUrl String?  // Custom Jitsi server URL
+  editorPrefs    Json?    // {gridSize, snapToGrid, showGrid, viewportPrefs, toolPrefs}
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Optional relation to User (when auth is implemented)
+  user   User?   @relation(fields: [userFk], references: [id], onDelete: Cascade)
+  userFk String? @unique
+
+  @@index([userFk])
+  @@map("user_settings")
+}
+
+// Jitsi room mappings - map interactive areas to Jitsi room names
+model JitsiRoomMapping {
+  id            String   @id @default(cuid())
+  areaId        String   @unique // Interactive area ID from map
+  jitsiRoomName String   // Sanitized Jitsi room name
+  displayName   String?  // Human-readable display name
+  isCustom      Boolean  @default(false) // true if custom, false if auto-generated
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("jitsi_room_mappings")
+}
+
+// ============================================================================
+// PLAYER STATE (Ephemeral)
+// ============================================================================
+
+// Player position - tracks player location in the world
+model PlayerPosition {
+  id        String   @id @default(cuid())
+  sessionId String   @unique // Browser session ID
+  userId    String?  // Optional - linked to user if authenticated
+  roomId    String   @default("default")
+  x         Int      @default(400)
+  y         Int      @default(300)
+  direction String   @default("down") // "up" | "down" | "left" | "right"
+  updatedAt DateTime @updatedAt
+
+  @@index([roomId])
+  @@map("player_positions")
+}
+
+// ============================================================================
+// CHAT SYSTEM
+// ============================================================================
+
+// ChatRoom model for persistent chat rooms
+model ChatRoom {
+  id          String    @id @default(cuid())
+  name        String
+  roomId      String    @unique  // matches map area ID
+  description String?
+  sessionId   String?   // for session-based rooms
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  expiresAt   DateTime? // for TTL cleanup (8hr)
+
+  // Relations
+  messages Message[]
+  owner    User?     @relation("RoomOwner", fields: [ownerId], references: [id])
+  ownerId  String?
+
+  @@map("chat_rooms")
+}
+
+// Message model with JSONB content for rich messages
+model Message {
+  id        String   @id @default(cuid())
+  content   Json     // JSONB - text, mentions, attachments, etc.
+  createdAt DateTime @default(now())
+  expiresAt DateTime // for 8hr TTL cleanup
+
+  // Relations
+  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomId    String
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorId  String?
+
+  @@index([roomId, createdAt])
+  @@index([expiresAt])
+  @@map("messages")
+}
+

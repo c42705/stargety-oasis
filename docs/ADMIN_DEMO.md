@@ -73,9 +73,7 @@ When you first open the application at `http://localhost:3000`, you'll see a pro
 ### **Settings Features to Test**
 
 #### **Video Service Selection:**
-- **RingCentral Option:**
-  - Professional video conferencing
-  - Features: HD Video & Audio, Screen Sharing, Recording, Large Meetings, Enterprise Security
+
 
 - **Jitsi Meet Option:**
   - Open-source video conferencing

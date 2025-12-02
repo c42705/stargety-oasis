@@ -1,0 +1,206 @@
+/* Split Layout Component Styles */
+.split-layout-component {
+  height: 100%;
+  width: 100%;
+  background-color: var(--color-bg-primary);
+}
+
+/* Ensure proper sizing for all panels */
+.split-layout-component .ant-splitter-panel {
+  overflow: hidden;
+}
+
+/* Left Panel (World) Styles */
+.world-module-panel {
+  height: 100%;
+  width: 100%;
+}
+
+.world-module-panel .world-module {
+  height: 100%;
+  width: 100%;
+}
+
+.world-module-panel .world-container {
+  height: 100%;
+  width: 100%;
+  position: relative;
+}
+
+.world-module-panel .game-canvas {
+  height: 100%;
+  width: 100%;
+}
+
+/* Video Panel Styles */
+.video-panel {
+  height: 100%;
+  width: 100%;
+}
+
+.video-panel-content {
+  height: 100%;
+  width: 100%;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* Chat Panel Styles */
+.chat-panel {
+  height: 100%;
+  width: 100%;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .split-layout-component .ant-splitter-panel:first-child {
+    min-width: 200px;
+  }
+}
+
+@media (max-width: 768px) {
+  .split-layout-component .ant-splitter-panel:first-child {
+    min-width: 150px;
+  }
+  
+  /* Stack panels vertically on mobile */
+  .split-layout-component {
+    flex-direction: column;
+  }
+}
+
+/* Ensure proper scrolling in panels */
+.video-communication-panel,
+.persistent-chat-panel {
+  overflow: hidden;
+}
+
+/* Custom scrollbar for chat messages */
+.persistent-chat-panel .ant-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-light) transparent;
+}
+
+.persistent-chat-panel .ant-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.persistent-chat-panel .ant-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.persistent-chat-panel .ant-list::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-light);
+  border-radius: 3px;
+}
+
+.persistent-chat-panel .ant-list::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-border);
+}
+
+/* Panel header overlays */
+.split-layout-component .ant-splitter-panel > div[style*="position: absolute"] {
+  z-index: 10;
+  pointer-events: none;
+}
+
+.split-layout-component .ant-splitter-panel > div[style*="position: absolute"] > * {
+  pointer-events: auto;
+}
+
+/* Smooth transitions */
+.split-layout-component .ant-splitter-panel {
+  transition: all 0.3s ease;
+}
+
+/* Focus states for accessibility */
+.split-layout-component .ant-splitter-panel:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+/* Loading states */
+.video-panel .ant-spin-container {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Empty states */
+.video-panel .ant-empty,
+.chat-panel .ant-empty {
+  margin: auto;
+}
+
+/* Ensure proper height inheritance */
+.main-split-layout,
+.main-split-layout > *,
+.main-split-layout .ant-splitter,
+.main-split-layout .ant-splitter-panel {
+  height: 100%;
+}
+
+/* Panel content padding adjustments */
+.video-panel > div:first-child,
+.chat-panel > div:first-child {
+  height: 100%;
+}
+
+/* Resizer styling */
+.split-layout-component .ant-splitter-resizer {
+  background-color: var(--color-border-light);
+  transition: background-color 0.2s ease;
+}
+
+.split-layout-component .ant-splitter-resizer:hover {
+  background-color: var(--color-primary);
+}
+
+.split-layout-component .ant-splitter-resizer-active {
+  background-color: var(--color-primary) !important;
+}
+
+/* Collapse button styling */
+.split-layout-component .ant-splitter-collapse-bar {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-light);
+  border-radius: 4px;
+}
+
+.split-layout-component .ant-splitter-collapse-bar:hover {
+  background-color: var(--color-bg-tertiary);
+  border-color: var(--color-primary);
+}
+
+/* Dark theme adjustments */
+[data-theme="dark"] .split-layout-component {
+  background-color: var(--color-bg-primary);
+}
+
+[data-theme="dark"] .split-layout-component .ant-splitter-resizer {
+  background-color: var(--color-border);
+}
+
+[data-theme="dark"] .split-layout-component .ant-splitter-resizer:hover {
+  background-color: var(--color-primary);
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .split-layout-component .ant-splitter-resizer {
+    background-color: var(--color-text-primary);
+  }
+  
+  .split-layout-component .ant-splitter-panel {
+    border: 1px solid var(--color-text-primary);
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .split-layout-component .ant-splitter-panel,
+  .split-layout-component .ant-splitter-resizer {
+    transition: none;
+  }
+}

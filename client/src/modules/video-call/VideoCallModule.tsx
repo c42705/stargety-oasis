@@ -1,17 +1,16 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useEventBus } from '../../shared/EventBusContext';
-import './VideoCallModule.css';
+import React, { useEffect, useRef } from 'react';
 
 interface VideoCallModuleProps {
   roomId: string;
   userName: string;
   serverUrl?: string;
-  className?: string;
+  hideToolbar?: boolean;
+  onParticipantCountChange?: (count: number) => void;
+  onCallQuality?: (quality: 'good' | 'medium' | 'poor') => void;
+  onError?: (error: string) => void;
 }
 
 interface JitsiAPI {
-  executeCommand: (command: string, ...args: any[]) => void;
-  addEventListeners: (listeners: Record<string, Function>) => void;
   dispose: () => void;
 }
 
@@ -21,192 +20,126 @@ declare global {
   }
 }
 
+/**
+ * Simple Jitsi Video Call Module
+ * Displays a Jitsi Meet iframe with minimal configuration
+ */
 export const VideoCallModule: React.FC<VideoCallModuleProps> = ({
   roomId,
   userName,
-  serverUrl = 'meet.jit.si',
-  className = '',
+  serverUrl = 'meet.stargety.com',
+  hideToolbar = false,
 }) => {
-  const [isJoined, setIsJoined] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [participants, setParticipants] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  const jitsiContainerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<JitsiAPI | null>(null);
-  const eventBus = useEventBus();
 
+  // Clean room ID (remove special characters)
   const cleanRoomId = roomId.replace(/[^a-zA-Z0-9]/g, '');
 
-  const loadJitsiScript = useCallback(() => {
-    return new Promise<void>((resolve, reject) => {
+  // Extract domain from serverUrl (strip http:// or https:// if present)
+  const cleanServerUrl = serverUrl.replace(/^https?:\/\//, '');
+
+  useEffect(() => {
+    console.log('🎥 VideoCallModule mounted - Room:', cleanRoomId, 'User:', userName);
+
+    // Load Jitsi script if not already loaded
+    const loadJitsi = async () => {
       if (window.JitsiMeetExternalAPI) {
-        resolve();
+        initializeJitsi();
         return;
       }
+
       const script = document.createElement('script');
-      script.src = `https://${serverUrl}/external_api.js`;
+      script.src = `https://${cleanServerUrl}/external_api.js`;
       script.async = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load Jitsi Meet API'));
-      document.head.appendChild(script);
-    });
-  }, [serverUrl]);
+      script.onload = () => {
+        console.log('✅ Jitsi script loaded');
+        initializeJitsi();
+      };
+      script.onerror = () => {
+        console.error('❌ Failed to load Jitsi script');
+      };
+      document.body.appendChild(script);
+    };
 
-  const initializeJitsi = useCallback(async () => {
-    if (!jitsiContainerRef.current || apiRef.current) return;
+    // Initialize Jitsi Meet
+    const initializeJitsi = () => {
+      if (!containerRef.current || apiRef.current) {
+        console.log('⚠️ Skipping Jitsi init - container:', !!containerRef.current, 'api:', !!apiRef.current);
+        return;
+      }
 
-    try {
-      setIsLoading(true);
-      setError(null);
-      await loadJitsiScript();
+      console.log('🎬 Initializing Jitsi for room:', cleanRoomId);
+
+      const toolbarButtons = hideToolbar
+        ? ['microphone', 'camera', 'desktop', 'fullscreen']
+        : ['microphone', 'camera', 'desktop', 'fullscreen', 'hangup', 'chat', 'settings', 'tileview'];
 
       const options = {
         roomName: cleanRoomId,
         width: '100%',
         height: '100%',
-        parentNode: jitsiContainerRef.current,
-        userInfo: { displayName: userName },
+        parentNode: containerRef.current,
+        userInfo: {
+          displayName: userName,
+        },
         configOverwrite: {
-          startWithAudioMuted: false,
+          startWithAudioMuted: true,
           startWithVideoMuted: false,
           enableWelcomePage: false,
           prejoinPageEnabled: false,
+          prejoinConfig: {
+            enabled: false,
+          },
+          disableDeepLinking: true,
+          // Additional settings to skip prejoin
+          requireDisplayName: false,
+          enableInsecureRoomNameWarning: false,
+          disableInitialGUM: false,
         },
         interfaceConfigOverwrite: {
-          TOOLBAR_BUTTONS: [
-            'microphone', 'camera', 'desktop', 'fullscreen',
-            'hangup', 'chat', 'settings', 'tileview'
-          ],
+          TOOLBAR_BUTTONS: toolbarButtons,
           SHOW_JITSI_WATERMARK: false,
-          SHOW_WATERMARK_FOR_GUESTS: false,
+          SHOW_WATERMARK_FOR_GUESTS: true,
+          DISABLE_JOIN_LEAVE_NOTIFICATIONS: false,
+          FILM_STRIP_MAX_HEIGHT: 120,
+          // Skip prejoin screen
+          DISABLE_FOCUS_INDICATOR: true,
+          MOBILE_APP_PROMO: false,
         },
       };
 
-      apiRef.current = new window.JitsiMeetExternalAPI(serverUrl, options);
-      const api = apiRef.current;
+      try {
+        apiRef.current = new window.JitsiMeetExternalAPI(cleanServerUrl, options);
+        console.log('✅ Jitsi initialized successfully');
+      } catch (error) {
+        console.error('❌ Jitsi initialization error:', error);
+      }
+    };
 
-      const eventListeners = {
-        videoConferenceJoined: () => {
-          setIsJoined(true);
-          setIsLoading(false);
-          const participantsList = [userName];
-          setParticipants(participantsList);
-          eventBus.publish('video:roomJoined', {
-            roomId: cleanRoomId,
-            participants: participantsList,
-          });
-        },
-        videoConferenceLeft: () => {
-          setIsJoined(false);
-          setParticipants([]);
-          eventBus.publish('video:roomLeft', { roomId: cleanRoomId });
-        },
-        participantJoined: (event: any) => {
-          const participantName = event.displayName || 'Anonymous';
-          setParticipants(prev => {
-            if (!prev.includes(participantName)) {
-              const newParticipants = [...prev, participantName];
-              eventBus.publish('video:participantJoined', {
-                roomId: cleanRoomId,
-                participant: participantName,
-              });
-              return newParticipants;
-            }
-            return prev;
-          });
-        },
-        participantLeft: (event: any) => {
-          const participantName = event.displayName || 'Anonymous';
-          setParticipants(prev => {
-            const newParticipants = prev.filter(p => p !== participantName);
-            eventBus.publish('video:participantLeft', {
-              roomId: cleanRoomId,
-              participant: participantName,
-            });
-            return newParticipants;
-          });
-        },
-      };
+    loadJitsi();
 
-      api.addEventListeners(eventListeners);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to initialize video call');
-      setIsLoading(false);
-    }
-  }, [cleanRoomId, userName, serverUrl, eventBus, loadJitsiScript]);
-
-  const handleLeaveCall = useCallback(() => {
-    if (apiRef.current) {
-      apiRef.current.dispose();
-      apiRef.current = null;
-    }
-    setIsJoined(false);
-    setIsLoading(false);
-    setParticipants([]);
-    setError(null);
-  }, []);
-
-  useEffect(() => {
-    return () => handleLeaveCall();
-  }, [handleLeaveCall]);
+    // Cleanup on unmount
+    return () => {
+      console.log('🔴 VideoCallModule unmounting - cleaning up');
+      if (apiRef.current) {
+        apiRef.current.dispose();
+        apiRef.current = null;
+      }
+    };
+  }, [cleanRoomId, userName, cleanServerUrl, hideToolbar]);
 
   return (
-    <div className={`video-call-module ${className}`}>
-      <div className="video-call-header">
-        <h3>Video Call - {roomId}</h3>
-        <div className="call-info">
-          <span>👥 {participants.length} participant{participants.length !== 1 ? 's' : ''}</span>
-          {isJoined && <span className="call-status">🟢 Connected</span>}
-        </div>
-      </div>
-
-      {error && (
-        <div className="error-message">
-          <span>❌ {error}</span>
-          <button onClick={() => setError(null)}>✕</button>
-        </div>
-      )}
-
-      <div className="video-container">
-        {!isJoined && !isLoading && (
-          <div className="join-screen">
-            <div className="join-content">
-              <h4>Join Video Call</h4>
-              <p>Room: <strong>{roomId}</strong></p>
-              <p>You will join as: <strong>{userName}</strong></p>
-              <button onClick={initializeJitsi} className="join-button">
-                📹 Join Call
-              </button>
-            </div>
-          </div>
-        )}
-
-        {isLoading && (
-          <div className="loading-screen">
-            <div className="loading-spinner"></div>
-            <p>Connecting to video call...</p>
-          </div>
-        )}
-
-        <div
-          ref={jitsiContainerRef}
-          className={`jitsi-container ${isJoined ? 'active' : 'hidden'}`}
-        />
-      </div>
-
-      {participants.length > 0 && (
-        <div className="participants-list">
-          <h5>Participants:</h5>
-          <div className="participants">
-            {participants.map((participant, index) => (
-              <span key={index} className="participant">
-                👤 {participant}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+    <div
+      ref={containerRef}
+      style={{
+        width: '100%',
+        height: '100%',
+        minHeight: '400px',
+      }}
+    />
   );
 };
+
+export default VideoCallModule;
+

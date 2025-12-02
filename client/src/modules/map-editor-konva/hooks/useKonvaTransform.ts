@@ -1,0 +1,242 @@
+/**
+ * Konva Map Editor - Transform Hook
+ * 
+ * Handles shape transformation including drag-to-move and resize.
+ */
+
+import { useCallback } from 'react';
+import type {
+  Shape,
+  RectangleGeometry,
+  PolygonGeometry,
+  ImageGeometry,
+  UseKonvaTransformParams,
+  UseKonvaTransformReturn,
+} from '../types';
+
+/**
+ * Hook for shape transformation functionality
+ * 
+ * Provides drag-to-move and resize functionality for selected shapes.
+ * 
+ * @example
+ * ```typescript
+ * const {
+ *   handleDragEnd,
+ *   handleTransformEnd,
+ *   canTransform,
+ * } = useKonvaTransform({
+ *   selectedIds,
+ *   shapes,
+ *   onShapeUpdate: (id, updates) => updateShape(id, updates),
+ * });
+ * ```
+ */
+export function useKonvaTransform(
+  params: UseKonvaTransformParams
+): UseKonvaTransformReturn {
+  const {
+    selectedIds,
+    shapes,
+    onShapeUpdate,
+    snapToGrid,
+  } = params;
+
+  // ==========================================================================
+  // TRANSFORM UTILITIES
+  // ==========================================================================
+
+  /**
+   * Check if a shape can be transformed
+   */
+  const canTransform = useCallback(
+    (shapeId: string): boolean => {
+      return selectedIds.includes(shapeId);
+    },
+    [selectedIds]
+  );
+
+  /**
+   * Get shape by ID
+   */
+  const getShape = useCallback(
+    (shapeId: string): Shape | undefined => {
+      return shapes.find((s) => s.id === shapeId);
+    },
+    [shapes]
+  );
+
+  // ==========================================================================
+  // DRAG HANDLERS
+  // ==========================================================================
+
+  /**
+   * Handle drag end - update shape position
+   */
+  const handleDragEnd = useCallback(
+    (shapeId: string, e: any) => {
+      const shape = getShape(shapeId);
+      if (!shape || !canTransform(shapeId)) return;
+
+      const node = e.target;
+      let newX = node.x();
+      let newY = node.y();
+
+      // Snap to grid if enabled
+      if (snapToGrid) {
+        const snapped = snapToGrid(newX, newY);
+        newX = snapped.x;
+        newY = snapped.y;
+        // Update node position to snapped value for visual feedback
+        node.x(newX);
+        node.y(newY);
+      }
+
+      // Update shape geometry based on type
+      if (shape.geometry.type === 'rectangle') {
+        const updates: Partial<RectangleGeometry> = {
+          x: newX,
+          y: newY,
+        };
+        onShapeUpdate?.(shapeId, { geometry: { ...shape.geometry, ...updates } });
+      } else if (shape.geometry.type === 'polygon') {
+        // For polygons, we need to update the points array
+        // The drag moves the entire polygon, so we just update x/y offset
+
+        // Calculate the delta from the original position
+        const deltaX = newX;
+        const deltaY = newY;
+
+        // Update all points by the delta
+        const newPoints = [...shape.geometry.points];
+        for (let i = 0; i < newPoints.length; i += 2) {
+          newPoints[i] += deltaX;
+          newPoints[i + 1] += deltaY;
+        }
+
+        // Reset node position to 0,0 since we've updated the points
+        node.x(0);
+        node.y(0);
+
+        onShapeUpdate?.(shapeId, { geometry: { ...shape.geometry, points: newPoints } });
+      } else if (shape.geometry.type === 'image') {
+        // For images, update position
+        const updates: Partial<ImageGeometry> = {
+          x: newX,
+          y: newY,
+        };
+        onShapeUpdate?.(shapeId, { geometry: { ...shape.geometry, ...updates } });
+      }
+    },
+    [getShape, canTransform, onShapeUpdate, snapToGrid]
+  );
+
+  // ==========================================================================
+  // TRANSFORM HANDLERS
+  // ==========================================================================
+
+  /**
+   * Check if selected shapes are grouped
+   */
+  const isGrouped = useCallback((): boolean => {
+    if (selectedIds.length === 0) return false;
+    const groupIds = selectedIds
+      .map(id => shapes.find(s => s.id === id)?.metadata.groupId)
+      .filter(Boolean);
+    return groupIds.length > 0 && new Set(groupIds).size === 1;
+  }, [selectedIds, shapes]);
+
+  /**
+   * Handle transform end - update shape size/rotation
+   * For grouped shapes, maintains aspect ratio and relative positioning
+   */
+  const handleTransformEnd = useCallback(
+    (shapeId: string, node: any) => {
+      const shape = getShape(shapeId);
+      if (!shape || !canTransform(shapeId)) return;
+
+      const scaleX = node.scaleX();
+      const scaleY = node.scaleY();
+
+      // For grouped shapes, lock aspect ratio to maintain proportions
+      const lockAspectRatio = isGrouped();
+      const finalScaleX = lockAspectRatio ? Math.min(scaleX, scaleY) : scaleX;
+      const finalScaleY = lockAspectRatio ? Math.min(scaleX, scaleY) : scaleY;
+
+      if (shape.geometry.type === 'rectangle') {
+        // Reset scale to 1 and adjust width/height instead
+        node.scaleX(1);
+        node.scaleY(1);
+
+        const updates: Partial<RectangleGeometry> = {
+          x: node.x(),
+          y: node.y(),
+          width: Math.max(5, node.width() * finalScaleX),
+          height: Math.max(5, node.height() * finalScaleY),
+          rotation: node.rotation(),
+        };
+
+        onShapeUpdate?.(shapeId, { geometry: { ...shape.geometry, ...updates } });
+      } else if (shape.geometry.type === 'polygon') {
+        // For polygons, apply scale to points
+        const updates: Partial<PolygonGeometry> = {
+          points: shape.geometry.points,
+        };
+
+        if (finalScaleX !== 1 || finalScaleY !== 1) {
+          const newPoints = [...shape.geometry.points];
+          for (let i = 0; i < newPoints.length; i += 2) {
+            newPoints[i] *= finalScaleX;
+            newPoints[i + 1] *= finalScaleY;
+          }
+          updates.points = newPoints;
+
+          // Reset scale
+          node.scaleX(1);
+          node.scaleY(1);
+        }
+
+        onShapeUpdate?.(shapeId, { geometry: { ...shape.geometry, ...updates } });
+      } else if (shape.geometry.type === 'image') {
+        // For images, update dimensions and rotation
+        node.scaleX(1);
+        node.scaleY(1);
+
+        const updates: Partial<ImageGeometry> = {
+          x: node.x(),
+          y: node.y(),
+          width: Math.max(5, node.width() * finalScaleX),
+          height: Math.max(5, node.height() * finalScaleY),
+          rotation: node.rotation(),
+        };
+
+        onShapeUpdate?.(shapeId, { geometry: { ...shape.geometry, ...updates } });
+      }
+    },
+    [getShape, canTransform, onShapeUpdate, isGrouped]
+  );
+
+  // ==========================================================================
+  // RETURN
+  // ==========================================================================
+
+  return {
+    // State
+    state: {
+      isTransforming: false,
+      transformType: null,
+      originalShapes: [],
+    },
+
+    // Transform queries
+    canTransform: selectedIds.length > 0,
+
+    // Event handlers
+    handleTransformStart: () => {},
+    handleTransform: () => {},
+    handleDragEnd,
+    handleTransformEnd,
+    cancelTransform: () => {},
+  };
+}
+

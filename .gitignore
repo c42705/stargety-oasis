@@ -1,0 +1,59 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# Dependencies
+**/node_modules/
+**/.pnp
+**/.pnp.js
+
+# Builds
+**/build/
+**/dist/
+**/client/build/
+
+# Testing
+**/coverage/
+
+# Env/Logs
+**/.env*.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+.env
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS/Editor
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.vscode/settings.json  # Personal settings only
+*.swp
+*.swo
+
+# Docker/LXC
+lxc-config/*.log
+**/docker-compose.override.yml
+
+# Prisma (if added)
+**/prisma/migrations/0_init.sql  # Generated
+
+# Server-specific (already partial)
+server/node_modules/*
+server/dist/
+
+# Client-specific (CRA)
+client/build/
+client/node_modules/
+
+# Docs/Other
+docs/*.log
+
+# Temp?
+COMMIT_MESSAGE_PHASE_*.txt
+
+

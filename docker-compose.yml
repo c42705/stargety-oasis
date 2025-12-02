@@ -1,7 +1,81 @@
 version: '3.8'
 
 services:
-  # Main application service
+  # PostgreSQL with PostGIS for spatial data
+  postgres:
+    image: postgis/postgis:17-3.4
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: stargety
+      POSTGRES_PASSWORD: stargety_dev_password
+      POSTGRES_DB: stargety_oasis
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stargety -d stargety_oasis"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - stargety_network
+    profiles:
+      - dev
+      - production
+
+  # Server - Development mode with hot reload
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server.dev
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      CLIENT_URL: http://localhost:3000
+      DATABASE_URL: postgresql://stargety:stargety_dev_password@postgres:5432/stargety_oasis
+    volumes:
+      - ./server:/app/server
+      - /app/server/node_modules
+      - uploads:/tmp/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - stargety_network
+    profiles:
+      - dev
+
+  # Client - Development mode with hot reload
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client.dev
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      REACT_APP_API_URL: http://localhost:3001
+      REACT_APP_WS_URL: http://localhost:3001
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+      WDS_SOCKET_PORT: 3000
+    volumes:
+      - ./client:/app/client
+      - /app/client/node_modules
+    depends_on:
+      - server
+    restart: unless-stopped
+    networks:
+      - stargety_network
+    profiles:
+      - dev
+
+  # Main application service (production)
   stargety-oasis:
     build:
       context: .
@@ -9,11 +83,16 @@ services:
     ports:
       - "3001:3001"
     environment:
-      - NODE_ENV=production
-      - PORT=3001
-      - CLIENT_URL=http://localhost:3001
+      NODE_ENV: production
+      PORT: 3001
+      CLIENT_URL: http://localhost:3001
+      DATABASE_URL: postgresql://stargety:stargety_dev_password@postgres:5432/stargety_oasis
     volumes:
       - app_data:/app/data
+      - uploads:/tmp/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
@@ -23,6 +102,8 @@ services:
       start_period: 40s
     networks:
       - stargety_network
+    profiles:
+      - production
 
   # Nginx reverse proxy (optional, for production)
   nginx:
@@ -41,24 +122,6 @@ services:
     profiles:
       - production
 
-  # MongoDB (for future database integration)
-  mongodb:
-    image: mongo:6.0
-    ports:
-      - "27017:27017"
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=admin
-      - MONGO_INITDB_ROOT_PASSWORD=password123
-      - MONGO_INITDB_DATABASE=stargety_oasis
-    volumes:
-      - mongodb_data:/data/db
-      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
-    restart: unless-stopped
-    networks:
-      - stargety_network
-    profiles:
-      - database
-
   # Redis (for session storage and caching)
   redis:
     image: redis:7-alpine
@@ -75,9 +138,11 @@ services:
 volumes:
   app_data:
     driver: local
-  mongodb_data:
+  postgres_data:
     driver: local
   redis_data:
+    driver: local
+  uploads:
     driver: local
 
 networks:

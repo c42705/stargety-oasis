@@ -1,0 +1,462 @@
+/* Map Editor Module Styles */
+.map-editor-module {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+
+/* Editor Header */
+.editor-header {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: start;
+  padding: var(--spacing-xs);
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border-light);
+  max-height: 120px; /* Limit header height to prevent layout collapse */
+  overflow: hidden; /* Hide overflow if toolbar wraps */
+}
+
+.editor-title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.editor-icon {
+  color: var(--color-accent);
+}
+
+.editor-title h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.editor-subtitle {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin-left: var(--spacing-sm);
+}
+
+.editor-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+/* Toolbar styles migrated to Ant Design components */
+
+.save-status-section .save-status-indicator {
+  background: transparent;
+  border: none;
+  padding: 0;
+  min-width: auto;
+}
+
+/* Editor Layout */
+.editor-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Integrated Sidebar */
+.editor-sidebar {
+  width: 350px;
+  background: var(--color-bg-secondary);
+  border-left: 1px solid var(--color-border-light);
+  display: flex;
+  flex-direction: column;
+  order: 2;
+  overflow: hidden;
+}
+
+/* Sidebar Toolbar Section */
+.sidebar-toolbar {
+  background: var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.toolbar-header {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.toolbar-header h3 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Editor Panel Tabs - Matching SlidingPanel Style */
+.editor-panel-tabs {
+  display: flex;
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.editor-panel-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  padding: var(--spacing-md) var(--spacing-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  font-size: 0.875rem;
+  position: relative;
+  min-height: 60px;
+}
+
+.editor-panel-tab:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+.editor-panel-tab.active {
+  color: var(--color-accent);
+  background: var(--color-bg-secondary);
+}
+
+.editor-panel-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-accent);
+}
+
+.editor-panel-tab .tab-icon {
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.editor-panel-tab .tab-label {
+  font-weight: 500;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+/* Sidebar Content Area */
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--color-bg-primary);
+}
+
+.tab-content-container {
+  
+  padding: var(--spacing-sm);
+}
+
+/* Main Content */
+.editor-main {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  order: 1;
+}
+
+.editor-content {
+  padding: var(--spacing-lg);
+  height: 100%;
+  overflow-y: auto;
+  position: relative;
+  z-index: 10;
+}
+
+/* Fabric.js Canvas */
+.canvas-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.fabric-canvas {
+  border: 1px solid var(--color-border-light);
+  background: var(--color-bg-primary);
+}
+
+/* Status Bar - Now using Ant Design Flex component */
+
+.save-status.saved {
+  color: #10b981;
+}
+
+.save-status.unsaved {
+  color: #f59e0b;
+}
+
+.save-status.saving {
+  color: var(--color-accent);
+}
+
+/* Tab content - Now using Ant Design Card and Space components */
+
+/* Buttons */
+.btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--spacing-xs);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.btn:hover {
+  background: var(--color-bg-primary);
+  border-color: var(--color-accent);
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.btn-secondary {
+  background: var(--color-bg-tertiary);
+  border-color: var(--color-border);
+}
+
+.btn-success {
+  background: #10b981;
+  border-color: #10b981;
+  color: white;
+}
+
+.btn-success:hover {
+  background: #059669;
+  border-color: #059669;
+}
+
+.btn-danger {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+/* Areas List - Now using Ant Design List component */
+
+/* Area styles - Now handled by Ant Design List.Item.Meta */
+
+/* Impassable Area SVG Styles */
+.impassable-area {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.impassable-area:hover {
+  fill: rgba(239, 68, 68, 0.5);
+  stroke-width: 3;
+}
+
+/* Placeholder Content */
+.placeholder-content {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--spacing-sm);
+  padding: var(--spacing-xl);
+  text-align: center;
+}
+
+.placeholder-content p {
+  font-size: 1.1rem;
+  margin-bottom: var(--spacing-md);
+  color: var(--color-text-secondary);
+}
+
+.placeholder-content ul {
+  text-align: left;
+  max-width: 400px;
+  margin: 0 auto;
+  color: var(--color-text-secondary);
+}
+
+.placeholder-content li {
+  margin-bottom: var(--spacing-sm);
+}
+
+/* Preview Mode */
+.preview-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: var(--color-accent);
+  color: white;
+  padding: var(--spacing-sm);
+}
+
+.preview-notice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  font-weight: 500;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .editor-header {    
+    gap: var(--spacing-md);
+    align-items: stretch;
+    padding: var(--spacing-xs);
+  }
+
+  .editor-actions {
+    justify-content: center;
+  }
+
+  /* Toolbar responsive styles migrated to Ant Design */
+
+  .editor-layout {
+    flex-direction: column;
+  }
+
+  .layers-panel {
+    order: 1;
+  }
+
+  .editor-sidebar {
+    width: 100%;
+    order: 3;
+    border-left: none;
+    border-top: 1px solid var(--color-border-light);
+    max-height: 50vh;
+  }
+
+  .editor-main {
+    order: 2;
+    flex: 1;
+  }
+
+  .sidebar-toolbar {
+    border-bottom: 1px solid var(--color-border-light);
+  }
+
+  .toolbar-header,
+  .nav-header {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .toolbar-header h3,
+  .nav-header h3 {
+    font-size: 0.75rem;
+  }
+
+  .editor-panel-tabs {
+    overflow-x: auto;
+  }
+
+  .editor-panel-tab {
+    min-width: 80px;
+    padding: var(--spacing-sm) var(--spacing-xs);
+    min-height: 50px;
+  }
+
+  .editor-panel-tab .tab-icon {
+    font-size: 1rem;
+  }
+
+  .editor-panel-tab .tab-label {
+    font-size: 0.625rem;
+  }
+
+  .sidebar-content {
+    max-height: 30vh;
+  }
+
+  /* Tab and area styles now handled by Ant Design responsive components */
+
+  .editor-content {
+    padding: var(--spacing-md);
+  }
+
+  /* Responsive styles now handled by Ant Design components */
+}
+
+/* Drawing Mode Overlay */
+.drawing-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(74, 144, 226, 0.1);
+  pointer-events: none;
+  z-index: 100;
+}
+
+.drawing-notice {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(74, 144, 226, 0.9);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  pointer-events: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.drawing-notice .btn {
+  margin-left: 8px;
+  padding: 4px 12px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+}
+
+.drawing-notice .btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+}

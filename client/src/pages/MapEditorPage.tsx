@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapEditorModule } from '../modules/map-editor/MapEditorModule';
+import { KonvaMapEditorModule } from '../modules/map-editor-konva';
 import { useAuth } from '../shared/AuthContext';
 import { MapDataProvider } from '../shared/MapDataContext';
 import { UnsavedChangesWarning } from '../components/UnsavedChangesWarning';
@@ -41,10 +41,9 @@ export const MapEditorPage: React.FC = () => {
           enabled={true}
           customMessage="You have unsaved map changes. Are you sure you want to leave the Map Editor?"
           onNavigationAttempt={() => {
-            console.log('User attempted to navigate away with unsaved changes');
           }}
         />
-        <MapEditorModule />
+        <KonvaMapEditorModule />
       </MapDataProvider>
     </div>
   );

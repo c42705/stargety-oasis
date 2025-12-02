@@ -29,6 +29,14 @@ export interface ChatMessage {
   editedAt?: Date;
 }
 
+// Avatar data for multiplayer synchronization
+export interface AvatarSyncData {
+  spriteSheetImageData: string;  // Base64 of the composed sprite sheet
+  frameWidth: number;
+  frameHeight: number;
+  characterName: string;
+}
+
 export interface WorldPlayer {
   id: string;
   name: string;
@@ -36,6 +44,7 @@ export interface WorldPlayer {
   y: number;
   roomId: string;
   lastMoved: Date;
+  avatarData?: AvatarSyncData;  // Optional avatar data for V2 characters
 }
 
 export interface ApiResponse<T = any> {
