@@ -185,17 +185,17 @@ export class PhaserMapRenderer {
    * Clear all map elements
    */
   private clearMap(): void {
-    // Safety checks to prevent errors if groups are not initialized
-    if (this.backgroundGroup) {
+    // Safety checks to prevent errors if groups are not initialized or have been destroyed
+    if (this.backgroundGroup && this.backgroundGroup.scene) {
       this.backgroundGroup.clear(true, true);
     }
-    if (this.assetsGroup) {
+    if (this.assetsGroup && this.assetsGroup.scene) {
       this.assetsGroup.clear(true, true);
     }
-    if (this.interactiveAreasGroup) {
+    if (this.interactiveAreasGroup && this.interactiveAreasGroup.scene) {
       this.interactiveAreasGroup.clear(true, true);
     }
-    if (this.collisionAreasGroup) {
+    if (this.collisionAreasGroup && this.collisionAreasGroup.scene) {
       this.collisionAreasGroup.clear(true, true);
     }
 
@@ -777,6 +777,7 @@ export class PhaserMapRenderer {
 
     // Clear groups
     this.backgroundGroup.destroy(true);
+    this.assetsGroup.destroy(true);
     this.interactiveAreasGroup.destroy(true);
     this.collisionAreasGroup.destroy(true);
 

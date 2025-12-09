@@ -59,6 +59,7 @@ export class WorldSocketService {
   private lastEmittedPosition: { x: number; y: number } = { x: 0, y: 0 };
   private moveThrottleMs: number = 50; // Max 20 updates/second
   private lastMoveTime: number = 0;
+  private serverId: string | null = null;
   private connectionResolvers: Array<() => void> = [];
 
   private constructor() {
@@ -70,6 +71,13 @@ export class WorldSocketService {
       WorldSocketService.instance = new WorldSocketService();
     }
     return WorldSocketService.instance;
+  }
+
+  /**
+   * Set the server-side ID for the current player
+   */
+  public setServerId(id: string): void {
+    this.serverId = id;
   }
 
   /**
@@ -125,7 +133,7 @@ export class WorldSocketService {
 
     // Listen for other players joining
     this.socket.on('player-joined', (data: RemotePlayerData) => {
-      logger.info('[WorldSocket] Player joined:', data.playerId);
+      logger.debug('[WorldSocket] Player joined:', data.playerId);
       this.callbacks?.onPlayerJoined(data);
     });
 
@@ -136,13 +144,13 @@ export class WorldSocketService {
 
     // Listen for players leaving
     this.socket.on('player-left', (data: { playerId: string }) => {
-      logger.info('[WorldSocket] Player left:', data.playerId);
+      logger.debug('[WorldSocket] Player left:', data.playerId);
       this.callbacks?.onPlayerLeft(data);
     });
 
     // Receive world state (existing players when joining)
     this.socket.on('world-state', (data: { players: ServerWorldPlayer[]; roomId: string }) => {
-      logger.info(`[WorldSocket] Received world state: ${data.players.length} players`);
+      logger.debug(`[WorldSocket] Received world state: ${data.players.length} players`);
       this.callbacks?.onWorldState(data);
     });
 
@@ -225,7 +233,7 @@ export class WorldSocketService {
    * Emit player movement (throttled)
    */
   public emitMove(x: number, y: number): void {
-    if (!this.socket || !this.isConnected || !this.currentPlayerId) return;
+    if (!this.socket || !this.isConnected || !this.serverId) return;
 
     const now = Date.now();
     if (now - this.lastMoveTime < this.moveThrottleMs) return;
@@ -237,11 +245,26 @@ export class WorldSocketService {
     this.lastEmittedPosition = { x, y };
 
     this.socket.emit('player-moved', {
-      playerId: this.currentPlayerId,
+      playerId: this.serverId,
       x,
       y,
       roomId: this.currentRoomId,
     });
+  }
+
+  /**
+   * Emit avatar update when player switches character
+   */
+  public emitAvatarUpdate(avatarData: AvatarSyncData): void {
+    if (!this.socket || !this.isConnected || !this.serverId) return;
+
+    this.socket.emit('player-avatar-updated', {
+      playerId: this.serverId,
+      roomId: this.currentRoomId,
+      avatarData,
+    });
+
+    logger.debug('[WorldSocket] Emitted avatar update for:', this.currentPlayerName);
   }
 
   /**

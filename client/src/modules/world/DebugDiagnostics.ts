@@ -17,13 +17,14 @@ export class DebugDiagnostics {
   private sharedMapSystem: SharedMapSystem;
   
   // Callbacks
-  private getPlayer: () => Phaser.GameObjects.Sprite | null;
+  // Accept either a Sprite or a Container so diagnostics can inspect container positions
+  private getPlayer: () => Phaser.GameObjects.Sprite | Phaser.GameObjects.Container | null;
   private getWorldBounds: () => { width: number; height: number };
 
   constructor(
     scene: Phaser.Scene,
     callbacks: {
-      getPlayer: () => Phaser.GameObjects.Sprite | null;
+      getPlayer: () => Phaser.GameObjects.Sprite | Phaser.GameObjects.Container | null;
       getWorldBounds: () => { width: number; height: number };
     }
   ) {

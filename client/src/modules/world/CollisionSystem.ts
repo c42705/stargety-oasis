@@ -160,7 +160,7 @@ export class CollisionSystem {
   /**
    * Check for collisions with interactive areas and emit events
    */
-  public checkAreaCollisions(player: Phaser.GameObjects.Sprite): void {
+  public checkAreaCollisions(player: Phaser.GameObjects.Sprite | Phaser.GameObjects.Container): void {
     // Only check collisions if player exists
     if (!player) {
       return;
