@@ -275,12 +275,35 @@ export class GameScene extends Phaser.Scene {
 
     if (connected) {
       logger.info('[GameScene] Socket connected, joining world room:', this.worldRoomId);
+
+      // Attempt to load active character/avatar data and include with join
+      let avatarData: any = undefined;
+      try {
+        const { CharacterStorage } = await import('../../components/avatar/v2/CharacterStorage');
+        const activeResult = CharacterStorage.getActiveCharacterSlot(this.playerId);
+        if (activeResult.success && activeResult.data && !(activeResult.data as any).isEmpty) {
+          const character = activeResult.data as any;
+          avatarData = {
+            spriteSheetImageData: character.cachedTexture || character.spriteSheet?.source?.imageData || '',
+            frameWidth: character.spriteSheet?.gridLayout?.frameWidth || 32,
+            frameHeight: character.spriteSheet?.gridLayout?.frameHeight || 32,
+            characterName: character.name || ''
+          };
+          logger.debug('[GameScene] Found active character for join, attaching avatarData');
+        } else {
+          logger.debug('[GameScene] No active character found for player on join');
+        }
+      } catch (error) {
+        logger.debug('[GameScene] Error loading active character for avatarData on join', error);
+      }
+
       this.worldSocketService.joinWorld(
         this.playerId,
         this.worldRoomId,
         initialX,
         initialY,
-        this.playerId // Use playerId as display name (it's actually the username)
+        this.playerId, // Use playerId as display name (it's actually the username)
+        avatarData
       );
     } else {
       logger.error('[GameScene] Failed to connect to socket server, multiplayer disabled');

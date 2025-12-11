@@ -306,7 +306,7 @@ export class PlayerManager {
   public playAnimation(direction: 'up' | 'down' | 'left' | 'right' | 'idle'): void {
     // Verify sprite is valid before attempting animation
     if (!this.verifySpriteValidity()) {
-      logger.warn('[PlayerManager] Sprite not valid, cannot play animation');
+      logger.debug('[PlayerManager] Sprite not valid, cannot play animation');
       return;
     }
     
@@ -331,7 +331,7 @@ export class PlayerManager {
       }
       const animSuccess = this.avatarRendererV2.playAnimation(this.playerId, animCategory);
       if (!animSuccess) {
-        logger.warn(`[PlayerManager] Animation playback failed for direction ${direction} - falling back to idle`, {
+        logger.debug(`[PlayerManager] Animation playback failed for direction ${direction} - falling back to idle`, {
           animCategory,
           playerId: this.playerId
         });
@@ -341,7 +341,7 @@ export class PlayerManager {
         }
       }
     } else {
-      logger.warn(`No V2 sprite available for player ${this.playerId}, cannot play animation for direction ${direction}`);
+      logger.debug(`[PlayerManager] No V2 sprite available for player ${this.playerId}, cannot play animation for direction ${direction}`);
     }
   }
 
@@ -365,22 +365,22 @@ export class PlayerManager {
    */
   private verifySpriteValidity(): boolean {
     if (!this.player) {
-      logger.warn('[PlayerManager] Player sprite is null');
+      logger.debug('[PlayerManager] Player sprite is null');
       return false;
     }
     
     if (!this.player.scene) {
-      logger.warn('[PlayerManager] Player sprite is not in a scene');
+      logger.debug('[PlayerManager] Player sprite is not in a scene');
       return false;
     }
     
     if (!this.player.active) {
-      logger.warn('[PlayerManager] Player sprite is not active, re-activating...');
+      logger.debug('[PlayerManager] Player sprite is not active, re-activating...');
       this.player.setActive(true);
     }
     
     if (!this.player.visible) {
-      logger.warn('[PlayerManager] Player sprite is not visible, making visible...');
+      logger.debug('[PlayerManager] Player sprite is not visible, making visible...');
       this.player.setVisible(true);
     }
     

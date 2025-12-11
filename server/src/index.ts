@@ -695,7 +695,7 @@ io.on('connection', (socket) => {
   socket.on('chat:typing', (data) => chatDbController.handleTyping(socket, data));
 
   // World events
-  socket.on('player-joined-world', (data) => worldController.handlePlayerJoinedWorld(socket, data));
+  socket.on('player-joined-world', (data) => worldController.handlePlayerJoinedWorld(socket, data).catch((error) => logger.error('Error in player-joined-world handler:', error)));
   socket.on('player-moved', (data) => worldController.handlePlayerMoved(socket, data));
 
   // Video call events

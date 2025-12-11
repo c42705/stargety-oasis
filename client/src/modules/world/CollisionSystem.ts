@@ -91,8 +91,14 @@ export class CollisionSystem {
    */
   public checkCollisionWithImpassableAreas(x: number, y: number, playerSize: number): boolean {
     const mapData = this.sharedMapSystem.getMapData();
-    if (!mapData || !mapData.impassableAreas) {
+    if (!mapData) {
+      logger.warn('[Collision] NO MAP DATA available for collision check!');
       return false; // No collision data available
+    }
+    
+    if (!mapData.impassableAreas || mapData.impassableAreas.length === 0) {
+      logger.warn('[Collision] NO IMPASSABLE AREAS in map data! impassableAreas:', mapData.impassableAreas);
+      return false; // No collision areas defined
     }
 
     // Player bounding box (centered on player position)
@@ -149,6 +155,12 @@ export class CollisionSystem {
             playerTop < areaBottom &&
             playerBottom > areaTop) {
           // Collision detected
+          logger.warn('[Collision] RECTANGLE collision detected!', {
+            areaId: area.id,
+            areaName: area.name,
+            playerPos: { x, y },
+            areaBounds: { x: area.x, y: area.y, width: area.width, height: area.height }
+          });
           return true;
         }
       }

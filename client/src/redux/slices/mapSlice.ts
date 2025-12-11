@@ -25,7 +25,8 @@ const initialState: MapState = {
 };
 
 export const loadMap = createAsyncThunk('map/load', async () => {
-  let data = await MapDataService.loadMapData();
+  // For map editor: allow localStorage fallback for offline editing support
+  let data = await MapDataService.loadMapData(undefined, false);
   if (!data) {
     data = await MapDataService.createDefaultMap();
   }

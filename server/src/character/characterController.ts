@@ -355,6 +355,54 @@ export class CharacterController {
       return false;
     }
   }
+
+  /**
+   * Get avatar sync data for a player's active character (for multiplayer sync)
+   * Returns base64 sprite sheet or null if no active character
+   */
+  async getActiveCharacterAvatarSync(userId: string): Promise<{ spriteSheetImageData: string; frameWidth: number; frameHeight: number; characterName: string } | null> {
+    try {
+      // Get active character slot for this user
+      const activeChar = await prisma.activeCharacter.findUnique({
+        where: { userId },
+      });
+      const activeSlotNumber = activeChar?.activeSlotNumber ?? 1;
+
+      // Get the character from that slot
+      const character = await prisma.character.findUnique({
+        where: { userId_slotNumber: { userId, activeSlotNumber } },
+      });
+
+      // If no character or it's empty, return null
+      if (!character || character.isEmpty) {
+        logger.debug(`[CharacterController] No active character for user ${userId}`);
+        return null;
+      }
+
+      // Extract spriteSheet and return as AvatarSyncData
+      const spriteSheet = character.spriteSheet as any;
+      const frameWidth = spriteSheet?.gridLayout?.frameWidth || 32;
+      const frameHeight = spriteSheet?.gridLayout?.frameHeight || 32;
+      const spriteSheetImageData = spriteSheet?.source?.imageData || '';
+
+      if (!spriteSheetImageData) {
+        logger.debug(`[CharacterController] No image data for active character of user ${userId}`);
+        return null;
+      }
+
+      logger.debug(`[CharacterController] Loaded avatar sync data for user ${userId}, character ${character.name}`);
+
+      return {
+        spriteSheetImageData,
+        frameWidth,
+        frameHeight,
+        characterName: character.name,
+      };
+    } catch (error) {
+      logger.error(`[CharacterController] Error loading avatar sync data for user ${userId}:`, error);
+      return null;
+    }
+  }
 }
 
 // Export singleton instance
