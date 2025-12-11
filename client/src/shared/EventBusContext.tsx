@@ -14,17 +14,19 @@ export interface EventMap {
   'world:playerLeft': { playerId: string };
   'world:objectInteraction': { playerId: string; objectId: string };
   'area-selected': { areaId: string; areaName: string; roomId: string };
-  // Area entry/exit events for Jitsi auto-join/leave
+  // Area entry/exit events for action dispatching
   'area-entered': { areaId: string; areaName: string; roomId: string };
   'area-exited': { areaId: string; areaName: string };
+  // Jitsi-specific events (dispatched by InteractiveAreaActionDispatcher)
+  'jitsi:join': { roomName: string; areaName: string };
+  'jitsi:leave': { areaName: string };
   'app:moduleLoaded': { module: string };
   'app:error': { error: string; module?: string };
-
 }
 
 type EventCallback<T = any> = (data: T) => void;
 
-interface EventBusInterface {
+export interface EventBus {
   publish: <K extends keyof EventMap>(event: K, data: EventMap[K]) => void;
   subscribe: <K extends keyof EventMap>(
     event: K,
@@ -37,7 +39,7 @@ interface EventBusInterface {
   clear: () => void;
 }
 
-const EventBusContext = createContext<EventBusInterface | null>(null);
+const EventBusContext = createContext<EventBus | null>(null);
 
 export const EventBusProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -102,7 +104,7 @@ export const EventBusProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Memoize the eventBus object to prevent unnecessary re-renders
   // This is critical for components that depend on eventBus (like WorldModuleAlt)
-  const eventBus: EventBusInterface = useMemo(() => ({
+  const eventBus: EventBus = useMemo(() => ({
     publish,
     subscribe,
     unsubscribe,
@@ -116,7 +118,7 @@ export const EventBusProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 };
 
-export const useEventBus = (): EventBusInterface => {
+export const useEventBus = (): EventBus => {
   const context = useContext(EventBusContext);
   if (!context) {
     throw new Error('useEventBus must be used within an EventBusProvider');

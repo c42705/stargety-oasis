@@ -24,16 +24,6 @@ export interface UserSettingsData {
   updatedAt: Date;
 }
 
-export interface JitsiMappingData {
-  id: string;
-  areaId: string;
-  jitsiRoomName: string;
-  displayName: string | null;
-  isCustom: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 export interface PlayerPositionData {
   id: string;
   sessionId: string;
@@ -150,115 +140,6 @@ export class SettingsController {
     } catch (error) {
       logger.error('Error updating user settings:', error);
       return null;
-    }
-  }
-
-  // --------------------------------------------------------------------------
-  // JITSI ROOM MAPPINGS
-  // --------------------------------------------------------------------------
-
-  /**
-   * Get all Jitsi room mappings
-   */
-  async listJitsiMappings(): Promise<JitsiMappingData[]> {
-    try {
-      const mappings = await prisma.jitsiRoomMapping.findMany({
-        orderBy: { createdAt: 'asc' },
-      });
-      return mappings.map((m) => ({
-        id: m.id,
-        areaId: m.areaId,
-        jitsiRoomName: m.jitsiRoomName,
-        displayName: m.displayName,
-        isCustom: m.isCustom,
-        createdAt: m.createdAt,
-        updatedAt: m.updatedAt,
-      }));
-    } catch (error) {
-      logger.error('Error listing Jitsi mappings:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get Jitsi mapping by area ID
-   */
-  async getJitsiMappingByArea(areaId: string): Promise<JitsiMappingData | null> {
-    try {
-      const mapping = await prisma.jitsiRoomMapping.findUnique({
-        where: { areaId },
-      });
-      if (!mapping) return null;
-      return {
-        id: mapping.id,
-        areaId: mapping.areaId,
-        jitsiRoomName: mapping.jitsiRoomName,
-        displayName: mapping.displayName,
-        isCustom: mapping.isCustom,
-        createdAt: mapping.createdAt,
-        updatedAt: mapping.updatedAt,
-      };
-    } catch (error) {
-      logger.error('Error getting Jitsi mapping:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Create or update a Jitsi mapping
-   */
-  async upsertJitsiMapping(data: {
-    areaId: string;
-    jitsiRoomName: string;
-    displayName?: string;
-    isCustom?: boolean;
-  }): Promise<JitsiMappingData | null> {
-    try {
-      const mapping = await prisma.jitsiRoomMapping.upsert({
-        where: { areaId: data.areaId },
-        update: {
-          jitsiRoomName: data.jitsiRoomName,
-          displayName: data.displayName,
-          isCustom: data.isCustom ?? true,
-        },
-        create: {
-          areaId: data.areaId,
-          jitsiRoomName: data.jitsiRoomName,
-          displayName: data.displayName ?? null,
-          isCustom: data.isCustom ?? false,
-        },
-      });
-
-      logger.info(`Upserted Jitsi mapping for area ${data.areaId}`);
-
-      return {
-        id: mapping.id,
-        areaId: mapping.areaId,
-        jitsiRoomName: mapping.jitsiRoomName,
-        displayName: mapping.displayName,
-        isCustom: mapping.isCustom,
-        createdAt: mapping.createdAt,
-        updatedAt: mapping.updatedAt,
-      };
-    } catch (error) {
-      logger.error('Error upserting Jitsi mapping:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Delete a Jitsi mapping by area ID
-   */
-  async deleteJitsiMapping(areaId: string): Promise<boolean> {
-    try {
-      await prisma.jitsiRoomMapping.delete({
-        where: { areaId },
-      });
-      logger.info(`Deleted Jitsi mapping for area ${areaId}`);
-      return true;
-    } catch (error) {
-      logger.error('Error deleting Jitsi mapping:', error);
-      return false;
     }
   }
 

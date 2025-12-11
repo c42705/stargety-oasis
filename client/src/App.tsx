@@ -8,6 +8,7 @@ import { EventBusProvider } from './shared/EventBusContext';
 import { SettingsProvider } from './shared/SettingsContext';
 import { AuthProvider, useAuth } from './shared/AuthContext';
 import { MapDataProvider } from './shared/MapDataContext';
+import { ActionDispatcherProvider } from './shared/ActionDispatcherProvider';
 import { ThemeProvider, useTheme } from './shared/ThemeContext';
 import { MapSynchronizer } from './shared/MapSynchronizer';
 import { ModalStateProvider } from './shared/ModalStateManager';
@@ -284,20 +285,22 @@ const AuthenticatedApp: React.FC = () => {
     <SettingsProvider currentUser={user.username}>
       <EventBusProvider>
         <MapDataProvider>
-          <MapSynchronizer
-            enableCrossTabSync={true}
-            syncDebounceMs={100}
-            onSyncError={(error) => {
-              logger.error('Map synchronization error', error);
-              // TODO: Add user-visible error notification
-            }}
-            onSyncSuccess={() => {
-              logger.info('Map synchronized successfully');
-              // TODO: Add user-visible success notification
-            }}
-          >
-            <AppContent />
-          </MapSynchronizer>
+          <ActionDispatcherProvider>
+            <MapSynchronizer
+              enableCrossTabSync={true}
+              syncDebounceMs={100}
+              onSyncError={(error) => {
+                logger.error('Map synchronization error', error);
+                // TODO: Add user-visible error notification
+              }}
+              onSyncSuccess={() => {
+                logger.info('Map synchronized successfully');
+                // TODO: Add user-visible success notification
+              }}
+            >
+              <AppContent />
+            </MapSynchronizer>
+          </ActionDispatcherProvider>
         </MapDataProvider>
       </EventBusProvider>
     </SettingsProvider>

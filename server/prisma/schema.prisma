@@ -136,19 +136,6 @@ model UserSettings {
   @@map("user_settings")
 }
 
-// Jitsi room mappings - map interactive areas to Jitsi room names
-model JitsiRoomMapping {
-  id            String   @id @default(cuid())
-  areaId        String   @unique // Interactive area ID from map
-  jitsiRoomName String   // Sanitized Jitsi room name
-  displayName   String?  // Human-readable display name
-  isCustom      Boolean  @default(false) // true if custom, false if auto-generated
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@map("jitsi_room_mappings")
-}
-
 // ============================================================================
 // PLAYER STATE (Ephemeral)
 // ============================================================================

@@ -103,7 +103,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
               onDeleteCollisionArea={onDeleteCollisionArea}
             />
           )}
-          {activeTab === 'jitsi' && <JitsiTab />}
+          {activeTab === 'jitsi' && <JitsiTab areas={areas} onEditArea={onEditArea} />}
           {activeTab === 'settings' && (
             <SettingsTab
               gridConfig={gridConfig}

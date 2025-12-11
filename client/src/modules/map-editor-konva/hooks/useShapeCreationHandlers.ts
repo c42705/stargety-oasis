@@ -179,6 +179,8 @@ export function useShapeCreationHandlers(
       y: rect.y,
       width: rect.width,
       height: rect.height,
+      actionType: 'none',
+      actionConfig: null,
     };
 
     logger.info('INTERACTIVE_AREA_CREATED', { areaId: newArea.id, areaName: newArea.name });

@@ -195,7 +195,9 @@ export class MapDataService {
           width: 120,
           height: 80,
           color: '#4A90E2',
-          description: 'Join the weekly team sync'
+          description: 'Join the weekly team sync',
+          actionType: 'none',
+          actionConfig: null
         },
         {
           id: 'coffee-corner-1',
@@ -206,7 +208,9 @@ export class MapDataService {
           width: 100,
           height: 80,
           color: '#8B4513',
-          description: 'Casual conversations'
+          description: 'Casual conversations',
+          actionType: 'none',
+          actionConfig: null
         }
       ],
       impassableAreas: [

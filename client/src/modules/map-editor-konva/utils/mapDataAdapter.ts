@@ -6,7 +6,13 @@
  */
 
 import type { Shape, ShapeCategory } from '../types';
-import type { InteractiveArea, ImpassableArea, Asset } from '../../../shared/MapDataContext';
+import type {
+  InteractiveArea,
+  ImpassableArea,
+  Asset,
+  InteractiveAreaActionType,
+  InteractiveAreaActionConfig,
+} from '../../../shared/MapDataContext';
 import { isPolygonGeometry, isRectangleGeometry, isImageGeometry } from '../types';
 
 // ============================================================================
@@ -26,16 +32,22 @@ export function shapeToInteractiveArea(shape: Shape): InteractiveArea {
     throw new Error('Interactive areas must be rectangles');
   }
 
+  // Extract action configuration from shape metadata
+  const actionType = (shape.metadata.actionType as InteractiveAreaActionType) || 'none';
+  const actionConfig = (shape.metadata.actionConfig as InteractiveAreaActionConfig) || null;
+
   return {
     id: shape.id,
     name: shape.metadata.name || 'Unnamed Area',
-    type: (shape.metadata.interactiveType as any) || 'custom',
+    type: (shape.metadata.interactiveType as InteractiveArea['type']) || 'custom',
     x: shape.geometry.x,
     y: shape.geometry.y,
     width: shape.geometry.width,
     height: shape.geometry.height,
     color: shape.style.fill || '#00ff00',
     description: shape.metadata.description || '',
+    actionType,
+    actionConfig,
   };
 }
 
@@ -170,7 +182,7 @@ export function shapesToMapData(shapes: Shape[]): {
 
 /**
  * Convert InteractiveArea to Konva shape
- * 
+ *
  * @param area - InteractiveArea from MapDataContext
  * @returns Konva shape
  */
@@ -195,6 +207,8 @@ export function interactiveAreaToShape(area: InteractiveArea): Shape {
       name: area.name,
       description: area.description,
       interactiveType: area.type,
+      actionType: area.actionType,
+      actionConfig: area.actionConfig,
       createdAt: new Date(),
       modifiedAt: new Date(),
     },

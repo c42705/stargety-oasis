@@ -243,30 +243,8 @@ export class MapPersistenceService {
     }
 
     return {
-      interactiveAreas: [
-        {
-          id: 'meeting-room-default',
-          name: 'Meeting Room',
-          type: 'meeting-room',
-          x: Math.floor(effectiveDimensions.width * 0.2),
-          y: Math.floor(effectiveDimensions.height * 0.25),
-          width: 120,
-          height: 80,
-          color: '#4A90E2',
-          description: 'Join the weekly team sync',
-        },
-        {
-          id: 'coffee-corner-default',
-          name: 'Coffee Corner',
-          type: 'coffee-corner',
-          x: Math.floor(effectiveDimensions.width * 0.6),
-          y: Math.floor(effectiveDimensions.height * 0.7),
-          width: 100,
-          height: 80,
-          color: '#D2691E',
-          description: 'Casual conversations',
-        },
-      ],
+      // Start with empty areas - user creates from scratch
+      interactiveAreas: [],
       impassableAreas: [
         {
           id: 'wall-default',

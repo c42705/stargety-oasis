@@ -1,9 +1,20 @@
 import React from 'react';
 import { Button, List, Typography, Flex, Card, Space, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import { InteractiveArea } from '../../../../shared/MapDataContext';
+import { PlusOutlined, EditOutlined, DeleteOutlined, VideoCameraOutlined, BellOutlined, LinkOutlined, FileTextOutlined } from '@ant-design/icons';
+import { InteractiveArea, InteractiveAreaActionType } from '../../../../shared/MapDataContext';
 
 const { Title, Text } = Typography;
+
+/** Get icon and color for action type */
+const getActionTypeDisplay = (actionType?: InteractiveAreaActionType): { icon: React.ReactNode; color: string; label: string } => {
+  switch (actionType) {
+    case 'jitsi': return { icon: <VideoCameraOutlined />, color: 'green', label: 'Jitsi' };
+    case 'alert': return { icon: <BellOutlined />, color: 'orange', label: 'Alert' };
+    case 'url': return { icon: <LinkOutlined />, color: 'cyan', label: 'URL' };
+    case 'modal': return { icon: <FileTextOutlined />, color: 'purple', label: 'Modal' };
+    default: return { icon: null, color: 'default', label: '' };
+  }
+};
 
 interface AreasTabProps {
   areas: InteractiveArea[];
@@ -41,7 +52,9 @@ export const AreasTab: React.FC<AreasTabProps> = ({
         dataSource={areas}
         locale={{ emptyText: 'No areas yet' }}
         size="small"
-        renderItem={(area) => (
+        renderItem={(area) => {
+          const actionDisplay = getActionTypeDisplay(area.actionType);
+          return (
           <List.Item style={{ padding: 16 }}>
             <div style={{ width: '100%' }}>
               {/* Header with name and actions */}
@@ -53,6 +66,11 @@ export const AreasTab: React.FC<AreasTabProps> = ({
                   {area.type && (
                     <Tag color="blue" style={{ marginLeft: '4px', fontSize: '10px', padding: '0 4px', lineHeight: '16px' }}>
                       {area.type}
+                    </Tag>
+                  )}
+                  {actionDisplay.label && (
+                    <Tag color={actionDisplay.color} icon={actionDisplay.icon} style={{ marginLeft: '4px', fontSize: '10px', padding: '0 4px', lineHeight: '16px' }}>
+                      {actionDisplay.label}
                     </Tag>
                   )}
                 </div>
@@ -95,7 +113,7 @@ export const AreasTab: React.FC<AreasTabProps> = ({
               </Text>
             </div>
           </List.Item>
-        )}
+        );}}
       />
     </Card>
   );

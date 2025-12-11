@@ -2,7 +2,86 @@ import React, { createContext, useContext, useState, ReactNode, useEffect, useCa
 import { useMapStore } from '../stores/useMapStore';
 import { useMapStoreInit } from '../stores/useMapStoreInit';
 
-// Shared interfaces for map data
+// ============================================================================
+// INTERACTIVE AREA ACTION TYPES
+// ============================================================================
+
+/** Action types that an Interactive Area can trigger */
+export type InteractiveAreaActionType =
+  | 'none'      // No action - just visual/informational
+  | 'alert'     // Show notification/message
+  | 'url'       // Open URL (new tab or embedded)
+  | 'modal'     // Show custom modal content
+  | 'jitsi';    // Join Jitsi video conference
+
+/** Configuration for alert action */
+export interface AlertActionConfig {
+  message: string;
+  alertType: 'info' | 'success' | 'warning' | 'error';
+  duration?: number; // milliseconds, 0 = persistent
+}
+
+/** Configuration for URL action */
+export interface UrlActionConfig {
+  url: string;
+  openMode: 'newTab' | 'embedded' | 'sameTab';
+  embedWidth?: number;
+  embedHeight?: number;
+}
+
+/** Configuration for modal action */
+export interface ModalActionConfig {
+  title: string;
+  content: string; // Plain text or markdown
+  showOnEntry: boolean;
+  showOnClick: boolean;
+}
+
+/** Configuration for Jitsi action - room name is auto-derived from area name */
+export interface JitsiActionConfig {
+  autoJoinOnEntry: boolean; // Auto-join when entering area
+  autoLeaveOnExit: boolean; // Auto-leave when exiting area
+}
+
+/** Union type for all action configs */
+export type InteractiveAreaActionConfig =
+  | AlertActionConfig
+  | UrlActionConfig
+  | ModalActionConfig
+  | JitsiActionConfig
+  | null;
+
+// ============================================================================
+// JITSI ROOM NAME UTILITIES
+// ============================================================================
+
+/**
+ * Sanitize a string to be a valid Jitsi room name
+ * - Lowercase
+ * - Replace spaces and special chars with hyphens
+ * - Remove consecutive hyphens
+ * - Prefix with 'stargety-' namespace
+ */
+export function sanitizeJitsiRoomName(areaName: string): string {
+  return `stargety-${areaName}`
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
+ * Get the Jitsi room name for an Interactive Area
+ * Derives the room name from the area's name property
+ */
+export function getJitsiRoomNameForArea(area: InteractiveArea): string {
+  return sanitizeJitsiRoomName(area.name);
+}
+
+// ============================================================================
+// SHARED INTERFACES FOR MAP DATA
+// ============================================================================
+
 export interface InteractiveArea {
   id: string;
   name: string;
@@ -13,6 +92,10 @@ export interface InteractiveArea {
   height: number;
   color: string;
   description: string;
+
+  // Action configuration - what happens when player enters/interacts with this area
+  actionType: InteractiveAreaActionType;
+  actionConfig: InteractiveAreaActionConfig;
 }
 
 export interface ImpassableArea {
@@ -81,54 +164,15 @@ interface MapDataContextType {
 
 const MapDataContext = createContext<MapDataContextType | undefined>(undefined);
 
-// Default map data
+// Default Jitsi action config for convenience
+const defaultJitsiConfig: JitsiActionConfig = {
+  autoJoinOnEntry: true,
+  autoLeaveOnExit: true,
+};
+
+// Default map data - starts empty, user creates areas from scratch
 const defaultMapData: MapData = {
-  interactiveAreas: [
-    {
-      id: 'meeting-room',
-      name: 'Meeting Room',
-      type: 'meeting-room',
-      x: 150,
-      y: 150,
-      width: 120,
-      height: 80,
-      color: '#4A90E2',
-      description: 'Join the weekly team sync'
-    },
-    {
-      id: 'presentation-hall',
-      name: 'Presentation Hall',
-      type: 'presentation-hall',
-      x: 300,
-      y: 150,
-      width: 140,
-      height: 100,
-      color: '#9B59B6',
-      description: 'Watch presentations and demos'
-    },
-    {
-      id: 'coffee-corner',
-      name: 'Coffee Corner',
-      type: 'coffee-corner',
-      x: 150,
-      y: 350,
-      width: 100,
-      height: 80,
-      color: '#D2691E',
-      description: 'Casual conversations'
-    },
-    {
-      id: 'game-zone',
-      name: 'Game Zone',
-      type: 'game-zone',
-      x: 300,
-      y: 350,
-      width: 120,
-      height: 90,
-      color: '#E74C3C',
-      description: 'Fun and games'
-    }
-  ],
+  interactiveAreas: [],
   impassableAreas: [
     {
       id: 'wall-1',
