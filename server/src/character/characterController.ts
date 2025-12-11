@@ -370,7 +370,7 @@ export class CharacterController {
 
       // Get the character from that slot
       const character = await prisma.character.findUnique({
-        where: { userId_slotNumber: { userId, activeSlotNumber } },
+        where: { userId_slotNumber: { userId, slotNumber: activeSlotNumber } },
       });
 
       // If no character or it's empty, return null

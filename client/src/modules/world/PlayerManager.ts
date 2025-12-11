@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { AvatarRenderer as AvatarRendererV2 } from '../../components/avatar/v2';
+import { CharacterStorage } from '../../components/avatar/v2/CharacterStorage';
 import { AnimationCategory } from '../../components/avatar/AvatarBuilderTypes';
 import { logger } from '../../shared/logger';
 
@@ -88,37 +89,33 @@ export class PlayerManager {
 
   /**
    * Asynchronously initialize player with V2 character system
+   * Uses API-first loading strategy with localStorage fallback
    */
   private async initializePlayerAsync(): Promise<void> {
     logger.debug('[PlayerManager] 🔵 initializePlayerAsync started');
 
-    // DEBUG: Check localStorage for character data
-    logger.debug('[PlayerManager] 🔍 Checking localStorage for character data...');
-    const activeKey = `stargety_v2_active_character_${this.playerId}`;
-    const activeData = localStorage.getItem(activeKey);
-    logger.debug('[PlayerManager] Active character key:', activeKey);
-    logger.debug('[PlayerManager] Active character data:', activeData);
+    // DEBUG: Check for character data using API-first method
+    logger.debug('[PlayerManager] 🔍 Checking for character data via API-first...');
+    const activeResult = await CharacterStorage.getActiveCharacterAsync(this.playerId);
 
-    if (activeData) {
-      try {
-        const parsed = JSON.parse(activeData);
-        logger.debug('[PlayerManager] Parsed active character:', parsed);
-        const slotKey = `stargety_v2_character_${this.playerId}_slot_${parsed.activeSlotNumber}`;
-        const slotData = localStorage.getItem(slotKey);
-        logger.debug('[PlayerManager] Slot key:', slotKey);
-        logger.debug('[PlayerManager] Slot data exists:', !!slotData);
-        if (slotData) {
-          const slotParsed = JSON.parse(slotData);
-          logger.debug('[PlayerManager] Slot character name:', slotParsed.name);
-        }
-      } catch (e) {
-        logger.error('[PlayerManager] Error parsing localStorage data:', e);
+    if (activeResult.success && activeResult.data) {
+      logger.debug('[PlayerManager] Active character state:', activeResult.data);
+      const slotResult = await CharacterStorage.loadCharacterSlotAsync(
+        this.playerId,
+        activeResult.data.activeSlotNumber
+      );
+      if (slotResult.success && slotResult.data) {
+        logger.debug('[PlayerManager] Slot character loaded:', {
+          slotNumber: activeResult.data.activeSlotNumber,
+          isEmpty: slotResult.data.isEmpty,
+          name: slotResult.data.name
+        });
       }
     } else {
-      logger.warn('[PlayerManager] ⚠️ No active character found in localStorage');
+      logger.warn('[PlayerManager] ⚠️ No active character found via API');
     }
 
-    // Try V2 system first (NEW)
+    // Try V2 system (uses API-first loading internally via AvatarRenderer)
     try {
       logger.debug('[PlayerManager] Attempting to load V2 character for:', this.playerId);
       const v2Sprite = await this.avatarRendererV2.createOrUpdateSprite(

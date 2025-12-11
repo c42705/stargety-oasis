@@ -1,16 +1,18 @@
 /**
  * Konva Map Editor - Persistence Hook
  *
- * Handles save/load functionality with localStorage and API sync.
+ * Handles save/load functionality with PostgreSQL via Redux store.
  * Editor preferences (grid, viewport, tools) are synced to UserSettings API.
  *
- * @version 2.0.0
- * @date 2025-11-28
+ * REFACTORED: Now uses Redux store (useMapStore) for map data persistence
+ * instead of localStorage. PostgreSQL is the primary source of truth.
+ *
+ * @version 3.0.0
+ * @date 2025-12-11
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type {
-  Shape,
   EditorState,
   UseKonvaPersistenceParams,
   UseKonvaPersistenceReturn,
@@ -18,32 +20,23 @@ import type {
 import { PERSISTENCE } from '../constants/konvaConstants';
 import { SettingsApiService, EditorPreferences } from '../../../services/api/SettingsApiService';
 import { logger } from '../../../shared/logger';
-
-/**
- * Persisted data structure
- */
-interface PersistedData {
-  shapes: Shape[];
-  selectedIds: string[];
-  version: number;
-  timestamp: number;
-}
+import { useMapStore } from '../../../stores/useMapStore';
+import { mapDataToShapes, shapesToMapData } from '../utils/mapDataAdapter';
 
 /**
  * Hook for state persistence
- * 
- * Provides save/load functionality with localStorage, auto-save, and error recovery.
- * 
+ *
+ * Provides save/load functionality with PostgreSQL (via Redux store) and API sync.
+ * Map data (shapes) are persisted to PostgreSQL through the Redux store.
+ * Editor preferences are synced to the UserSettings API.
+ *
  * @example
  * ```typescript
  * const {
  *   save,
  *   load,
- *   canLoad,
- *   isSaving,
- *   lastSaved,
- *   autoSaveEnabled,
- *   setAutoSaveEnabled,
+ *   hasSavedState,
+ *   lastSaveTime,
  * } = useKonvaPersistence({
  *   currentState: { shapes, selectedIds },
  *   onStateRestore: (state) => {
@@ -60,24 +53,32 @@ export function useKonvaPersistence(
   const {
     currentState,
     onStateRestore,
-    storageKey = PERSISTENCE.STORAGE_KEY,
     autoSaveDelay = PERSISTENCE.AUTO_SAVE_DELAY,
     enabled = true,
   } = params;
 
+  // Redux store for map data persistence (PostgreSQL)
+  const {
+    mapData,
+    saveMap,
+    isDirty,
+    setInteractiveAreas,
+    setCollisionAreas,
+    setAssets,
+    markDirty,
+  } = useMapStore();
+
   // State
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isSaving, setIsSaving] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isLoading, setIsLoading] = useState(false);
   const [lastSaved, setLastSaved] = useState<number | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [error, setError] = useState<string | null>(null);
 
   // Auto-save timer ref
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Track if initial load has been done
+  const initialLoadDoneRef = useRef(false);
 
   // ==========================================================================
   // SAVE FUNCTIONALITY
@@ -104,16 +105,44 @@ export function useKonvaPersistence(
 
       await SettingsApiService.updateSettings(userId, { editorPrefs });
       logger.debug('EDITOR PREFS SYNCED TO API', { userId });
-    } catch (error) {
-      logger.warn('FAILED TO SYNC EDITOR PREFS TO API', { error });
+    } catch (err) {
+      logger.warn('FAILED TO SYNC EDITOR PREFS TO API', { error: err });
     }
   }, [currentState]);
 
   /**
-   * Save current state to localStorage (with API sync for preferences)
+   * Sync shapes to Redux store (which persists to PostgreSQL)
+   */
+  const syncShapesToStore = useCallback(() => {
+    if (!currentState.shapes || currentState.shapes.length === 0) {
+      return;
+    }
+
+    try {
+      // Convert Konva shapes to map data format
+      const { interactiveAreas, impassableAreas, assets } = shapesToMapData(currentState.shapes);
+
+      // Update Redux store (this marks the store as dirty)
+      setInteractiveAreas(interactiveAreas);
+      setCollisionAreas(impassableAreas);
+      setAssets(assets);
+      markDirty();
+
+      logger.debug('SHAPES SYNCED TO REDUX STORE', {
+        interactiveCount: interactiveAreas.length,
+        collisionCount: impassableAreas.length,
+        assetCount: assets.length,
+      });
+    } catch (err) {
+      logger.error('FAILED TO SYNC SHAPES TO STORE', { error: err });
+    }
+  }, [currentState.shapes, setInteractiveAreas, setCollisionAreas, setAssets, markDirty]);
+
+  /**
+   * Save current state to PostgreSQL (via Redux store)
    *
-   * Image assets stored as base64 can quickly consume localStorage space (typically 5-10MB limit).
-   * Editor preferences are also synced to the API for cross-device persistence.
+   * Map data is saved through the Redux store which persists to PostgreSQL.
+   * Editor preferences are synced to the UserSettings API.
    */
   const save = useCallback(async (): Promise<boolean> => {
     if (!enabled) return false;
@@ -122,31 +151,18 @@ export function useKonvaPersistence(
     setError(null);
 
     try {
-      const data: PersistedData = {
-        shapes: currentState.shapes,
-        selectedIds: currentState.selection?.selectedIds || [],
-        version: PERSISTENCE.VERSION,
-        timestamp: Date.now(),
-      };
+      // First sync shapes to Redux store
+      syncShapesToStore();
 
-      const serialized = JSON.stringify(data);
-
-      // Check storage quota
-      const estimatedSize = new Blob([serialized]).size;
-      if (estimatedSize > PERSISTENCE.MAX_SIZE) {
-        throw new Error(
-          `Data size (${estimatedSize} bytes) exceeds maximum (${PERSISTENCE.MAX_SIZE} bytes). Consider reducing the number of image assets or their sizes.`
-        );
-      }
-
-      // Save to localStorage (fast, for content)
-      localStorage.setItem(storageKey, serialized);
+      // Save to PostgreSQL via Redux store
+      await saveMap();
 
       // Sync preferences to API (fire and forget, for cross-device sync)
       syncPrefsToApiAsync();
 
       setLastSaved(Date.now());
       setIsSaving(false);
+      logger.info('MAP SAVED TO POSTGRESQL');
       return true;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save';
@@ -155,64 +171,44 @@ export function useKonvaPersistence(
       logger.error('SAVE FAILED', { error: err });
       return false;
     }
-  }, [enabled, currentState, storageKey, syncPrefsToApiAsync]);
+  }, [enabled, syncShapesToStore, saveMap, syncPrefsToApiAsync]);
 
   // ==========================================================================
   // LOAD FUNCTIONALITY
   // ==========================================================================
 
   /**
-   * Check if saved data exists
+   * Check if map data exists in the store
    */
   const canLoad = useCallback((): boolean => {
     if (!enabled) return false;
-
-    try {
-      const saved = localStorage.getItem(storageKey);
-      return !!saved;
-    } catch {
-      return false;
-    }
-  }, [enabled, storageKey]);
+    return !!mapData;
+  }, [enabled, mapData]);
 
   /**
-   * Load state from localStorage
+   * Load state from Redux store (which loads from PostgreSQL)
    */
   const load = useCallback((): EditorState | null => {
-    if (!enabled) return null;
+    if (!enabled || !mapData) return null;
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const saved = localStorage.getItem(storageKey);
-
-      if (!saved) {
-        throw new Error('No saved data found');
-      }
-
-      const data: PersistedData = JSON.parse(saved);
-
-      // Validate data structure
-      if (!data.shapes || !Array.isArray(data.shapes)) {
-        throw new Error('Invalid data structure');
-      }
-
-      // Version check
-      if (data.version !== PERSISTENCE.VERSION) {
-        console.warn(
-          `Data version mismatch: saved=${data.version}, current=${PERSISTENCE.VERSION}`
-        );
-        // TODO: Implement migration logic if needed
-      }
+      // Convert map data to Konva shapes
+      const shapes = mapDataToShapes(
+        mapData.interactiveAreas || [],
+        mapData.impassableAreas || [],
+        mapData.assets || []
+      );
 
       // Create a partial EditorState with the loaded data
-      const loadedState = {
+      const loadedState: EditorState = {
         ...currentState,
-        shapes: data.shapes,
+        shapes,
         selection: {
           ...currentState.selection,
-          selectedIds: data.selectedIds || [],
+          selectedIds: [],
         },
       };
 
@@ -220,33 +216,27 @@ export function useKonvaPersistence(
       onStateRestore(loadedState);
 
       setIsLoading(false);
+      logger.info('MAP LOADED FROM POSTGRESQL', { shapeCount: shapes.length });
       return loadedState;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load';
       setError(errorMessage);
       setIsLoading(false);
-      console.error('Load failed:', err);
+      logger.error('LOAD FAILED', { error: err });
       return null;
     }
-  }, [enabled, storageKey, onStateRestore, currentState]);
+  }, [enabled, mapData, onStateRestore, currentState]);
 
   /**
-   * Clear saved data
+   * Clear is now a no-op since we don't use localStorage for map data
+   * Map data can only be reset through the Redux store's resetMap action
    */
   const clear = useCallback(() => {
-    if (!enabled) return;
-
-    try {
-      localStorage.removeItem(storageKey);
-      setLastSaved(null);
-      setError(null);
-    } catch (err) {
-      console.error('Clear failed:', err);
-    }
-  }, [enabled, storageKey]);
+    logger.debug('CLEAR CALLED - no-op for PostgreSQL persistence');
+  }, []);
 
   // ==========================================================================
-  // AUTO-SAVE
+  // AUTO-SAVE (syncs to Redux store, which auto-saves to PostgreSQL)
   // ==========================================================================
 
   useEffect(() => {
@@ -264,9 +254,9 @@ export function useKonvaPersistence(
       clearTimeout(autoSaveTimerRef.current);
     }
 
-    // Set new timer
+    // Set new timer - sync shapes to store (store handles auto-save to PostgreSQL)
     autoSaveTimerRef.current = setTimeout(() => {
-      save();
+      syncShapesToStore();
     }, autoSaveDelay);
 
     return () => {
@@ -274,21 +264,21 @@ export function useKonvaPersistence(
         clearTimeout(autoSaveTimerRef.current);
       }
     };
-  }, [enabled, autoSaveEnabled, autoSaveDelay, currentState, save]);
+  }, [enabled, autoSaveEnabled, autoSaveDelay, currentState, syncShapesToStore]);
 
   // ==========================================================================
-  // AUTO-LOAD ON MOUNT
+  // AUTO-LOAD ON MOUNT (from Redux store / PostgreSQL)
   // ==========================================================================
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || initialLoadDoneRef.current) return;
 
-    // Auto-load on mount if data exists
+    // Auto-load on mount if data exists in store
     if (canLoad()) {
       load();
+      initialLoadDoneRef.current = true;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run on mount
+  }, [enabled, canLoad, load, mapData]);
 
   // ==========================================================================
   // RETURN

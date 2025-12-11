@@ -62,18 +62,19 @@ export class AvatarRenderer {
 
   /**
    * Load character sprite sheet into Phaser
+   * Uses API-first loading strategy with localStorage fallback
    */
   async loadCharacterTexture(username: string, slotNumber?: number): Promise<RenderResult> {
     return PerformanceMonitor.measure('AvatarRenderer.loadCharacterTexture', async () => {
       try {
         logger.debug('[AvatarRenderer] loadCharacterTexture START:', { username, slotNumber });
 
-      // Load character slot
+      // Load character slot using API-first async methods
       let characterSlot: CharacterSlot | EmptyCharacterSlot;
 
       if (slotNumber !== undefined) {
-        logger.debug('[AvatarRenderer] Loading specific slot:', slotNumber);
-        const result = CharacterStorage.loadCharacterSlot(username, slotNumber);
+        logger.debug('[AvatarRenderer] Loading specific slot via API-first:', slotNumber);
+        const result = await CharacterStorage.loadCharacterSlotAsync(username, slotNumber);
         logger.debug('[AvatarRenderer] Load slot result:', result);
         if (!result.success || !result.data) {
           logger.error('[AvatarRenderer] Failed to load slot:', result.error);
@@ -85,9 +86,9 @@ export class AvatarRenderer {
         characterSlot = result.data;
         logger.debug('[AvatarRenderer] Slot loaded:', characterSlot);
       } else {
-        // Load active character
-        logger.debug('[AvatarRenderer] Loading active character (no slot specified)');
-        const result = CharacterStorage.getActiveCharacterSlot(username);
+        // Load active character using API-first async method
+        logger.debug('[AvatarRenderer] Loading active character via API-first (no slot specified)');
+        const result = await CharacterStorage.getActiveCharacterSlotAsync(username);
         logger.debug('[AvatarRenderer] Active character result:', result);
         if (!result.success || !result.data) {
           logger.error('[AvatarRenderer] Failed to load active character:', result.error);
