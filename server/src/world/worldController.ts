@@ -1,6 +1,7 @@
 import { Socket, Server } from 'socket.io';
 import { WorldPlayer, Room, AvatarSyncData } from '../types';
 import { logger } from '../utils/logger';
+import { characterController } from '../character/characterController';
 
 // In-memory storage for world state
 const worldRooms: Map<string, Room> = new Map();
@@ -17,7 +18,7 @@ export class WorldController {
   }
 
   // Handle player joining world
-  handlePlayerJoinedWorld(socket: Socket, data: { playerId: string; x: number; y: number; roomId: string; name?: string; avatarData?: AvatarSyncData }) {
+  async handlePlayerJoinedWorld(socket: Socket, data: { playerId: string; x: number; y: number; roomId: string; name?: string; avatarData?: AvatarSyncData }) {
     const { playerId, x, y, roomId, name, avatarData } = data;
 
     // Track socket-to-player mapping for disconnect handling
@@ -37,6 +38,19 @@ export class WorldController {
       roomPlayers.set(roomId, new Set());
     }
 
+    // Determine avatar data: use provided or fall back to DB
+    let finalAvatarData: AvatarSyncData | undefined = avatarData;
+    if (!finalAvatarData) {
+      logger.debug(`[WorldController] No avatarData provided by client for ${playerId}, attempting to load from DB`);
+      const dbAvatarData = await characterController.getActiveCharacterAvatarSync(playerId);
+      if (dbAvatarData) {
+        finalAvatarData = dbAvatarData;
+        logger.debug(`[WorldController] Loaded avatarData from DB for ${playerId}`);
+      } else {
+        logger.debug(`[WorldController] No avatarData in DB for ${playerId}, will render placeholder`);
+      }
+    }
+
     // Create or update player with avatar data
     // Use provided display name, or fall back to playerId
     const displayName = name || playerId;
@@ -47,7 +61,7 @@ export class WorldController {
       y: this.clampPosition(y, 'y'),
       roomId,
       lastMoved: new Date(),
-      avatarData: avatarData
+      avatarData: finalAvatarData
     };
 
     players.set(playerId, player);

@@ -12,8 +12,6 @@ import { WorldSocketService } from '../../services/WorldSocketService';
 import { shouldBlockBackgroundInteractions } from '../../shared/ModalStateManager';
 import { logger } from '../../shared/logger';
 
-console.log('🎮🎮🎮 GameScene.ts FILE LOADED 🎮🎮🎮');
-
 /**
  * GameScene - Main Phaser scene for the game world
  * 
@@ -45,6 +43,8 @@ export class GameScene extends Phaser.Scene {
   private remotePlayerManager!: RemotePlayerManager;
   private worldSocketService!: WorldSocketService;
 
+  private myServerId: string | null = null;
+
   // Movement tracking
   private lastPlayerX: number = 0;
   private lastPlayerY: number = 0;
@@ -57,7 +57,7 @@ export class GameScene extends Phaser.Scene {
 
   constructor(eventBus: any, playerId: string, worldRoomId: string, onAreaClick: (areaId: string) => void) {
     super({ key: 'GameScene' });
-    console.log('🎮🎮🎮 GameScene CONSTRUCTOR called for player:', playerId, 'in room:', worldRoomId);
+    logger.debug(`🎮🎮🎮 GameScene CONSTRUCTOR called for player: ${playerId} in room: ${worldRoomId}`);
     this.eventBus = eventBus;
     this.playerId = playerId;
     this.worldRoomId = worldRoomId;
@@ -118,9 +118,9 @@ export class GameScene extends Phaser.Scene {
     // Initialize collision system
     this.collisionSystem = new CollisionSystem(this, this.eventBus, this.onAreaClick);
 
-    // Initialize movement controller
+    // Initialize movement controller (use container as authoritative position)
     this.movementController = new MovementController(this, this.eventBus, this.playerId, {
-      getPlayer: () => this.playerManager.getPlayer(),
+      getPlayer: () => this.playerManager.getPlayerContainer(),
       getOriginalY: () => this.playerManager.originalY,
       setOriginalY: (y: number) => this.playerManager.updateOriginalY(y),
       checkCollision: (x: number, y: number, size: number) => 
@@ -132,7 +132,8 @@ export class GameScene extends Phaser.Scene {
 
     // Initialize camera controller
     this.cameraController = new CameraController(this, {
-      getPlayer: () => this.playerManager.getPlayer(),
+      // Camera should follow the container (world position)
+      getPlayer: () => this.playerManager.getPlayerContainer(),
       getWorldBounds: () => this.worldBoundsManager.getWorldBounds(),
       calculateMinZoom: () => this.worldBoundsManager.calculateMinZoom()
     });
@@ -140,7 +141,8 @@ export class GameScene extends Phaser.Scene {
 
     // Initialize debug diagnostics
     this.debugDiagnostics = new DebugDiagnostics(this, {
-      getPlayer: () => this.playerManager.getPlayer(),
+      // Diagnostics should inspect the container position as authoritative
+      getPlayer: () => this.playerManager.getPlayerContainer(),
       getWorldBounds: () => this.worldBoundsManager.getWorldBounds()
     });
 
@@ -169,31 +171,39 @@ export class GameScene extends Phaser.Scene {
     // Initialize socket with callbacks
     this.worldSocketService.initialize({
       onPlayerJoined: (player) => {
-        logger.info(`[GameScene] onPlayerJoined callback: ${player.playerId}, self: ${this.playerId}`);
-        if (player.playerId !== this.playerId) {
+        logger.debug(`[GameScene] onPlayerJoined callback: ${player.playerId}, self: ${this.playerId}`);
+        if (player.name !== this.playerId) {
           this.remotePlayerManager.addPlayer(player);
         }
       },
       onPlayerMoved: (data) => {
-        if (data.playerId !== this.playerId) {
+        if (data.playerId !== this.myServerId) {
           this.remotePlayerManager.updatePlayerPosition(data.playerId, data.x, data.y);
         }
       },
       onPlayerLeft: (data) => {
-        logger.info(`[GameScene] onPlayerLeft callback: ${data.playerId}`);
+        logger.debug(`[GameScene] onPlayerLeft callback: ${data.playerId}`);
         this.remotePlayerManager.removePlayer(data.playerId);
       },
       onWorldState: (data) => {
-        logger.info(`[GameScene] onWorldState: received ${data.players.length} players, my playerId="${this.playerId}" (type: ${typeof this.playerId})`);
+        logger.debug(`[GameScene] onWorldState: received ${data.players.length} players, my playerId="${this.playerId}"`);
+        
+        // Find the local player in the list to get their server-side ID
+        const me = data.players.find(p => p.name === this.playerId);
+        if (me) {
+          this.myServerId = me.id;
+          this.worldSocketService.setServerId(this.myServerId);
+        }
+
         // Log all players for debugging with detailed comparison
         data.players.forEach(p => {
-          const isMe = p.id === this.playerId;
-          const idMatch = `id="${p.id}" === playerId="${this.playerId}" ? ${isMe}`;
-          logger.info(`[GameScene] Player in world-state: ${idMatch}, name="${p.name}", pos=(${p.x}, ${p.y})`);
+          const isMe = p.id === this.myServerId;
+          const idMatch = `id="${p.id}" === myServerId="${this.myServerId}" ? ${isMe}`;
+          logger.debug(`[GameScene] Player in world-state: ${idMatch}, name="${p.name}", pos=(${p.x}, ${p.y})`);
         });
         // Add all existing players except self
-        const otherPlayers = data.players.filter(p => p.id !== this.playerId);
-        logger.info(`[GameScene] After filtering self: ${otherPlayers.length} other players (filtered out ${data.players.length - otherPlayers.length})`);
+        const otherPlayers = data.players.filter(p => p.id !== this.myServerId);
+        logger.debug(`[GameScene] After filtering self: ${otherPlayers.length} other players`);
         this.remotePlayerManager.handleWorldState(
           otherPlayers.map(p => ({
             playerId: p.id,
@@ -211,6 +221,45 @@ export class GameScene extends Phaser.Scene {
 
     // Wait for socket connection, then join world room
     this.joinMultiplayerWorld();
+
+    // Set up character switch listener to emit avatar updates to other players
+    this.setupCharacterSwitchListener();
+  }
+
+  /**
+   * Listen for character switch events and emit avatar updates to multiplayer
+   */
+  private setupCharacterSwitchListener(): void {
+    this.eventBus.subscribe('world:characterSwitched', async (data: { playerId: string; slotNumber: number }) => {
+      logger.debug('[GameScene] Character switched event received:', data);
+
+      // Get the updated character data to send to other players
+      try {
+        // Import CharacterStorage to load the character data
+        const { CharacterStorage } = await import('../../components/avatar/v2/CharacterStorage');
+        
+        const result = CharacterStorage.loadCharacterSlot(data.playerId, data.slotNumber);
+        if (result.success && result.data && 'spriteSheet' in result.data) {
+          const character = result.data as any;
+          
+          // Prepare avatar sync data
+          const avatarSyncData = {
+            spriteSheetImageData: character.spriteSheet?.source?.imageData || '',
+            frameWidth: character.spriteSheet?.gridLayout?.frameWidth || 32,
+            frameHeight: character.spriteSheet?.gridLayout?.frameHeight || 32,
+            characterName: character.name || 'Unknown'
+          };
+
+          // Emit avatar update through socket to other players
+          if (this.worldSocketService) {
+            this.worldSocketService.emitAvatarUpdate(avatarSyncData);
+            logger.debug('[GameScene] Avatar update emitted for character:', character.name);
+          }
+        }
+      } catch (error) {
+        logger.error('[GameScene] Error emitting avatar update:', error);
+      }
+    });
   }
 
   /**
@@ -226,12 +275,35 @@ export class GameScene extends Phaser.Scene {
 
     if (connected) {
       logger.info('[GameScene] Socket connected, joining world room:', this.worldRoomId);
+
+      // Attempt to load active character/avatar data and include with join
+      let avatarData: any = undefined;
+      try {
+        const { CharacterStorage } = await import('../../components/avatar/v2/CharacterStorage');
+        const activeResult = CharacterStorage.getActiveCharacterSlot(this.playerId);
+        if (activeResult.success && activeResult.data && !(activeResult.data as any).isEmpty) {
+          const character = activeResult.data as any;
+          avatarData = {
+            spriteSheetImageData: character.cachedTexture || character.spriteSheet?.source?.imageData || '',
+            frameWidth: character.spriteSheet?.gridLayout?.frameWidth || 32,
+            frameHeight: character.spriteSheet?.gridLayout?.frameHeight || 32,
+            characterName: character.name || ''
+          };
+          logger.debug('[GameScene] Found active character for join, attaching avatarData');
+        } else {
+          logger.debug('[GameScene] No active character found for player on join');
+        }
+      } catch (error) {
+        logger.debug('[GameScene] Error loading active character for avatarData on join', error);
+      }
+
       this.worldSocketService.joinWorld(
         this.playerId,
         this.worldRoomId,
         initialX,
         initialY,
-        this.playerId // Use playerId as display name (it's actually the username)
+        this.playerId, // Use playerId as display name (it's actually the username)
+        avatarData
       );
     } else {
       logger.error('[GameScene] Failed to connect to socket server, multiplayer disabled');
@@ -239,7 +311,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(): void {
-    const player = this.playerManager.getPlayer();
+    // Use the player container as the authoritative world position
+    const player = this.playerManager.getPlayerContainer();
     if (!player) return;
 
     // Check if background interactions are blocked (modal open)
@@ -283,6 +356,7 @@ export class GameScene extends Phaser.Scene {
     // Check collision before moving
     if (moved) {
       if (!this.collisionSystem.checkCollisionWithImpassableAreas(newX, newY, playerSize)) {
+        // Update container position (authoritative)
         player.x = newX;
         player.y = newY;
         this.playerManager.updateOriginalY(player.y);
@@ -311,7 +385,8 @@ export class GameScene extends Phaser.Scene {
     this.remotePlayerManager?.update();
 
     // Check area collisions
-    this.collisionSystem.checkAreaCollisions(player);
+    // Pass the container to area collision checks (signature accepts container now)
+    this.collisionSystem.checkAreaCollisions(player as any);
   }
 
   /**
@@ -348,7 +423,7 @@ export class GameScene extends Phaser.Scene {
    * Teleport player to position
    */
   private teleportPlayerToPosition(x: number, y: number): void {
-    const player = this.playerManager.getPlayer();
+    const player = this.playerManager.getPlayerContainer();
     if (!player) return;
 
     const worldBounds = this.worldBoundsManager.getWorldBounds();
@@ -388,6 +463,7 @@ export class GameScene extends Phaser.Scene {
 
   shutdown(): void {
     // Cleanup all systems
+    this.mapRenderer?.destroy();
     this.playerManager?.destroy();
     this.movementController?.destroy();
     this.cameraController?.destroy();

@@ -59,22 +59,32 @@
   min-width: auto;
 }
 
-/* Editor Layout */
+/* Editor Layout - 3-Column Grid (Figma/Unity style) */
 .editor-layout {
-  display: flex;
+  display: grid;
+  grid-template-columns: 280px 1fr 320px;
   flex: 1;
   overflow: hidden;
   position: relative;
 }
 
-/* Integrated Sidebar */
+/* Left Sidebar (Layers Panel) */
+.editor-left-sidebar {
+  width: 280px;
+  background: var(--color-bg-secondary);
+  border-right: 1px solid var(--color-border-light);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Right Sidebar (Properties/Assets/Settings) */
 .editor-sidebar {
-  width: 350px;
+  width: 320px;
   background: var(--color-bg-secondary);
   border-left: 1px solid var(--color-border-light);
   display: flex;
   flex-direction: column;
-  order: 2;
   overflow: hidden;
 }
 
@@ -168,12 +178,11 @@
   padding: var(--spacing-sm);
 }
 
-/* Main Content */
+/* Main Content (Canvas Area - Center Column) */
 .editor-main {
-  flex: 1;
   position: relative;
   overflow: hidden;
-  order: 1;
+  min-width: 0; /* Prevent grid blowout */
 }
 
 .editor-content {
@@ -337,9 +346,30 @@
   font-weight: 500;
 }
 
-/* Responsive Design */
+/* Responsive Design - Stack columns on mobile */
+@media (max-width: 1024px) {
+  .editor-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto;
+  }
+
+  .editor-left-sidebar {
+    width: 100%;
+    max-height: 200px;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border-light);
+  }
+
+  .editor-sidebar {
+    width: 100%;
+    max-height: 300px;
+    border-left: none;
+    border-top: 1px solid var(--color-border-light);
+  }
+}
+
 @media (max-width: 768px) {
-  .editor-header {    
+  .editor-header {
     gap: var(--spacing-md);
     align-items: stretch;
     padding: var(--spacing-xs);
@@ -347,29 +377,6 @@
 
   .editor-actions {
     justify-content: center;
-  }
-
-  /* Toolbar responsive styles migrated to Ant Design */
-
-  .editor-layout {
-    flex-direction: column;
-  }
-
-  .layers-panel {
-    order: 1;
-  }
-
-  .editor-sidebar {
-    width: 100%;
-    order: 3;
-    border-left: none;
-    border-top: 1px solid var(--color-border-light);
-    max-height: 50vh;
-  }
-
-  .editor-main {
-    order: 2;
-    flex: 1;
   }
 
   .sidebar-toolbar {
@@ -408,13 +415,9 @@
     max-height: 30vh;
   }
 
-  /* Tab and area styles now handled by Ant Design responsive components */
-
   .editor-content {
     padding: var(--spacing-md);
   }
-
-  /* Responsive styles now handled by Ant Design components */
 }
 
 /* Drawing Mode Overlay */

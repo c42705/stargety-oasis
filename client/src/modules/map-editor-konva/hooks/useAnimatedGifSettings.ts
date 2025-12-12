@@ -1,12 +1,17 @@
 /**
  * Hook for managing animated GIF settings and performance
- * 
+ *
  * Provides global controls for animated GIF playback, performance monitoring,
  * and automatic optimization based on the number of active GIFs.
+ *
+ * REFACTORED (2025-12-11): Now uses SettingsApiService for persistence.
+ * Settings are stored as part of editorPrefs in PostgreSQL.
+ * localStorage is used only as a session cache.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { logger } from '../../../shared/logger';
+import { SettingsApiService } from '../../../services/api/SettingsApiService';
 
 export interface AnimatedGifSettings {
   /** Enable/disable all GIF animations globally */
@@ -67,9 +72,9 @@ const DEFAULT_SETTINGS: AnimatedGifSettings = {
 const STORAGE_KEY = 'konva-map-editor-gif-settings';
 
 /**
- * Load settings from localStorage
+ * Load settings from localStorage (session cache only)
  */
-function loadSettings(): AnimatedGifSettings {
+function loadSettingsFromCache(): AnimatedGifSettings {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -77,19 +82,19 @@ function loadSettings(): AnimatedGifSettings {
       return { ...DEFAULT_SETTINGS, ...parsed };
     }
   } catch (error) {
-    logger.error('ANIMATED_GIF_SETTINGS_LOAD_ERROR', { error });
+    logger.error('ANIMATED_GIF_SETTINGS_CACHE_LOAD_ERROR', { error });
   }
   return DEFAULT_SETTINGS;
 }
 
 /**
- * Save settings to localStorage
+ * Save settings to localStorage (session cache)
  */
-function saveSettings(settings: AnimatedGifSettings): void {
+function saveSettingsToCache(settings: AnimatedGifSettings): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   } catch (error) {
-    logger.error('ANIMATED_GIF_SETTINGS_SAVE_ERROR', { error });
+    logger.error('ANIMATED_GIF_SETTINGS_CACHE_SAVE_ERROR', { error });
   }
 }
 
@@ -100,10 +105,11 @@ export function useAnimatedGifSettings(
   params: UseAnimatedGifSettingsParams = {}
 ): UseAnimatedGifSettingsReturn {
   const { initialSettings, onSettingsChange } = params;
+  const hasLoadedFromApi = useRef(false);
 
-  // Load settings from localStorage or use defaults
+  // Load settings from cache initially, then sync from API
   const [settings, setSettings] = useState<AnimatedGifSettings>(() => {
-    const loaded = loadSettings();
+    const loaded = loadSettingsFromCache();
     return initialSettings ? { ...loaded, ...initialSettings } : loaded;
   });
 
@@ -114,6 +120,68 @@ export function useAnimatedGifSettings(
     limitReached: false,
   });
 
+  // Load settings from API on mount (API-first)
+  useEffect(() => {
+    const loadFromApi = async () => {
+      try {
+        // Get current user from localStorage (set by AuthContext)
+        const authData = localStorage.getItem('auth');
+        const userId = authData ? JSON.parse(authData).username : null;
+
+        if (!userId) {
+          logger.warn('ANIMATED_GIF_SETTINGS_NO_USER', { message: 'No user ID for API load' });
+          return;
+        }
+
+        const result = await SettingsApiService.getSettings(userId);
+        if (result.success && result.data?.editorPrefs) {
+          // Extract GIF settings from editorPrefs (stored as JSON)
+          const editorPrefs = result.data.editorPrefs as Record<string, unknown>;
+          const gifSettings = editorPrefs.gifSettings as Partial<AnimatedGifSettings> | undefined;
+
+          if (gifSettings) {
+            hasLoadedFromApi.current = true;
+            const mergedSettings = { ...DEFAULT_SETTINGS, ...gifSettings };
+            setSettings(mergedSettings);
+            saveSettingsToCache(mergedSettings); // Update cache
+            logger.info('ANIMATED_GIF_SETTINGS_LOADED_FROM_API', { gifSettings });
+          }
+        }
+      } catch (error) {
+        logger.warn('ANIMATED_GIF_SETTINGS_API_LOAD_FAILED', { error });
+        // Keep using cached settings
+      }
+    };
+
+    loadFromApi();
+  }, []);
+
+  // Save settings to API (fire and forget)
+  const saveToApiAsync = useCallback(async (newSettings: AnimatedGifSettings) => {
+    try {
+      const authData = localStorage.getItem('auth');
+      const userId = authData ? JSON.parse(authData).username : null;
+
+      if (!userId) return;
+
+      // Get current editor prefs and merge with GIF settings
+      const result = await SettingsApiService.getSettings(userId);
+      const currentEditorPrefs = (result.success && result.data?.editorPrefs)
+        ? result.data.editorPrefs as Record<string, unknown>
+        : {};
+
+      await SettingsApiService.updateSettings(userId, {
+        editorPrefs: {
+          ...currentEditorPrefs,
+          gifSettings: newSettings,
+        },
+      });
+      logger.info('ANIMATED_GIF_SETTINGS_SAVED_TO_API');
+    } catch (error) {
+      logger.warn('ANIMATED_GIF_SETTINGS_API_SAVE_FAILED', { error });
+    }
+  }, []);
+
   /**
    * Update settings
    */
@@ -121,18 +189,19 @@ export function useAnimatedGifSettings(
     (updates: Partial<AnimatedGifSettings>) => {
       setSettings((prev) => {
         const newSettings = { ...prev, ...updates };
-        saveSettings(newSettings);
+        saveSettingsToCache(newSettings); // Update cache
+        saveToApiAsync(newSettings); // Sync to API
         onSettingsChange?.(newSettings);
-        
-        logger.info('ANIMATED_GIF_SETTINGS_UPDATED', { 
+
+        logger.info('ANIMATED_GIF_SETTINGS_UPDATED', {
           updates,
-          newSettings 
+          newSettings
         });
-        
+
         return newSettings;
       });
     },
-    [onSettingsChange]
+    [onSettingsChange, saveToApiAsync]
   );
 
   /**
@@ -188,16 +257,12 @@ export function useAnimatedGifSettings(
    */
   const resetToDefaults = useCallback(() => {
     setSettings(DEFAULT_SETTINGS);
-    saveSettings(DEFAULT_SETTINGS);
+    saveSettingsToCache(DEFAULT_SETTINGS);
+    saveToApiAsync(DEFAULT_SETTINGS);
     onSettingsChange?.(DEFAULT_SETTINGS);
-    
-    logger.info('ANIMATED_GIF_SETTINGS_RESET');
-  }, [onSettingsChange]);
 
-  // Save settings whenever they change
-  useEffect(() => {
-    saveSettings(settings);
-  }, [settings]);
+    logger.info('ANIMATED_GIF_SETTINGS_RESET');
+  }, [onSettingsChange, saveToApiAsync]);
 
   return {
     settings,

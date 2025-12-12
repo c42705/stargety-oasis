@@ -2,10 +2,9 @@ import Phaser from 'phaser';
 import { AvatarSyncData, RemotePlayerData } from '../../services/WorldSocketService';
 import { logger } from '../../shared/logger';
 
-// Remote player sprite with metadata
+// Remote player container with metadata
 interface RemotePlayer {
-  sprite: Phaser.GameObjects.Sprite | Phaser.GameObjects.Container;
-  nameLabel: Phaser.GameObjects.Text;
+  container: Phaser.GameObjects.Container;
   playerId: string;
   targetX: number;
   targetY: number;
@@ -16,9 +15,9 @@ interface RemotePlayer {
  * RemotePlayerManager - Manages rendering of other players in the world
  *
  * Responsibilities:
- * - Create sprites for remote players
+ * - Create sprites and nameplates for remote players in a container
  * - Update positions with smooth interpolation
- * - Destroy sprites when players leave
+ * - Destroy containers when players leave
  * - Render V2 avatars or placeholder for remote players
  */
 export class RemotePlayerManager {
@@ -29,6 +28,22 @@ export class RemotePlayerManager {
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
     logger.info('[RemotePlayerManager] Initialized');
+  }
+
+  private truncateName(name: string, maxLength: number = 15): string {
+    if (name.length > maxLength) {
+      return name.substring(0, maxLength) + '...';
+    }
+    return name;
+  }
+
+  /**
+   * Calculate dynamic name label Y offset based on sprite height
+   * This ensures the label appears above the sprite regardless of size
+   */
+  private getNameLabelYOffset(sprite: Phaser.GameObjects.Sprite): number {
+    const spriteHeight = sprite.height || 32;
+    return -(spriteHeight / 2) - 8;  // -(sprite.height / 2) - 8px spacing
   }
 
   /**
@@ -42,22 +57,45 @@ export class RemotePlayerManager {
 
     logger.info(`[RemotePlayerManager] Adding remote player: id=${data.playerId}, name=${data.name}, pos=(${data.x}, ${data.y})`);
 
-    // Create sprite based on avatar data
-    const sprite = this.createPlayerSprite(data);
+    const container = this.scene.add.container(data.x, data.y);
+    container.setDepth(500); // High depth to be above all map elements
 
-    // Create name label above sprite
-    const nameLabel = this.scene.add.text(data.x, data.y - 35, data.name || data.playerId, {
-      fontSize: '14px',
+    // 1. Player Sprite
+    const sprite = this.createPlayerSprite(data);
+    container.add(sprite);
+
+    // 2. Status Dot
+    // TODO: Connect this to actual player status (live, idle, busy)
+    const statusDot = this.scene.add.circle(0, 0, 4, 0x2ade2a); // Default 'online' green
+    statusDot.setStrokeStyle(1.5, 0x1a1a1a); // Dark outline
+    container.add(statusDot);
+
+    // 3. Name Text
+    const truncatedName = this.truncateName(data.name || data.playerId);
+    const nameText = this.scene.add.text(0, 0, truncatedName, {
+      fontSize: '12px',
       color: '#ffffff',
-      backgroundColor: '#000000cc',
-      padding: { x: 6, y: 3 },
+      fontFamily: 'Arial, sans-serif',
+      // backgroundColor: '#00000099',
+      padding: { x: 4, y: 2 },
     });
-    nameLabel.setOrigin(0.5, 1);
-    nameLabel.setDepth(500); // Very high depth to always be visible above everything
+    nameText.setOrigin(0.5, 1);
+    container.add(nameText);
+    
+    // Position elements relative to the sprite (which is at 0,0 in the container)
+    // Dynamically calculate nameplate Y offset based on sprite height
+    const nameplateYOffset = this.getNameLabelYOffset(sprite);
+    
+    // Position the text centered horizontally
+    nameText.y = nameplateYOffset;
+
+    // Position the dot to the left of the text
+    const textWidth = nameText.getBounds().width;
+    statusDot.x = -(textWidth / 2) - 8; // 8px spacing
+    statusDot.y = nameplateYOffset - nameText.getBounds().height / 2 + 1; // Vertically center with text
 
     const remotePlayer: RemotePlayer = {
-      sprite,
-      nameLabel,
+      container,
       playerId: data.playerId,
       targetX: data.x,
       targetY: data.y,
@@ -65,7 +103,6 @@ export class RemotePlayerManager {
     };
 
     this.remotePlayers.set(data.playerId, remotePlayer);
-    logger.info(`[RemotePlayerManager] Total remote players: ${this.remotePlayers.size}`);
   }
 
   /**
@@ -103,19 +140,14 @@ export class RemotePlayerManager {
     const textureKey = `remote_placeholder_${data.playerId}_${Date.now()}`;
     graphics.generateTexture(textureKey, size, size);
     graphics.destroy();
-
-    const sprite = this.scene.add.sprite(data.x, data.y, textureKey);
+    
+    // Sprite is positioned at (0,0) relative to its container
+    const sprite = this.scene.add.sprite(0, 0, textureKey);
     sprite.setOrigin(0.5, 0.5);
-    sprite.setDepth(450); // High depth to be above all map elements (collision polygons are at 100)
-    sprite.setVisible(true);
-    sprite.setActive(true);
 
     // Debug: Log sprite creation details
-    logger.info(`[RemotePlayerManager] Created sprite for ${data.playerId}:`);
-    logger.info(`  - Position: (${sprite.x}, ${sprite.y})`);
-    logger.info(`  - Size: ${sprite.width}x${sprite.height}, displaySize: ${sprite.displayWidth}x${sprite.displayHeight}`);
-    logger.info(`  - Depth: ${sprite.depth}, Visible: ${sprite.visible}, Active: ${sprite.active}`);
-    logger.info(`  - Texture: ${sprite.texture.key}, Color: 0x${color.toString(16)}`);
+    logger.debug(`[RemotePlayerManager] Created sprite for ${data.playerId}:`);
+    logger.debug(`  - Texture: ${sprite.texture.key}, Color: 0x${color.toString(16)}`);
 
     return sprite;
   }
@@ -154,8 +186,7 @@ export class RemotePlayerManager {
 
     logger.info('[RemotePlayerManager] Removing player:', playerId);
 
-    remotePlayer.sprite.destroy();
-    remotePlayer.nameLabel.destroy();
+    remotePlayer.container.destroy();
     this.remotePlayers.delete(playerId);
   }
 
@@ -165,20 +196,17 @@ export class RemotePlayerManager {
   public update(): void {
     this.remotePlayers.forEach((remotePlayer) => {
       // Interpolate position smoothly
-      const sprite = remotePlayer.sprite;
-      const currentX = sprite.x;
-      const currentY = sprite.y;
+      const container = remotePlayer.container;
+      const currentX = container.x;
+      const currentY = container.y;
 
       const dx = remotePlayer.targetX - currentX;
       const dy = remotePlayer.targetY - currentY;
 
+      // Only move if the distance is significant to avoid jitter
       if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
-        sprite.x += dx * this.interpolationSpeed;
-        sprite.y += dy * this.interpolationSpeed;
-
-        // Update name label position
-        remotePlayer.nameLabel.x = sprite.x;
-        remotePlayer.nameLabel.y = sprite.y - 25;
+        container.x += dx * this.interpolationSpeed;
+        container.y += dy * this.interpolationSpeed;
       }
     });
   }
@@ -187,7 +215,7 @@ export class RemotePlayerManager {
    * Handle world state (multiple players at once)
    */
   public handleWorldState(players: RemotePlayerData[]): void {
-    logger.info(`[RemotePlayerManager] Handling world state with ${players.length} players`);
+    logger.debug(`[RemotePlayerManager] Handling world state with ${players.length} players`);
 
     players.forEach(playerData => {
       if (!this.remotePlayers.has(playerData.playerId)) {
@@ -208,8 +236,7 @@ export class RemotePlayerManager {
    */
   public destroy(): void {
     this.remotePlayers.forEach((remotePlayer) => {
-      remotePlayer.sprite.destroy();
-      remotePlayer.nameLabel.destroy();
+      remotePlayer.container.destroy();
     });
     this.remotePlayers.clear();
     logger.info('[RemotePlayerManager] Destroyed');

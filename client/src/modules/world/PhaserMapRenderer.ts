@@ -185,17 +185,17 @@ export class PhaserMapRenderer {
    * Clear all map elements
    */
   private clearMap(): void {
-    // Safety checks to prevent errors if groups are not initialized
-    if (this.backgroundGroup) {
+    // Safety checks to prevent errors if groups are not initialized or have been destroyed
+    if (this.backgroundGroup && this.backgroundGroup.scene) {
       this.backgroundGroup.clear(true, true);
     }
-    if (this.assetsGroup) {
+    if (this.assetsGroup && this.assetsGroup.scene) {
       this.assetsGroup.clear(true, true);
     }
-    if (this.interactiveAreasGroup) {
+    if (this.interactiveAreasGroup && this.interactiveAreasGroup.scene) {
       this.interactiveAreasGroup.clear(true, true);
     }
-    if (this.collisionAreasGroup) {
+    if (this.collisionAreasGroup && this.collisionAreasGroup.scene) {
       this.collisionAreasGroup.clear(true, true);
     }
 
@@ -444,18 +444,19 @@ export class PhaserMapRenderer {
 
     // Create visual representation with visibility based on debug mode
     const fillAlpha = this.debugMode ? 0.7 : 0;
+    const areaColor = area.color || '#00ff00';
     const rect = this.scene.add.rectangle(
       area.x + area.width / 2,
       area.y + area.height / 2,
       area.width,
       area.height,
-      Phaser.Display.Color.HexStringToColor(area.color).color,
+      Phaser.Display.Color.HexStringToColor(areaColor).color,
       fillAlpha
     );
 
     // Add border (visible only in debug mode)
     if (this.debugMode) {
-      rect.setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(area.color).color);
+      rect.setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(areaColor).color);
     }
 
     // Add text label (visible only in debug mode)
@@ -777,6 +778,7 @@ export class PhaserMapRenderer {
 
     // Clear groups
     this.backgroundGroup.destroy(true);
+    this.assetsGroup.destroy(true);
     this.interactiveAreasGroup.destroy(true);
     this.collisionAreasGroup.destroy(true);
 

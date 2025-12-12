@@ -5,7 +5,7 @@ import { useSettings } from '../shared/SettingsContext';
 import { useAuth } from '../shared/AuthContext';
 import { useEventBus } from '../shared/EventBusContext';
 import { VideoCallModule } from '../modules/video-call/VideoCallModule';
-import { jitsiRoomMappingService } from '../shared/JitsiRoomMappingService';
+import { logger } from '../shared/logger';
 
 const { Text } = Typography;
 
@@ -50,10 +50,10 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
     setCurrentAreaRoom(null);
   };
 
-  // Simplified auto-join/leave logic for Jitsi based on area entry/exit
+  // Listen to jitsi:join and jitsi:leave events from InteractiveAreaActionDispatcher
   useEffect(() => {
-    const handleAreaEntered = (data: { areaId: string; areaName: string; roomId: string }) => {
-      console.log('🚪 Area entered:', data.areaName, '- Setting up Jitsi room');
+    const handleJitsiJoin = (data: { roomName: string; areaName: string }) => {
+      logger.info('[VideoCommunicationPanel] Jitsi join event', { roomName: data.roomName, areaName: data.areaName });
 
       // Clear any pending transition
       if (transitionTimeoutRef.current) {
@@ -61,20 +61,17 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
         transitionTimeoutRef.current = null;
       }
 
-      // Get Jitsi room name from mapping service
-      const jitsiRoomName = jitsiRoomMappingService.getJitsiRoomForArea(data.areaId);
-
       // Debounce: wait 500ms before actually joining
       // This prevents rapid room switches when walking through multiple areas
       transitionTimeoutRef.current = setTimeout(() => {
-        console.log('📹 Setting current area room to:', jitsiRoomName);
-        setCurrentAreaRoom(jitsiRoomName);
-        onRoomChange?.(jitsiRoomName);
+        logger.info('[VideoCommunicationPanel] Setting current area room', { roomName: data.roomName });
+        setCurrentAreaRoom(data.roomName);
+        onRoomChange?.(data.roomName);
       }, 500);
     };
 
-    const handleAreaExited = (data: { areaId: string; areaName: string }) => {
-      console.log('🚪 Area exited:', data.areaName);
+    const handleJitsiLeave = (data: { areaName: string }) => {
+      logger.info('[VideoCommunicationPanel] Jitsi leave event', { areaName: data.areaName });
 
       // Clear any pending transition
       if (transitionTimeoutRef.current) {
@@ -90,18 +87,18 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
           setShowStickyModal(true);
           setPendingDisconnect(true);
         } else {
-          console.log('📹 Clearing current area room');
+          logger.info('[VideoCommunicationPanel] Clearing current area room');
           setCurrentAreaRoom(null);
         }
       }, 500);
     };
 
-    const unsubscribeEntered = eventBus.subscribe('area-entered', handleAreaEntered);
-    const unsubscribeExited = eventBus.subscribe('area-exited', handleAreaExited);
+    const unsubscribeJoin = eventBus.subscribe('jitsi:join', handleJitsiJoin);
+    const unsubscribeLeave = eventBus.subscribe('jitsi:leave', handleJitsiLeave);
 
     return () => {
-      unsubscribeEntered();
-      unsubscribeExited();
+      unsubscribeJoin();
+      unsubscribeLeave();
 
       // Clean up timeout on unmount
       if (transitionTimeoutRef.current) {

@@ -37,7 +37,7 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
   const [saveState, setSaveState] = useState({
     isSaving: false,
     hasUnsavedChanges: false,
-    lastSaveTime: null as Date | null,
+    lastSaveTime: null as Date | string | null,
     saveError: null as string | null,
     autoSaveEnabled: true
   });
@@ -133,9 +133,11 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
   };
 
   // Format time ago
-  const getTimeAgo = (date: Date): string => {
+  const getTimeAgo = (date: Date | string): string => {
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
+    // Ensure date is a Date object (may be string from Redux serialization)
+    const dateObj = date instanceof Date ? date : new Date(date);
+    const diffMs = now.getTime() - dateObj.getTime();
     const diffSeconds = Math.floor(diffMs / 1000);
     const diffMinutes = Math.floor(diffSeconds / 60);
     const diffHours = Math.floor(diffMinutes / 60);
@@ -147,7 +149,7 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
     } else if (diffHours < 24) {
       return `${diffHours}h ago`;
     } else {
-      return date.toLocaleDateString();
+      return dateObj.toLocaleDateString();
     }
   };
 

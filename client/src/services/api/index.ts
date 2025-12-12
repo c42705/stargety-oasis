@@ -19,5 +19,4 @@ export * from './MapApiService';
 export * from './CharacterApiService';
 export * from './SettingsApiService';
 export * from './AssetApiService';
-export * from './JitsiMappingApiService';
 

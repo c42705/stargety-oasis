@@ -139,6 +139,13 @@ export function useAreaHandlers(params: UseAreaHandlersParams): AreaHandlersRetu
     setEditingArea(null);
   }, [setShowAreaModal, setEditingArea]);
 
+  // Inline update for Properties tab (no modal)
+  const handleUpdateArea = useCallback((areaId: string, updates: Partial<InteractiveArea>) => {
+    logger.debug('AREA_INLINE_UPDATE', { areaId, updates });
+    updateInteractiveArea(areaId, updates);
+    markDirty();
+  }, [updateInteractiveArea, markDirty]);
+
   const handleAreaDrawingComplete = useCallback((shape: Shape) => {
     // This will be called from the main component when rect drawing completes
     logger.info('AREA_DRAWING_COMPLETE', { shapeId: shape.id });
@@ -247,6 +254,7 @@ export function useAreaHandlers(params: UseAreaHandlersParams): AreaHandlersRetu
       handleAreaFormSubmit,
       handleAreaFormCancel,
       handleAreaDrawingComplete,
+      handleUpdateArea,
     },
     collision: {
       handleCreateCollisionArea,

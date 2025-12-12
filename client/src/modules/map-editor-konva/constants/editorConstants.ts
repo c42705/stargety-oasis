@@ -1,20 +1,20 @@
 import React from 'react';
 import {
-  Grid,
   Palette,
   Settings,
-  Shield,
-  TreePine,
-  Video
+  SlidersHorizontal
 } from 'lucide-react';
 import { EditorTab, GridConfig, ToolbarState, GridPattern } from '../types/ui.types';
 
+/**
+ * Editor Tabs - 3-tab structure (Figma/Unity style)
+ * - Properties: Selection-driven editing (shows when object selected)
+ * - Assets: Asset library and upload
+ * - Settings: Grid, preview mode, and editor settings
+ */
 export const EDITOR_TABS: EditorTab[] = [
-  { id: 'areas', label: 'Interactive Areas', icon: React.createElement(Grid, { size: 16 }) },
-  { id: 'terrain', label: 'Terrain', icon: React.createElement(TreePine, { size: 16 }) },
+  { id: 'properties', label: 'Properties', icon: React.createElement(SlidersHorizontal, { size: 16 }) },
   { id: 'assets', label: 'Assets', icon: React.createElement(Palette, { size: 16 }) },
-  { id: 'collision', label: 'Collision', icon: React.createElement(Shield, { size: 16 }) },
-  { id: 'jitsi', label: 'Jitsi Rooms', icon: React.createElement(Video, { size: 16 }) },
   { id: 'settings', label: 'Settings', icon: React.createElement(Settings, { size: 16 }) }
 ];
 

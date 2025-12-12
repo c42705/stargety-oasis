@@ -363,72 +363,6 @@ app.put('/api/settings/:userId', async (req, res) => {
 });
 
 // ============================================================================
-// JITSI MAPPING API ROUTES
-// ============================================================================
-
-// List all Jitsi mappings
-app.get('/api/jitsi-mappings', async (_req, res) => {
-  try {
-    const mappings = await settingsController.listJitsiMappings();
-    res.json({ success: true, data: mappings });
-  } catch (error) {
-    logger.error('Error listing Jitsi mappings:', error);
-    res.status(500).json({ success: false, error: 'Failed to list Jitsi mappings' });
-  }
-});
-
-// Get Jitsi mapping by area ID
-app.get('/api/jitsi-mappings/:areaId', async (req, res) => {
-  const { areaId } = req.params;
-  try {
-    const mapping = await settingsController.getJitsiMappingByArea(areaId);
-    if (!mapping) {
-      return res.status(404).json({ success: false, error: 'Mapping not found' });
-    }
-    res.json({ success: true, data: mapping });
-  } catch (error) {
-    logger.error('Error getting Jitsi mapping:', error);
-    res.status(500).json({ success: false, error: 'Failed to get Jitsi mapping' });
-  }
-});
-
-// Create or update Jitsi mapping
-app.put('/api/jitsi-mappings/:areaId', async (req, res) => {
-  const { areaId } = req.params;
-  const { jitsiRoomName, displayName, isCustom } = req.body;
-  try {
-    const mapping = await settingsController.upsertJitsiMapping({
-      areaId,
-      jitsiRoomName,
-      displayName,
-      isCustom,
-    });
-    if (!mapping) {
-      return res.status(500).json({ success: false, error: 'Failed to save mapping' });
-    }
-    res.json({ success: true, data: mapping });
-  } catch (error) {
-    logger.error('Error upserting Jitsi mapping:', error);
-    res.status(500).json({ success: false, error: 'Failed to save Jitsi mapping' });
-  }
-});
-
-// Delete Jitsi mapping
-app.delete('/api/jitsi-mappings/:areaId', async (req, res) => {
-  const { areaId } = req.params;
-  try {
-    const deleted = await settingsController.deleteJitsiMapping(areaId);
-    if (!deleted) {
-      return res.status(404).json({ success: false, error: 'Mapping not found' });
-    }
-    res.json({ success: true, message: 'Mapping deleted' });
-  } catch (error) {
-    logger.error('Error deleting Jitsi mapping:', error);
-    res.status(500).json({ success: false, error: 'Failed to delete Jitsi mapping' });
-  }
-});
-
-// ============================================================================
 // PLAYER POSITION API ROUTES
 // ============================================================================
 
@@ -695,7 +629,7 @@ io.on('connection', (socket) => {
   socket.on('chat:typing', (data) => chatDbController.handleTyping(socket, data));
 
   // World events
-  socket.on('player-joined-world', (data) => worldController.handlePlayerJoinedWorld(socket, data));
+  socket.on('player-joined-world', (data) => worldController.handlePlayerJoinedWorld(socket, data).catch((error) => logger.error('Error in player-joined-world handler:', error)));
   socket.on('player-moved', (data) => worldController.handlePlayerMoved(socket, data));
 
   // Video call events

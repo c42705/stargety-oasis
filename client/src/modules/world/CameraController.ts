@@ -37,7 +37,8 @@ export class CameraController {
   private isSettingDefaultZoom: boolean = false;
 
   // Callbacks
-  private getPlayer: () => Phaser.GameObjects.Sprite | null;
+  // Accept either a Sprite or a Container as the follow target (both expose x/y)
+  private getPlayer: () => Phaser.GameObjects.Sprite | Phaser.GameObjects.Container | null;
   private getWorldBounds: () => { width: number; height: number };
   private calculateMinZoom: () => number;
   private spaceKey?: Phaser.Input.Keyboard.Key;
@@ -45,7 +46,7 @@ export class CameraController {
   constructor(
     scene: Phaser.Scene,
     callbacks: {
-      getPlayer: () => Phaser.GameObjects.Sprite | null;
+      getPlayer: () => Phaser.GameObjects.Sprite | Phaser.GameObjects.Container | null;
       getWorldBounds: () => { width: number; height: number };
       calculateMinZoom: () => number;
     }

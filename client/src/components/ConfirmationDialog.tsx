@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { App } from 'antd';
 import { ExclamationCircleOutlined, WarningOutlined, InfoCircleOutlined } from '@ant-design/icons';
 
@@ -28,6 +28,16 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   showUndoWarning = true
 }) => {
   const { modal } = App.useApp();
+
+  // Use refs to avoid re-triggering the effect when callbacks change
+  const onCloseRef = useRef(onClose);
+  const onConfirmRef = useRef(onConfirm);
+
+  // Keep refs updated with latest callbacks
+  useEffect(() => {
+    onCloseRef.current = onClose;
+    onConfirmRef.current = onConfirm;
+  }, [onClose, onConfirm]);
 
   useEffect(() => {
     if (isOpen) {
@@ -73,18 +83,20 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
         cancelText,
         okType: type === 'danger' ? 'danger' : 'primary',
         onOk: () => {
-          onConfirm();
-          onClose();
+          onConfirmRef.current();
+          onCloseRef.current();
         },
         onCancel: () => {
-          onClose();
+          onCloseRef.current();
         },
         centered: true,
         maskClosable: true,
         width: 400,
       });
     }
-  }, [isOpen, onClose, onConfirm, title, message, content, showUndoWarning, confirmText, cancelText, type, modal]);
+  // Only trigger when isOpen changes, or when display props change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, title, message, content, showUndoWarning, confirmText, cancelText, type, modal]);
 
   // Return null since Modal.confirm() handles the rendering
   return null;

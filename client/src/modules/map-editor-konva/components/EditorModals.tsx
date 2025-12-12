@@ -1,42 +1,40 @@
 /**
  * EditorModals Component
- * 
+ *
  * Renders all modal dialogs for the map editor including:
- * - Area form modal (create/edit interactive areas)
- * - Collision area form modal (create/edit collision areas)
- * - Delete confirmation dialogs (areas, collision areas, keyboard delete)
+ * - Area form modal (create/edit interactive areas, including impassable/collision areas)
+ * - Delete confirmation dialogs (areas, keyboard delete)
  */
 
 import React from 'react';
 import type { InteractiveArea } from '../types';
 import { AreaFormModal } from '../../../components/AreaFormModal';
-import { CollisionAreaFormModal } from '../../../components/CollisionAreaFormModal';
 import { ConfirmationDialog } from '../../../components/ConfirmationDialog';
 
 interface EditorModalsProps {
-  // Area modal
+  // Area modal (unified for all area types including collision/impassable)
   showAreaModal: boolean;
   editingArea: InteractiveArea | null;
   onAreaFormSubmit: (data: Partial<InteractiveArea>) => void;
   onAreaFormCancel: () => void;
-  
-  // Collision area modal
+
+  // Collision area modal (deprecated - uses AreaFormModal with impassable action type)
   showCollisionAreaModal: boolean;
   editingCollisionArea: any | null;
   onCollisionAreaFormSubmit: (data: any) => void;
   onCollisionAreaFormCancel: () => void;
-  
+
   // Delete confirmations
   showDeleteConfirm: boolean;
   areaToDelete: InteractiveArea | null;
   onConfirmDeleteArea: () => void;
   onCancelDeleteArea: () => void;
-  
+
   showCollisionDeleteConfirm: boolean;
   collisionAreaToDelete: any | null;
   onConfirmDeleteCollisionArea: () => void;
   onCancelDeleteCollisionArea: () => void;
-  
+
   showKeyboardDeleteConfirm: boolean;
   shapesToDelete: string[];
   onConfirmKeyboardDelete: () => void;
@@ -75,12 +73,23 @@ export const EditorModals: React.FC<EditorModalsProps> = ({
         onClose={onAreaFormCancel}
       />
 
-      {/* Collision Area Form Modal */}
-      <CollisionAreaFormModal
+      {/* Collision Area Form Modal (uses unified AreaFormModal with impassable action type) */}
+      <AreaFormModal
         isOpen={showCollisionAreaModal}
-        editingArea={editingCollisionArea}
-        onSave={onCollisionAreaFormSubmit}
+        editingArea={editingCollisionArea ? {
+          ...editingCollisionArea,
+          actionType: 'impassable',
+          actionConfig: null,
+        } : null}
+        onSave={(data) => {
+          // Convert back to collision area format for backward compatibility
+          onCollisionAreaFormSubmit({
+            ...data,
+            type: 'impassable',
+          });
+        }}
         onClose={onCollisionAreaFormCancel}
+        title={editingCollisionArea ? 'Edit Collision Area' : 'Create Collision Area'}
       />
 
       {/* Interactive Area Delete Confirmation */}

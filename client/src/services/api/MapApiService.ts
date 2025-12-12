@@ -6,6 +6,17 @@
  */
 
 import { apiFetch, apiUpload, ApiResponse } from './apiClient';
+// Import and re-export the canonical InteractiveArea type from MapDataContext
+// This ensures type consistency across the codebase
+import type {
+  InteractiveArea,
+  InteractiveAreaActionType,
+  InteractiveAreaActionConfig,
+  AlertActionConfig,
+  UrlActionConfig,
+  ModalActionConfig,
+  JitsiActionConfig,
+} from '../../shared/MapDataContext';
 
 // Types matching server schema
 export interface MapAsset {
@@ -20,17 +31,15 @@ export interface MapAsset {
   uploadedAt: string;
 }
 
-export interface InteractiveArea {
-  id: string;
-  name: string;
-  type: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color?: string;
-  description?: string;
-}
+export type {
+  InteractiveArea,
+  InteractiveAreaActionType,
+  InteractiveAreaActionConfig,
+  AlertActionConfig,
+  UrlActionConfig,
+  ModalActionConfig,
+  JitsiActionConfig,
+};
 
 export interface ImpassableArea {
   id: string;

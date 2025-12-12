@@ -4,7 +4,7 @@
  * Centralized keyboard shortcut management for all editor actions.
  */
 
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import type {
   UseKonvaKeyboardShortcutsParams,
   UseKonvaKeyboardShortcutsReturn,
@@ -14,9 +14,9 @@ import { shouldIgnoreKeyboardEvent } from '../../../shared/keyboardFocusUtils';
 
 /**
  * Hook for centralized keyboard shortcut management
- * 
+ *
  * Provides a unified system for managing all keyboard shortcuts in the editor.
- * 
+ *
  * @example
  * ```typescript
  * const shortcuts = useKonvaKeyboardShortcuts({
@@ -37,7 +37,9 @@ export function useKonvaKeyboardShortcuts(
     shortcuts: shortcutsParam = [],
   } = params;
 
-  const [registeredShortcuts, setRegisteredShortcuts] = useState<KeyboardShortcut[]>(shortcutsParam);
+  // Use ref to always have access to latest shortcuts without causing re-renders
+  const shortcutsRef = useRef<KeyboardShortcut[]>(shortcutsParam);
+  shortcutsRef.current = shortcutsParam;
 
   /**
    * Parse key combination string (e.g., 'ctrl+z', 'delete', 'escape')
@@ -78,7 +80,7 @@ export function useKonvaKeyboardShortcuts(
   );
 
   /**
-   * Handle keyboard events
+   * Handle keyboard events - uses ref to avoid dependency on shortcuts array
    */
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -89,8 +91,8 @@ export function useKonvaKeyboardShortcuts(
         return;
       }
 
-      // Find matching shortcut
-      const matchingShortcut = registeredShortcuts.find((shortcut) =>
+      // Find matching shortcut using ref (always has latest shortcuts)
+      const matchingShortcut = shortcutsRef.current.find((shortcut) =>
         matchesShortcut(event, shortcut)
       );
 
@@ -99,29 +101,29 @@ export function useKonvaKeyboardShortcuts(
         matchingShortcut.handler(event);
       }
     },
-    [enabledParam, registeredShortcuts, matchesShortcut]
+    [enabledParam, matchesShortcut]
   );
 
   /**
-   * Register a new shortcut
+   * Register a new shortcut (no-op, shortcuts are passed via props)
    */
-  const registerShortcut = useCallback((shortcut: KeyboardShortcut) => {
-    setRegisteredShortcuts((prev) => [...prev, shortcut]);
+  const registerShortcut = useCallback((_shortcut: KeyboardShortcut) => {
+    // No-op: shortcuts are managed via props, not internal state
   }, []);
 
   /**
-   * Unregister a shortcut by key
+   * Unregister a shortcut by key (no-op, shortcuts are passed via props)
    */
-  const unregisterShortcut = useCallback((key: string) => {
-    setRegisteredShortcuts((prev) => prev.filter((s) => s.key !== key));
+  const unregisterShortcut = useCallback((_key: string) => {
+    // No-op: shortcuts are managed via props, not internal state
   }, []);
 
   /**
    * Get all registered shortcuts
    */
   const getShortcuts = useCallback(() => {
-    return registeredShortcuts;
-  }, [registeredShortcuts]);
+    return shortcutsRef.current;
+  }, []);
 
   /**
    * Get shortcut description for display
@@ -142,7 +144,7 @@ export function useKonvaKeyboardShortcuts(
       'Other': [],
     };
 
-    registeredShortcuts.forEach((shortcut) => {
+    shortcutsRef.current.forEach((shortcut) => {
       // Categorize based on description
       const desc = shortcut.description?.toLowerCase() || '';
       if (desc.includes('undo') || desc.includes('redo')) {
@@ -159,7 +161,7 @@ export function useKonvaKeyboardShortcuts(
     });
 
     return categories;
-  }, [registeredShortcuts]);
+  }, []);
 
   // ==========================================================================
   // SETUP EVENT LISTENERS
@@ -185,7 +187,7 @@ export function useKonvaKeyboardShortcuts(
     getShortcutsByCategory,
 
     // State
-    shortcuts: registeredShortcuts,
+    shortcuts: shortcutsParam,
     enabled: enabledParam,
   };
 }

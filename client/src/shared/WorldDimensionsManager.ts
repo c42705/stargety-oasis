@@ -10,6 +10,10 @@
  * - Subscription system for React components
  * - Comprehensive validation and error handling
  * - Performance optimized with minimal re-renders
+ *
+ * REFACTORED (2025-12-11): Removed localStorage persistence.
+ * Dimensions are now persisted as part of map data in PostgreSQL via SharedMapSystem.
+ * This manager is now a runtime cache that gets synced from SharedMapSystem.
  */
 import { logger } from './logger';
 
@@ -75,7 +79,8 @@ export class WorldDimensionsManager {
 
   private constructor() {
     this.state = this.createDefaultState();
-    this.loadFromStorage();
+    // Note: No longer loading from localStorage
+    // Dimensions are synced from SharedMapSystem via MapDimensionService
   }
 
   public static getInstance(): WorldDimensionsManager {
@@ -171,7 +176,7 @@ export class WorldDimensionsManager {
       source = 'system',
       validateOnly = false,
       syncBackground = true,
-      skipPersistence = false,
+      // skipPersistence is no longer used - dimensions persist via SharedMapSystem
     } = options;
 
     // Prevent circular updates
@@ -232,10 +237,8 @@ export class WorldDimensionsManager {
         scaled: validation.scaled,
       });
 
-      // Persist to storage
-      if (!skipPersistence) {
-        this.saveToStorage();
-      }
+      // Note: No longer persisting to localStorage
+      // Dimensions are persisted as part of map data in PostgreSQL via SharedMapSystem
 
       // Notify subscribers
       this.notifySubscribers();
@@ -265,9 +268,8 @@ export class WorldDimensionsManager {
       source: options.source || 'background',
     };
 
-    if (!options.skipPersistence) {
-      this.saveToStorage();
-    }
+    // Note: No longer persisting to localStorage
+    // Dimensions are persisted as part of map data in PostgreSQL via SharedMapSystem
 
     this.notifySubscribers();
     return validation;
@@ -345,42 +347,9 @@ export class WorldDimensionsManager {
     });
   }
 
-  private saveToStorage(): void {
-    try {
-      const storageData = {
-        worldDimensions: this.state.worldDimensions,
-        backgroundImageDimensions: this.state.backgroundImageDimensions,
-        lastUpdated: this.state.lastUpdated.toISOString(),
-      };
-      localStorage.setItem('worldDimensions', JSON.stringify(storageData));
-    } catch (error) {
-      logger.warn('WorldDimensionsManager: Failed to save to storage', error as Error);
-    }
-  }
-
-  private loadFromStorage(): void {
-    try {
-      const stored = localStorage.getItem('worldDimensions');
-      if (stored) {
-        const data = JSON.parse(stored);
-        if (data.worldDimensions) {
-          const validation = this.validateDimensions(data.worldDimensions);
-          if (validation.isValid) {
-            this.state.worldDimensions = validation.dimensions;
-            this.state.effectiveDimensions = this.calculateEffectiveDimensions(
-              validation.dimensions,
-              data.backgroundImageDimensions
-            );
-            this.state.canvasDimensions = validation.dimensions;
-            this.state.backgroundImageDimensions = data.backgroundImageDimensions;
-            this.state.lastUpdated = new Date(data.lastUpdated || Date.now());
-          }
-        }
-      }
-    } catch (error) {
-      logger.warn('WorldDimensionsManager: Failed to load from storage', error as Error);
-    }
-  }
+  // Note: localStorage methods removed (2025-12-11)
+  // Dimensions are now persisted as part of map data in PostgreSQL via SharedMapSystem.
+  // This manager is a runtime cache that gets synced from MapDimensionService.
 }
 
 // Export singleton instance

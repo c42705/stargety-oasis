@@ -28,7 +28,8 @@ export class MovementController {
   private rotationTween?: Phaser.Tweens.Tween;
 
   // Callbacks
-  private getPlayer: () => Phaser.GameObjects.Sprite;
+  // Accept either a Sprite or a Container as the movement target (both expose x/y)
+  private getPlayer: () => Phaser.GameObjects.Sprite | Phaser.GameObjects.Container;
   private getOriginalY: () => number;
   private setOriginalY: (y: number) => void;
   private checkCollision: (x: number, y: number, size: number) => boolean;
@@ -40,7 +41,7 @@ export class MovementController {
     eventBus: any,
     playerId: string,
     callbacks: {
-      getPlayer: () => Phaser.GameObjects.Sprite;
+      getPlayer: () => Phaser.GameObjects.Sprite | Phaser.GameObjects.Container;
       getOriginalY: () => number;
       setOriginalY: (y: number) => void;
       checkCollision: (x: number, y: number, size: number) => boolean;

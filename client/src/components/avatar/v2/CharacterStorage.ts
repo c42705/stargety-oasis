@@ -520,21 +520,47 @@ export class CharacterStorage {
   }
   
   /**
-   * Get the active character slot data
+   * Get the active character slot data (sync - localStorage only)
    */
   static getActiveCharacterSlot(username: string): StorageResult<CharacterSlot | EmptyCharacterSlot> {
     try {
       const activeState = this.getActiveCharacter(username);
-      
+
       if (!activeState.success || !activeState.data) {
         return {
           success: false,
           error: activeState.error || 'Failed to get active character state'
         };
       }
-      
+
       return this.loadCharacterSlot(username, activeState.data.activeSlotNumber);
-      
+
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to get active character slot: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+
+  /**
+   * Get the active character slot data (async - API first, localStorage fallback)
+   */
+  static async getActiveCharacterSlotAsync(username: string): Promise<StorageResult<CharacterSlot | EmptyCharacterSlot>> {
+    try {
+      // Get active character state from API first
+      const activeState = await this.getActiveCharacterAsync(username);
+
+      if (!activeState.success || !activeState.data) {
+        return {
+          success: false,
+          error: activeState.error || 'Failed to get active character state'
+        };
+      }
+
+      // Load the actual slot data using API-first method
+      return this.loadCharacterSlotAsync(username, activeState.data.activeSlotNumber);
+
     } catch (error) {
       return {
         success: false,

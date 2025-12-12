@@ -94,9 +94,10 @@ export class MapDataService {
   }
 
   /**
-   * Load map data from PostgreSQL (with localStorage fallback)
+   * Load map data from PostgreSQL (with localStorage fallback - editor only)
+   * For gameplay: throws if API fails, don't silently fall back to stale localStorage
    */
-  static async loadMapData(roomId: string = DEFAULT_ROOM_ID): Promise<ExtendedMapData | null> {
+  static async loadMapData(roomId: string = DEFAULT_ROOM_ID, forGameplay: boolean = true): Promise<ExtendedMapData | null> {
     try {
       // Try to load from API first
       try {
@@ -125,27 +126,37 @@ export class MapDataService {
           return this.validateAndSanitizeMapData(mapData);
         }
       } catch (apiError) {
-        logger.warn('API LOAD FAILED, FALLING BACK TO LOCALSTORAGE', apiError);
+        logger.warn('API LOAD FAILED', { apiError, forGameplay, roomId });
+        
+        // For gameplay: fail hard to force default map creation (don't use stale localStorage)
+        if (forGameplay) {
+          logger.warn('[MapDataService] API load failed during gameplay - will use default map');
+          return null; // This will trigger createDefaultMap in the caller
+        }
       }
 
-      // Fallback to localStorage
-      const storedData = localStorage.getItem(STORAGE_KEYS.MAP_DATA);
+      // For editor mode: fallback to localStorage (allows offline editing)
+      if (!forGameplay) {
+        const storedData = localStorage.getItem(STORAGE_KEYS.MAP_DATA);
 
-      if (!storedData) {
-        return null;
+        if (!storedData) {
+          return null;
+        }
+
+        const parsedData = JSON.parse(storedData);
+
+        // Convert date strings to Date objects
+        if (parsedData.lastModified) {
+          parsedData.lastModified = new Date(parsedData.lastModified);
+        }
+
+        // Validate and sanitize data
+        const validatedData = this.validateAndSanitizeMapData(parsedData);
+
+        return validatedData;
       }
 
-      const parsedData = JSON.parse(storedData);
-
-      // Convert date strings to Date objects
-      if (parsedData.lastModified) {
-        parsedData.lastModified = new Date(parsedData.lastModified);
-      }
-
-      // Validate and sanitize data
-      const validatedData = this.validateAndSanitizeMapData(parsedData);
-
-      return validatedData;
+      return null;
 
     } catch (error) {
       logger.error('FAILED TO LOAD MAP DATA', error);
@@ -178,24 +189,26 @@ export class MapDataService {
         {
           id: 'meeting-room-1',
           name: 'Meeting Room',
-          type: 'meeting-room',
           x: 1520,
           y: 919,
           width: 120,
           height: 80,
           color: '#4A90E2',
-          description: 'Join the weekly team sync'
+          description: 'Join the weekly team sync',
+          actionType: 'jitsi',
+          actionConfig: null
         },
         {
           id: 'coffee-corner-1',
           name: 'Coffee Corner',
-          type: 'coffee-corner',
           x: 4561,
           y: 2575,
           width: 100,
           height: 80,
           color: '#8B4513',
-          description: 'Casual conversations'
+          description: 'Casual conversations',
+          actionType: 'none',
+          actionConfig: null
         }
       ],
       impassableAreas: [

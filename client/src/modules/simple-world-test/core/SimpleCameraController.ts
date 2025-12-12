@@ -15,7 +15,7 @@ interface CameraConfig {
 export class SimpleCameraController {
   private camera: Phaser.Cameras.Scene2D.Camera;
   private config: CameraConfig;
-  private target: Phaser.GameObjects.Sprite | null = null;
+  private target: (Phaser.GameObjects.Sprite | Phaser.GameObjects.Container) | null = null;
   private isZooming: boolean = false;
 
   constructor(camera: Phaser.Cameras.Scene2D.Camera, config: CameraConfig) {
@@ -37,7 +37,7 @@ export class SimpleCameraController {
   /**
    * Set the target for camera to follow
    */
-  setTarget(target: Phaser.GameObjects.Sprite): void {
+  setTarget(target: Phaser.GameObjects.Sprite | Phaser.GameObjects.Container): void {
     this.target = target;
   }
 

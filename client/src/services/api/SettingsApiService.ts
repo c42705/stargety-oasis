@@ -26,6 +26,14 @@ export interface EditorPreferences {
   zoomLevel?: number;
   panPosition?: { x: number; y: number };
   selectedTool?: string;
+  /** Animated GIF settings for map editor */
+  gifSettings?: {
+    enabled?: boolean;
+    defaultSpeed?: number;
+    maxGifsWarningThreshold?: number;
+    maxGifsLimit?: number;
+    autoPauseOnOverload?: boolean;
+  };
 }
 
 export interface NotificationPreferences {
