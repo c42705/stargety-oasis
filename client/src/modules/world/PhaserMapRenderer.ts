@@ -444,18 +444,19 @@ export class PhaserMapRenderer {
 
     // Create visual representation with visibility based on debug mode
     const fillAlpha = this.debugMode ? 0.7 : 0;
+    const areaColor = area.color || '#00ff00';
     const rect = this.scene.add.rectangle(
       area.x + area.width / 2,
       area.y + area.height / 2,
       area.width,
       area.height,
-      Phaser.Display.Color.HexStringToColor(area.color).color,
+      Phaser.Display.Color.HexStringToColor(areaColor).color,
       fillAlpha
     );
 
     // Add border (visible only in debug mode)
     if (this.debugMode) {
-      rect.setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(area.color).color);
+      rect.setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(areaColor).color);
     }
 
     // Add text label (visible only in debug mode)

@@ -14,7 +14,7 @@ export const useEditorCoreState = () => {
   const [viewport, setViewport] = useState<Viewport>({ pan: { x: 0, y: 0 }, zoom: 1 });
   const [gridConfig, setGridConfig] = useState<GridConfig>({ visible: true, spacing: 20, opacity: 0.5, snapToGrid: false, pattern: 'dots', color: '#ddd' });
   const [currentTool, setCurrentTool] = useState<EditorTool>('select');
-  const [activeTab, setActiveTab] = useState<TabId>('layers');
+  const [activeTab, setActiveTab] = useState<TabId>('properties');
 
   // Interaction
   const [isSpacebarPressed, setIsSpacebarPressed] = useState(false);

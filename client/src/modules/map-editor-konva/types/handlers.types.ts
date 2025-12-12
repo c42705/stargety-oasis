@@ -111,6 +111,7 @@ export interface InteractiveAreaHandlers {
   handleAreaFormSubmit: (data: Partial<InteractiveArea>) => void;
   handleAreaFormCancel: () => void;
   handleAreaDrawingComplete: (shape: Shape) => void;
+  handleUpdateArea: (areaId: string, updates: Partial<InteractiveArea>) => void;
 }
 
 export interface CollisionAreaHandlers {

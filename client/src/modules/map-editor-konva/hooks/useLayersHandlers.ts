@@ -22,11 +22,13 @@ interface UseLayersHandlersParams {
   setCollisionAreaToDelete: (area: any | null) => void;
   setShowCollisionDeleteConfirm: (show: boolean) => void;
   setViewport: (viewport: Viewport | ((prev: Viewport) => Viewport)) => void;
+  setActiveTab?: (tab: 'properties' | 'assets' | 'settings') => void;
 
   // State values
   shapes: Shape[];
   areas: InteractiveArea[];
   impassableAreas: any[];
+  activeTab?: 'properties' | 'assets' | 'settings';
 
   // Refs
   mainRef: RefObject<HTMLDivElement | null>;
@@ -47,10 +49,12 @@ export function useLayersHandlers(params: UseLayersHandlersParams): LayersHandle
     setCollisionAreaToDelete,
     setShowCollisionDeleteConfirm,
     setViewport,
+    setActiveTab,
     shapes,
     areas,
     removeAsset,
     impassableAreas,
+    activeTab,
     mainRef,
     markDirty,
     history,
@@ -59,7 +63,11 @@ export function useLayersHandlers(params: UseLayersHandlersParams): LayersHandle
   const handleShapeSelect = useCallback((shapeId: string) => {
     setSelectedIds([shapeId]);
     setCurrentTool('select');
-  }, [setSelectedIds, setCurrentTool]);
+    // Auto-switch to Properties tab when selecting items (unless in Settings tab)
+    if (setActiveTab && activeTab !== 'settings') {
+      setActiveTab('properties');
+    }
+  }, [setSelectedIds, setCurrentTool, setActiveTab, activeTab]);
 
   const handleShapeVisibilityToggle = useCallback((shapeId: string) => {
     setShapes(prev => prev.map(s => {

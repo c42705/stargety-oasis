@@ -13,6 +13,7 @@ import type {
   InteractiveAreaActionType,
   InteractiveAreaActionConfig,
 } from '../../../shared/MapDataContext';
+import { getColorForActionType } from '../../../shared/MapDataContext';
 import { isPolygonGeometry, isRectangleGeometry, isImageGeometry } from '../types';
 
 // ============================================================================
@@ -39,7 +40,6 @@ export function shapeToInteractiveArea(shape: Shape): InteractiveArea {
   return {
     id: shape.id,
     name: shape.metadata.name || 'Unnamed Area',
-    type: (shape.metadata.interactiveType as InteractiveArea['type']) || 'custom',
     x: shape.geometry.x,
     y: shape.geometry.y,
     width: shape.geometry.width,
@@ -187,6 +187,43 @@ export function shapesToMapData(shapes: Shape[]): {
  * @returns Konva shape
  */
 export function interactiveAreaToShape(area: InteractiveArea): Shape {
+  // Auto-derive color from action type if not explicitly set
+  const derivedColor = getColorForActionType(area.actionType || 'none');
+  const areaColor = area.color || derivedColor;
+
+  // Check if it's a polygon shape
+  if (area.shapeType === 'polygon' && area.points && area.points.length > 0) {
+    // Convert points array to flat array for Konva Line
+    const points: number[] = [];
+    area.points.forEach((point) => {
+      points.push(point.x, point.y);
+    });
+
+    return {
+      id: area.id,
+      category: 'interactive',
+      geometry: {
+        type: 'polygon',
+        points,
+      },
+      style: {
+        fill: areaColor,
+        stroke: areaColor,
+        strokeWidth: 2,
+        opacity: 0.7,
+      },
+      metadata: {
+        name: area.name,
+        description: area.description,
+        actionType: area.actionType,
+        actionConfig: area.actionConfig,
+        createdAt: new Date(),
+        modifiedAt: new Date(),
+      },
+    };
+  }
+
+  // Default: Rectangle shape
   return {
     id: area.id,
     category: 'interactive',
@@ -198,15 +235,14 @@ export function interactiveAreaToShape(area: InteractiveArea): Shape {
       height: area.height,
     },
     style: {
-      fill: area.color || 'rgba(0, 255, 0, 0.3)',
-      stroke: area.color || '#00ff00',
+      fill: areaColor,
+      stroke: areaColor,
       strokeWidth: 2,
       opacity: 0.7,
     },
     metadata: {
       name: area.name,
       description: area.description,
-      interactiveType: area.type,
       actionType: area.actionType,
       actionConfig: area.actionConfig,
       createdAt: new Date(),

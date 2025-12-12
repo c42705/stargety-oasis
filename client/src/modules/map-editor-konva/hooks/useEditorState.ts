@@ -13,7 +13,7 @@ import { logger } from '../../../shared/logger';
 
 export function useEditorState(): EditorStateReturn {
   // Tab state
-  const [activeTab, setActiveTab] = useState<TabId>('areas');
+  const [activeTab, setActiveTab] = useState<TabId>('properties');
   
   // Shape state
   const [shapes, setShapes] = useState<Shape[]>([]);

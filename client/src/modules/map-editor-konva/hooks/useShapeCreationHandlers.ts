@@ -12,12 +12,13 @@ import { useCallback } from 'react';
 import { logger } from '../../../shared/logger';
 import type { Shape, EditorTool } from '../types';
 import type { InteractiveArea, ImpassableArea } from '../../../shared/MapDataContext';
+import { getColorForActionType, InteractiveAreaActionType } from '../../../shared/MapDataContext';
 
 // Types for pending area data
 interface PendingAreaData {
   name?: string;
   description?: string;
-  type?: string;
+  actionType?: InteractiveAreaActionType;
   color?: string;
 }
 
@@ -88,7 +89,7 @@ export function useShapeCreationHandlers(
   } = params;
 
   /**
-   * Handle polygon shape creation (for collision areas)
+   * Handle polygon shape creation (for interactive areas with impassable action type)
    */
   const handlePolygonShapeCreate = useCallback((shape: Shape) => {
     logger.debug('POLYGON_SHAPE_CREATE', { shapeId: shape.id, geometryType: shape.geometry.type });
@@ -111,28 +112,35 @@ export function useShapeCreationHandlers(
     const maxX = Math.max(...xs);
     const maxY = Math.max(...ys);
 
-    // Auto-generate name if no pending data
-    const defaultName = `Collision Layer ${impassableAreas.length + 1}`;
+    // Auto-generate name - use pending data or auto-generate
+    const defaultName = pendingCollisionAreaData?.name || `Area ${impassableAreas.length + 1}`;
 
-    const newCollisionArea: NewCollisionArea = {
+    // Default to 'impassable' action type for polygon areas
+    const actionType: InteractiveAreaActionType = 'impassable';
+
+    const newArea: InteractiveArea = {
       id: shape.id,
-      name: pendingCollisionAreaData?.name || defaultName,
-      type: 'impassable-polygon',
-      color: pendingCollisionAreaData?.color || '#ff0000',
-      points,
+      name: defaultName,
+      description: undefined,
+      color: getColorForActionType(actionType),
       x: minX,
       y: minY,
       width: maxX - minX,
       height: maxY - minY,
+      actionType,
+      actionConfig: null,
+      shapeType: 'polygon',
+      points,
     };
 
-    logger.info('POLYGON_COLLISION_AREA_CREATED', {
-      id: newCollisionArea.id,
-      name: newCollisionArea.name,
-      pointsCount: newCollisionArea.points?.length,
+    logger.info('POLYGON_INTERACTIVE_AREA_CREATED', {
+      id: newArea.id,
+      name: newArea.name,
+      pointsCount: points.length,
+      actionType,
     });
 
-    addCollisionArea(newCollisionArea);
+    addInteractiveArea(newArea);
     setPendingCollisionAreaData(null);
     markDirty();
     history.pushState('Draw polygon');
@@ -141,7 +149,7 @@ export function useShapeCreationHandlers(
   }, [
     pendingCollisionAreaData,
     impassableAreas.length,
-    addCollisionArea,
+    addInteractiveArea,
     setPendingCollisionAreaData,
     markDirty,
     history,
@@ -167,20 +175,20 @@ export function useShapeCreationHandlers(
     }
 
     const rect = shape.geometry;
-    // Cast type to valid InteractiveArea type
-    const areaType = (pendingAreaData.type || 'custom') as InteractiveArea['type'];
+    // Default to 'impassable' action type for new areas
+    const actionType = pendingAreaData.actionType || 'impassable';
     const newArea: InteractiveArea = {
       id: shape.id,
       name: pendingAreaData.name || 'New Area',
-      description: pendingAreaData.description || '',
-      type: areaType,
-      color: pendingAreaData.color || '#4A90E2',
+      description: pendingAreaData.description,
+      color: pendingAreaData.color || getColorForActionType(actionType),
       x: rect.x,
       y: rect.y,
       width: rect.width,
       height: rect.height,
-      actionType: 'none',
+      actionType,
       actionConfig: null,
+      shapeType: 'rectangle',
     };
 
     logger.info('INTERACTIVE_AREA_CREATED', { areaId: newArea.id, areaName: newArea.name });
@@ -202,7 +210,7 @@ export function useShapeCreationHandlers(
   ]);
 
   /**
-   * Handle collision rectangle shape creation
+   * Handle collision rectangle shape creation (creates interactive area with impassable action type)
    */
   const handleCollisionRectShapeCreate = useCallback((shape: Shape) => {
     logger.debug('COLLISION_RECT_SHAPE_CREATE', { shapeId: shape.id });
@@ -210,20 +218,32 @@ export function useShapeCreationHandlers(
     if (!pendingCollisionAreaData || shape.geometry.type !== 'rectangle') return;
 
     const rect = shape.geometry;
-    const defaultName = `Collision Layer ${impassableAreas.length + 1}`;
+    const defaultName = pendingCollisionAreaData.name || `Area ${impassableAreas.length + 1}`;
 
-    const newCollisionArea: NewCollisionArea = {
+    // Default to 'impassable' action type for collision rectangles
+    const actionType: InteractiveAreaActionType = 'impassable';
+
+    const newArea: InteractiveArea = {
       id: shape.id,
-      name: pendingCollisionAreaData.name || defaultName,
-      type: 'rectangle',
-      color: pendingCollisionAreaData.color || '#ff0000',
+      name: defaultName,
+      description: undefined,
+      color: getColorForActionType(actionType),
       x: rect.x,
       y: rect.y,
       width: rect.width,
       height: rect.height,
+      actionType,
+      actionConfig: null,
+      shapeType: 'rectangle',
     };
 
-    addCollisionArea(newCollisionArea);
+    logger.info('COLLISION_RECT_INTERACTIVE_AREA_CREATED', {
+      id: newArea.id,
+      name: newArea.name,
+      actionType,
+    });
+
+    addInteractiveArea(newArea);
     setPendingCollisionAreaData(null);
     markDirty();
     history.pushState('Draw collision rectangle');
@@ -232,7 +252,7 @@ export function useShapeCreationHandlers(
   }, [
     pendingCollisionAreaData,
     impassableAreas.length,
-    addCollisionArea,
+    addInteractiveArea,
     setPendingCollisionAreaData,
     markDirty,
     history,

@@ -6,6 +6,17 @@
  */
 
 import { apiFetch, apiUpload, ApiResponse } from './apiClient';
+// Import and re-export the canonical InteractiveArea type from MapDataContext
+// This ensures type consistency across the codebase
+import type {
+  InteractiveArea,
+  InteractiveAreaActionType,
+  InteractiveAreaActionConfig,
+  AlertActionConfig,
+  UrlActionConfig,
+  ModalActionConfig,
+  JitsiActionConfig,
+} from '../../shared/MapDataContext';
 
 // Types matching server schema
 export interface MapAsset {
@@ -19,18 +30,6 @@ export interface MapAsset {
   metadata?: Record<string, unknown>;
   uploadedAt: string;
 }
-
-// Import and re-export the canonical InteractiveArea type from MapDataContext
-// This ensures type consistency across the codebase
-import type {
-  InteractiveArea,
-  InteractiveAreaActionType,
-  InteractiveAreaActionConfig,
-  AlertActionConfig,
-  UrlActionConfig,
-  ModalActionConfig,
-  JitsiActionConfig,
-} from '../../shared/MapDataContext';
 
 export type {
   InteractiveArea,

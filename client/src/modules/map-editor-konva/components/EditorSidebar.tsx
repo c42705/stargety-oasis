@@ -1,41 +1,41 @@
 /**
- * EditorSidebar Component
- * 
- * Renders the sidebar with tab navigation and tab content panels.
- * Includes all editor tabs: Areas, Terrain, Assets, Collision, Jitsi, Settings.
+ * EditorSidebar Component (Right Sidebar)
+ *
+ * 3-tab structure following Figma/Unity pattern:
+ * - Properties: Selection-driven editing
+ * - Assets: Asset library and upload
+ * - Settings: Grid, preview mode, editor settings
  */
 
 import React from 'react';
 import type { TabId, InteractiveArea } from '../types';
 import type { GridConfig } from '../types/ui.types';
+import type { Shape } from '../types';
+import type { ImpassableArea } from '../../../shared/MapDataContext';
 import { EDITOR_TABS } from '../constants/editorConstants';
-import { AreasTab } from './tabs/AreasTab';
-import { TerrainTab } from './tabs/TerrainTab';
+import { PropertiesTab } from './tabs/PropertiesTab';
 import { AssetsTab } from './tabs/AssetsTab';
-import { CollisionTab } from './tabs/CollisionTab';
-import { JitsiTab } from './tabs/JitsiTab';
 import { SettingsTab } from './tabs/SettingsTab';
 
 interface EditorSidebarProps {
   // Tab state
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
-  
-  // Areas tab
+
+  // Properties tab (selection-driven)
+  selectedIds: string[];
+  shapes: Shape[];
   areas: InteractiveArea[];
-  onCreateNewArea: () => void;
+  impassableAreas: ImpassableArea[];
   onEditArea: (area: InteractiveArea) => void;
   onDeleteArea: (area: InteractiveArea) => void;
-  
+  onEditCollisionArea: (area: ImpassableArea) => void;
+  onDeleteCollisionArea: (area: ImpassableArea) => void;
+  onUpdateArea?: (areaId: string, updates: Partial<InteractiveArea>) => void;
+
   // Assets tab
   onPlaceAsset: (fileData: string, fileName: string, width: number, height: number) => void;
-  
-  // Collision tab
-  impassableAreas: any[];
-  onCreateNewCollisionArea: () => void;
-  onEditCollisionArea: (area: any) => void;
-  onDeleteCollisionArea: (area: any) => void;
-  
+
   // Settings tab
   gridConfig: GridConfig;
   onGridConfigChange: (config: Partial<GridConfig>) => void;
@@ -46,15 +46,16 @@ interface EditorSidebarProps {
 export const EditorSidebar: React.FC<EditorSidebarProps> = ({
   activeTab,
   onTabChange,
+  selectedIds,
+  shapes,
   areas,
-  onCreateNewArea,
+  impassableAreas,
   onEditArea,
   onDeleteArea,
-  onPlaceAsset,
-  impassableAreas,
-  onCreateNewCollisionArea,
   onEditCollisionArea,
   onDeleteCollisionArea,
+  onUpdateArea,
+  onPlaceAsset,
   gridConfig,
   onGridConfigChange,
   previewMode,
@@ -83,27 +84,22 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
       {/* Tab Content */}
       <div className="sidebar-content">
         <div className="tab-content-container">
-          {activeTab === 'areas' && (
-            <AreasTab
+          {activeTab === 'properties' && (
+            <PropertiesTab
+              selectedIds={selectedIds}
+              shapes={shapes}
               areas={areas}
-              onCreateNewArea={onCreateNewArea}
+              impassableAreas={impassableAreas}
               onEditArea={onEditArea}
               onDeleteArea={onDeleteArea}
+              onEditCollisionArea={onEditCollisionArea}
+              onDeleteCollisionArea={onDeleteCollisionArea}
+              onUpdateArea={onUpdateArea}
             />
           )}
-          {activeTab === 'terrain' && <TerrainTab />}
           {activeTab === 'assets' && (
             <AssetsTab onPlaceAsset={onPlaceAsset} />
           )}
-          {activeTab === 'collision' && (
-            <CollisionTab
-              impassableAreas={impassableAreas}
-              onCreateNewCollisionArea={onCreateNewCollisionArea}
-              onEditCollisionArea={onEditCollisionArea}
-              onDeleteCollisionArea={onDeleteCollisionArea}
-            />
-          )}
-          {activeTab === 'jitsi' && <JitsiTab areas={areas} onEditArea={onEditArea} />}
           {activeTab === 'settings' && (
             <SettingsTab
               gridConfig={gridConfig}

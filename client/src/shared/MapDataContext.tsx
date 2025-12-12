@@ -8,11 +8,39 @@ import { useMapStoreInit } from '../stores/useMapStoreInit';
 
 /** Action types that an Interactive Area can trigger */
 export type InteractiveAreaActionType =
-  | 'none'      // No action - just visual/informational
-  | 'alert'     // Show notification/message
-  | 'url'       // Open URL (new tab or embedded)
-  | 'modal'     // Show custom modal content
-  | 'jitsi';    // Join Jitsi video conference
+  | 'none'        // No action - just visual/informational
+  | 'impassable'  // Blocks movement (collision only)
+  | 'alert'       // Show notification/message
+  | 'url'         // Open URL (new tab or embedded)
+  | 'modal'       // Show custom modal content
+  | 'jitsi'       // Join Jitsi video conference
+  | 'collectible' // Collision-activated effect (e.g., speed boost)
+  | 'switch';     // Toggle visibility of other areas/assets
+
+// ============================================================================
+// ACTION TYPE COLORS (Auto-derived)
+// ============================================================================
+
+/** Color mapping for action types - used for auto-derived area colors */
+export const ACTION_TYPE_COLORS: Record<InteractiveAreaActionType, string> = {
+  none: '#8c8c8c',        // Gray
+  impassable: '#ff4d4f',  // Red
+  jitsi: '#52c41a',       // Green
+  alert: '#fa8c16',       // Orange
+  url: '#13c2c2',         // Cyan
+  modal: '#722ed1',       // Purple
+  collectible: '#40a9ff', // Blue
+  switch: '#fadb14',      // Yellow
+};
+
+/** Get the color for an action type */
+export function getColorForActionType(actionType: InteractiveAreaActionType): string {
+  return ACTION_TYPE_COLORS[actionType] || ACTION_TYPE_COLORS.none;
+}
+
+// ============================================================================
+// ACTION CONFIG INTERFACES
+// ============================================================================
 
 /** Configuration for alert action */
 export interface AlertActionConfig {
@@ -43,12 +71,30 @@ export interface JitsiActionConfig {
   autoLeaveOnExit: boolean; // Auto-leave when exiting area
 }
 
+/** Configuration for collectible action */
+export interface CollectibleActionConfig {
+  effectType: 'speed_boost' | 'invincibility' | 'score' | 'custom';
+  effectValue: number;      // e.g., 30 for +30% speed
+  effectDuration: number;   // Duration in seconds, 0 = permanent
+  consumable: boolean;      // If true, disappears after collection
+  respawnTime?: number;     // Seconds until respawn (if consumable)
+}
+
+/** Configuration for switch action */
+export interface SwitchActionConfig {
+  targetIds: string[];      // IDs of areas/assets to toggle
+  initialState: boolean;    // Initial visibility state of targets
+  toggleMode: 'visibility' | 'collision' | 'both';
+}
+
 /** Union type for all action configs */
 export type InteractiveAreaActionConfig =
   | AlertActionConfig
   | UrlActionConfig
   | ModalActionConfig
   | JitsiActionConfig
+  | CollectibleActionConfig
+  | SwitchActionConfig
   | null;
 
 // ============================================================================
@@ -85,17 +131,22 @@ export function getJitsiRoomNameForArea(area: InteractiveArea): string {
 export interface InteractiveArea {
   id: string;
   name: string;
-  type: 'meeting-room' | 'presentation-hall' | 'coffee-corner' | 'game-zone' | 'custom';
   x: number;
   y: number;
   width: number;
   height: number;
-  color: string;
-  description: string;
+
+  // Optional fields - color is auto-derived from actionType if not specified
+  color?: string;
+  description?: string;
 
   // Action configuration - what happens when player enters/interacts with this area
   actionType: InteractiveAreaActionType;
   actionConfig: InteractiveAreaActionConfig;
+
+  // Extended properties for polygon support
+  shapeType?: 'rectangle' | 'polygon';
+  points?: { x: number; y: number }[];
 }
 
 export interface ImpassableArea {

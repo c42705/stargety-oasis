@@ -6,10 +6,8 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { Layout, Button, Tooltip, Flex, Typography, Divider, theme, Tree, Space, Badge } from 'antd';
+import { Button, Tooltip, Flex, Typography, Divider, theme, Tree, Space, Badge } from 'antd';
 import {
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
   EyeOutlined,
   EyeInvisibleOutlined,
   EditOutlined,
@@ -26,9 +24,9 @@ import {
   Pentagon
 } from 'lucide-react';
 import type { Shape, Viewport } from '../types';
-import type { ImpassableArea } from '../../../shared/MapDataContext';
+import type { ImpassableArea, InteractiveAreaActionType } from '../../../shared/MapDataContext';
+import { getColorForActionType } from '../../../shared/MapDataContext';
 
-const { Sider } = Layout;
 const { Text } = Typography;
 
 interface LayerObject {
@@ -85,8 +83,7 @@ export const KonvaLayersPanel: React.FC<KonvaLayersPanelProps> = ({
   onUngroupShapes,
   onMultiSelect
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [expandedKeys, setExpandedKeys] = useState<string[]>(['background', 'interactive', 'collision']);
+  const [expandedKeys, setExpandedKeys] = useState<string[]>(['background', 'interactive', 'collision', 'asset']);
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
   const { token } = theme.useToken();
 
@@ -310,118 +307,152 @@ export const KonvaLayersPanel: React.FC<KonvaLayersPanelProps> = ({
     }
   }, [selectedIds, areAllInSameGroup, onUngroupShapes]);
 
-  // Build tree data for Ant Design Tree component
+  // Handle group expand/collapse - using functional update to avoid dependency on expandedKeys
+  const handleGroupToggle = useCallback((groupKey: string) => {
+    setExpandedKeys(prev =>
+      prev.includes(groupKey)
+        ? prev.filter(k => k !== groupKey)
+        : [...prev, groupKey]
+    );
+  }, []);
+
+  // Build tree data with minimal data - render via titleRender to avoid reference issues
   const treeData = useMemo(() => {
     return layerGroups.map(group => ({
       key: group.key,
-      title: (
+      title: group.title,
+      selectable: false,
+      isGroup: true,
+      groupIcon: group.icon,
+      objectCount: group.objects.length,
+      children: group.objects.map(obj => ({
+        key: obj.id,
+        title: obj.name,
+        selectable: true,
+        isLeaf: true,
+        data: obj,
+        isGroup: false,
+      }))
+    }));
+  }, [layerGroups]);
+
+  // Render tree node titles - this is called by Tree component
+  const renderTreeTitle = useCallback((node: any) => {
+    // Group node
+    if (node.isGroup) {
+      return (
         <div
-          onClick={() => {
-            const newExpandedKeys = expandedKeys.includes(group.key)
-              ? expandedKeys.filter(k => k !== group.key)
-              : [...expandedKeys, group.key];
-            setExpandedKeys(newExpandedKeys);
-          }}
+          onClick={() => handleGroupToggle(node.key)}
           style={{ cursor: 'pointer', flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}
         >
           <Space size="small" style={{ flex: 1 }}>
-            {group.icon}
-            <Text strong>{group.title}</Text>
-            <Badge count={group.objects.length} showZero style={{ backgroundColor: token.colorPrimary }} />
+            {node.groupIcon}
+            <Text strong>{node.title}</Text>
+            <Badge count={node.objectCount} showZero style={{ backgroundColor: token.colorPrimary }} />
           </Space>
         </div>
-      ),
-      selectable: false,
-      children: group.objects.map(obj => {
-        const isGrouped = !!obj.shape.metadata.groupId;
-        const isSelected = selectedIds.includes(obj.id);
+      );
+    }
 
-        return {
-          key: obj.id,
-          title: (
-            <Flex
-              justify="space-between"
-              align="center"
-              style={{ width: '100%' }}
-              onMouseDown={(e) => {
-                // Capture shift key on mouse down for range selection
-                if (e.shiftKey) {
-                  e.preventDefault();
-                  handleLayerSelect(obj, e.ctrlKey || e.metaKey, true);
-                }
+    // Leaf node (layer object)
+    const obj = node.data as LayerObject;
+    if (!obj) return node.title;
+
+    const isGrouped = !!obj.shape.metadata.groupId;
+    const isSelected = selectedIds.includes(obj.id);
+
+    return (
+      <Flex
+        justify="space-between"
+        align="center"
+        style={{ width: '100%' }}
+        onMouseDown={(e) => {
+          if (e.shiftKey) {
+            e.preventDefault();
+            handleLayerSelect(obj, e.ctrlKey || e.metaKey, true);
+          }
+        }}
+      >
+        <Flex align="center" gap={8} style={{ flex: 1, minWidth: 0 }}>
+          {obj.thumbnail && (
+            <img
+              src={obj.thumbnail}
+              alt={obj.name}
+              style={{
+                width: 24,
+                height: 24,
+                objectFit: 'cover',
+                borderRadius: 4,
+                border: `1px solid ${token.colorBorder}`
               }}
-            >
-              <Flex align="center" gap={8} style={{ flex: 1, minWidth: 0 }}>
-                {obj.thumbnail && (
-                  <img
-                    src={obj.thumbnail}
-                    alt={obj.name}
-                    style={{
-                      width: 24,
-                      height: 24,
-                      objectFit: 'cover',
-                      borderRadius: 4,
-                      border: `1px solid ${token.colorBorder}`
-                    }}
-                  />
-                )}
-                {obj.type === 'collision' && (
-                  obj.shape.geometry.type === 'rectangle'
-                    ? <Square size={14} style={{ color: token.colorError }} />
-                    : <Pentagon size={14} style={{ color: token.colorError }} />
-                )}
-                {isGrouped && (
-                  <Tooltip title="Part of a group">
-                    <GroupOutlined style={{ color: token.colorWarning, fontSize: 12 }} />
-                  </Tooltip>
-                )}
-                <Text
-                  ellipsis
-                  style={{
-                    flex: 1,
-                    fontWeight: isSelected ? 600 : 400,
-                    color: isSelected ? token.colorPrimary : token.colorText
-                  }}
-                >
-                  {obj.name}
-                </Text>
-              </Flex>
-              <Space size="small">
-                <Tooltip title={obj.visible ? 'Hide' : 'Show'}>
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={obj.visible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
-                    onClick={(e) => handleVisibilityToggle(obj, e)}
-                  />
-                </Tooltip>
-                <Tooltip title="Edit">
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<EditOutlined />}
-                    onClick={(e) => handleEdit(obj, e)}
-                  />
-                </Tooltip>
-                <Tooltip title="Delete">
-                  <Button
-                    type="text"
-                    size="small"
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={(e) => handleDelete(obj, e)}
-                  />
-                </Tooltip>
-              </Space>
-            </Flex>
-          ),
-          selectable: true,
-          isLeaf: true,
-          data: obj
-        };
-      })
-    }));
-  }, [layerGroups, selectedIds, token, expandedKeys, handleVisibilityToggle, handleEdit, handleDelete, handleLayerSelect]);
+            />
+          )}
+          {obj.type === 'collision' && (
+            obj.shape.geometry.type === 'rectangle'
+              ? <Square size={14} style={{ color: token.colorError }} />
+              : <Pentagon size={14} style={{ color: token.colorError }} />
+          )}
+          {obj.type === 'interactive' && (
+            <div
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: '50%',
+                backgroundColor: getColorForActionType(
+                  (obj.shape.metadata?.actionType as InteractiveAreaActionType) || 'none'
+                ),
+                border: `1px solid ${token.colorBorder}`,
+                flexShrink: 0,
+              }}
+              title={`Action: ${obj.shape.metadata?.actionType || 'none'}`}
+            />
+          )}
+          {isGrouped && (
+            <Tooltip title="Part of a group">
+              <GroupOutlined style={{ color: token.colorWarning, fontSize: 12 }} />
+            </Tooltip>
+          )}
+          <Text
+            ellipsis
+            style={{
+              flex: 1,
+              fontWeight: isSelected ? 600 : 400,
+              color: isSelected ? token.colorPrimary : token.colorText
+            }}
+          >
+            {obj.name}
+          </Text>
+        </Flex>
+        <Space size="small">
+          <Tooltip title={obj.visible ? 'Hide' : 'Show'}>
+            <Button
+              type="text"
+              size="small"
+              icon={obj.visible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
+              onClick={(e) => handleVisibilityToggle(obj, e)}
+            />
+          </Tooltip>
+          <Tooltip title="Edit">
+            <Button
+              type="text"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={(e) => handleEdit(obj, e)}
+            />
+          </Tooltip>
+          <Tooltip title="Delete">
+            <Button
+              type="text"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={(e) => handleDelete(obj, e)}
+            />
+          </Tooltip>
+        </Space>
+      </Flex>
+    );
+  }, [selectedIds, token, handleGroupToggle, handleVisibilityToggle, handleEdit, handleDelete, handleLayerSelect]);
 
   // Handle tree node select with multi-select and range selection support
   const handleTreeSelect = useCallback((selectedKeys: React.Key[], info: any) => {
@@ -433,20 +464,16 @@ export const KonvaLayersPanel: React.FC<KonvaLayersPanelProps> = ({
   }, [handleLayerSelect]);
 
   return (
-    <Sider
-      collapsible
-      collapsed={isCollapsed}
-      onCollapse={setIsCollapsed}
-      trigger={null}
-      width={300}
-      collapsedWidth={48}
+    <div
+      className="editor-left-sidebar"
       style={{
+        display: 'flex',
+        flexDirection: 'column',
         overflow: 'hidden',
-        transition: 'all 0.3s ease',
-        borderRight: `1px solid ${token.colorBorder}`
+        background: token.colorBgContainer,
       }}
     >
-      {/* Header with collapse button and group actions */}
+      {/* Header with group actions */}
       <Flex
         justify="space-between"
         align="center"
@@ -457,17 +484,13 @@ export const KonvaLayersPanel: React.FC<KonvaLayersPanelProps> = ({
         }}
       >
         <Flex gap="small" align="center">
-          {!isCollapsed && (
-            <>
-              <Layers size={16} style={{ color: token.colorPrimary }} />
-              <Text strong style={{ fontSize: token.fontSizeSM }}>
-                Layers
-              </Text>
-            </>
-          )}
+          <Layers size={16} style={{ color: token.colorPrimary }} />
+          <Text strong style={{ fontSize: token.fontSizeSM }}>
+            Layers
+          </Text>
         </Flex>
         <Flex gap="small" align="center">
-          {!isCollapsed && selectedIds.length > 0 && (
+          {selectedIds.length > 0 && (
             <>
               <Tooltip title={canGroupShapes(selectedIds) ? 'Group selected' : 'Select 2+ items of same type'}>
                 <Button
@@ -489,42 +512,33 @@ export const KonvaLayersPanel: React.FC<KonvaLayersPanelProps> = ({
               </Tooltip>
             </>
           )}
-          <Tooltip title={isCollapsed ? 'Expand Layers Panel' : 'Collapse Layers Panel'}>
-            <Button
-              type="text"
-              size="small"
-              icon={isCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-              onClick={() => setIsCollapsed(!isCollapsed)}
-            />
-          </Tooltip>
         </Flex>
       </Flex>
 
       <Divider style={{ margin: 0 }} />
 
       {/* Content */}
-      {!isCollapsed && (
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            padding: token.paddingXS
-          }}
-        >
-          <Tree
-            treeData={treeData}
-            expandedKeys={expandedKeys}
-            onExpand={(keys) => setExpandedKeys(keys as string[])}
-            selectedKeys={selectedIds}
-            onSelect={handleTreeSelect}
-            showLine={false}
-            showIcon={false}
-            style={{ background: 'transparent' }}
-          />
-        </div>
-      )}
-    </Sider>
+      <div
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          padding: token.paddingXS
+        }}
+      >
+        <Tree
+          treeData={treeData}
+          expandedKeys={expandedKeys}
+          onExpand={(keys) => setExpandedKeys(keys as string[])}
+          selectedKeys={selectedIds}
+          onSelect={handleTreeSelect}
+          titleRender={renderTreeTitle}
+          showLine={false}
+          showIcon={false}
+          style={{ background: 'transparent' }}
+        />
+      </div>
+    </div>
   );
 };
 

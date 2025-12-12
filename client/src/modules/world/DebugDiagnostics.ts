@@ -183,7 +183,7 @@ export class DebugDiagnostics {
             top: area.y,
             bottom: area.y + area.height
           },
-          areaType: area.type,
+          areaType: area.actionType || 'none',
           color: area.color
         });
       });

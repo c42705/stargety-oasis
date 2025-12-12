@@ -1,18 +1,19 @@
 /**
  * Interactive Area Action Dispatcher
- * 
+ *
  * Handles dispatching actions when players enter/exit interactive areas.
- * Supports multiple action types: jitsi, alert, url, modal.
+ * Supports action types: jitsi, alert, url, modal, collectible, switch, impassable.
  */
 
 import { message, Modal } from 'antd';
-import { 
-  InteractiveArea, 
-  InteractiveAreaActionType,
+import {
+  InteractiveArea,
   JitsiActionConfig,
   AlertActionConfig,
   UrlActionConfig,
   ModalActionConfig,
+  CollectibleActionConfig,
+  SwitchActionConfig,
   getJitsiRoomNameForArea,
 } from './MapDataContext';
 import { EventBus } from './EventBusContext';
@@ -68,7 +69,7 @@ export class InteractiveAreaActionDispatcher {
 
   private dispatchAction(area: InteractiveArea, trigger: 'enter' | 'exit'): void {
     const actionType = area.actionType || 'none';
-    
+
     switch (actionType) {
       case 'jitsi':
         this.handleJitsiAction(area, trigger);
@@ -81,6 +82,15 @@ export class InteractiveAreaActionDispatcher {
         break;
       case 'modal':
         if (trigger === 'enter') this.handleModalAction(area);
+        break;
+      case 'collectible':
+        if (trigger === 'enter') this.handleCollectibleAction(area);
+        break;
+      case 'switch':
+        if (trigger === 'enter') this.handleSwitchAction(area);
+        break;
+      case 'impassable':
+        // Impassable areas are handled by physics collision, no action needed here
         break;
       case 'none':
       default:
@@ -139,6 +149,51 @@ export class InteractiveAreaActionDispatcher {
       content: config.content,
       okText: 'Close',
     });
+  }
+
+  private handleCollectibleAction(area: InteractiveArea): void {
+    const config = area.actionConfig as CollectibleActionConfig | null;
+    if (!config) return;
+
+    // Emit collectible event for game systems to handle
+    this.config.eventBus.publish('collectible:collected', {
+      areaId: area.id,
+      areaName: area.name,
+      effectType: config.effectType,
+      effectValue: config.effectValue,
+      effectDuration: config.effectDuration,
+      consumable: config.consumable,
+    });
+
+    logger.info('[ActionDispatcher] Collectible collected', {
+      name: area.name,
+      effectType: config.effectType,
+      effectValue: config.effectValue,
+    });
+
+    // Show feedback to player
+    message.success(`Collected ${area.name}! ${config.effectType.replace('_', ' ')} +${config.effectValue}%`);
+  }
+
+  private handleSwitchAction(area: InteractiveArea): void {
+    const config = area.actionConfig as SwitchActionConfig | null;
+    if (!config?.targetIds?.length) return;
+
+    // Emit switch event for game systems to handle
+    this.config.eventBus.publish('switch:toggled', {
+      areaId: area.id,
+      areaName: area.name,
+      targetIds: config.targetIds,
+      toggleMode: config.toggleMode,
+    });
+
+    logger.info('[ActionDispatcher] Switch toggled', {
+      name: area.name,
+      targetIds: config.targetIds,
+      toggleMode: config.toggleMode,
+    });
+
+    message.info(`${area.name} activated`);
   }
 }
 

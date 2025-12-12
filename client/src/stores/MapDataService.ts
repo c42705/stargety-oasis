@@ -189,20 +189,18 @@ export class MapDataService {
         {
           id: 'meeting-room-1',
           name: 'Meeting Room',
-          type: 'meeting-room',
           x: 1520,
           y: 919,
           width: 120,
           height: 80,
           color: '#4A90E2',
           description: 'Join the weekly team sync',
-          actionType: 'none',
+          actionType: 'jitsi',
           actionConfig: null
         },
         {
           id: 'coffee-corner-1',
           name: 'Coffee Corner',
-          type: 'coffee-corner',
           x: 4561,
           y: 2575,
           width: 100,

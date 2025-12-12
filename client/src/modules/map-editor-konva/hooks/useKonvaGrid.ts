@@ -112,6 +112,9 @@ export function useKonvaGrid(params: UseKonvaGridParams): UseKonvaGridReturn {
 
   /**
    * Generate grid lines based on pattern
+   *
+   * Grid extends beyond visible area to ensure it covers the entire canvas
+   * when panned or zoomed. Lines start at 0 and extend to full canvas dimensions.
    */
   const gridLines = useMemo(() => {
     if (!shouldRenderGrid) return [];
@@ -128,10 +131,19 @@ export function useKonvaGrid(params: UseKonvaGridParams): UseKonvaGridReturn {
     const gridSpacing = effectiveSpacing;
     const gridOpacity = effectiveOpacity;
 
-    // Generate vertical lines
-    for (let x = 0; x <= canvasWidth; x += gridSpacing) {
+    // Extend grid beyond canvas to ensure coverage when panned
+    // Use a buffer that accounts for pan offset
+    const buffer = gridSpacing * 2;
+    const startX = -buffer;
+    const startY = -buffer;
+    const endX = canvasWidth + buffer;
+    const endY = canvasHeight + buffer;
+
+    // Generate vertical lines (snap to grid spacing)
+    const firstVerticalLine = Math.floor(startX / gridSpacing) * gridSpacing;
+    for (let x = firstVerticalLine; x <= endX; x += gridSpacing) {
       lines.push({
-        points: [x, 0, x, canvasHeight],
+        points: [x, startY, x, endY],
         stroke: color,
         strokeWidth: 1,
         opacity: gridOpacity,
@@ -139,10 +151,11 @@ export function useKonvaGrid(params: UseKonvaGridParams): UseKonvaGridReturn {
       });
     }
 
-    // Generate horizontal lines
-    for (let y = 0; y <= canvasHeight; y += gridSpacing) {
+    // Generate horizontal lines (snap to grid spacing)
+    const firstHorizontalLine = Math.floor(startY / gridSpacing) * gridSpacing;
+    for (let y = firstHorizontalLine; y <= endY; y += gridSpacing) {
       lines.push({
-        points: [0, y, canvasWidth, y],
+        points: [startX, y, endX, y],
         stroke: color,
         strokeWidth: 1,
         opacity: gridOpacity,

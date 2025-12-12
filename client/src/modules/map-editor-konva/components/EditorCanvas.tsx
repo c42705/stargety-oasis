@@ -141,24 +141,6 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
 
           {/* Grid Layer - Render on top of background */}
           <Layer ref={layerRefs.gridLayer}>
-            {(() => {
-              // Debug logging for grid rendering
-              if (grid.shouldRenderGrid && grid.gridLines.length > 0) {
-                logger.debug('GRID_RENDERING', {
-                  gridLinesCount: grid.gridLines.length,
-                  gridConfig: gridConfig,
-                  firstLine: grid.gridLines[0],
-                  viewport: viewport
-                });
-              } else if (!grid.shouldRenderGrid) {
-                logger.debug('GRID_NOT_RENDERING', {
-                  shouldRenderGrid: grid.shouldRenderGrid,
-                  gridVisible: gridConfig.visible,
-                  zoom: viewport.zoom
-                });
-              }
-              return null;
-            })()}
             {grid.shouldRenderGrid && grid.gridLines.map((line, index) => (
               <Line
                 key={`grid-line-${index}`}

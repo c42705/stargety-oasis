@@ -49,8 +49,7 @@ export function useStageEventHandlers(params: UseStageEventHandlersParams): Stag
     } else if (currentTool === 'polygon') {
       polygonDrawing.handleClick(e);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTool]);
+  }, [currentTool, selection, polygonDrawing]);
 
   const handleStageMouseDown = useCallback((e: any) => {
     // Pan tool or spacebar pressed - enable panning
@@ -75,8 +74,7 @@ export function useStageEventHandlers(params: UseStageEventHandlersParams): Stag
         rectDrawing.handleMouseDown(e);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTool, isSpacebarPressed, collisionDrawingMode, pendingCollisionAreaData, drawingMode, pendingAreaData]);
+  }, [currentTool, isSpacebarPressed, collisionDrawingMode, pendingCollisionAreaData, drawingMode, pendingAreaData, pan, selection, collisionRectDrawing, rectDrawing]);
 
   const handleStageMouseMove = useCallback((e: any) => {
     // Pan tool or spacebar pressed - enable panning
@@ -94,8 +92,7 @@ export function useStageEventHandlers(params: UseStageEventHandlersParams): Stag
         rectDrawing.handleMouseMove(e);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTool, isSpacebarPressed, collisionDrawingMode, pendingCollisionAreaData]);
+  }, [currentTool, isSpacebarPressed, collisionDrawingMode, pendingCollisionAreaData, pan, selection, polygonDrawing, collisionRectDrawing, rectDrawing]);
 
   const handleStageMouseUp = useCallback(() => {
     // Always call pan.handleMouseUp to ensure panning state is cleared
@@ -121,15 +118,13 @@ export function useStageEventHandlers(params: UseStageEventHandlersParams): Stag
         rectDrawing.handleMouseUp();
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTool, collisionDrawingMode, pendingCollisionAreaData, drawingMode, pendingAreaData]);
+  }, [currentTool, collisionDrawingMode, pendingCollisionAreaData, drawingMode, pendingAreaData, pan, selection, collisionRectDrawing, rectDrawing]);
 
   const handleStageDoubleClick = useCallback(() => {
     if (currentTool === 'polygon') {
       polygonDrawing.handleDoubleClick();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTool]);
+  }, [currentTool, polygonDrawing]);
 
   return {
     handleStageClick,

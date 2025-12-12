@@ -20,6 +20,22 @@ export interface EventMap {
   // Jitsi-specific events (dispatched by InteractiveAreaActionDispatcher)
   'jitsi:join': { roomName: string; areaName: string };
   'jitsi:leave': { areaName: string };
+  // Collectible events (dispatched by InteractiveAreaActionDispatcher)
+  'collectible:collected': {
+    areaId: string;
+    areaName: string;
+    effectType: string;
+    effectValue: number;
+    effectDuration?: number;
+    consumable?: boolean;
+  };
+  // Switch events (dispatched by InteractiveAreaActionDispatcher)
+  'switch:toggled': {
+    areaId: string;
+    areaName: string;
+    targetIds: string[];
+    toggleMode?: string;
+  };
   'app:moduleLoaded': { module: string };
   'app:error': { error: string; module?: string };
 }

@@ -337,11 +337,20 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     minSize: 10,
   });
 
+  // Selection change handler with auto-switch to Properties tab
+  const handleSelectionChange = useCallback((ids: string[]) => {
+    setSelectedIds(ids);
+    // Auto-switch to Properties tab when selecting items (unless in Settings tab)
+    if (ids.length > 0 && activeTab !== 'settings') {
+      setActiveTab('properties');
+    }
+  }, [setSelectedIds, activeTab, setActiveTab]);
+
   // Selection (controlled - selectedIds is managed by useEditorState)
   const selection = useKonvaSelection({
     shapes,
     selectedIds,
-    onSelectionChange: setSelectedIds,
+    onSelectionChange: handleSelectionChange,
     enabled: currentTool === 'select' && !previewMode.isPreviewMode,
     viewport,
   });
@@ -538,9 +547,11 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     setCollisionAreaToDelete,
     setShowCollisionDeleteConfirm,
     setViewport,
+    setActiveTab,
     shapes,
     areas,
     impassableAreas,
+    activeTab,
     mainRef,
     markDirty,
     history,
@@ -613,7 +624,11 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
   // Handle multi-select from layers panel
   const handleMultiSelect = useCallback((shapeIds: string[]) => {
     setSelectedIds(shapeIds);
-  }, [setSelectedIds]);
+    // Auto-switch to Properties tab when selecting items (unless in Settings tab)
+    if (shapeIds.length > 0 && activeTab !== 'settings') {
+      setActiveTab('properties');
+    }
+  }, [setSelectedIds, activeTab, setActiveTab]);
 
   // ===== UI STATE PREPARATION =====
 
@@ -773,19 +788,20 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
           isPreviewMode={previewMode.isPreviewMode}
         />
 
-        {/* Sidebar */}
+        {/* Right Sidebar (Properties/Assets/Settings) */}
         <EditorSidebar
           activeTab={activeTab}
           onTabChange={setActiveTab}
+          selectedIds={selectedIds}
+          shapes={shapes}
           areas={areas}
-          onCreateNewArea={areaHandlers.interactive.handleCreateArea}
+          impassableAreas={impassableAreas}
           onEditArea={areaHandlers.interactive.handleEditArea}
           onDeleteArea={areaHandlers.interactive.handleDeleteArea}
-          onPlaceAsset={handlePlaceAsset}
-          impassableAreas={impassableAreas}
-          onCreateNewCollisionArea={areaHandlers.collision.handleCreateCollisionArea}
           onEditCollisionArea={areaHandlers.collision.handleEditCollisionArea}
           onDeleteCollisionArea={areaHandlers.collision.handleDeleteCollisionArea}
+          onUpdateArea={areaHandlers.interactive.handleUpdateArea}
+          onPlaceAsset={handlePlaceAsset}
           gridConfig={uiGridConfig}
           onGridConfigChange={handleGridConfigChange}
           previewMode={previewMode.isPreviewMode}
