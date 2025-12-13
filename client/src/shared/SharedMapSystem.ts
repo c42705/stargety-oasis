@@ -11,6 +11,7 @@ import { MapHistoryManager } from './mapSystem/MapHistoryManager';
 import { MapAreaService } from './mapSystem/MapAreaService';
 import { MapDimensionService } from './mapSystem/MapDimensionService';
 import { MapEventEmitter } from './mapSystem/MapEventEmitter';
+import { worldDimensionsManager } from './WorldDimensionsManager';
 
 export type { SharedMapData, MapEventType, MapChange, MapLayer, MapElement, MapResource, MapEvent } from './mapSystem/types';
 
@@ -99,15 +100,51 @@ export class SharedMapSystem {
       // Check if map has background image
       if (!result.data.backgroundImage) {
         this.mapData = await this.persistenceService.createDefaultMap();
+        this.syncDimensionsFromMapData(this.mapData);
         return this.mapData;
       }
       this.mapData = result.data;
+      this.syncDimensionsFromMapData(result.data);
       return result.data;
     }
 
     // Create default map if load failed
     this.mapData = await this.persistenceService.createDefaultMap();
+    this.syncDimensionsFromMapData(this.mapData);
     return this.mapData;
+  }
+
+  /**
+   * Synchronize WorldDimensionsManager with loaded map data (PostgreSQL as source of truth)
+   */
+  private syncDimensionsFromMapData(mapData: SharedMapData): void {
+    const worldDims = mapData.worldDimensions;
+    const bgDims = mapData.backgroundImageDimensions;
+
+    logger.info('[SharedMapSystem] Syncing dimensions from PostgreSQL', {
+      worldDimensions: worldDims,
+      backgroundImageDimensions: bgDims,
+    });
+
+    // Update world dimensions (primary)
+    if (worldDims && worldDims.width > 0 && worldDims.height > 0) {
+      worldDimensionsManager.updateDimensions(worldDims, {
+        source: 'world',
+        syncBackground: false, // Don't auto-sync background; we'll set it explicitly
+      });
+    }
+
+    // Update background dimensions if available
+    if (bgDims && bgDims.width > 0 && bgDims.height > 0) {
+      worldDimensionsManager.updateBackgroundDimensions(bgDims, {
+        source: 'background',
+      });
+    } else if (worldDims && worldDims.width > 0 && worldDims.height > 0) {
+      // If no background dimensions, use world dimensions as fallback
+      worldDimensionsManager.updateBackgroundDimensions(worldDims, {
+        source: 'world',
+      });
+    }
   }
 
   /**

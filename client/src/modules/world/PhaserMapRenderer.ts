@@ -52,6 +52,9 @@ export class PhaserMapRenderer {
   // Simplified texture management (no caching)
   private textureCache: Map<string, { key: string; timestamp: number; size: number }> = new Map();
 
+  // Lifecycle flag to prevent async callbacks from executing after destroy
+  private isDestroyed: boolean = false;
+
   constructor(config: PhaserMapRendererConfig) {
     this.scene = config.scene;
     this.enablePhysics = config.enablePhysics ?? true;
@@ -247,11 +250,14 @@ export class PhaserMapRenderer {
       return;
     }
 
-    // Removed: Non-critical rendering background log.
-
     // Check if we have a background image
     if (this.mapData.backgroundImage) {
-      // Removed: Non-critical rendering background image log.
+      // Guard: ensure scene and texture system are available
+      if (!this.isSceneValid() || !this.scene.textures) {
+        logger.warn('[PhaserMapRenderer] renderBackground: scene not ready for texture operations');
+        this.renderDefaultBackground();
+        return;
+      }
 
       try {
         // Create a simple texture key
@@ -264,6 +270,10 @@ export class PhaserMapRenderer {
           // Create texture from base64 data URL
           this.scene.textures.addBase64(textureKey, this.mapData.backgroundImage);
           setTimeout(() => {
+            // Guard: check if destroyed or scene invalid before proceeding
+            if (this.isDestroyed || !this.isSceneValid()) {
+              return;
+            }
             if (this.scene.textures.exists(textureKey)) {
               this.createSimpleBackground(textureKey);
             } else {
@@ -275,6 +285,10 @@ export class PhaserMapRenderer {
           this.scene.load.image(textureKey, this.mapData.backgroundImage);
           this.scene.load.start();
           this.scene.load.once('filecomplete-image-' + textureKey, () => {
+            // Guard: check if destroyed or scene invalid before proceeding
+            if (this.isDestroyed || !this.isSceneValid()) {
+              return;
+            }
             this.createSimpleBackground(textureKey);
           });
         }
@@ -284,7 +298,6 @@ export class PhaserMapRenderer {
         this.renderDefaultBackground();
       }
     } else {
-      // Removed: Non-critical no background image log.
       this.renderDefaultBackground();
     }
   }
@@ -333,6 +346,12 @@ export class PhaserMapRenderer {
       return;
     }
 
+    // Guard: ensure scene.add is available
+    if (!this.isSceneValid() || !(this.scene as any).add) {
+      logger.warn('[PhaserMapRenderer] createSimpleBackground: scene.add not available');
+      return;
+    }
+
     const worldWidth = this.mapData.worldDimensions.width;
     const worldHeight = this.mapData.worldDimensions.height;
     const bgDimensions = this.mapData.backgroundImageDimensions;
@@ -362,8 +381,10 @@ export class PhaserMapRenderer {
       // Set depth behind other elements
       backgroundImage.setDepth(-1000);
 
-      // Add to background group
-      this.backgroundGroup.add(backgroundImage);
+      // Add to background group (with safety check)
+      if (this.backgroundGroup?.scene) {
+        this.backgroundGroup.add(backgroundImage);
+      }
 
     } catch (error) {
       logger.error('Error in createSimpleBackground', error);
@@ -388,6 +409,12 @@ export class PhaserMapRenderer {
    * Add a single asset to the scene
    */
   private addAsset(asset: Asset): void {
+    // Guard: ensure scene and texture system are available
+    if (!this.isSceneValid() || !this.scene.textures) {
+      logger.warn('[PhaserMapRenderer] addAsset: scene not ready', { assetId: asset.id });
+      return;
+    }
+
     try {
       // Create unique texture key for this asset
       const textureKey = `asset_${asset.id}_${Date.now()}`;
@@ -399,6 +426,10 @@ export class PhaserMapRenderer {
 
         // Wait for texture to be ready, then create the image
         setTimeout(() => {
+          // Guard: check if destroyed or scene invalid before proceeding
+          if (this.isDestroyed || !this.isSceneValid()) {
+            return;
+          }
           if (this.scene.textures.exists(textureKey)) {
             this.createAssetImage(asset, textureKey);
           } else {
@@ -417,6 +448,12 @@ export class PhaserMapRenderer {
    * Create the Phaser image for an asset
    */
   private createAssetImage(asset: Asset, textureKey: string): void {
+    // Guard: ensure scene.add is available
+    if (!this.isSceneValid() || !(this.scene as any).add) {
+      logger.warn('[PhaserMapRenderer] createAssetImage: scene.add not available', { assetId: asset.id });
+      return;
+    }
+
     try {
       // Create the image at the asset's position
       const image = this.scene.add.image(asset.x, asset.y, textureKey);
@@ -441,8 +478,10 @@ export class PhaserMapRenderer {
       // Set depth to be above background but below interactive/collision areas
       image.setDepth(2);
 
-      // Add to assets group and track
-      this.assetsGroup.add(image);
+      // Add to assets group and track (with safety check)
+      if (this.assetsGroup?.scene) {
+        this.assetsGroup.add(image);
+      }
       this.assetObjects.set(asset.id, image);
 
       logger.debug('Asset image created', {
@@ -830,11 +869,11 @@ export class PhaserMapRenderer {
               shapeObject.strokePath();
             }
           }
-        } else if (shapeObject.setAlpha) {
+        } else if (typeof shapeObject.setAlpha === 'function') {
           // Rectangle object
           shapeObject.setAlpha(enabled ? 0.7 : 0);
 
-          if (shapeObject.setStrokeStyle) {
+          if (typeof shapeObject.setStrokeStyle === 'function') {
             if (enabled && area?.color) {
               shapeObject.setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(area.color).color);
             } else if (!enabled) {
@@ -844,7 +883,7 @@ export class PhaserMapRenderer {
         }
       }
 
-      if (text && text.setAlpha) {
+      if (text && typeof text.setAlpha === 'function') {
         text.setAlpha(enabled ? 1.0 : 0);
       }
     });
@@ -876,47 +915,72 @@ export class PhaserMapRenderer {
           obj.fillPath();
           obj.strokePath();
         }
-      } else if (obj.setAlpha && obj.setStrokeStyle) {
+      } else if (typeof obj.setAlpha === 'function') {
         // It's a Rectangle object
         const fillAlpha = enabled ? 1.0 : 0;
         const strokeAlpha = enabled ? 1.0 : 0;
 
         obj.setAlpha(fillAlpha);
-        obj.setStrokeStyle(2, 0xff0000, strokeAlpha);
+        if (typeof obj.setStrokeStyle === 'function') {
+          obj.setStrokeStyle(2, 0xff0000, strokeAlpha);
+        }
       }
     });
+  }
+
+  /**
+   * Check if renderer is in a valid state for operations
+   */
+  private isSceneValid(): boolean {
+    return !this.isDestroyed &&
+           !!this.scene &&
+           !!(this.scene as any).sys?.game?.renderer;
   }
 
   /**
    * Cleanup resources (Enhanced with texture cache management)
    */
   public destroy(): void {
+    // Mark as destroyed FIRST to prevent async callbacks from executing
+    this.isDestroyed = true;
+
     // Remove event listeners
     this.eventListeners.forEach(cleanup => cleanup());
     this.eventListeners = [];
 
-    // Clean up texture cache (simplified)
-    // Removed: Non-critical destroying texture cache log.
-
-    // Remove all cached textures
-    this.textureCache.forEach((entry) => {
-      if (this.scene.textures.exists(entry.key)) {
-        this.scene.textures.remove(entry.key);
-      }
-    });
-
+    // Clean up texture cache with safety checks
+    try {
+      this.textureCache.forEach((entry) => {
+        if (this.scene?.textures?.exists?.(entry.key)) {
+          this.scene.textures.remove(entry.key);
+        }
+      });
+    } catch (error) {
+      logger.warn('[PhaserMapRenderer] Error cleaning texture cache during destroy', error);
+    }
     this.textureCache.clear();
 
-    // Clear groups
-    this.backgroundGroup.destroy(true);
-    this.assetsGroup.destroy(true);
-    this.interactiveAreasGroup.destroy(true);
-    this.collisionAreasGroup.destroy(true);
+    // Clear groups with safety checks
+    try {
+      if (this.backgroundGroup?.scene) {
+        this.backgroundGroup.destroy(true);
+      }
+      if (this.assetsGroup?.scene) {
+        this.assetsGroup.destroy(true);
+      }
+      if (this.interactiveAreasGroup?.scene) {
+        this.interactiveAreasGroup.destroy(true);
+      }
+      if (this.collisionAreasGroup?.scene) {
+        this.collisionAreasGroup.destroy(true);
+      }
+    } catch (error) {
+      logger.warn('[PhaserMapRenderer] Error destroying groups during cleanup', error);
+    }
 
     // Clear tracking maps
     this.interactiveAreaObjects.clear();
     this.collisionAreaObjects.clear();
-
-    // Removed: Non-critical cleanup complete log.
+    this.assetObjects.clear();
   }
 }
