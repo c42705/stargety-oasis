@@ -103,15 +103,20 @@ export const KonvaPhase2Test: React.FC = () => {
   // ==========================================================================
 
   const handleBackgroundUpload = useCallback((file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      if (result) {
-        setBackgroundUrl(result);
-      }
-    };
-    reader.readAsDataURL(file);
-    return false; // Prevent automatic upload
+    return new Promise<void>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        if (result) {
+          setBackgroundUrl(result);
+        }
+        resolve();
+      };
+      reader.onerror = () => {
+        resolve();
+      };
+      reader.readAsDataURL(file);
+    });
   }, []);
 
   const handleGridSpacingChange = useCallback((value: number | null) => {
@@ -352,6 +357,9 @@ export const KonvaPhase2Test: React.FC = () => {
                 beforeUpload={handleBackgroundUpload}
                 showUploadList={false}
                 accept="image/*"
+                multiple={false}
+                openFileDialogOnClick={true}
+                action="javascript:void(0);"
               >
                 <Button icon={<UploadOutlined />} block>
                   Upload Background

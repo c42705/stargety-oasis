@@ -66,6 +66,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     height: mapData.worldDimensions.height
   });
   const [selectedPreset, setSelectedPreset] = useState<string>('custom');
+  const [backgroundImageDimensions, setBackgroundImageDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [isApplyingBackgroundSize, setIsApplyingBackgroundSize] = useState(false);
 
   // Animated GIF settings
   const gifSettings = useAnimatedGifSettings();
@@ -174,32 +176,79 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     handleMapSizeChange(customMapSize);
   }, [customMapSize, handleMapSizeChange]);
 
+  // Fetch background image dimensions from current map data
+  const handleFetchBackgroundDimensions = useCallback(() => {
+    logger.info('FETCHING BACKGROUND IMAGE DIMENSIONS');
+    if (mapData.backgroundImageDimensions) {
+      setBackgroundImageDimensions(mapData.backgroundImageDimensions);
+      message.success(`Background image dimensions: ${mapData.backgroundImageDimensions.width}×${mapData.backgroundImageDimensions.height}`);
+      logger.info('BACKGROUND IMAGE DIMENSIONS FETCHED', mapData.backgroundImageDimensions);
+    } else {
+      message.warning('No background image dimensions available');
+      logger.warn('NO BACKGROUND IMAGE DIMENSIONS FOUND');
+    }
+  }, [mapData]);
+
+  // Apply background image dimensions to map size
+  const handleApplyBackgroundSize = useCallback(async () => {
+    if (!backgroundImageDimensions) {
+      message.warning('Please fetch background image dimensions first');
+      return;
+    }
+
+    logger.info('APPLYING BACKGROUND IMAGE DIMENSIONS TO MAP', backgroundImageDimensions);
+    setIsApplyingBackgroundSize(true);
+    try {
+      await handleMapSizeChange(backgroundImageDimensions);
+      setCustomMapSize(backgroundImageDimensions);
+      message.success(`Map resized to ${backgroundImageDimensions.width}×${backgroundImageDimensions.height}`);
+      logger.info('MAP SIZE APPLIED FROM BACKGROUND DIMENSIONS', backgroundImageDimensions);
+    } catch (error) {
+      logger.error('FAILED TO APPLY BACKGROUND SIZE', error);
+      message.error('Failed to apply background dimensions');
+    } finally {
+      setIsApplyingBackgroundSize(false);
+    }
+  }, [backgroundImageDimensions, handleMapSizeChange]);
+
   // Handle background image upload
   const handleImageUpload = useCallback((file: File) => {
-    // Removed: Non-critical background image upload started log.
+    logger.info('BACKGROUND IMAGE UPLOAD INITIATED', { fileName: file.name, size: file.size });
+    console.log('[SettingsTab] Upload button clicked, file:', file.name);
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      logger.error('INVALID FILE TYPE', { type: file.type });
+      message.error('Invalid file type. Please use JPG, PNG, GIF, or WebP images.');
+      return Upload.LIST_IGNORE;
+    }
 
     // Check file size (limit to 5MB to prevent localStorage quota issues)
     const maxSizeInBytes = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSizeInBytes) {
       logger.error('FILE TOO LARGE', { size: file.size });
       message.error(`Image file is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Please use an image smaller than 5MB.`);
-      return false;
+      return Upload.LIST_IGNORE;
     }
 
-    // Process the image asynchronously
-    setTimeout(async () => {
+    // Return a Promise that processes the image
+    return new Promise<void>((resolve) => {
+      logger.info('BACKGROUND IMAGE PROCESSING STARTED', { fileName: file.name });
       try {
         // Create a canvas to resize the image if needed
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         if (!ctx) {
+          logger.error('CANVAS NOT SUPPORTED');
           message.error('Canvas not supported in this browser');
+          resolve();
           return;
         }
 
         const img = new window.Image();
         img.onload = async () => {
-          // Removed: Non-critical image loaded debug log.
+          logger.info('BACKGROUND IMAGE LOADED', { width: img.width, height: img.height });
 
           // Calculate optimal size to keep under localStorage limits
           let targetWidth = img.width;
@@ -210,7 +259,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             const scale = Math.min(maxDimension / img.width, maxDimension / img.height);
             targetWidth = Math.floor(img.width * scale);
             targetHeight = Math.floor(img.height * scale);
-            // Removed: Non-critical resizing image for storage log.
+            logger.info('RESIZING IMAGE FOR STORAGE', { original: { width: img.width, height: img.height }, target: { width: targetWidth, height: targetHeight } });
           }
 
           // Set canvas size and draw image
@@ -220,19 +269,20 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
           // Convert to base64 with quality optimization
           const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8); // 80% quality to reduce size
-          // Removed: Non-critical optimized image data URL length log.
+          logger.info('IMAGE DATA URL CREATED', { size: imageDataUrl.length });
 
           // Check if the optimized image is still too large
           const estimatedSizeInMB = imageDataUrl.length / 1024 / 1024;
           if (estimatedSizeInMB > 3) { // Conservative limit for localStorage
             logger.error('OPTIMIZED IMAGE STILL TOO LARGE', { sizeMB: estimatedSizeInMB });
             message.error(`Image is still too large after optimization (${estimatedSizeInMB.toFixed(1)}MB). Please use a smaller image.`);
+            resolve();
             return;
           }
 
           // Save background image to SharedMapSystem
           try {
-            // Removed: Non-critical saving background image to shared map system log.
+            logger.info('SAVING BACKGROUND IMAGE TO MAP');
 
             // Update background dimensions in WorldDimensionsManager first
             const backgroundDimensions = { width: img.width, height: img.height };
@@ -243,6 +293,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
             if (!backgroundValidation.isValid) {
               message.error('Invalid background image dimensions: ' + backgroundValidation.errors.join(', '));
+              resolve();
               return;
             }
 
@@ -252,39 +303,21 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               backgroundImageDimensions: backgroundValidation.dimensions
             });
 
-            // Removed: Non-critical background image saved to shared map system log.
-            // Show modal with resize options
-            Modal.confirm({
-              title: 'Background Image Detected',
-              content: (
-                <div>
-                  <p>Image dimensions: {backgroundValidation.dimensions.width}×{backgroundValidation.dimensions.height}</p>
-                  <p>Current map size: {worldDimensions.worldDimensions.width}×{worldDimensions.worldDimensions.height}</p>
-                  {targetWidth !== img.width && (
-                    <p style={{ color: '#1890ff', fontSize: '12px' }}>
-                      Note: Image was optimized for storage ({targetWidth}×{targetHeight})
-                    </p>
-                  )}
-                  {backgroundValidation.scaled && (
-                    <p style={{ color: '#ff6b35', fontSize: '12px' }}>
-                      Note: Image dimensions were scaled to fit limits
-                    </p>
-                  )}
-                  <p>How would you like to handle the image?</p>
-                </div>
-              ),
-              okText: 'Resize Map to Image',
-              cancelText: 'Keep Current Size',
-              onOk: async () => {
-                // Removed: Non-critical user chose to resize map to image log.
-                await handleMapSizeChange(backgroundValidation.dimensions);
-                message.success('Map resized to match background image');
-              },
-              onCancel: () => {
-                // Removed: Non-critical user chose to keep current map size log.
-                message.info('Background image added without resizing map');
-              }
+            logger.info('BACKGROUND IMAGE SAVED TO MAP DATA');
+            // Store background dimensions in state for manual controls
+            setBackgroundImageDimensions(backgroundValidation.dimensions);
+            
+            // Automatically resize map to match image dimensions
+            logger.info('AUTO-RESIZING MAP TO IMAGE DIMENSIONS', { 
+              imageDimensions: backgroundValidation.dimensions,
+              previousMapSize: worldDimensions.worldDimensions
             });
+            
+            await handleMapSizeChange(backgroundValidation.dimensions);
+            setCustomMapSize(backgroundValidation.dimensions);
+            
+            message.success(`Map automatically resized to ${backgroundValidation.dimensions.width}×${backgroundValidation.dimensions.height} to match background image`);
+            resolve();
 
           } catch (error) {
             logger.error('FAILED TO SAVE BACKGROUND IMAGE', error);
@@ -293,20 +326,24 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             } else {
               message.error('Failed to save background image. Please try a smaller image.');
             }
+            resolve();
           }
         };
 
         img.onerror = (error) => {
           logger.error('FAILED TO LOAD IMAGE', error);
           message.error('Failed to load image. Please check the file format.');
+          resolve();
         };
 
         // Read file as data URL
         const reader = new FileReader();
+        logger.info('READING FILE AS DATA URL');
         reader.onload = (e) => {
-          // Removed: Non-critical file reader loaded log.
+          logger.info('FILE READER LOADED');
           const result = e.target?.result as string;
           if (result) {
+            logger.info('SETTING IMAGE SOURCE');
             img.src = result;
           }
         };
@@ -314,17 +351,16 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         reader.onerror = (error) => {
           logger.error('FILE READER ERROR', error);
           message.error('Failed to read image file');
+          resolve();
         };
 
         reader.readAsDataURL(file);
       } catch (error) {
         logger.error('IMAGE UPLOAD ERROR', error);
         message.error('Failed to upload image');
+        resolve();
       }
-    }, 0);
-
-    // Return false to prevent automatic upload
-    return false;
+    });
   }, [handleMapSizeChange, sharedMap, worldDimensions]);
 
   // Handle reset to default map
@@ -454,6 +490,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 beforeUpload={handleImageUpload}
                 showUploadList={false}
                 accept="image/*"
+                multiple={false}
+                openFileDialogOnClick={true}
+                action="javascript:void(0);"
               >
                 <Button icon={<UploadOutlined />}>
                   Upload Background Image
@@ -468,8 +507,39 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 Reset
               </Button>
             </Space>
-            <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+
+            {/* Background Image Dimension Controls */}
+            <Space style={{ marginTop: '12px', width: '100%' }} direction="vertical">
+              <Space>
+                <Button
+                  onClick={handleFetchBackgroundDimensions}
+                  type="dashed"
+                >
+                  📏 Fetch Background Size
+                </Button>
+                {backgroundImageDimensions && (
+                  <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                    {backgroundImageDimensions.width}×{backgroundImageDimensions.height}
+                  </span>
+                )}
+              </Space>
+              
+              {backgroundImageDimensions && (
+                <Button
+                  onClick={handleApplyBackgroundSize}
+                  type="primary"
+                  loading={isApplyingBackgroundSize}
+                  style={{ width: '100%' }}
+                >
+                  ✓ Apply Background Dimensions to Map
+                </Button>
+              )}
+            </Space>
+
+            <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
               Supported formats: JPG, PNG, GIF. The map can be automatically resized to match the image dimensions.
+              <br />
+              Use "Fetch Background Size" to manually retrieve current background image dimensions.
               <br />
               Use "Reset to Default Map" to restore the original Zep-style background and layout.
             </div>

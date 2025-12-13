@@ -59,9 +59,9 @@ export class PhaserMapRenderer {
     this.debugMode = config.debugMode ?? false;
     
     this.sharedMapSystem = SharedMapSystem.getInstance();
-    
-    this.initializeGroups();
-    this.setupEventListeners();
+    // Defer group and event listener initialization until the scene is fully
+    // initialized to avoid cases where `scene.add` / renderer systems are not
+    // yet available and cause `null`-access errors in Phaser internals.
   }
 
   /**
@@ -69,6 +69,15 @@ export class PhaserMapRenderer {
    */
   private initializeGroups(): void {
     try {
+      // Log scene/system readiness for debugging renderer issues
+      logger.debug('[PhaserMapRenderer] initializeGroups called', {
+        hasScene: !!this.scene,
+        hasSceneAdd: !!(this.scene && (this.scene as any).add),
+        hasTextures: !!(this.scene && (this.scene as any).textures),
+        hasSys: !!(this.scene && (this.scene as any).sys),
+        hasRenderer: !!(this.scene && (this.scene as any).sys && (this.scene as any).sys.game && (this.scene as any).sys.game.renderer)
+      });
+
       this.backgroundGroup = this.scene.add.group();
       this.assetsGroup = this.scene.add.group();
       this.interactiveAreasGroup = this.scene.add.group();
@@ -83,7 +92,10 @@ export class PhaserMapRenderer {
 
       // Removed: Non-critical groups initialized log.
     } catch (error) {
-      logger.error('Failed to initialize PhaserMapRenderer groups', error);
+      logger.error('Failed to initialize PhaserMapRenderer groups', {
+        error: error instanceof Error ? error.message : error,
+        scenePresent: !!this.scene
+      });
     }
   }
 
@@ -154,13 +166,31 @@ export class PhaserMapRenderer {
    */
   public async initialize(): Promise<void> {
     try {
+      logger.debug('[PhaserMapRenderer] initialize START');
+
+      // Ensure Phaser groups and event listeners are created when the scene
+      // systems are ready (preload/create lifecycle). This prevents calls to
+      // `this.scene.add` or texture creation when the renderer is not set.
+      this.initializeGroups();
+      this.setupEventListeners();
+
+      logger.debug('[PhaserMapRenderer] SharedMapSystem.initialize() about to be awaited');
       await this.sharedMapSystem.initialize();
+      logger.debug('[PhaserMapRenderer] SharedMapSystem.initialize() completed');
       this.mapData = this.sharedMapSystem.getMapData();
       if (this.mapData) {
+        logger.debug('[PhaserMapRenderer] mapData available, calling renderMap');
         this.renderMap();
+      } else {
+        logger.debug('[PhaserMapRenderer] mapData is null after SharedMapSystem.initialize');
       }
     } catch (error) {
       console.error('Failed to initialize PhaserMapRenderer:', error);
+      logger.error('[PhaserMapRenderer] initialize failed', {
+        error: error instanceof Error ? error.message : error,
+        hasScene: !!this.scene,
+        hasRenderer: !!(this.scene && (this.scene as any).sys && (this.scene as any).sys.game && (this.scene as any).sys.game.renderer)
+      });
     }
   }
 
@@ -265,8 +295,18 @@ export class PhaserMapRenderer {
   private renderDefaultBackground(): void {
     if (!this.mapData) return;
 
+    // Guard: ensure scene.add is available
+    if (!this.scene || !(this.scene as any).add) {
+      logger.error('[PhaserMapRenderer] renderDefaultBackground: scene.add is not available', {
+        hasScene: !!this.scene,
+        hasSceneAdd: !!(this.scene && (this.scene as any).add),
+        rendererPresent: !!(this.scene && (this.scene as any).sys && (this.scene as any).sys.game && (this.scene as any).sys.game.renderer)
+      });
+      return;
+    }
+
     // Create a simple background
-    const background = this.scene.add.rectangle(
+    const background = (this.scene as any).add.rectangle(
       this.mapData.worldDimensions.width / 2,
       this.mapData.worldDimensions.height / 2,
       this.mapData.worldDimensions.width,
@@ -275,7 +315,13 @@ export class PhaserMapRenderer {
       0.1
     );
 
-    this.backgroundGroup.add(background);
+    if (this.backgroundGroup && this.backgroundGroup.add) {
+      this.backgroundGroup.add(background);
+    } else {
+      logger.warn('[PhaserMapRenderer] renderDefaultBackground: backgroundGroup missing (will not add to group)', {
+        backgroundGroupPresent: !!this.backgroundGroup
+      });
+    }
   }
 
   /**
@@ -445,7 +491,18 @@ export class PhaserMapRenderer {
     // Create visual representation with visibility based on debug mode
     const fillAlpha = this.debugMode ? 0.7 : 0;
     const areaColor = area.color || '#00ff00';
-    const rect = this.scene.add.rectangle(
+    // Guard: ensure scene.add is available before creating GameObjects
+    if (!this.scene || !(this.scene as any).add) {
+      logger.error('[PhaserMapRenderer] addInteractiveArea: scene.add is not available', {
+        areaId: area.id,
+        hasScene: !!this.scene,
+        hasSceneAdd: !!(this.scene && (this.scene as any).add),
+        rendererPresent: !!(this.scene && (this.scene as any).sys && (this.scene as any).sys.game && (this.scene as any).sys.game.renderer)
+      });
+      return;
+    }
+
+    const rect = (this.scene as any).add.rectangle(
       area.x + area.width / 2,
       area.y + area.height / 2,
       area.width,

@@ -208,40 +208,47 @@ export const AssetsTab: React.FC<AssetsTabProps> = ({ onAssetUpload, onPlaceAsse
 
     console.log('[AssetsTab] File validation passed, processing file...');
 
-    // Process the file immediately since ImgCrop handles the cropping
-    // and we don't want to do an actual HTTP upload
-    try {
-      const imageData = await getBase64(file);
-      console.log('[AssetsTab] File converted to base64, length:', imageData.length);
+    // Return a Promise that processes the file
+    return new Promise<void>((resolve) => {
+      try {
+        const imageData = getBase64(file).then((data) => {
+          console.log('[AssetsTab] File converted to base64, length:', data.length);
 
-      // Load image to get dimensions
-      const img = new window.Image();
-      img.onload = () => {
-        console.log(`[AssetsTab] Image loaded in beforeUpload: ${file.name} (${img.width}x${img.height})`);
+          // Load image to get dimensions
+          const img = new window.Image();
+          img.onload = () => {
+            console.log(`[AssetsTab] Image loaded in beforeUpload: ${file.name} (${img.width}x${img.height})`);
 
-        // Save to library
-        saveAssetToLibrary(imageData, file.name, img.width, img.height);
+            // Save to library
+            saveAssetToLibrary(data, file.name, img.width, img.height);
 
-        // Place on map if auto-place is enabled
-        if (autoPlace) {
-          console.log(`[AssetsTab] Auto-placing asset on map from beforeUpload: ${file.name}`);
-          onPlaceAsset?.(imageData, file.name, img.width, img.height);
-          message.success(`Uploaded and placed "${file.name}" on map`);
-        } else {
-          message.success(`Uploaded "${file.name}" to library`);
-        }
-      };
-      img.onerror = () => {
-        console.error(`[AssetsTab] Failed to load image in beforeUpload: ${file.name}`);
-        message.error('Failed to load image');
-      };
-      img.src = imageData;
-    } catch (error) {
-      console.error('[AssetsTab] Error processing file in beforeUpload:', error);
-      message.error('Failed to process image');
-    }
-
-    return false; // Prevent auto upload
+            // Place on map if auto-place is enabled
+            if (autoPlace) {
+              console.log(`[AssetsTab] Auto-placing asset on map from beforeUpload: ${file.name}`);
+              onPlaceAsset?.(data, file.name, img.width, img.height);
+              message.success(`Uploaded and placed "${file.name}" on map`);
+            } else {
+              message.success(`Uploaded "${file.name}" to library`);
+            }
+            resolve();
+          };
+          img.onerror = () => {
+            console.error(`[AssetsTab] Failed to load image in beforeUpload: ${file.name}`);
+            message.error('Failed to load image');
+            resolve();
+          };
+          img.src = data;
+        }).catch((error) => {
+          console.error('[AssetsTab] Error converting file to base64:', error);
+          message.error('Failed to process image');
+          resolve();
+        });
+      } catch (error) {
+        console.error('[AssetsTab] Error processing file in beforeUpload:', error);
+        message.error('Failed to process image');
+        resolve();
+      }
+    });
   }, [saveAssetToLibrary, autoPlace, onPlaceAsset]);
 
   const handleChange: UploadProps['onChange'] = useCallback((info: Parameters<NonNullable<UploadProps['onChange']>>[0]) => {

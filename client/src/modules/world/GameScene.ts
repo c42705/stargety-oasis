@@ -67,13 +67,10 @@ export class GameScene extends Phaser.Scene {
 
   preload(): void {
     // V1 player-sheet removed - now using Avatar V2 system only
-    // Initialize map renderer
-    this.mapRenderer = new PhaserMapRenderer({
-      scene: this,
-      enablePhysics: false,
-      enableInteractions: true,
-      debugMode: false
-    });
+    // V1 player-sheet removed - now using Avatar V2 system only
+    // NOTE: PhaserMapRenderer instantiation moved to `create()` to ensure
+    // Phaser renderer/texture systems are fully initialized before we call
+    // any `scene.add` / texture APIs. This prevents `null` renderer errors.
   }
 
   /**
@@ -86,9 +83,19 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Instantiate the map renderer now that the scene is created and Phaser
+    // systems (renderer, textures, add, etc.) are available.
+    if (!this.mapRenderer) {
+      this.mapRenderer = new PhaserMapRenderer({
+        scene: this,
+        enablePhysics: false,
+        enableInteractions: true,
+        debugMode: false
+      });
+    }
+
     // Initialize and render map from localStorage
     this.mapRenderer.initialize().then(() => {
-      // Map loaded successfully
       logger.debug('Map loaded from localStorage');
     }).catch(error => {
       logger.error('Failed to load map data from localStorage', error);

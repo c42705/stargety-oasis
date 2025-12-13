@@ -492,11 +492,18 @@ export class CharacterStorage {
         if (result.success && result.data) {
           logger.info('ACTIVE CHARACTER LOADED FROM API', { username, slot: result.data.activeSlot });
 
-          const activeState: ActiveCharacterState = {
-            username,
-            activeSlotNumber: result.data.activeSlot,
-            lastSwitched: new Date().toISOString()
-          };
+            let activeSlotNum = result.data.activeSlot;
+            // Validate API-provided active slot number; fall back to 1 if invalid
+            if (!isValidSlotNumber(activeSlotNum)) {
+              logger.warn('API returned invalid activeSlot, falling back to 1', { username, activeSlot: activeSlotNum });
+              activeSlotNum = 1;
+            }
+
+            const activeState: ActiveCharacterState = {
+              username,
+              activeSlotNumber: activeSlotNum,
+              lastSwitched: new Date().toISOString()
+            };
 
           // Sync to localStorage
           const key = this.getActiveKey(username);

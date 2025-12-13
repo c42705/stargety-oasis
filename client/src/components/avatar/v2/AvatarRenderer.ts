@@ -164,6 +164,11 @@ export class AvatarRenderer {
       const textureKey = `avatar_v2_${username}_${definition.id}`;
 
       logger.debug('[AvatarRenderer] Loading sprite sheet:', { textureKey, frameCount: definition.frames.length });
+      logger.debug('[AvatarRenderer] Scene state', {
+        hasScene: !!this.scene,
+        hasTextures: !!(this.scene && (this.scene as any).textures),
+        hasRenderer: !!(this.scene && (this.scene as any).sys && (this.scene as any).sys.game && (this.scene as any).sys.game.renderer)
+      });
 
       // Check if texture already exists
       if (this.scene.textures.exists(textureKey)) {
@@ -205,6 +210,7 @@ export class AvatarRenderer {
   private loadImage(dataUrl: string): Promise<HTMLImageElement | null> {
     return new Promise((resolve) => {
       const img = new Image();
+      logger.debug('[AvatarRenderer] loadImage: starting image load, dataUrl length:', dataUrl?.length || 0);
       img.onload = () => resolve(img);
       img.onerror = () => {
         logger.error('[AvatarRenderer] Failed to load image from data URL');
@@ -238,7 +244,17 @@ export class AvatarRenderer {
       });
 
       // Use Phaser's addSpriteSheet for grid layouts
-      logger.debug('[AvatarRenderer] Adding sprite sheet to Phaser textures...');
+      logger.debug('[AvatarRenderer] Adding sprite sheet to Phaser textures...', {
+        hasScene: !!this.scene,
+        hasTextures: !!(this.scene && (this.scene as any).textures),
+        hasRenderer: !!(this.scene && (this.scene as any).sys && (this.scene as any).sys.game && (this.scene as any).sys.game.renderer)
+      });
+
+      if (!this.scene || !(this.scene as any).textures || !(this.scene as any).sys || !(this.scene as any).sys.game || !(this.scene as any).sys.game.renderer) {
+        logger.error('[AvatarRenderer] Cannot add sprite sheet: Phaser renderer or texture manager not ready', { textureKey });
+        return null;
+      }
+
       this.scene.textures.addSpriteSheet(textureKey, img, {
         frameWidth: gridLayout.frameWidth,
         frameHeight: gridLayout.frameHeight,
@@ -280,6 +296,11 @@ export class AvatarRenderer {
       });
 
       // Add base texture
+      if (!this.scene || !(this.scene as any).textures || !(this.scene as any).sys || !(this.scene as any).sys.game || !(this.scene as any).sys.game.renderer) {
+        logger.error('[AvatarRenderer] Cannot add image texture: Phaser renderer or texture manager not ready', { textureKey });
+        return null;
+      }
+
       this.scene.textures.addImage(textureKey, img);
 
       // Add individual frames
