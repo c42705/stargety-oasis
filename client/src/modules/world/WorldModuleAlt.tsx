@@ -379,7 +379,7 @@ class ExampleScene extends Phaser.Scene {
     if (Math.random() < 0.05) { // Log 5% of checks
       console.log('🔍 [Collision] Checking impassable areas:', {
         totalAreas: mapData.impassableAreas.length,
-        polygonAreas: mapData.impassableAreas.filter(a => a.type === 'impassable-polygon').length,
+        polygonAreas: mapData.impassableAreas.filter(a => a.type === 'polygon').length,
         playerPos: { x, y },
         playerBounds: { left: playerLeft, right: playerRight, top: playerTop, bottom: playerBottom }
       });
@@ -388,7 +388,7 @@ class ExampleScene extends Phaser.Scene {
     // Check collision with each impassable area
     for (const area of mapData.impassableAreas) {
       // Check if this is a polygon type
-      if (area.type === 'impassable-polygon' && area.points && area.points.length > 0) {
+      if (area.type === 'polygon' && area.points && area.points.length > 0) {
         // First: Quick AABB check using bounding box
         const areaLeft = area.x;
         const areaRight = area.x + area.width;

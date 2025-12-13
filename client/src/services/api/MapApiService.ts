@@ -48,7 +48,12 @@ export interface ImpassableArea {
   y: number;
   width: number;
   height: number;
+  /** Shape type: 'rectangle' for standard boxes, 'polygon' for custom polygon shapes */
+  type?: 'rectangle' | 'polygon';
+  /** Polygon vertices (only used when type is 'polygon') */
   points?: Array<{ x: number; y: number }>;
+  /** Visual color for the area */
+  color?: string;
 }
 
 export interface MapData {

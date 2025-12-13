@@ -22,33 +22,65 @@ import { isPolygonGeometry, isRectangleGeometry, isImageGeometry } from '../type
 
 /**
  * Convert Konva shape to InteractiveArea
- * 
- * @param shape - Konva shape (must be rectangle geometry)
+ *
+ * @param shape - Konva shape (can be rectangle or polygon geometry)
  * @returns InteractiveArea for MapDataContext
- * 
- * @throws Error if shape is not a rectangle
+ *
+ * @throws Error if shape geometry is not supported
  */
 export function shapeToInteractiveArea(shape: Shape): InteractiveArea {
-  if (!isRectangleGeometry(shape.geometry)) {
-    throw new Error('Interactive areas must be rectangles');
-  }
-
   // Extract action configuration from shape metadata
   const actionType = (shape.metadata.actionType as InteractiveAreaActionType) || 'none';
   const actionConfig = (shape.metadata.actionConfig as InteractiveAreaActionConfig) || null;
 
-  return {
-    id: shape.id,
-    name: shape.metadata.name || 'Unnamed Area',
-    x: shape.geometry.x,
-    y: shape.geometry.y,
-    width: shape.geometry.width,
-    height: shape.geometry.height,
-    color: shape.style.fill || '#00ff00',
-    description: shape.metadata.description || '',
-    actionType,
-    actionConfig,
-  };
+  if (isPolygonGeometry(shape.geometry)) {
+    // Polygon interactive area - convert flat array [x1,y1,x2,y2,...] to point objects
+    const flatPoints = shape.geometry.points;
+    const points: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i < flatPoints.length; i += 2) {
+      points.push({ x: flatPoints[i], y: flatPoints[i + 1] });
+    }
+
+    // Calculate bounding box for x, y, width, height (for backward compatibility)
+    const xs = points.map(p => p.x);
+    const ys = points.map(p => p.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...xs);
+    const maxY = Math.max(...ys);
+
+    return {
+      id: shape.id,
+      name: shape.metadata.name || 'Unnamed Area',
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+      color: shape.style.fill || '#00ff00',
+      description: shape.metadata.description || '',
+      actionType,
+      actionConfig,
+      shapeType: 'polygon',
+      points,
+    };
+  } else if (isRectangleGeometry(shape.geometry)) {
+    // Rectangle interactive area
+    return {
+      id: shape.id,
+      name: shape.metadata.name || 'Unnamed Area',
+      x: shape.geometry.x,
+      y: shape.geometry.y,
+      width: shape.geometry.width,
+      height: shape.geometry.height,
+      color: shape.style.fill || '#00ff00',
+      description: shape.metadata.description || '',
+      actionType,
+      actionConfig,
+      shapeType: 'rectangle',
+    };
+  } else {
+    throw new Error('Interactive areas must be rectangles or polygons');
+  }
 }
 
 /**
@@ -96,7 +128,7 @@ export function shapeToImpassableArea(shape: Shape): ImpassableArea {
       width: maxX - minX,
       height: maxY - minY,
       name: shape.metadata.name,
-      type: 'impassable-polygon',
+      type: 'polygon',
       points,
       color: shape.style.fill,
     };
@@ -259,7 +291,7 @@ export function interactiveAreaToShape(area: InteractiveArea): Shape {
  */
 export function impassableAreaToShape(area: ImpassableArea): Shape {
   // Check if it's a polygon
-  if (area.type === 'impassable-polygon' && area.points && area.points.length > 0) {
+  if (area.type === 'polygon' && area.points && area.points.length > 0) {
     // Convert points array to flat array
     const points: number[] = [];
     area.points.forEach((point) => {

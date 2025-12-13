@@ -156,7 +156,7 @@ export class MapPersistenceService {
 
     if (data.impassableAreas) {
       data.impassableAreas = data.impassableAreas.map((area: ImpassableArea & { type?: string; points?: Array<{ x: number; y: number }> }) => {
-        if (area.type === 'impassable-polygon' && area.points && area.points.length > 0) {
+        if (area.type === 'polygon' && area.points && area.points.length > 0) {
           if (!area.width || !area.height || area.width === 0 || area.height === 0) {
             const xs = area.points.map((p) => p.x);
             const ys = area.points.map((p) => p.y);

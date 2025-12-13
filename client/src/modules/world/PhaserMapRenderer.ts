@@ -328,8 +328,6 @@ export class PhaserMapRenderer {
    * Create background image with simple scaling (simplified approach)
    */
   private createSimpleBackground(textureKey: string): void {
-    // Removed: Non-critical background creation log.
-
     if (!this.mapData) {
       console.error('🖼️ BACKGROUND: Cannot create background - no map data');
       return;
@@ -337,6 +335,7 @@ export class PhaserMapRenderer {
 
     const worldWidth = this.mapData.worldDimensions.width;
     const worldHeight = this.mapData.worldDimensions.height;
+    const bgDimensions = this.mapData.backgroundImageDimensions;
 
     try {
       // Create background image at origin
@@ -348,13 +347,23 @@ export class PhaserMapRenderer {
       const scaleY = worldHeight / backgroundImage.height;
       backgroundImage.setScale(scaleX, scaleY);
 
+      // Log dimension comparison for debugging scale issues
+      logger.debug('[PhaserMapRenderer] Background created', {
+        textureKey,
+        textureSize: { width: backgroundImage.width, height: backgroundImage.height },
+        worldDimensions: { width: worldWidth, height: worldHeight },
+        backgroundImageDimensions: bgDimensions,
+        appliedScale: { scaleX, scaleY },
+        dimensionsMatch: bgDimensions
+          ? (bgDimensions.width === worldWidth && bgDimensions.height === worldHeight)
+          : 'no bgDimensions stored'
+      });
+
       // Set depth behind other elements
       backgroundImage.setDepth(-1000);
 
       // Add to background group
       this.backgroundGroup.add(backgroundImage);
-
-      // Removed: Non-critical background image created log.
 
     } catch (error) {
       logger.error('Error in createSimpleBackground', error);
@@ -491,6 +500,8 @@ export class PhaserMapRenderer {
     // Create visual representation with visibility based on debug mode
     const fillAlpha = this.debugMode ? 0.7 : 0;
     const areaColor = area.color || '#00ff00';
+    const colorValue = Phaser.Display.Color.HexStringToColor(areaColor).color;
+
     // Guard: ensure scene.add is available before creating GameObjects
     if (!this.scene || !(this.scene as any).add) {
       logger.error('[PhaserMapRenderer] addInteractiveArea: scene.add is not available', {
@@ -502,37 +513,67 @@ export class PhaserMapRenderer {
       return;
     }
 
-    const rect = (this.scene as any).add.rectangle(
-      area.x + area.width / 2,
-      area.y + area.height / 2,
-      area.width,
-      area.height,
-      Phaser.Display.Color.HexStringToColor(areaColor).color,
-      fillAlpha
-    );
+    let shapeObject: Phaser.GameObjects.Shape | Phaser.GameObjects.Graphics;
 
-    // Add border (visible only in debug mode)
-    if (this.debugMode) {
-      rect.setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(areaColor).color);
+    // Check if this is a polygon shape
+    if (area.shapeType === 'polygon' && area.points && area.points.length > 2) {
+      // Create polygon using Graphics object
+      const graphics = this.scene.add.graphics();
+      graphics.fillStyle(colorValue, fillAlpha);
+      if (this.debugMode) {
+        graphics.lineStyle(2, colorValue, 1);
+      }
+
+      graphics.beginPath();
+      graphics.moveTo(area.points[0].x, area.points[0].y);
+      for (let i = 1; i < area.points.length; i++) {
+        graphics.lineTo(area.points[i].x, area.points[i].y);
+      }
+      graphics.closePath();
+      graphics.fillPath();
+      if (this.debugMode) {
+        graphics.strokePath();
+      }
+
+      shapeObject = graphics;
+    } else {
+      // Create rectangle (default behavior)
+      const rect = (this.scene as any).add.rectangle(
+        area.x + area.width / 2,
+        area.y + area.height / 2,
+        area.width,
+        area.height,
+        colorValue,
+        fillAlpha
+      );
+
+      // Add border (visible only in debug mode)
+      if (this.debugMode) {
+        rect.setStrokeStyle(2, colorValue);
+      }
+
+      shapeObject = rect;
     }
 
     // Add text label (visible only in debug mode)
-    const text = this.scene.add.text(
-      area.x + area.width / 2,
-      area.y + area.height / 2,
-      area.name,
-      {
-        fontSize: '14px',
-        color: '#ffffff',
-        align: 'center',
-        fontFamily: 'Arial, sans-serif'
-      }
-    );
+    const textX = area.shapeType === 'polygon' && area.points?.length
+      ? area.points.reduce((sum, p) => sum + p.x, 0) / area.points.length
+      : area.x + area.width / 2;
+    const textY = area.shapeType === 'polygon' && area.points?.length
+      ? area.points.reduce((sum, p) => sum + p.y, 0) / area.points.length
+      : area.y + area.height / 2;
+
+    const text = this.scene.add.text(textX, textY, area.name, {
+      fontSize: '14px',
+      color: '#ffffff',
+      align: 'center',
+      fontFamily: 'Arial, sans-serif'
+    });
     text.setOrigin(0.5, 0.5);
     text.setAlpha(this.debugMode ? 1 : 0);
 
     // Create container for grouping
-    const container = this.scene.add.container(0, 0, [rect, text]);
+    const container = this.scene.add.container(0, 0, [shapeObject, text]);
 
     // Add metadata
     (container as any).mapElementId = area.id;
@@ -541,32 +582,39 @@ export class PhaserMapRenderer {
 
     // Enable interactions if configured (always interactive, even when invisible)
     if (this.enableInteractions) {
-      rect.setInteractive();
-      rect.on('pointerdown', () => {
-        // Don't handle area clicks if modals are blocking background interactions
+      // For polygons, create an invisible rectangle hit area for interaction
+      const hitRect = (this.scene as any).add.rectangle(
+        area.x + area.width / 2,
+        area.y + area.height / 2,
+        area.width,
+        area.height,
+        0x000000,
+        0
+      );
+      hitRect.setInteractive();
+      hitRect.on('pointerdown', () => {
         if (!shouldBlockBackgroundInteractions()) {
           this.handleInteractiveAreaClick(area);
         }
       });
-
-      rect.on('pointerover', () => {
-        if (this.debugMode) {
-          rect.setAlpha(1);
+      hitRect.on('pointerover', () => {
+        if (this.debugMode && shapeObject instanceof Phaser.GameObjects.Shape) {
+          shapeObject.setAlpha(1);
         }
         this.scene.input.setDefaultCursor('pointer');
       });
-
-      rect.on('pointerout', () => {
-        if (this.debugMode) {
-          rect.setAlpha(0.7);
+      hitRect.on('pointerout', () => {
+        if (this.debugMode && shapeObject instanceof Phaser.GameObjects.Shape) {
+          shapeObject.setAlpha(0.7);
         }
         this.scene.input.setDefaultCursor('default');
       });
+      container.add(hitRect);
     }
 
     // Add physics if enabled
-    if (this.enablePhysics && this.scene.physics) {
-      this.scene.physics.add.existing(rect, true); // true = static body
+    if (this.enablePhysics && this.scene.physics && shapeObject instanceof Phaser.GameObjects.Shape) {
+      this.scene.physics.add.existing(shapeObject, true);
     }
 
     this.interactiveAreasGroup.add(container);
@@ -601,7 +649,7 @@ export class PhaserMapRenderer {
     let visualObject: Phaser.GameObjects.GameObject;
 
     // Check if this is a polygon type
-    if (area.type === 'impassable-polygon' && area.points && area.points.length > 0) {
+    if (area.type === 'polygon' && area.points && area.points.length > 0) {
       // 🔍 DEBUG: Log polygon rendering
       console.log('🎨 [WorldMap] Rendering POLYGON collision area:', {
         id: area.id,
@@ -749,40 +797,66 @@ export class PhaserMapRenderer {
 
     // Update interactive areas visibility
     this.interactiveAreaObjects.forEach((container: any) => {
-      if (container && container.list) {
-        const rect = container.list[0]; // Rectangle
-        const text = container.list[1]; // Text label
+      if (!container || !container.list) return;
 
-        if (rect) {
-          // Update rectangle fill alpha
-          rect.setAlpha(enabled ? 1.0 : 0);
+      const area = (container as any).mapElementData;
+      const shapeObject = container.list[0]; // Rectangle or Graphics
+      const text = container.list[1]; // Text label
 
-          // Update stroke (border)
+      if (shapeObject) {
+        // Check if it's a Graphics object (polygon) or Rectangle
+        if (area?.shapeType === 'polygon' && shapeObject.clear) {
+          // Graphics object - redraw with new alpha
+          shapeObject.clear();
+          const colorValue = area.color
+            ? Phaser.Display.Color.HexStringToColor(area.color).color
+            : 0x00ff00;
+          const fillAlpha = enabled ? 0.7 : 0;
+
+          shapeObject.fillStyle(colorValue, fillAlpha);
           if (enabled) {
-            const area = (container as any).mapElementData;
-            if (area && area.color) {
-              rect.setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(area.color).color);
+            shapeObject.lineStyle(2, colorValue, 1);
+          }
+
+          if (area.points && area.points.length > 0) {
+            shapeObject.beginPath();
+            shapeObject.moveTo(area.points[0].x, area.points[0].y);
+            for (let i = 1; i < area.points.length; i++) {
+              shapeObject.lineTo(area.points[i].x, area.points[i].y);
             }
-          } else {
-            rect.setStrokeStyle(0); // Remove stroke when not in debug mode
+            shapeObject.closePath();
+            shapeObject.fillPath();
+            if (enabled) {
+              shapeObject.strokePath();
+            }
+          }
+        } else if (shapeObject.setAlpha) {
+          // Rectangle object
+          shapeObject.setAlpha(enabled ? 0.7 : 0);
+
+          if (shapeObject.setStrokeStyle) {
+            if (enabled && area?.color) {
+              shapeObject.setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(area.color).color);
+            } else if (!enabled) {
+              shapeObject.setStrokeStyle(0);
+            }
           }
         }
+      }
 
-        if (text) {
-          // Update text visibility
-          text.setAlpha(enabled ? 1.0 : 0);
-        }
+      if (text && text.setAlpha) {
+        text.setAlpha(enabled ? 1.0 : 0);
       }
     });
 
-    // Update collision areas visibility
+    // Update collision areas visibility (legacy impassableAreas)
     this.collisionAreaObjects.forEach((obj: any) => {
       if (!obj) return;
 
       const area = obj.mapElementData;
 
       // Check if it's a polygon (Graphics object) or rectangle
-      if (area && area.type === 'impassable-polygon' && obj.clear) {
+      if (area && area.type === 'polygon' && obj.clear) {
         // It's a Graphics object (polygon) - redraw with new alpha
         obj.clear();
 

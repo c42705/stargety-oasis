@@ -195,8 +195,8 @@ export const POLYGON_DRAWING = {
   MAX_VERTICES: 100,
   /** Minimum polygon area (square pixels) */
   MIN_AREA: 100,
-  /** Close threshold - distance to origin to close polygon (pixels) */
-  CLOSE_THRESHOLD: 15,
+  /** Close threshold - distance to origin to close polygon (pixels in world coordinates) */
+  CLOSE_THRESHOLD: 30,
   /** Vertex circle radius */
   VERTEX_RADIUS: 6,
   /** Vertex fill color */

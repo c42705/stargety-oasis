@@ -144,7 +144,8 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
   } = useEditorCoreState();
 
   // Use shared map data
-  const { interactiveAreas: areas, impassableAreas } = mapData;
+  const { interactiveAreas, impassableAreas } = mapData;
+  const areas = interactiveAreas; // Alias for backward compatibility
 
   // Use WorldDimensionsManager for direct, non-looping dimension access
   const worldDimensions = useWorldDimensions({
@@ -293,6 +294,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     pendingAreaData,
     pendingCollisionAreaData,
     impassableAreas,
+    interactiveAreas,
     setPendingAreaData,
     setPendingCollisionAreaData,
     setDrawingMode,
