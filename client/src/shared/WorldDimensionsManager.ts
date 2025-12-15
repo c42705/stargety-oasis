@@ -12,8 +12,9 @@
  * - Performance optimized with minimal re-renders
  *
  * REFACTORED (2025-12-11): Removed localStorage persistence.
- * Dimensions are now persisted as part of map data in PostgreSQL via SharedMapSystem.
- * This manager is now a runtime cache that gets synced from SharedMapSystem.
+ * REFACTORED (2025-12-15): Removed SharedMapSystem dependency.
+ * Dimensions are now persisted as part of map data in PostgreSQL via Redux mapSlice.
+ * This manager is a runtime cache that gets synced from Redux store.
  */
 import { logger } from './logger';
 
@@ -80,7 +81,7 @@ export class WorldDimensionsManager {
   private constructor() {
     this.state = this.createDefaultState();
     // Note: No longer loading from localStorage
-    // Dimensions are synced from SharedMapSystem via MapDimensionService
+    // Dimensions are synced from Redux store via useMapStore
   }
 
   public static getInstance(): WorldDimensionsManager {
@@ -226,7 +227,7 @@ export class WorldDimensionsManager {
       source = 'system',
       validateOnly = false,
       syncBackground = true,
-      // skipPersistence is no longer used - dimensions persist via SharedMapSystem
+      // skipPersistence is no longer used - dimensions persist via Redux mapSlice
     } = options;
 
     // Prevent circular updates
@@ -288,7 +289,7 @@ export class WorldDimensionsManager {
       });
 
       // Note: No longer persisting to localStorage
-      // Dimensions are persisted as part of map data in PostgreSQL via SharedMapSystem
+      // Dimensions are persisted as part of map data in PostgreSQL via Redux mapSlice
 
       // Notify subscribers
       this.notifySubscribers();
@@ -319,7 +320,7 @@ export class WorldDimensionsManager {
     };
 
     // Note: No longer persisting to localStorage
-    // Dimensions are persisted as part of map data in PostgreSQL via SharedMapSystem
+    // Dimensions are persisted as part of map data in PostgreSQL via Redux mapSlice
 
     this.notifySubscribers();
     return validation;
@@ -426,8 +427,8 @@ export class WorldDimensionsManager {
   }
 
   // Note: localStorage methods removed (2025-12-11)
-  // Dimensions are now persisted as part of map data in PostgreSQL via SharedMapSystem.
-  // This manager is a runtime cache that gets synced from MapDimensionService.
+  // Dimensions are now persisted as part of map data in PostgreSQL via Redux mapSlice.
+  // This manager is a runtime cache that gets synced from useMapStore.
 }
 
 // Export singleton instance

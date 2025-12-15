@@ -23,7 +23,7 @@ import { GridConfig } from '../../types/ui.types';
 import { GRID_PATTERNS } from '../../constants/editorConstants';
 import { MapDataManager } from '../../../../components/MapDataManager';
 import { useMapData } from '../../../../shared/MapDataContext';
-import { useSharedMap } from '../../../../shared/useSharedMap';
+import { useMapStore } from '../../../../stores/useMapStore';
 import { useWorldDimensions } from '../../../../shared/useWorldDimensions';
 import { useAnimatedGifSettings } from '../../hooks/useAnimatedGifSettings';
 import { EnhancedBackgroundUpload } from '../EnhancedBackgroundUpload';
@@ -59,8 +59,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   onPreviewModeChange
 }) => {
   const { mapData, updateInteractiveAreas } = useMapData();
-  // Auto-save is now controlled by the Redux store configuration
-  const sharedMap = useSharedMap({ source: 'editor' });
+  // Redux-based map store for persistence operations
+  const { setWorldDimensions, setBackgroundImage, saveMap } = useMapStore();
   const worldDimensions = useWorldDimensions();
   const [customMapSize, setCustomMapSize] = useState({
     width: mapData.worldDimensions.width,
@@ -144,8 +144,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       });
 
       if (updateResult.isValid) {
-        // Also update SharedMapSystem for persistence compatibility
-        await sharedMap.updateWorldDimensions(finalDimensions);
+        // Update Redux store for persistence
+        setWorldDimensions(finalDimensions);
         message.success(`Map size updated to ${finalDimensions.width}×${finalDimensions.height}`);
       } else {
         message.error('Failed to update map dimensions: ' + updateResult.errors.join(', '));
@@ -155,7 +155,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       logger.error('Failed to update map size', error);
       message.error('Failed to update map size');
     }
-  }, [mapData.interactiveAreas, updateInteractiveAreas, sharedMap, worldDimensions]);
+  }, [mapData.interactiveAreas, updateInteractiveAreas, setWorldDimensions, worldDimensions]);
 
   // Handle preset selection
   const handlePresetChange = useCallback((preset: string) => {
@@ -282,7 +282,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             return;
           }
 
-          // Save background image to SharedMapSystem
+          // Save background image to Redux store
           try {
             logger.info('SAVING BACKGROUND IMAGE TO MAP');
 
@@ -299,11 +299,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               return;
             }
 
-            // Update map data with background image (use validated dimensions)
-            await sharedMap.updateMapData({
-              backgroundImage: imageDataUrl,
-              backgroundImageDimensions: backgroundValidation.dimensions
-            });
+            // Update map data with background image via Redux store
+            setBackgroundImage(imageDataUrl, backgroundValidation.dimensions);
 
             logger.info('BACKGROUND IMAGE SAVED TO MAP DATA');
             // Store background dimensions in state for manual controls
@@ -363,7 +360,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         resolve();
       }
     });
-  }, [handleMapSizeChange, sharedMap, worldDimensions]);
+  }, [handleMapSizeChange, setBackgroundImage, worldDimensions]);
 
   // Handle reset to default map
   const handleResetToDefault = useCallback(async () => {

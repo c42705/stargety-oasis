@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import { PhaserMapRenderer } from './PhaserMapRenderer';
-import { SharedMapSystem } from '../../shared/SharedMapSystem';
 import { CollisionSystem } from './CollisionSystem';
 import { WorldBoundsManager } from './WorldBoundsManager';
 import { PlayerManager } from './PlayerManager';
@@ -31,7 +30,6 @@ export class GameScene extends Phaser.Scene {
 
   // Core systems
   private mapRenderer!: PhaserMapRenderer;
-  private sharedMapSystem!: SharedMapSystem;
   private collisionSystem!: CollisionSystem;
   private worldBoundsManager!: WorldBoundsManager;
   private playerManager!: PlayerManager;
@@ -62,7 +60,6 @@ export class GameScene extends Phaser.Scene {
     this.playerId = playerId;
     this.worldRoomId = worldRoomId;
     this.onAreaClick = onAreaClick;
-    this.sharedMapSystem = SharedMapSystem.getInstance();
   }
 
   preload(): void {
@@ -79,6 +76,16 @@ export class GameScene extends Phaser.Scene {
   setMapAreasVisibility(visible: boolean): void {
     if (this.mapRenderer) {
       this.mapRenderer.setDebugMode(visible);
+    }
+  }
+
+  /**
+   * Update map data from Redux (called from React component)
+   */
+  updateMapData(mapData: import('../../shared/MapDataContext').MapData | null): void {
+    if (this.mapRenderer) {
+      this.mapRenderer.updateMapData(mapData);
+      logger.debug('[GameScene] Updated map data from Redux');
     }
   }
 
@@ -122,8 +129,13 @@ export class GameScene extends Phaser.Scene {
     const worldBounds = this.worldBoundsManager.getWorldBounds();
     this.playerManager.initialize(worldBounds.width / 2, worldBounds.height / 2);
 
-    // Initialize collision system
-    this.collisionSystem = new CollisionSystem(this, this.eventBus, this.onAreaClick);
+    // Initialize collision system with getMapData callback
+    this.collisionSystem = new CollisionSystem(
+      this,
+      this.eventBus,
+      this.onAreaClick,
+      () => this.mapRenderer?.getMapData() ?? null
+    );
 
     // Initialize movement controller (use container as authoritative position)
     this.movementController = new MovementController(this, this.eventBus, this.playerId, {
@@ -146,11 +158,12 @@ export class GameScene extends Phaser.Scene {
     });
     this.cameraController.initialize(this.movementController.getCursors().space);
 
-    // Initialize debug diagnostics
+    // Initialize debug diagnostics with getMapData callback
     this.debugDiagnostics = new DebugDiagnostics(this, {
       // Diagnostics should inspect the container position as authoritative
       getPlayer: () => this.playerManager.getPlayerContainer(),
-      getWorldBounds: () => this.worldBoundsManager.getWorldBounds()
+      getWorldBounds: () => this.worldBoundsManager.getWorldBounds(),
+      getMapData: () => this.mapRenderer?.getMapData() ?? null
     });
 
     // Set up double-click teleportation

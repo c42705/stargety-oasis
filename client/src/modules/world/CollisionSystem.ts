@@ -1,23 +1,26 @@
 import Phaser from 'phaser';
-import { SharedMapSystem } from '../../shared/SharedMapSystem';
+import { MapData } from '../../shared/MapDataContext';
 import { logger } from '../../shared/logger';
 
 /**
  * CollisionSystem - Handles all collision detection for the game world
- * 
+ *
  * Responsibilities:
  * - Polygon collision detection
  * - Point-in-polygon checks
  * - Impassable area collision detection
  * - Interactive area collision detection
  * - Area entry/exit event handling
+ *
+ * REFACTORED (2025-12-15): Removed SharedMapSystem dependency.
+ * Now receives mapData via callback from parent component.
  */
 export class CollisionSystem {
   private scene: Phaser.Scene;
-  private sharedMapSystem: SharedMapSystem;
   private eventBus: any;
   private onAreaClick: (areaId: string) => void;
-  
+  private getMapData: () => MapData | null;
+
   // Area tracking
   private currentArea: string | null = null;
   private previousArea: string | null = null;
@@ -25,12 +28,13 @@ export class CollisionSystem {
   constructor(
     scene: Phaser.Scene,
     eventBus: any,
-    onAreaClick: (areaId: string) => void
+    onAreaClick: (areaId: string) => void,
+    getMapData: () => MapData | null
   ) {
     this.scene = scene;
     this.eventBus = eventBus;
     this.onAreaClick = onAreaClick;
-    this.sharedMapSystem = SharedMapSystem.getInstance();
+    this.getMapData = getMapData;
   }
 
   /**
@@ -91,7 +95,7 @@ export class CollisionSystem {
    * Checks BOTH legacy impassableAreas AND interactiveAreas with actionType: 'impassable'
    */
   public checkCollisionWithImpassableAreas(x: number, y: number, playerSize: number): boolean {
-    const mapData = this.sharedMapSystem.getMapData();
+    const mapData = this.getMapData();
     if (!mapData) {
       logger.warn('[Collision] NO MAP DATA available for collision check!');
       return false;
@@ -197,8 +201,8 @@ export class CollisionSystem {
       return;
     }
 
-    // Get areas from SharedMapSystem (localStorage) instead of hardcoded data
-    const mapData = this.sharedMapSystem.getMapData();
+    // Get areas from Redux store via callback
+    const mapData = this.getMapData();
 
     if (!mapData) {
       return; // No map data available

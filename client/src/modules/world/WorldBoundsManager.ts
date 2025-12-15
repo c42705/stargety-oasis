@@ -1,29 +1,29 @@
 import Phaser from 'phaser';
-import { SharedMapSystem } from '../../shared/SharedMapSystem';
 import { worldDimensionsManager, WorldDimensionsState } from '../../shared/WorldDimensionsManager';
 import { logger } from '../../shared/logger';
 
 /**
  * WorldBoundsManager - Manages world dimensions and bounds
- * 
+ *
  * Responsibilities:
  * - World bounds updates
  * - Background image dimension handling
  * - Map dimension listeners
  * - Scale manager synchronization
  * - Dimension calculations
+ *
+ * REFACTORED (2025-12-15): Removed SharedMapSystem dependency.
+ * Now uses WorldDimensionsManager as the single source of truth.
  */
 export class WorldBoundsManager {
   private scene: Phaser.Scene;
-  private sharedMapSystem: SharedMapSystem;
   public worldBounds = { width: 7603, height: 3679 }; // Default dimensions
-  
+
   // Dimension change callback
   private onDimensionsChanged?: () => void;
 
   constructor(scene: Phaser.Scene, onDimensionsChanged?: () => void) {
     this.scene = scene;
-    this.sharedMapSystem = SharedMapSystem.getInstance();
     this.onDimensionsChanged = onDimensionsChanged;
   }
 
@@ -109,17 +109,7 @@ export class WorldBoundsManager {
       );
     } catch (error) {
       logger.error('Failed to get dimensions from WorldDimensionsManager', error);
-
-      // Fallback to SharedMapSystem for backward compatibility
-      const mapData = this.sharedMapSystem.getMapData();
-      if (mapData && mapData.worldDimensions) {
-        logger.warn('Falling back to SharedMapSystem dimensions');
-        this.updateWorldBounds(
-          mapData.worldDimensions.width,
-          mapData.worldDimensions.height,
-          'SharedMapSystem-fallback'
-        );
-      }
+      // No fallback - WorldDimensionsManager is the single source of truth
     }
   }
 

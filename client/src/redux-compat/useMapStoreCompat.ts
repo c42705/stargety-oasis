@@ -1,3 +1,13 @@
+/**
+ * Redux Map Store Hook
+ *
+ * Primary hook for accessing and modifying map data via Redux.
+ * This is the single source of truth for map state management.
+ *
+ * REFACTORED (2025-12-15): Renamed from useMapStoreCompat.
+ * The "Compat" suffix was removed since SharedMapSystem has been eliminated
+ * and this is now the only map data management system.
+ */
 import { useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../redux/hooks';
 import {
@@ -38,7 +48,10 @@ import {
 } from '../redux/slices/mapSlice';
 import { MapDataService } from '../stores/MapDataService';
 
-export const useMapStoreCompat = () => {
+/**
+ * Hook for map store access - provides state and actions for map data management
+ */
+export const useMapStoreImpl = () => {
   const dispatch = useAppDispatch();
 
   const mapData = useAppSelector(selectMapData);
@@ -106,3 +119,5 @@ export const useMapStoreCompat = () => {
   } as const;
 };
 
+// Backward-compatible export (deprecated - use useMapStoreImpl or useMapStore from stores/useMapStore.ts)
+export const useMapStoreCompat = useMapStoreImpl;

@@ -23,7 +23,6 @@ export { useKonvaSelection } from './hooks/useKonvaSelection';
 export { useKonvaTransform } from './hooks/useKonvaTransform';
 export { useKonvaHistory } from './hooks/useKonvaHistory';
 export { useKonvaPersistence } from './hooks/useKonvaPersistence';
-export { useKonvaSharedMap } from './hooks/useKonvaSharedMap';
 export { useKonvaKeyboardShortcuts } from './hooks/useKonvaKeyboardShortcuts';
 export { useKonvaPreviewMode } from './hooks/useKonvaPreviewMode';
 export { useKonvaPerformance } from './hooks/useKonvaPerformance';
@@ -53,7 +52,6 @@ export * from './utils/coordinateTransform';
 export * from './utils/shapeFactories';
 export * from './utils/validation';
 export * from './utils/mapDataAdapter';
-export * from './utils/sharedMapAdapter';
 
 // Temporary export to prevent empty module error
 export const MAP_EDITOR_KONVA_VERSION = '0.1.0-alpha';

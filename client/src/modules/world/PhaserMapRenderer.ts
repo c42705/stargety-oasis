@@ -13,13 +13,13 @@
  */
 
 import Phaser from 'phaser';
-import { SharedMapSystem, SharedMapData } from '../../shared/SharedMapSystem';
-import { InteractiveArea, ImpassableArea, Asset } from '../../shared/MapDataContext';
+import { InteractiveArea, ImpassableArea, Asset, MapData } from '../../shared/MapDataContext';
 import { shouldBlockBackgroundInteractions } from '../../shared/ModalStateManager';
 import { logger } from '../../shared/logger';
 
 export interface PhaserMapRendererConfig {
   scene: Phaser.Scene;
+  mapData?: MapData | null; // Optional initial map data from Redux
   enablePhysics?: boolean;
   enableInteractions?: boolean;
   debugMode?: boolean;
@@ -27,8 +27,7 @@ export interface PhaserMapRendererConfig {
 
 export class PhaserMapRenderer {
   private scene: Phaser.Scene;
-  private sharedMapSystem: SharedMapSystem;
-  private mapData: SharedMapData | null = null;
+  private mapData: MapData | null = null;
 
   // Phaser groups for different map elements
   private interactiveAreasGroup!: Phaser.GameObjects.Group;
@@ -60,9 +59,8 @@ export class PhaserMapRenderer {
     this.enablePhysics = config.enablePhysics ?? true;
     this.enableInteractions = config.enableInteractions ?? true;
     this.debugMode = config.debugMode ?? false;
-    
-    this.sharedMapSystem = SharedMapSystem.getInstance();
-    // Defer group and event listener initialization until the scene is fully
+    this.mapData = config.mapData ?? null;
+    // Defer group initialization until the scene is fully
     // initialized to avoid cases where `scene.add` / renderer systems are not
     // yet available and cause `null`-access errors in Phaser internals.
   }
@@ -105,87 +103,43 @@ export class PhaserMapRenderer {
   /**
    * Get current map data for collision detection
    */
-  public getMapData(): SharedMapData | null {
+  public getMapData(): MapData | null {
     return this.mapData;
   }
 
   /**
-   * Set up event listeners for map data changes
+   * Update map data from external source (Redux)
+   * Call this when Redux mapData changes to re-render
    */
-  private setupEventListeners(): void {
-    const handleMapChanged = (data: any) => {
-      this.mapData = data.mapData;
+  public updateMapData(newMapData: MapData | null): void {
+    if (this.isDestroyed) return;
+    this.mapData = newMapData;
+    if (this.mapData) {
       this.renderMap();
-    };
-
-    const handleMapLoaded = (data: any) => {
-      this.mapData = data.mapData;
-      this.renderMap();
-    };
-
-    const handleElementAdded = (data: any) => {
-      if (data.type === 'interactive') {
-        this.addInteractiveArea(data.element);
-      } else if (data.type === 'collision') {
-        this.addCollisionArea(data.element);
-      }
-    };
-
-    const handleElementUpdated = (data: any) => {
-      if (data.type === 'interactive') {
-        this.updateInteractiveArea(data.element);
-      } else if (data.type === 'collision') {
-        this.updateCollisionArea(data.element);
-      }
-    };
-
-    const handleElementRemoved = (data: any) => {
-      if (data.type === 'interactive') {
-        this.removeInteractiveArea(data.element.id);
-      } else if (data.type === 'collision') {
-        this.removeCollisionArea(data.element.id);
-      }
-    };
-
-    // Subscribe to events
-    this.sharedMapSystem.on('map:changed', handleMapChanged);
-    this.sharedMapSystem.on('map:loaded', handleMapLoaded);
-    this.sharedMapSystem.on('map:element:added', handleElementAdded);
-    this.sharedMapSystem.on('map:element:updated', handleElementUpdated);
-    this.sharedMapSystem.on('map:element:removed', handleElementRemoved);
-
-    // Store cleanup functions
-    this.eventListeners.push(
-      () => this.sharedMapSystem.off('map:changed', handleMapChanged),
-      () => this.sharedMapSystem.off('map:loaded', handleMapLoaded),
-      () => this.sharedMapSystem.off('map:element:added', handleElementAdded),
-      () => this.sharedMapSystem.off('map:element:updated', handleElementUpdated),
-      () => this.sharedMapSystem.off('map:element:removed', handleElementRemoved)
-    );
+    }
   }
 
   /**
-   * Initialize the renderer and load map data
+   * Initialize the renderer and prepare Phaser groups
+   * Map data is now provided via constructor or updateMapData() from Redux
    */
   public async initialize(): Promise<void> {
     try {
       logger.debug('[PhaserMapRenderer] initialize START');
 
-      // Ensure Phaser groups and event listeners are created when the scene
+      // Ensure Phaser groups are created when the scene
       // systems are ready (preload/create lifecycle). This prevents calls to
       // `this.scene.add` or texture creation when the renderer is not set.
       this.initializeGroups();
-      this.setupEventListeners();
 
-      logger.debug('[PhaserMapRenderer] SharedMapSystem.initialize() about to be awaited');
-      await this.sharedMapSystem.initialize();
-      logger.debug('[PhaserMapRenderer] SharedMapSystem.initialize() completed');
-      this.mapData = this.sharedMapSystem.getMapData();
+      logger.debug('[PhaserMapRenderer] Groups initialized');
+
+      // Render map if data was provided in constructor
       if (this.mapData) {
         logger.debug('[PhaserMapRenderer] mapData available, calling renderMap');
         this.renderMap();
       } else {
-        logger.debug('[PhaserMapRenderer] mapData is null after SharedMapSystem.initialize');
+        logger.debug('[PhaserMapRenderer] mapData is null - waiting for updateMapData() call');
       }
     } catch (error) {
       console.error('Failed to initialize PhaserMapRenderer:', error);

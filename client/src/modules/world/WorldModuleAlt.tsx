@@ -11,7 +11,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import Phaser from 'phaser';
 import WorldZoomControls from './WorldZoomControls';
-import { SharedMapSystem } from '../../shared/SharedMapSystem';
+import { useMapStore } from '../../stores/useMapStore';
 import { PhaserMapRenderer } from './PhaserMapRenderer';
 import { useEventBus } from '../../shared/EventBusContext';
 import { shouldBlockBackgroundInteractions } from '../../shared/ModalStateManager';
@@ -526,12 +526,15 @@ export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, classN
   const phaserGameRef = useRef<Phaser.Game | null>(null);
   const eventBus = useEventBus(); // Get EventBus for cross-component communication
 
+  // Redux map data hook - single source of truth
+  const { mapData, loadMap, isLoading } = useMapStore();
+
   // State for zoom/camera controls UI
   const [canZoomIn, setCanZoomIn] = useState(true);
   const [canZoomOut, setCanZoomOut] = useState(true);
   const [isCameraFollowing, setIsCameraFollowing] = useState(true);
 
-  // State for map config (async load)
+  // State for map config (derived from Redux mapData)
   const [mapReady, setMapReady] = useState(false);
   const [mapConfig, setMapConfig] = useState<{ backgroundImageUrl: string; worldWidth: number; worldHeight: number; showMapAreas: boolean }>({
     backgroundImageUrl: '',
@@ -551,28 +554,23 @@ export const WorldModuleAlt: React.FC<WorldModuleAltProps> = ({ playerId, classN
     }
   }, []);
 
-  // Load map data on mount
+  // Load map data from Redux on mount
   useEffect(() => {
-    let mounted = true;
-    SharedMapSystem.getInstance()
-      .initialize()
-      .then(() => {
-        if (!mounted) return;
-        const mapData = SharedMapSystem.getInstance().getMapData();
-        if (mapData && mapData.backgroundImage && mapData.worldDimensions) {
-          setMapConfig({
-            backgroundImageUrl: mapData.backgroundImage,
-            worldWidth: mapData.worldDimensions.width,
-            worldHeight: mapData.worldDimensions.height,
-            showMapAreas: false,
-          });
-        }
-        setMapReady(true);
+    loadMap();
+  }, [loadMap]);
+
+  // React to mapData changes from Redux
+  useEffect(() => {
+    if (!isLoading && mapData && mapData.backgroundImage && mapData.worldDimensions) {
+      setMapConfig({
+        backgroundImageUrl: mapData.backgroundImage,
+        worldWidth: mapData.worldDimensions.width,
+        worldHeight: mapData.worldDimensions.height,
+        showMapAreas: false,
       });
-    return () => {
-      mounted = false;
-    };
-  }, []);
+      setMapReady(true);
+    }
+  }, [mapData, isLoading]);
 
   // Zoom/camera controls handlers
   const handleZoomIn = useCallback(() => {

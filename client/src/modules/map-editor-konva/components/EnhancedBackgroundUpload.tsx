@@ -30,7 +30,7 @@ import {
   saveMap
 } from '../../../redux/slices/mapSlice';
 import { useMapData } from '../../../shared/MapDataContext';
-import { useSharedMap } from '../../../shared/useSharedMap';
+import { useMapStore } from '../../../stores/useMapStore';
 import { useWorldDimensions } from '../../../shared/useWorldDimensions';
 
 const { Dragger } = Upload;
@@ -46,7 +46,7 @@ export const EnhancedBackgroundUpload: React.FC<EnhancedBackgroundUploadProps> =
 }) => {
   const dispatch = useAppDispatch();
   const { mapData } = useMapData();
-  const sharedMap = useSharedMap({ source: 'editor' });
+  const { setBackgroundImage } = useMapStore();
   const worldDimensions = useWorldDimensions();
   
   const uploadStatus = useAppSelector((state: any) => state.map.uploadStatus);
@@ -112,11 +112,10 @@ export const EnhancedBackgroundUpload: React.FC<EnhancedBackgroundUploadProps> =
       fileName: uploadStatus.fileName
     });
 
-    // Update the map data immediately for rendering
-    sharedMap.updateMapData({
-      backgroundImage: mapData.backgroundImage,
-      backgroundImageDimensions: uploadStatus.dimensions
-    });
+    // Update the map data immediately for rendering via Redux
+    if (mapData.backgroundImage) {
+      setBackgroundImage(mapData.backgroundImage, uploadStatus.dimensions);
+    }
 
     // Update world dimensions to match background
     worldDimensions.updateBackgroundDimensions(uploadStatus.dimensions, {
@@ -126,7 +125,7 @@ export const EnhancedBackgroundUpload: React.FC<EnhancedBackgroundUploadProps> =
 
     message.success('Background applied for immediate rendering');
     setHasUnsavedChanges(false);
-  }, [uploadStatus, mapData, sharedMap, worldDimensions]);
+  }, [uploadStatus, mapData, setBackgroundImage, worldDimensions]);
 
   // Handle Save button - with confirmation and persistence
   const handleSave = useCallback(async () => {
@@ -161,16 +160,15 @@ export const EnhancedBackgroundUpload: React.FC<EnhancedBackgroundUploadProps> =
 
       // Save to database
       await dispatch(saveMap()).unwrap();
-      
-      // Also update shared map with current background
-      await sharedMap.updateMapData({
-        backgroundImage: mapData.backgroundImage,
-        backgroundImageDimensions: uploadStatus.dimensions
-      });
+
+      // Also update Redux store with current background
+      if (mapData.backgroundImage) {
+        setBackgroundImage(mapData.backgroundImage, uploadStatus.dimensions);
+      }
 
       setHasUnsavedChanges(false);
       message.success('Background image saved successfully');
-      
+
       if (onUploadComplete) {
         onUploadComplete(uploadStatus.dimensions);
       }
@@ -179,7 +177,7 @@ export const EnhancedBackgroundUpload: React.FC<EnhancedBackgroundUploadProps> =
       const errorMessage = error instanceof Error ? error.message : 'Failed to save background';
       message.error(errorMessage);
     }
-  }, [uploadStatus, mapData, sharedMap, dispatch, isSaving, onUploadComplete]);
+  }, [uploadStatus, mapData, setBackgroundImage, dispatch, isSaving, onUploadComplete]);
 
   // Reset upload
   const handleReset = useCallback(() => {

@@ -1,37 +1,41 @@
 import Phaser from 'phaser';
-import { SharedMapSystem } from '../../shared/SharedMapSystem';
+import { MapData } from '../../shared/MapDataContext';
 
 /**
  * DebugDiagnostics - Debug and diagnostic methods for the game
- * 
+ *
  * Most methods are disabled for performance but kept for debugging purposes
- * 
+ *
  * Responsibilities:
  * - Test methods
  * - Debug data collection
  * - Diagnostic analysis
  * - Validation methods
+ *
+ * REFACTORED (2025-12-15): Removed SharedMapSystem dependency.
+ * Now receives mapData via callback from parent component.
  */
 export class DebugDiagnostics {
   private scene: Phaser.Scene;
-  private sharedMapSystem: SharedMapSystem;
-  
+
   // Callbacks
   // Accept either a Sprite or a Container so diagnostics can inspect container positions
   private getPlayer: () => Phaser.GameObjects.Sprite | Phaser.GameObjects.Container | null;
   private getWorldBounds: () => { width: number; height: number };
+  private getMapData: () => MapData | null;
 
   constructor(
     scene: Phaser.Scene,
     callbacks: {
       getPlayer: () => Phaser.GameObjects.Sprite | Phaser.GameObjects.Container | null;
       getWorldBounds: () => { width: number; height: number };
+      getMapData: () => MapData | null;
     }
   ) {
     this.scene = scene;
     this.getPlayer = callbacks.getPlayer;
     this.getWorldBounds = callbacks.getWorldBounds;
-    this.sharedMapSystem = SharedMapSystem.getInstance();
+    this.getMapData = callbacks.getMapData;
   }
 
   /**
@@ -140,7 +144,7 @@ export class DebugDiagnostics {
    */
   public validateObjectPositioning(): any {
     const camera = this.scene.cameras.main;
-    const mapData = this.sharedMapSystem.getMapData();
+    const mapData = this.getMapData();
     const player = this.getPlayer();
     const worldBounds = this.getWorldBounds();
 
