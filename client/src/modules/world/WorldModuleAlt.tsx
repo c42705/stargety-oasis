@@ -446,10 +446,17 @@ class ExampleScene extends Phaser.Scene {
 
     const mapData = this.mapRenderer?.getMapData();
     if (!mapData || !mapData.interactiveAreas) {
+      console.log('🔍 [AreaCollision] No map data or interactive areas found');
       return; // No areas to check
     }
 
     const areas = mapData.interactiveAreas;
+    console.log('🔍 [AreaCollision] Found', areas.length, 'interactive areas:', areas.map(a => ({
+      id: a.id,
+      name: a.name,
+      actionType: a.actionType,
+      hasConfig: !!a.actionConfig
+    })));
     const playerSize = 64; // Match the display size
     const playerLeft = this.cody.x - playerSize / 2;
     const playerRight = this.cody.x + playerSize / 2;
@@ -476,11 +483,18 @@ class ExampleScene extends Phaser.Scene {
 
     // Detect area changes and emit events for Jitsi auto-join/leave
     if (currentlyInArea !== this.previousArea) {
+      console.log('🔄 Area change detected:', {
+        previousArea: this.previousArea,
+        currentlyInArea: currentlyInArea,
+        totalAreas: areas.length,
+        areas: areas.map(a => ({ id: a.id, name: a.name, actionType: a.actionType }))
+      });
+
       // Exited previous area
       if (this.previousArea && !shouldBlockBackgroundInteractions()) {
         const previousAreaData = areas.find(a => a.id === this.previousArea);
         if (previousAreaData && this.eventBus) {
-          console.log('🚪 Area exited:', previousAreaData.name);
+          console.log('🚪 Area exited:', previousAreaData.name, 'actionType:', previousAreaData.actionType);
           this.eventBus.publish('area-exited', {
             areaId: previousAreaData.id,
             areaName: previousAreaData.name
@@ -492,7 +506,7 @@ class ExampleScene extends Phaser.Scene {
       if (currentlyInArea && !shouldBlockBackgroundInteractions()) {
         const currentAreaData = areas.find(a => a.id === currentlyInArea);
         if (currentAreaData && this.eventBus) {
-          console.log('🚪 Area entered:', currentAreaData.name);
+          console.log('🚪 Area entered:', currentAreaData.name, 'actionType:', currentAreaData.actionType);
           this.eventBus.publish('area-entered', {
             areaId: currentAreaData.id,
             areaName: currentAreaData.name,

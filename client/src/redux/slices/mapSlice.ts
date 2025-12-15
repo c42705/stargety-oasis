@@ -11,6 +11,13 @@ export interface MapState {
   isInitializing: boolean;
   autoSaveEnabled: boolean;
   autoSaveDelay: number;
+  uploadStatus: {
+    status: 'idle' | 'pending' | 'in-progress' | 'completed' | 'failed';
+    progress: number;
+    fileName: string | null;
+    error: string | null;
+    dimensions: { width: number; height: number } | null;
+  };
 }
 
 const initialState: MapState = {
@@ -22,6 +29,13 @@ const initialState: MapState = {
   isInitializing: true,
   autoSaveEnabled: false,
   autoSaveDelay: 2000,
+  uploadStatus: {
+    status: 'idle',
+    progress: 0,
+    fileName: null,
+    error: null,
+    dimensions: null,
+  },
 };
 
 export const loadMap = createAsyncThunk('map/load', async () => {
@@ -77,6 +91,20 @@ const mapSlice = createSlice({
     markClean(state) { state.isDirty = false; },
     setAutoSaveEnabled(state, action: PayloadAction<boolean>) { state.autoSaveEnabled = action.payload; },
     setAutoSaveDelay(state, action: PayloadAction<number>) { state.autoSaveDelay = action.payload; },
+
+    // Upload status management
+    setUploadStatus(state, action: PayloadAction<MapState['uploadStatus']>) {
+      state.uploadStatus = action.payload;
+    },
+    resetUploadStatus(state) {
+      state.uploadStatus = {
+        status: 'idle',
+        progress: 0,
+        fileName: null,
+        error: null,
+        dimensions: null,
+      };
+    },
 
     setWorldDimensions(state, action: PayloadAction<{ width: number; height: number }>) {
       if (state.mapData) {
@@ -253,9 +281,16 @@ const mapSlice = createSlice({
         state.error = action.error.message || 'Failed to restore from backup';
       })
 
-      .addCase(uploadBackgroundImage.pending, (state) => {
+      .addCase(uploadBackgroundImage.pending, (state, action) => {
         state.isLoading = true;
         state.error = null;
+        state.uploadStatus = {
+          status: 'in-progress',
+          progress: 10,
+          fileName: action.meta.arg?.name || 'Unknown file',
+          error: null,
+          dimensions: null,
+        };
       })
       .addCase(uploadBackgroundImage.fulfilled, (state, action) => {
         if (state.mapData) {
@@ -265,6 +300,13 @@ const mapSlice = createSlice({
           state.isDirty = true;
         }
         state.isLoading = false;
+        state.uploadStatus = {
+          status: 'completed',
+          progress: 100,
+          fileName: state.uploadStatus.fileName,
+          error: null,
+          dimensions: action.payload.dimensions,
+        };
       })
       .addCase(uploadBackgroundImage.rejected, (state, action) => {
         state.isLoading = false;
@@ -281,6 +323,8 @@ export const {
   setAutoSaveDelay,
   setWorldDimensions,
   setBackgroundImage,
+  setUploadStatus,
+  resetUploadStatus,
   addInteractiveArea,
   updateInteractiveArea,
   removeInteractiveArea,

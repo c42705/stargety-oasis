@@ -243,8 +243,69 @@ export class MapPersistenceService {
     }
 
     return {
-      // Start with empty areas - user creates from scratch
-      interactiveAreas: [],
+      // Include Jitsi-enabled interactive areas for auto-join functionality
+      interactiveAreas: [
+        {
+          id: 'meeting-room-1',
+          name: 'Meeting Room',
+          x: Math.floor(effectiveDimensions.width * 0.2),
+          y: Math.floor(effectiveDimensions.height * 0.25),
+          width: 120,
+          height: 80,
+          color: '#4A90E2',
+          description: 'Join the weekly team sync',
+          actionType: 'jitsi',
+          actionConfig: {
+            autoJoinOnEntry: true,
+            autoLeaveOnExit: true
+          }
+        },
+        {
+          id: 'presentation-hall-1',
+          name: 'Presentation Hall',
+          x: Math.floor(effectiveDimensions.width * 0.26),
+          y: Math.floor(effectiveDimensions.height * 0.25),
+          width: 140,
+          height: 100,
+          color: '#9B59B6',
+          description: 'Watch presentations and demos',
+          actionType: 'jitsi',
+          actionConfig: {
+            autoJoinOnEntry: true,
+            autoLeaveOnExit: true
+          }
+        },
+        {
+          id: 'coffee-corner-1',
+          name: 'Coffee Corner',
+          x: Math.floor(effectiveDimensions.width * 0.6),
+          y: Math.floor(effectiveDimensions.height * 0.7),
+          width: 100,
+          height: 80,
+          color: '#8B4513',
+          description: 'Casual conversations',
+          actionType: 'jitsi',
+          actionConfig: {
+            autoJoinOnEntry: true,
+            autoLeaveOnExit: true
+          }
+        },
+        {
+          id: 'game-zone-1',
+          name: 'Game Zone',
+          x: Math.floor(effectiveDimensions.width * 0.72),
+          y: Math.floor(effectiveDimensions.height * 0.4),
+          width: 120,
+          height: 90,
+          color: '#E74C3C',
+          description: 'Fun and games',
+          actionType: 'jitsi',
+          actionConfig: {
+            autoJoinOnEntry: true,
+            autoLeaveOnExit: true
+          }
+        }
+      ],
       impassableAreas: [
         {
           id: 'wall-default',

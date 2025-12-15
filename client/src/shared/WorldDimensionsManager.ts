@@ -54,15 +54,15 @@ export const DIMENSION_LIMITS = {
   MIN_HEIGHT: 300,
   MAX_WIDTH: 8000,
   MAX_HEIGHT: 4000,
-  DEFAULT_WIDTH: 7603, // Updated to match actual map dimensions
-  DEFAULT_HEIGHT: 3679, // Updated to match actual map dimensions
+  DEFAULT_WIDTH: 1920, // Standard HD resolution
+  DEFAULT_HEIGHT: 1080, // Standard HD resolution
 } as const;
 
 export const DIMENSION_PRESETS = {
-  small: { width: 7603, height: 3679 }, // Updated to match actual map dimensions
-  medium: { width: 1200, height: 800 },
-  large: { width: 1600, height: 1200 },
-  xlarge: { width: 2400, height: 1600 },
+  small: { width: 1280, height: 720 }, // HD
+  medium: { width: 1920, height: 1080 }, // Full HD
+  large: { width: 2560, height: 1440 }, // 2K
+  xlarge: { width: 3840, height: 2160 }, // 4K
 } as const;
 
 // Subscription callback type
@@ -162,6 +162,56 @@ export class WorldDimensionsManager {
       errors,
       warnings,
       scaled,
+    };
+  }
+
+  /**
+   * Validate if background dimensions match world dimensions
+   */
+  public validateBackgroundDimensions(
+    worldDimensions: Dimensions,
+    backgroundDimensions: Dimensions,
+    tolerance: number = 0.1 // 10% tolerance
+  ): { isValid: boolean; warnings: string[]; aspectRatioMatch: boolean } {
+    const warnings: string[] = [];
+    let aspectRatioMatch = true;
+
+    // Check if both dimensions exist
+    if (!worldDimensions || !backgroundDimensions) {
+      return {
+        isValid: false,
+        warnings: ['Missing dimension data'],
+        aspectRatioMatch: false
+      };
+    }
+
+    // Calculate aspect ratios
+    const worldAspect = worldDimensions.width / worldDimensions.height;
+    const backgroundAspect = backgroundDimensions.width / backgroundDimensions.height;
+
+    // Check aspect ratio match with tolerance
+    const aspectRatioDiff = Math.abs(worldAspect - backgroundAspect);
+    if (aspectRatioDiff > tolerance) {
+      aspectRatioMatch = false;
+      warnings.push(
+        `Aspect ratio mismatch: world (${worldAspect.toFixed(3)}) vs background (${backgroundAspect.toFixed(3)})`
+      );
+    }
+
+    // Check if dimensions are close enough (within tolerance)
+    const widthDiff = Math.abs(worldDimensions.width - backgroundDimensions.width) / worldDimensions.width;
+    const heightDiff = Math.abs(worldDimensions.height - backgroundDimensions.height) / worldDimensions.height;
+
+    if (widthDiff > tolerance || heightDiff > tolerance) {
+      warnings.push(
+        `Dimension mismatch: world (${worldDimensions.width}×${worldDimensions.height}) vs background (${backgroundDimensions.width}×${backgroundDimensions.height})`
+      );
+    }
+
+    return {
+      isValid: warnings.length === 0,
+      warnings,
+      aspectRatioMatch
     };
   }
 
@@ -309,6 +359,34 @@ export class WorldDimensionsManager {
       width: DIMENSION_LIMITS.DEFAULT_WIDTH,
       height: DIMENSION_LIMITS.DEFAULT_HEIGHT,
     }, { source: 'system' });
+  }
+
+  /**
+   * Get dimension warnings for the current state
+   */
+  public getDimensionWarnings(): string[] {
+    const warnings: string[] = [];
+
+    if (!this.state.backgroundImageDimensions) {
+      warnings.push('No background image dimensions set');
+      return warnings;
+    }
+
+    const validation = this.validateBackgroundDimensions(
+      this.state.worldDimensions,
+      this.state.backgroundImageDimensions
+    );
+
+    warnings.push(...validation.warnings);
+
+    return warnings;
+  }
+
+  /**
+   * Check if dimension warnings exist
+   */
+  public hasDimensionWarnings(): boolean {
+    return this.getDimensionWarnings().length > 0;
   }
 
   // Private methods

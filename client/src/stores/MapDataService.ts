@@ -177,13 +177,13 @@ export class MapDataService {
         tags: ['default', 'office', 'zep-style']
       },
       worldDimensions: {
-        width: 7603,
-        height: 3679
+        width: 1920,
+        height: 1080
       },
       backgroundImage: '/default-background.jpg',
       backgroundImageDimensions: {
-        width: 7603,
-        height: 3679
+        width: 1920,
+        height: 1080
       },
       interactiveAreas: [
         {
@@ -196,7 +196,25 @@ export class MapDataService {
           color: '#4A90E2',
           description: 'Join the weekly team sync',
           actionType: 'jitsi',
-          actionConfig: null
+          actionConfig: {
+            autoJoinOnEntry: true,
+            autoLeaveOnExit: true
+          }
+        },
+        {
+          id: 'presentation-hall-1',
+          name: 'Presentation Hall',
+          x: 2000,
+          y: 919,
+          width: 140,
+          height: 100,
+          color: '#9B59B6',
+          description: 'Watch presentations and demos',
+          actionType: 'jitsi',
+          actionConfig: {
+            autoJoinOnEntry: true,
+            autoLeaveOnExit: true
+          }
         },
         {
           id: 'coffee-corner-1',
@@ -207,8 +225,26 @@ export class MapDataService {
           height: 80,
           color: '#8B4513',
           description: 'Casual conversations',
-          actionType: 'none',
-          actionConfig: null
+          actionType: 'jitsi',
+          actionConfig: {
+            autoJoinOnEntry: true,
+            autoLeaveOnExit: true
+          }
+        },
+        {
+          id: 'game-zone-1',
+          name: 'Game Zone',
+          x: 5500,
+          y: 1500,
+          width: 120,
+          height: 90,
+          color: '#E74C3C',
+          description: 'Fun and games',
+          actionType: 'jitsi',
+          actionConfig: {
+            autoJoinOnEntry: true,
+            autoLeaveOnExit: true
+          }
         }
       ],
       impassableAreas: [
@@ -334,7 +370,29 @@ export class MapDataService {
   /**
    * Handle background image upload and conversion
    */
-  static async handleBackgroundImageUpload(file: File): Promise<{ url: string; dimensions: { width: number; height: number } }> {
+  static async handleBackgroundImageUpload(
+    file: File,
+    options: {
+      optimize?: boolean;
+      quality?: number;
+      autoResize?: boolean;
+      maxWidth?: number;
+      maxHeight?: number;
+    } = {}
+  ): Promise<{
+    url: string;
+    dimensions: { width: number; height: number };
+    optimized: boolean;
+    aspectRatio: number;
+  }> {
+    const {
+      optimize = true,
+      quality = 0.9,
+      autoResize = false,
+      maxWidth = 1920,
+      maxHeight = 1080
+    } = options;
+
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
 
@@ -342,7 +400,7 @@ export class MapDataService {
         const img = new Image();
 
         img.onload = () => {
-          const canvas = document.createElement('canvas');
+          let canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
 
           if (!ctx) {
@@ -350,20 +408,49 @@ export class MapDataService {
             return;
           }
 
-          // Set canvas dimensions to image dimensions
-          canvas.width = img.width;
-          canvas.height = img.height;
+          let finalWidth = img.width;
+          let finalHeight = img.height;
+          let optimized = false;
 
-          // Draw image to canvas
-          ctx.drawImage(img, 0, 0);
+          // Auto-resize if requested and image is too large
+          if (autoResize && (img.width > maxWidth || img.height > maxHeight)) {
+            const aspectRatio = img.width / img.height;
+            
+            if (img.width > img.height) {
+              // Landscape
+              finalWidth = maxWidth;
+              finalHeight = Math.round(maxWidth / aspectRatio);
+            } else {
+              // Portrait
+              finalHeight = maxHeight;
+              finalWidth = Math.round(maxHeight * aspectRatio);
+            }
+            
+            canvas.width = finalWidth;
+            canvas.height = finalHeight;
+            
+            // Use high-quality interpolation for resizing
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, finalWidth, finalHeight);
+            optimized = true;
+          } else {
+            // Use original dimensions
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+          }
 
-          // Convert to data URL
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+          // Convert to data URL with specified quality
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
 
+          // Clean up canvas (just let it be garbage collected)
 
           resolve({
             url: dataUrl,
-            dimensions: { width: img.width, height: img.height }
+            dimensions: { width: finalWidth, height: finalHeight },
+            optimized,
+            aspectRatio: finalWidth / finalHeight
           });
         };
 
@@ -380,6 +467,59 @@ export class MapDataService {
 
       reader.readAsDataURL(file);
     });
+  }
+
+  /**
+   * Update world dimensions to match background image dimensions
+   */
+  static async updateWorldDimensionsToBackground(
+    currentMapData: ExtendedMapData,
+    newBackgroundDimensions: { width: number; height: number }
+  ): Promise<ExtendedMapData> {
+    const updatedMapData = {
+      ...currentMapData,
+      worldDimensions: newBackgroundDimensions,
+      backgroundImageDimensions: newBackgroundDimensions,
+      lastModified: new Date(),
+      version: currentMapData.version + 1
+    };
+
+    // Scale existing interactive areas proportionally
+    const oldWidth = currentMapData.worldDimensions.width;
+    const oldHeight = currentMapData.worldDimensions.height;
+    const newWidth = newBackgroundDimensions.width;
+    const newHeight = newBackgroundDimensions.height;
+
+    const widthScale = newWidth / oldWidth;
+    const heightScale = newHeight / oldHeight;
+
+    updatedMapData.interactiveAreas = currentMapData.interactiveAreas.map(area => ({
+      ...area,
+      x: Math.round(area.x * widthScale),
+      y: Math.round(area.y * heightScale),
+      width: Math.round(area.width * widthScale),
+      height: Math.round(area.height * heightScale)
+    }));
+
+    // Scale existing impassable areas
+    updatedMapData.impassableAreas = currentMapData.impassableAreas.map(area => ({
+      ...area,
+      x: Math.round(area.x * widthScale),
+      y: Math.round(area.y * heightScale),
+      width: Math.round(area.width * widthScale),
+      height: Math.round(area.height * heightScale)
+    }));
+
+    // Scale existing assets
+    updatedMapData.assets = (currentMapData.assets || []).map(asset => ({
+      ...asset,
+      x: Math.round(asset.x * widthScale),
+      y: Math.round(asset.y * heightScale),
+      width: Math.round(asset.width * widthScale),
+      height: Math.round(asset.height * widthScale)
+    }));
+
+    return updatedMapData;
   }
 
   /**

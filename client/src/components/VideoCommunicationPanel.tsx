@@ -53,6 +53,7 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
   // Listen to jitsi:join and jitsi:leave events from InteractiveAreaActionDispatcher
   useEffect(() => {
     const handleJitsiJoin = (data: { roomName: string; areaName: string }) => {
+      console.log('🎬 [VideoCommunicationPanel] Jitsi join event received:', data);
       logger.info('[VideoCommunicationPanel] Jitsi join event', { roomName: data.roomName, areaName: data.areaName });
 
       // Clear any pending transition
@@ -64,6 +65,7 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
       // Debounce: wait 500ms before actually joining
       // This prevents rapid room switches when walking through multiple areas
       transitionTimeoutRef.current = setTimeout(() => {
+        console.log('🎬 [VideoCommunicationPanel] Setting current area room after debounce:', { roomName: data.roomName });
         logger.info('[VideoCommunicationPanel] Setting current area room', { roomName: data.roomName });
         setCurrentAreaRoom(data.roomName);
         onRoomChange?.(data.roomName);

@@ -15,7 +15,12 @@ const defaultMapData = {
       width: 120,
       height: 80,
       color: '#4A90E2',
-      description: 'Join the weekly team sync'
+      description: 'Join the weekly team sync',
+      actionType: 'jitsi',
+      actionConfig: {
+        autoJoinOnEntry: true,
+        autoLeaveOnExit: true
+      }
     },
     {
       id: 'presentation-hall-1',
@@ -26,7 +31,12 @@ const defaultMapData = {
       width: 140,
       height: 100,
       color: '#9B59B6',
-      description: 'Watch presentations and demos'
+      description: 'Watch presentations and demos',
+      actionType: 'jitsi',
+      actionConfig: {
+        autoJoinOnEntry: true,
+        autoLeaveOnExit: true
+      }
     },
     {
       id: 'coffee-corner-1',
@@ -37,7 +47,12 @@ const defaultMapData = {
       width: 100,
       height: 80,
       color: '#D2691E',
-      description: 'Casual conversations'
+      description: 'Casual conversations',
+      actionType: 'jitsi',
+      actionConfig: {
+        autoJoinOnEntry: true,
+        autoLeaveOnExit: true
+      }
     },
     {
       id: 'game-zone-1',
@@ -48,7 +63,12 @@ const defaultMapData = {
       width: 120,
       height: 90,
       color: '#E74C3C',
-      description: 'Fun and games'
+      description: 'Fun and games',
+      actionType: 'jitsi',
+      actionConfig: {
+        autoJoinOnEntry: true,
+        autoLeaveOnExit: true
+      }
     }
   ],
   impassableAreas: [
@@ -71,13 +91,13 @@ const defaultMapData = {
   ],
   assets: [],
   worldDimensions: {
-    width: 7603,
-    height: 3679
+    width: 1920,
+    height: 1080
   },
   backgroundImage: '/default-background.jpg',
   backgroundImageDimensions: {
-    width: 7603,
-    height: 3679
+    width: 1920,
+    height: 1080
   },
   version: 1,
   lastModified: new Date().toISOString(),

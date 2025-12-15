@@ -361,18 +361,38 @@ export class PhaserMapRenderer {
       const backgroundImage = this.scene.add.image(0, 0, textureKey);
       backgroundImage.setOrigin(0, 0);
 
-      // Scale to fit world dimensions
-      const scaleX = worldWidth / backgroundImage.width;
-      const scaleY = worldHeight / backgroundImage.height;
+      // Calculate aspect ratios
+      const imageAspect = backgroundImage.width / backgroundImage.height;
+      const worldAspect = worldWidth / worldHeight;
+
+      let scaleX, scaleY, offsetX = 0, offsetY = 0;
+
+      if (imageAspect > worldAspect) {
+        // Image is wider than world - fit to height, center horizontally
+        scaleY = worldHeight / backgroundImage.height;
+        scaleX = scaleY;
+        offsetX = (worldWidth - backgroundImage.width * scaleX) / 2;
+      } else {
+        // Image is taller than world - fit to width, center vertically
+        scaleX = worldWidth / backgroundImage.width;
+        scaleY = scaleX;
+        offsetY = (worldHeight - backgroundImage.height * scaleY) / 2;
+      }
+
+      // Apply scaling with centering offset
       backgroundImage.setScale(scaleX, scaleY);
+      backgroundImage.setPosition(offsetX, offsetY);
 
       // Log dimension comparison for debugging scale issues
-      logger.debug('[PhaserMapRenderer] Background created', {
+      logger.debug('[PhaserMapRenderer] Background created with aspect ratio preservation', {
         textureKey,
         textureSize: { width: backgroundImage.width, height: backgroundImage.height },
         worldDimensions: { width: worldWidth, height: worldHeight },
         backgroundImageDimensions: bgDimensions,
+        imageAspect,
+        worldAspect,
         appliedScale: { scaleX, scaleY },
+        centerOffset: { offsetX, offsetY },
         dimensionsMatch: bgDimensions
           ? (bgDimensions.width === worldWidth && bgDimensions.height === worldHeight)
           : 'no bgDimensions stored'
