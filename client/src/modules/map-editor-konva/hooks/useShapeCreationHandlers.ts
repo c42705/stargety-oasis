@@ -45,8 +45,9 @@ interface UseShapeCreationHandlersParams {
   // Pending data state
   pendingAreaData: PendingAreaData | null;
   pendingCollisionAreaData: PendingCollisionAreaData | null;
-  // Existing areas for naming
+  // Existing areas for naming (both types)
   impassableAreas: ImpassableArea[];
+  interactiveAreas: InteractiveArea[];
   // State setters
   setPendingAreaData: (data: PendingAreaData | null) => void;
   setPendingCollisionAreaData: (data: PendingCollisionAreaData | null) => void;
@@ -77,6 +78,7 @@ export function useShapeCreationHandlers(
     pendingAreaData,
     pendingCollisionAreaData,
     impassableAreas,
+    interactiveAreas,
     setPendingAreaData,
     setPendingCollisionAreaData,
     setDrawingMode,
@@ -112,8 +114,10 @@ export function useShapeCreationHandlers(
     const maxX = Math.max(...xs);
     const maxY = Math.max(...ys);
 
-    // Auto-generate name - use pending data or auto-generate
-    const defaultName = pendingCollisionAreaData?.name || `Area ${impassableAreas.length + 1}`;
+    // Auto-generate name - use pending data or auto-generate unique name
+    // Count total areas (both interactive and impassable) to avoid duplicate names
+    const totalAreas = interactiveAreas.length + impassableAreas.length;
+    const defaultName = pendingCollisionAreaData?.name || `Area ${totalAreas + 1}`;
 
     // Default to 'impassable' action type for polygon areas
     const actionType: InteractiveAreaActionType = 'impassable';
@@ -218,7 +222,9 @@ export function useShapeCreationHandlers(
     if (!pendingCollisionAreaData || shape.geometry.type !== 'rectangle') return;
 
     const rect = shape.geometry;
-    const defaultName = pendingCollisionAreaData.name || `Area ${impassableAreas.length + 1}`;
+    // Count total areas (both interactive and impassable) to avoid duplicate names
+    const totalAreas = interactiveAreas.length + impassableAreas.length;
+    const defaultName = pendingCollisionAreaData.name || `Area ${totalAreas + 1}`;
 
     // Default to 'impassable' action type for collision rectangles
     const actionType: InteractiveAreaActionType = 'impassable';
@@ -251,6 +257,7 @@ export function useShapeCreationHandlers(
     setCurrentTool('select');
   }, [
     pendingCollisionAreaData,
+    interactiveAreas.length,
     impassableAreas.length,
     addInteractiveArea,
     setPendingCollisionAreaData,

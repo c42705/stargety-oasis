@@ -100,7 +100,7 @@ export const KonvaLayersPanel: React.FC<KonvaLayersPanelProps> = ({
       if (shape.category === 'interactive') {
         layerObj = {
           id: shape.id,
-          name: shape.name || `Interactive Area ${interactiveObjects.length + 1}`,
+          name: shape.name || shape.metadata?.name || `Area ${interactiveObjects.length + 1}`,
           type: 'interactive',
           visible: shape.visible !== false,
           shape

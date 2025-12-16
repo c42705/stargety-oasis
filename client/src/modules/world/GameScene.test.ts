@@ -103,7 +103,12 @@ describe('GameScene Multiplayer', () => {
         // Mock waitForConnection to simulate a successful connection
         mockWorldSocketService.waitForConnection.mockResolvedValue(true);
 
-        eventBus = { publish: jest.fn() };
+        eventBus = {
+            publish: jest.fn(),
+            subscribe: jest.fn().mockReturnValue(jest.fn()), // Mock subscribe that returns an unsubscribe function
+            unsubscribe: jest.fn(),
+            clear: jest.fn()
+        };
         
         // We need to bypass the constructor and manually initialize for testing
         gameScene = new GameScene(eventBus, localPlayerId, 'test-room', jest.fn());

@@ -23,9 +23,10 @@ import { GridConfig } from '../../types/ui.types';
 import { GRID_PATTERNS } from '../../constants/editorConstants';
 import { MapDataManager } from '../../../../components/MapDataManager';
 import { useMapData } from '../../../../shared/MapDataContext';
-import { useSharedMap } from '../../../../shared/useSharedMap';
+import { useMapStore } from '../../../../stores/useMapStore';
 import { useWorldDimensions } from '../../../../shared/useWorldDimensions';
 import { useAnimatedGifSettings } from '../../hooks/useAnimatedGifSettings';
+import { EnhancedBackgroundUpload } from '../EnhancedBackgroundUpload';
 
 const { Option } = Select;
 
@@ -58,8 +59,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   onPreviewModeChange
 }) => {
   const { mapData, updateInteractiveAreas } = useMapData();
-  // Auto-save is now controlled by the Redux store configuration
-  const sharedMap = useSharedMap({ source: 'editor' });
+  // Redux-based map store for persistence operations
+  const { setWorldDimensions, setBackgroundImage, saveMap } = useMapStore();
   const worldDimensions = useWorldDimensions();
   const [customMapSize, setCustomMapSize] = useState({
     width: mapData.worldDimensions.width,
@@ -68,6 +69,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [selectedPreset, setSelectedPreset] = useState<string>('custom');
   const [backgroundImageDimensions, setBackgroundImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [isApplyingBackgroundSize, setIsApplyingBackgroundSize] = useState(false);
+  const [uploadedImageDimensions, setUploadedImageDimensions] = useState<{ width: number; height: number } | null>(null);
 
   // Animated GIF settings
   const gifSettings = useAnimatedGifSettings();
@@ -142,8 +144,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       });
 
       if (updateResult.isValid) {
-        // Also update SharedMapSystem for persistence compatibility
-        await sharedMap.updateWorldDimensions(finalDimensions);
+        // Update Redux store for persistence
+        setWorldDimensions(finalDimensions);
         message.success(`Map size updated to ${finalDimensions.width}×${finalDimensions.height}`);
       } else {
         message.error('Failed to update map dimensions: ' + updateResult.errors.join(', '));
@@ -153,7 +155,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       logger.error('Failed to update map size', error);
       message.error('Failed to update map size');
     }
-  }, [mapData.interactiveAreas, updateInteractiveAreas, sharedMap, worldDimensions]);
+  }, [mapData.interactiveAreas, updateInteractiveAreas, setWorldDimensions, worldDimensions]);
 
   // Handle preset selection
   const handlePresetChange = useCallback((preset: string) => {
@@ -280,7 +282,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             return;
           }
 
-          // Save background image to SharedMapSystem
+          // Save background image to Redux store
           try {
             logger.info('SAVING BACKGROUND IMAGE TO MAP');
 
@@ -297,11 +299,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               return;
             }
 
-            // Update map data with background image (use validated dimensions)
-            await sharedMap.updateMapData({
-              backgroundImage: imageDataUrl,
-              backgroundImageDimensions: backgroundValidation.dimensions
-            });
+            // Update map data with background image via Redux store
+            setBackgroundImage(imageDataUrl, backgroundValidation.dimensions);
 
             logger.info('BACKGROUND IMAGE SAVED TO MAP DATA');
             // Store background dimensions in state for manual controls
@@ -361,7 +360,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         resolve();
       }
     });
-  }, [handleMapSizeChange, sharedMap, worldDimensions]);
+  }, [handleMapSizeChange, setBackgroundImage, worldDimensions]);
 
   // Handle reset to default map
   const handleResetToDefault = useCallback(async () => {
@@ -483,65 +482,70 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </Form.Item>
           )}
 
-          {/* Background Image Upload */}
+          {/* Enhanced Background Image Upload */}
           <Form.Item label="Background Image">
-            <Space>
-              <Upload
-                beforeUpload={handleImageUpload}
-                showUploadList={false}
-                accept="image/*"
-                multiple={false}
-                openFileDialogOnClick={true}
-                action="javascript:void(0);"
-              >
-                <Button icon={<UploadOutlined />}>
-                  Upload Background Image
-                </Button>
-              </Upload>
-
-              <Button
-                onClick={handleResetToDefault}
-                type="default"
-                danger
-              >
-                Reset
-              </Button>
-            </Space>
-
-            {/* Background Image Dimension Controls */}
-            <Space style={{ marginTop: '12px', width: '100%' }} direction="vertical">
+            <EnhancedBackgroundUpload
+              onUploadComplete={(dimensions) => {
+                setUploadedImageDimensions(dimensions);
+                setBackgroundImageDimensions(dimensions);
+              }}
+              onError={(error) => {
+                logger.error('Upload error from enhanced component', error);
+              }}
+            />
+            
+            {/* Legacy controls - hidden but available for fallback */}
+            <div style={{ display: 'none' }}>
               <Space>
-                <Button
-                  onClick={handleFetchBackgroundDimensions}
-                  type="dashed"
+                <Upload
+                  beforeUpload={handleImageUpload}
+                  showUploadList={false}
+                  accept="image/*"
+                  multiple={false}
+                  openFileDialogOnClick={true}
+                  action="javascript:void(0);"
                 >
-                  📏 Fetch Background Size
+                  <Button icon={<UploadOutlined />}>
+                    Upload Background Image (Legacy)
+                  </Button>
+                </Upload>
+
+                <Button
+                  onClick={handleResetToDefault}
+                  type="default"
+                  danger
+                >
+                  Reset
                 </Button>
+              </Space>
+
+              {/* Background Image Dimension Controls */}
+              <Space style={{ marginTop: '12px', width: '100%' }} direction="vertical">
+                <Space>
+                  <Button
+                    onClick={handleFetchBackgroundDimensions}
+                    type="dashed"
+                  >
+                    📏 Fetch Background Size
+                  </Button>
+                  {backgroundImageDimensions && (
+                    <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                      {backgroundImageDimensions.width}×{backgroundImageDimensions.height}
+                    </span>
+                  )}
+                </Space>
+                
                 {backgroundImageDimensions && (
-                  <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                    {backgroundImageDimensions.width}×{backgroundImageDimensions.height}
-                  </span>
+                  <Button
+                    onClick={handleApplyBackgroundSize}
+                    type="primary"
+                    loading={isApplyingBackgroundSize}
+                    style={{ width: '100%' }}
+                  >
+                    ✓ Apply Background Dimensions to Map
+                  </Button>
                 )}
               </Space>
-              
-              {backgroundImageDimensions && (
-                <Button
-                  onClick={handleApplyBackgroundSize}
-                  type="primary"
-                  loading={isApplyingBackgroundSize}
-                  style={{ width: '100%' }}
-                >
-                  ✓ Apply Background Dimensions to Map
-                </Button>
-              )}
-            </Space>
-
-            <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-              Supported formats: JPG, PNG, GIF. The map can be automatically resized to match the image dimensions.
-              <br />
-              Use "Fetch Background Size" to manually retrieve current background image dimensions.
-              <br />
-              Use "Reset to Default Map" to restore the original Zep-style background and layout.
             </div>
           </Form.Item>
         </Form>

@@ -1,10 +1,10 @@
 /**
  * Map Data Manager Component
- * 
+ *
  * This component provides UI for managing map data including export, import,
- * backup, and restore functionality. It integrates with the SharedMapSystem
+ * backup, and restore functionality. It integrates with the Redux mapSlice
  * to provide comprehensive map data management.
- * 
+ *
  * TODO: Future Enhancements
  * - Add cloud storage integration for map sharing
  * - Implement map versioning and diff visualization
@@ -18,7 +18,6 @@ import { App, Alert, Button, Card, Space, Typography, Upload } from 'antd';
 import { UploadOutlined, DownloadOutlined, InboxOutlined, CopyOutlined } from '@ant-design/icons';
 import { useMapStore } from '../stores/useMapStore';
 import { useMapStoreInit } from '../stores/useMapStoreInit';
-import { SharedMapSystem } from '../shared/SharedMapSystem';
 
 interface MapDataManagerProps {
   className?: string;

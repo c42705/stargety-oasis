@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Phaser from 'phaser';
 import { useEventBus } from '../../shared/EventBusContext';
 import { useAuth } from '../../shared/AuthContext';
-import { SharedMapSystem } from '../../shared/SharedMapSystem';
+import { useMapStore } from '../../stores/useMapStore';
 import WorldZoomControls from './WorldZoomControls';
 import { makeFocusable, addClickToFocus } from '../../shared/keyboardFocusUtils';
 import { GameScene } from './GameScene';
@@ -33,6 +33,7 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
   const phaserGameRef = useRef<Phaser.Game | null>(null);
   const gameSceneRef = useRef<GameScene | null>(null);
   const { user } = useAuth();
+  const { mapData } = useMapStore();
 
   // Zoom control state
   const [canZoomIn, setCanZoomIn] = useState(true);
@@ -111,29 +112,36 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
     }
   }, [isCameraFollowing, updateZoomState]);
 
-  const handleAreaClick = useCallback((areaId: string) => {
-    const sharedMapSystem = SharedMapSystem.getInstance();
-    const mapData = sharedMapSystem.getMapData();
+  // Use refs to avoid recreating Phaser when dependencies change
+  const mapDataRef = useRef(mapData);
+  mapDataRef.current = mapData;
 
-    if (mapData) {
-      const area = mapData.interactiveAreas.find(a => a.id === areaId);
+  const eventBusRef = useRef(eventBus);
+  eventBusRef.current = eventBus;
+
+  const handleAreaClick = useCallback((areaId: string) => {
+    const currentMapData = mapDataRef.current;
+    const currentEventBus = eventBusRef.current;
+    if (currentMapData && currentEventBus) {
+      const area = currentMapData.interactiveAreas.find(a => a.id === areaId);
       if (area) {
-        eventBus.publish('area-selected', {
+        currentEventBus.publish('area-selected', {
           areaId: area.id,
           areaName: area.name,
           roomId: area.id
         });
       }
     }
-  }, [eventBus]);
+  }, []);
 
+  // Initialize Phaser only once on mount
   useEffect(() => {
     if (!gameRef.current || phaserGameRef.current) {
       return;
     }
 
     const worldRoomId = user?.worldRoomId || 'Stargety-Oasis-1';
-    const gameScene = new GameScene(eventBus, user?.username || playerId, worldRoomId, handleAreaClick);
+    const gameScene = new GameScene(eventBusRef.current, user?.username || playerId, worldRoomId, handleAreaClick);
     gameSceneRef.current = gameScene;
 
     const config: Phaser.Types.Core.GameConfig = {
@@ -234,7 +242,8 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
         delete (window as any).phaserGame;
       }
     };
-  }, [eventBus, user?.username, playerId, handleAreaClick, updateZoomState]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerId]); // Only reinitialize if playerId changes - other values use refs
 
   // Update map areas visibility when showMapAreas prop changes
   useEffect(() => {
@@ -242,6 +251,14 @@ export const WorldModule: React.FC<WorldModuleProps> = ({
       gameSceneRef.current.setMapAreasVisibility(showMapAreas);
     }
   }, [showMapAreas]);
+
+  // Pass Redux mapData to GameScene when it changes
+  useEffect(() => {
+    if (gameSceneRef.current && mapData) {
+      gameSceneRef.current.updateMapData(mapData);
+      logger.debug('[WorldModule] Passed mapData to GameScene');
+    }
+  }, [mapData]);
 
   return (
     <div className={`world-module ${className}`} style={{ height: '100%', width: '100%' }}>

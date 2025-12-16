@@ -55,6 +55,14 @@ export class InteractiveAreaActionDispatcher {
       return;
     }
 
+    logger.debug('[ActionDispatcher] Area entered event received', {
+      areaId: data.areaId,
+      areaName: data.areaName,
+      actionType: area.actionType,
+      areaConfig: area.actionConfig,
+      shapeType: area.shapeType,
+      hasJitsiConfig: !!(area.actionConfig && (area.actionConfig as any).autoJoinOnEntry !== false)
+    });
     logger.info('[ActionDispatcher] Area entered', { name: area.name, actionType: area.actionType });
     this.dispatchAction(area, 'enter');
   };
@@ -103,14 +111,25 @@ export class InteractiveAreaActionDispatcher {
     const config = area.actionConfig as JitsiActionConfig | null;
     const roomName = getJitsiRoomNameForArea(area);
 
+    logger.debug('[ActionDispatcher] Handling Jitsi action', {
+      areaName: area.name,
+      trigger,
+      config,
+      roomName,
+      autoJoinOnEntry: config?.autoJoinOnEntry,
+      autoLeaveOnExit: config?.autoLeaveOnExit
+    });
+
     if (trigger === 'enter' && config?.autoJoinOnEntry !== false) {
       this.currentJitsiArea = area;
       // Emit jitsi:join event for VideoCommunicationPanel to handle
+      logger.info('[ActionDispatcher] Emitting jitsi:join event', { roomName, areaName: area.name });
       this.config.eventBus.publish('jitsi:join', { roomName, areaName: area.name });
     } else if (trigger === 'exit' && config?.autoLeaveOnExit !== false) {
       if (this.currentJitsiArea?.id === area.id) {
         this.currentJitsiArea = null;
         // Emit jitsi:leave event for VideoCommunicationPanel to handle
+        logger.info('[ActionDispatcher] Emitting jitsi:leave event', { areaName: area.name });
         this.config.eventBus.publish('jitsi:leave', { areaName: area.name });
       }
     }

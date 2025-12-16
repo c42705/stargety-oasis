@@ -208,66 +208,6 @@ export const useMapMetadata = () => {
 };
 
 /**
- * Comprehensive hook that provides the same interface as useSharedMap
- * for backward compatibility during migration
- */
-export const useMapStoreCompat = () => {
-  const mapOperations = useMapOperations();
-  const areaActions = useInteractiveAreaActions();
-  const collisionActions = useCollisionAreaActions();
-  const configuration = useMapConfiguration();
-  const metadata = useMapMetadata();
-
-  const { mapData } = useMapStore();
-
-  return {
-    // Map data
-    mapData,
-    isLoading: mapOperations.isLoading,
-    error: mapOperations.error,
-    
-    // Interactive areas
-    interactiveAreas: mapData?.interactiveAreas || [],
-    addInteractiveArea: areaActions.addInteractiveArea,
-    updateInteractiveArea: areaActions.updateInteractiveArea,
-    removeInteractiveArea: areaActions.removeInteractiveArea,
-    
-    // Collision areas
-    collisionAreas: mapData?.impassableAreas || [],
-    addCollisionArea: collisionActions.addCollisionArea,
-    updateCollisionArea: collisionActions.updateCollisionArea,
-    removeCollisionArea: collisionActions.removeCollisionArea,
-    
-    // Map operations
-    saveMap: mapOperations.saveMap,
-    loadMap: mapOperations.loadMap,
-    exportMap: mapOperations.exportMap,
-    importMap: mapOperations.importMap,
-    updateWorldDimensions: configuration.setWorldDimensions,
-    updateMapData: async (updates: any) => {
-      // Handle partial updates for compatibility
-      if (updates.interactiveAreas) {
-        areaActions.setInteractiveAreas(updates.interactiveAreas);
-      }
-      if (updates.impassableAreas) {
-        collisionActions.setCollisionAreas(updates.impassableAreas);
-      }
-      if (updates.backgroundImage) {
-        configuration.setBackgroundImage(updates.backgroundImage, updates.backgroundImageDimensions);
-      }
-      if (updates.worldDimensions) {
-        configuration.setWorldDimensions(updates.worldDimensions);
-      }
-    },
-    
-    // Utilities
-    getMapStatistics: metadata.statistics,
-    clearError: mapOperations.clearError,
-    refresh: mapOperations.loadMap
-  };
-};
-
-/**
  * Auto-save hook that can be used to automatically save changes
  */
 export const useAutoSave = (enabled: boolean = true, delay: number = 5000) => {

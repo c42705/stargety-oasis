@@ -1,23 +1,26 @@
 import Phaser from 'phaser';
-import { SharedMapSystem } from '../../shared/SharedMapSystem';
+import { MapData } from '../../shared/MapDataContext';
 import { logger } from '../../shared/logger';
 
 /**
  * CollisionSystem - Handles all collision detection for the game world
- * 
+ *
  * Responsibilities:
  * - Polygon collision detection
  * - Point-in-polygon checks
  * - Impassable area collision detection
  * - Interactive area collision detection
  * - Area entry/exit event handling
+ *
+ * REFACTORED (2025-12-15): Removed SharedMapSystem dependency.
+ * Now receives mapData via callback from parent component.
  */
 export class CollisionSystem {
   private scene: Phaser.Scene;
-  private sharedMapSystem: SharedMapSystem;
   private eventBus: any;
   private onAreaClick: (areaId: string) => void;
-  
+  private getMapData: () => MapData | null;
+
   // Area tracking
   private currentArea: string | null = null;
   private previousArea: string | null = null;
@@ -25,12 +28,13 @@ export class CollisionSystem {
   constructor(
     scene: Phaser.Scene,
     eventBus: any,
-    onAreaClick: (areaId: string) => void
+    onAreaClick: (areaId: string) => void,
+    getMapData: () => MapData | null
   ) {
     this.scene = scene;
     this.eventBus = eventBus;
     this.onAreaClick = onAreaClick;
-    this.sharedMapSystem = SharedMapSystem.getInstance();
+    this.getMapData = getMapData;
   }
 
   /**
@@ -88,17 +92,13 @@ export class CollisionSystem {
 
   /**
    * Check if player position would collide with any impassable areas
+   * Checks BOTH legacy impassableAreas AND interactiveAreas with actionType: 'impassable'
    */
   public checkCollisionWithImpassableAreas(x: number, y: number, playerSize: number): boolean {
-    const mapData = this.sharedMapSystem.getMapData();
+    const mapData = this.getMapData();
     if (!mapData) {
       logger.warn('[Collision] NO MAP DATA available for collision check!');
-      return false; // No collision data available
-    }
-    
-    if (!mapData.impassableAreas || mapData.impassableAreas.length === 0) {
-      logger.warn('[Collision] NO IMPASSABLE AREAS in map data! impassableAreas:', mapData.impassableAreas);
-      return false; // No collision areas defined
+      return false;
     }
 
     // Player bounding box (centered on player position)
@@ -107,60 +107,83 @@ export class CollisionSystem {
     const playerTop = y - playerSize / 2;
     const playerBottom = y + playerSize / 2;
 
+    // Get InteractiveAreas with actionType: 'impassable' (new unified approach)
+    const impassableInteractiveAreas = (mapData.interactiveAreas || []).filter(
+      area => area.actionType === 'impassable'
+    );
+
+    // Combine with legacy impassableAreas for backward compatibility
+    const legacyImpassableAreas = mapData.impassableAreas || [];
+    const totalImpassableCount = impassableInteractiveAreas.length + legacyImpassableAreas.length;
+
+    if (totalImpassableCount === 0) {
+      return false; // No collision areas defined
+    }
+
     // Debug logging (5% sample rate)
     if (Math.random() < 0.05) {
       logger.debug('[Collision] Checking impassable areas:', {
-        totalAreas: mapData.impassableAreas.length,
-        polygonAreas: mapData.impassableAreas.filter(a => a.type === 'impassable-polygon').length,
-        rectangleAreas: mapData.impassableAreas.filter(a => a.type !== 'impassable-polygon').length,
+        interactiveImpassable: impassableInteractiveAreas.length,
+        legacyImpassable: legacyImpassableAreas.length,
         playerPos: { x, y },
-        playerBounds: { left: playerLeft, right: playerRight, top: playerTop, bottom: playerBottom }
       });
     }
 
-    // Check collision with each impassable area
-    for (const area of mapData.impassableAreas) {
-      // Check if this is a polygon type
-      if (area.type === 'impassable-polygon' && area.points && area.points.length > 0) {
-        // First: Quick AABB check using bounding box
+    // Check collision with InteractiveAreas that have actionType: 'impassable'
+    for (const area of impassableInteractiveAreas) {
+      if (area.shapeType === 'polygon' && area.points && area.points.length > 0) {
+        // Polygon collision check
         const areaLeft = area.x;
         const areaRight = area.x + area.width;
         const areaTop = area.y;
         const areaBottom = area.y + area.height;
 
-        if (playerLeft < areaRight &&
-            playerRight > areaLeft &&
-            playerTop < areaBottom &&
-            playerBottom > areaTop) {
-          // Bounding boxes overlap, now do precise polygon collision check
+        if (playerLeft < areaRight && playerRight > areaLeft &&
+            playerTop < areaBottom && playerBottom > areaTop) {
           if (this.checkPolygonCollision(area.points, playerLeft, playerRight, playerTop, playerBottom)) {
-            logger.debug('[Collision] POLYGON collision detected!', {
-              areaId: area.id,
-              areaName: area.name,
-              playerPos: { x, y }
-            });
+            logger.debug('[Collision] POLYGON (interactive) collision detected!', { areaId: area.id });
             return true;
           }
         }
       } else {
-        // Regular rectangular collision (default behavior)
+        // Rectangle collision check
         const areaLeft = area.x;
         const areaRight = area.x + area.width;
         const areaTop = area.y;
         const areaBottom = area.y + area.height;
 
-        // Check for overlap using AABB (Axis-Aligned Bounding Box) collision detection
-        if (playerLeft < areaRight &&
-            playerRight > areaLeft &&
-            playerTop < areaBottom &&
-            playerBottom > areaTop) {
-          // Collision detected
-          logger.warn('[Collision] RECTANGLE collision detected!', {
-            areaId: area.id,
-            areaName: area.name,
-            playerPos: { x, y },
-            areaBounds: { x: area.x, y: area.y, width: area.width, height: area.height }
-          });
+        if (playerLeft < areaRight && playerRight > areaLeft &&
+            playerTop < areaBottom && playerBottom > areaTop) {
+          logger.debug('[Collision] RECTANGLE (interactive) collision detected!', { areaId: area.id });
+          return true;
+        }
+      }
+    }
+
+    // Check collision with legacy impassableAreas (backward compatibility)
+    for (const area of legacyImpassableAreas) {
+      if (area.type === 'polygon' && area.points && area.points.length > 0) {
+        const areaLeft = area.x;
+        const areaRight = area.x + area.width;
+        const areaTop = area.y;
+        const areaBottom = area.y + area.height;
+
+        if (playerLeft < areaRight && playerRight > areaLeft &&
+            playerTop < areaBottom && playerBottom > areaTop) {
+          if (this.checkPolygonCollision(area.points, playerLeft, playerRight, playerTop, playerBottom)) {
+            logger.debug('[Collision] POLYGON (legacy) collision detected!', { areaId: area.id });
+            return true;
+          }
+        }
+      } else {
+        const areaLeft = area.x;
+        const areaRight = area.x + area.width;
+        const areaTop = area.y;
+        const areaBottom = area.y + area.height;
+
+        if (playerLeft < areaRight && playerRight > areaLeft &&
+            playerTop < areaBottom && playerBottom > areaTop) {
+          logger.debug('[Collision] RECTANGLE (legacy) collision detected!', { areaId: area.id });
           return true;
         }
       }
@@ -178,8 +201,8 @@ export class CollisionSystem {
       return;
     }
 
-    // Get areas from SharedMapSystem (localStorage) instead of hardcoded data
-    const mapData = this.sharedMapSystem.getMapData();
+    // Get areas from Redux store via callback
+    const mapData = this.getMapData();
 
     if (!mapData) {
       return; // No map data available
@@ -191,11 +214,35 @@ export class CollisionSystem {
     // Find which area player is currently in
     areas.forEach(area => {
       // Check if player is within area bounds
-      if (player.x >= area.x &&
+      const isWithinBounds = player.x >= area.x &&
           player.x <= area.x + area.width &&
           player.y >= area.y &&
-          player.y <= area.y + area.height) {
+          player.y <= area.y + area.height;
+      
+      // For polygon areas, use precise collision detection
+      let isActuallyInArea = isWithinBounds;
+      if (area.shapeType === 'polygon' && area.points && area.points.length > 0) {
+        isActuallyInArea = this.checkPolygonCollision(
+          area.points,
+          player.x - 16, // player size / 2
+          player.x + 16, // player size / 2
+          player.y - 16, // player size / 2
+          player.y + 16  // player size / 2
+        );
+      }
+      
+      if (isActuallyInArea) {
         currentlyInArea = area.id;
+        logger.debug('[Collision] Player entered area', {
+          areaId: area.id,
+          areaName: area.name,
+          shapeType: area.shapeType,
+          actionType: area.actionType,
+          playerPos: { x: player.x, y: player.y },
+          areaBounds: { x: area.x, y: area.y, width: area.width, height: area.height },
+          isPolygon: area.shapeType === 'polygon',
+          hasPoints: !!(area.points && area.points.length > 0)
+        });
       }
     });
 

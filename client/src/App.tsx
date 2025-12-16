@@ -10,7 +10,7 @@ import { AuthProvider, useAuth } from './shared/AuthContext';
 import { MapDataProvider } from './shared/MapDataContext';
 import { ActionDispatcherProvider } from './shared/ActionDispatcherProvider';
 import { ThemeProvider, useTheme } from './shared/ThemeContext';
-import { MapSynchronizer } from './shared/MapSynchronizer';
+
 import { ModalStateProvider } from './shared/ModalStateManager';
 import { WorldModule } from './modules/world/WorldModule';
 import SimpleWorldModuleDemo from './modules/simple-world-test/SimpleWorldModuleDemo';
@@ -94,8 +94,7 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <EventBusProvider>
-      <div className="App" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="App" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
         <Layout.Header style={{
           background: 'var(--color-bg-secondary)',
@@ -269,8 +268,7 @@ const AppContent: React.FC = () => {
           <PeopleTab />
         </Modal>
       </div>
-    </EventBusProvider>
-  );
+    );
 };
 
 // Main App wrapper component with authentication
@@ -286,20 +284,7 @@ const AuthenticatedApp: React.FC = () => {
       <EventBusProvider>
         <MapDataProvider>
           <ActionDispatcherProvider>
-            <MapSynchronizer
-              enableCrossTabSync={true}
-              syncDebounceMs={100}
-              onSyncError={(error) => {
-                logger.error('Map synchronization error', error);
-                // TODO: Add user-visible error notification
-              }}
-              onSyncSuccess={() => {
-                logger.info('Map synchronized successfully');
-                // TODO: Add user-visible success notification
-              }}
-            >
-              <AppContent />
-            </MapSynchronizer>
+            <AppContent />
           </ActionDispatcherProvider>
         </MapDataProvider>
       </EventBusProvider>

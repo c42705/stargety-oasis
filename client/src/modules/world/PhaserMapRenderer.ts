@@ -13,13 +13,13 @@
  */
 
 import Phaser from 'phaser';
-import { SharedMapSystem, SharedMapData } from '../../shared/SharedMapSystem';
-import { InteractiveArea, ImpassableArea, Asset } from '../../shared/MapDataContext';
+import { InteractiveArea, ImpassableArea, Asset, MapData } from '../../shared/MapDataContext';
 import { shouldBlockBackgroundInteractions } from '../../shared/ModalStateManager';
 import { logger } from '../../shared/logger';
 
 export interface PhaserMapRendererConfig {
   scene: Phaser.Scene;
+  mapData?: MapData | null; // Optional initial map data from Redux
   enablePhysics?: boolean;
   enableInteractions?: boolean;
   debugMode?: boolean;
@@ -27,8 +27,7 @@ export interface PhaserMapRendererConfig {
 
 export class PhaserMapRenderer {
   private scene: Phaser.Scene;
-  private sharedMapSystem: SharedMapSystem;
-  private mapData: SharedMapData | null = null;
+  private mapData: MapData | null = null;
 
   // Phaser groups for different map elements
   private interactiveAreasGroup!: Phaser.GameObjects.Group;
@@ -52,14 +51,16 @@ export class PhaserMapRenderer {
   // Simplified texture management (no caching)
   private textureCache: Map<string, { key: string; timestamp: number; size: number }> = new Map();
 
+  // Lifecycle flag to prevent async callbacks from executing after destroy
+  private isDestroyed: boolean = false;
+
   constructor(config: PhaserMapRendererConfig) {
     this.scene = config.scene;
     this.enablePhysics = config.enablePhysics ?? true;
     this.enableInteractions = config.enableInteractions ?? true;
     this.debugMode = config.debugMode ?? false;
-    
-    this.sharedMapSystem = SharedMapSystem.getInstance();
-    // Defer group and event listener initialization until the scene is fully
+    this.mapData = config.mapData ?? null;
+    // Defer group initialization until the scene is fully
     // initialized to avoid cases where `scene.add` / renderer systems are not
     // yet available and cause `null`-access errors in Phaser internals.
   }
@@ -102,87 +103,43 @@ export class PhaserMapRenderer {
   /**
    * Get current map data for collision detection
    */
-  public getMapData(): SharedMapData | null {
+  public getMapData(): MapData | null {
     return this.mapData;
   }
 
   /**
-   * Set up event listeners for map data changes
+   * Update map data from external source (Redux)
+   * Call this when Redux mapData changes to re-render
    */
-  private setupEventListeners(): void {
-    const handleMapChanged = (data: any) => {
-      this.mapData = data.mapData;
+  public updateMapData(newMapData: MapData | null): void {
+    if (this.isDestroyed) return;
+    this.mapData = newMapData;
+    if (this.mapData) {
       this.renderMap();
-    };
-
-    const handleMapLoaded = (data: any) => {
-      this.mapData = data.mapData;
-      this.renderMap();
-    };
-
-    const handleElementAdded = (data: any) => {
-      if (data.type === 'interactive') {
-        this.addInteractiveArea(data.element);
-      } else if (data.type === 'collision') {
-        this.addCollisionArea(data.element);
-      }
-    };
-
-    const handleElementUpdated = (data: any) => {
-      if (data.type === 'interactive') {
-        this.updateInteractiveArea(data.element);
-      } else if (data.type === 'collision') {
-        this.updateCollisionArea(data.element);
-      }
-    };
-
-    const handleElementRemoved = (data: any) => {
-      if (data.type === 'interactive') {
-        this.removeInteractiveArea(data.element.id);
-      } else if (data.type === 'collision') {
-        this.removeCollisionArea(data.element.id);
-      }
-    };
-
-    // Subscribe to events
-    this.sharedMapSystem.on('map:changed', handleMapChanged);
-    this.sharedMapSystem.on('map:loaded', handleMapLoaded);
-    this.sharedMapSystem.on('map:element:added', handleElementAdded);
-    this.sharedMapSystem.on('map:element:updated', handleElementUpdated);
-    this.sharedMapSystem.on('map:element:removed', handleElementRemoved);
-
-    // Store cleanup functions
-    this.eventListeners.push(
-      () => this.sharedMapSystem.off('map:changed', handleMapChanged),
-      () => this.sharedMapSystem.off('map:loaded', handleMapLoaded),
-      () => this.sharedMapSystem.off('map:element:added', handleElementAdded),
-      () => this.sharedMapSystem.off('map:element:updated', handleElementUpdated),
-      () => this.sharedMapSystem.off('map:element:removed', handleElementRemoved)
-    );
+    }
   }
 
   /**
-   * Initialize the renderer and load map data
+   * Initialize the renderer and prepare Phaser groups
+   * Map data is now provided via constructor or updateMapData() from Redux
    */
   public async initialize(): Promise<void> {
     try {
       logger.debug('[PhaserMapRenderer] initialize START');
 
-      // Ensure Phaser groups and event listeners are created when the scene
+      // Ensure Phaser groups are created when the scene
       // systems are ready (preload/create lifecycle). This prevents calls to
       // `this.scene.add` or texture creation when the renderer is not set.
       this.initializeGroups();
-      this.setupEventListeners();
 
-      logger.debug('[PhaserMapRenderer] SharedMapSystem.initialize() about to be awaited');
-      await this.sharedMapSystem.initialize();
-      logger.debug('[PhaserMapRenderer] SharedMapSystem.initialize() completed');
-      this.mapData = this.sharedMapSystem.getMapData();
+      logger.debug('[PhaserMapRenderer] Groups initialized');
+
+      // Render map if data was provided in constructor
       if (this.mapData) {
         logger.debug('[PhaserMapRenderer] mapData available, calling renderMap');
         this.renderMap();
       } else {
-        logger.debug('[PhaserMapRenderer] mapData is null after SharedMapSystem.initialize');
+        logger.debug('[PhaserMapRenderer] mapData is null - waiting for updateMapData() call');
       }
     } catch (error) {
       console.error('Failed to initialize PhaserMapRenderer:', error);
@@ -247,11 +204,14 @@ export class PhaserMapRenderer {
       return;
     }
 
-    // Removed: Non-critical rendering background log.
-
     // Check if we have a background image
     if (this.mapData.backgroundImage) {
-      // Removed: Non-critical rendering background image log.
+      // Guard: ensure scene and texture system are available
+      if (!this.isSceneValid() || !this.scene.textures) {
+        logger.warn('[PhaserMapRenderer] renderBackground: scene not ready for texture operations');
+        this.renderDefaultBackground();
+        return;
+      }
 
       try {
         // Create a simple texture key
@@ -264,6 +224,10 @@ export class PhaserMapRenderer {
           // Create texture from base64 data URL
           this.scene.textures.addBase64(textureKey, this.mapData.backgroundImage);
           setTimeout(() => {
+            // Guard: check if destroyed or scene invalid before proceeding
+            if (this.isDestroyed || !this.isSceneValid()) {
+              return;
+            }
             if (this.scene.textures.exists(textureKey)) {
               this.createSimpleBackground(textureKey);
             } else {
@@ -275,6 +239,10 @@ export class PhaserMapRenderer {
           this.scene.load.image(textureKey, this.mapData.backgroundImage);
           this.scene.load.start();
           this.scene.load.once('filecomplete-image-' + textureKey, () => {
+            // Guard: check if destroyed or scene invalid before proceeding
+            if (this.isDestroyed || !this.isSceneValid()) {
+              return;
+            }
             this.createSimpleBackground(textureKey);
           });
         }
@@ -284,7 +252,6 @@ export class PhaserMapRenderer {
         this.renderDefaultBackground();
       }
     } else {
-      // Removed: Non-critical no background image log.
       this.renderDefaultBackground();
     }
   }
@@ -328,33 +295,70 @@ export class PhaserMapRenderer {
    * Create background image with simple scaling (simplified approach)
    */
   private createSimpleBackground(textureKey: string): void {
-    // Removed: Non-critical background creation log.
-
     if (!this.mapData) {
       console.error('🖼️ BACKGROUND: Cannot create background - no map data');
       return;
     }
 
+    // Guard: ensure scene.add is available
+    if (!this.isSceneValid() || !(this.scene as any).add) {
+      logger.warn('[PhaserMapRenderer] createSimpleBackground: scene.add not available');
+      return;
+    }
+
     const worldWidth = this.mapData.worldDimensions.width;
     const worldHeight = this.mapData.worldDimensions.height;
+    const bgDimensions = this.mapData.backgroundImageDimensions;
 
     try {
       // Create background image at origin
       const backgroundImage = this.scene.add.image(0, 0, textureKey);
       backgroundImage.setOrigin(0, 0);
 
-      // Scale to fit world dimensions
-      const scaleX = worldWidth / backgroundImage.width;
-      const scaleY = worldHeight / backgroundImage.height;
+      // Calculate aspect ratios
+      const imageAspect = backgroundImage.width / backgroundImage.height;
+      const worldAspect = worldWidth / worldHeight;
+
+      let scaleX, scaleY, offsetX = 0, offsetY = 0;
+
+      if (imageAspect > worldAspect) {
+        // Image is wider than world - fit to height, center horizontally
+        scaleY = worldHeight / backgroundImage.height;
+        scaleX = scaleY;
+        offsetX = (worldWidth - backgroundImage.width * scaleX) / 2;
+      } else {
+        // Image is taller than world - fit to width, center vertically
+        scaleX = worldWidth / backgroundImage.width;
+        scaleY = scaleX;
+        offsetY = (worldHeight - backgroundImage.height * scaleY) / 2;
+      }
+
+      // Apply scaling with centering offset
       backgroundImage.setScale(scaleX, scaleY);
+      backgroundImage.setPosition(offsetX, offsetY);
+
+      // Log dimension comparison for debugging scale issues
+      logger.debug('[PhaserMapRenderer] Background created with aspect ratio preservation', {
+        textureKey,
+        textureSize: { width: backgroundImage.width, height: backgroundImage.height },
+        worldDimensions: { width: worldWidth, height: worldHeight },
+        backgroundImageDimensions: bgDimensions,
+        imageAspect,
+        worldAspect,
+        appliedScale: { scaleX, scaleY },
+        centerOffset: { offsetX, offsetY },
+        dimensionsMatch: bgDimensions
+          ? (bgDimensions.width === worldWidth && bgDimensions.height === worldHeight)
+          : 'no bgDimensions stored'
+      });
 
       // Set depth behind other elements
       backgroundImage.setDepth(-1000);
 
-      // Add to background group
-      this.backgroundGroup.add(backgroundImage);
-
-      // Removed: Non-critical background image created log.
+      // Add to background group (with safety check)
+      if (this.backgroundGroup?.scene) {
+        this.backgroundGroup.add(backgroundImage);
+      }
 
     } catch (error) {
       logger.error('Error in createSimpleBackground', error);
@@ -379,6 +383,12 @@ export class PhaserMapRenderer {
    * Add a single asset to the scene
    */
   private addAsset(asset: Asset): void {
+    // Guard: ensure scene and texture system are available
+    if (!this.isSceneValid() || !this.scene.textures) {
+      logger.warn('[PhaserMapRenderer] addAsset: scene not ready', { assetId: asset.id });
+      return;
+    }
+
     try {
       // Create unique texture key for this asset
       const textureKey = `asset_${asset.id}_${Date.now()}`;
@@ -390,6 +400,10 @@ export class PhaserMapRenderer {
 
         // Wait for texture to be ready, then create the image
         setTimeout(() => {
+          // Guard: check if destroyed or scene invalid before proceeding
+          if (this.isDestroyed || !this.isSceneValid()) {
+            return;
+          }
           if (this.scene.textures.exists(textureKey)) {
             this.createAssetImage(asset, textureKey);
           } else {
@@ -408,6 +422,12 @@ export class PhaserMapRenderer {
    * Create the Phaser image for an asset
    */
   private createAssetImage(asset: Asset, textureKey: string): void {
+    // Guard: ensure scene.add is available
+    if (!this.isSceneValid() || !(this.scene as any).add) {
+      logger.warn('[PhaserMapRenderer] createAssetImage: scene.add not available', { assetId: asset.id });
+      return;
+    }
+
     try {
       // Create the image at the asset's position
       const image = this.scene.add.image(asset.x, asset.y, textureKey);
@@ -432,8 +452,10 @@ export class PhaserMapRenderer {
       // Set depth to be above background but below interactive/collision areas
       image.setDepth(2);
 
-      // Add to assets group and track
-      this.assetsGroup.add(image);
+      // Add to assets group and track (with safety check)
+      if (this.assetsGroup?.scene) {
+        this.assetsGroup.add(image);
+      }
       this.assetObjects.set(asset.id, image);
 
       logger.debug('Asset image created', {
@@ -491,6 +513,8 @@ export class PhaserMapRenderer {
     // Create visual representation with visibility based on debug mode
     const fillAlpha = this.debugMode ? 0.7 : 0;
     const areaColor = area.color || '#00ff00';
+    const colorValue = Phaser.Display.Color.HexStringToColor(areaColor).color;
+
     // Guard: ensure scene.add is available before creating GameObjects
     if (!this.scene || !(this.scene as any).add) {
       logger.error('[PhaserMapRenderer] addInteractiveArea: scene.add is not available', {
@@ -502,37 +526,67 @@ export class PhaserMapRenderer {
       return;
     }
 
-    const rect = (this.scene as any).add.rectangle(
-      area.x + area.width / 2,
-      area.y + area.height / 2,
-      area.width,
-      area.height,
-      Phaser.Display.Color.HexStringToColor(areaColor).color,
-      fillAlpha
-    );
+    let shapeObject: Phaser.GameObjects.Shape | Phaser.GameObjects.Graphics;
 
-    // Add border (visible only in debug mode)
-    if (this.debugMode) {
-      rect.setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(areaColor).color);
+    // Check if this is a polygon shape
+    if (area.shapeType === 'polygon' && area.points && area.points.length > 2) {
+      // Create polygon using Graphics object
+      const graphics = this.scene.add.graphics();
+      graphics.fillStyle(colorValue, fillAlpha);
+      if (this.debugMode) {
+        graphics.lineStyle(2, colorValue, 1);
+      }
+
+      graphics.beginPath();
+      graphics.moveTo(area.points[0].x, area.points[0].y);
+      for (let i = 1; i < area.points.length; i++) {
+        graphics.lineTo(area.points[i].x, area.points[i].y);
+      }
+      graphics.closePath();
+      graphics.fillPath();
+      if (this.debugMode) {
+        graphics.strokePath();
+      }
+
+      shapeObject = graphics;
+    } else {
+      // Create rectangle (default behavior)
+      const rect = (this.scene as any).add.rectangle(
+        area.x + area.width / 2,
+        area.y + area.height / 2,
+        area.width,
+        area.height,
+        colorValue,
+        fillAlpha
+      );
+
+      // Add border (visible only in debug mode)
+      if (this.debugMode) {
+        rect.setStrokeStyle(2, colorValue);
+      }
+
+      shapeObject = rect;
     }
 
     // Add text label (visible only in debug mode)
-    const text = this.scene.add.text(
-      area.x + area.width / 2,
-      area.y + area.height / 2,
-      area.name,
-      {
-        fontSize: '14px',
-        color: '#ffffff',
-        align: 'center',
-        fontFamily: 'Arial, sans-serif'
-      }
-    );
+    const textX = area.shapeType === 'polygon' && area.points?.length
+      ? area.points.reduce((sum, p) => sum + p.x, 0) / area.points.length
+      : area.x + area.width / 2;
+    const textY = area.shapeType === 'polygon' && area.points?.length
+      ? area.points.reduce((sum, p) => sum + p.y, 0) / area.points.length
+      : area.y + area.height / 2;
+
+    const text = this.scene.add.text(textX, textY, area.name, {
+      fontSize: '14px',
+      color: '#ffffff',
+      align: 'center',
+      fontFamily: 'Arial, sans-serif'
+    });
     text.setOrigin(0.5, 0.5);
     text.setAlpha(this.debugMode ? 1 : 0);
 
     // Create container for grouping
-    const container = this.scene.add.container(0, 0, [rect, text]);
+    const container = this.scene.add.container(0, 0, [shapeObject, text]);
 
     // Add metadata
     (container as any).mapElementId = area.id;
@@ -541,32 +595,39 @@ export class PhaserMapRenderer {
 
     // Enable interactions if configured (always interactive, even when invisible)
     if (this.enableInteractions) {
-      rect.setInteractive();
-      rect.on('pointerdown', () => {
-        // Don't handle area clicks if modals are blocking background interactions
+      // For polygons, create an invisible rectangle hit area for interaction
+      const hitRect = (this.scene as any).add.rectangle(
+        area.x + area.width / 2,
+        area.y + area.height / 2,
+        area.width,
+        area.height,
+        0x000000,
+        0
+      );
+      hitRect.setInteractive();
+      hitRect.on('pointerdown', () => {
         if (!shouldBlockBackgroundInteractions()) {
           this.handleInteractiveAreaClick(area);
         }
       });
-
-      rect.on('pointerover', () => {
-        if (this.debugMode) {
-          rect.setAlpha(1);
+      hitRect.on('pointerover', () => {
+        if (this.debugMode && shapeObject instanceof Phaser.GameObjects.Shape) {
+          shapeObject.setAlpha(1);
         }
         this.scene.input.setDefaultCursor('pointer');
       });
-
-      rect.on('pointerout', () => {
-        if (this.debugMode) {
-          rect.setAlpha(0.7);
+      hitRect.on('pointerout', () => {
+        if (this.debugMode && shapeObject instanceof Phaser.GameObjects.Shape) {
+          shapeObject.setAlpha(0.7);
         }
         this.scene.input.setDefaultCursor('default');
       });
+      container.add(hitRect);
     }
 
     // Add physics if enabled
-    if (this.enablePhysics && this.scene.physics) {
-      this.scene.physics.add.existing(rect, true); // true = static body
+    if (this.enablePhysics && this.scene.physics && shapeObject instanceof Phaser.GameObjects.Shape) {
+      this.scene.physics.add.existing(shapeObject, true);
     }
 
     this.interactiveAreasGroup.add(container);
@@ -601,7 +662,7 @@ export class PhaserMapRenderer {
     let visualObject: Phaser.GameObjects.GameObject;
 
     // Check if this is a polygon type
-    if (area.type === 'impassable-polygon' && area.points && area.points.length > 0) {
+    if (area.type === 'polygon' && area.points && area.points.length > 0) {
       // 🔍 DEBUG: Log polygon rendering
       console.log('🎨 [WorldMap] Rendering POLYGON collision area:', {
         id: area.id,
@@ -749,40 +810,66 @@ export class PhaserMapRenderer {
 
     // Update interactive areas visibility
     this.interactiveAreaObjects.forEach((container: any) => {
-      if (container && container.list) {
-        const rect = container.list[0]; // Rectangle
-        const text = container.list[1]; // Text label
+      if (!container || !container.list) return;
 
-        if (rect) {
-          // Update rectangle fill alpha
-          rect.setAlpha(enabled ? 1.0 : 0);
+      const area = (container as any).mapElementData;
+      const shapeObject = container.list[0]; // Rectangle or Graphics
+      const text = container.list[1]; // Text label
 
-          // Update stroke (border)
+      if (shapeObject) {
+        // Check if it's a Graphics object (polygon) or Rectangle
+        if (area?.shapeType === 'polygon' && shapeObject.clear) {
+          // Graphics object - redraw with new alpha
+          shapeObject.clear();
+          const colorValue = area.color
+            ? Phaser.Display.Color.HexStringToColor(area.color).color
+            : 0x00ff00;
+          const fillAlpha = enabled ? 0.7 : 0;
+
+          shapeObject.fillStyle(colorValue, fillAlpha);
           if (enabled) {
-            const area = (container as any).mapElementData;
-            if (area && area.color) {
-              rect.setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(area.color).color);
+            shapeObject.lineStyle(2, colorValue, 1);
+          }
+
+          if (area.points && area.points.length > 0) {
+            shapeObject.beginPath();
+            shapeObject.moveTo(area.points[0].x, area.points[0].y);
+            for (let i = 1; i < area.points.length; i++) {
+              shapeObject.lineTo(area.points[i].x, area.points[i].y);
             }
-          } else {
-            rect.setStrokeStyle(0); // Remove stroke when not in debug mode
+            shapeObject.closePath();
+            shapeObject.fillPath();
+            if (enabled) {
+              shapeObject.strokePath();
+            }
+          }
+        } else if (typeof shapeObject.setAlpha === 'function') {
+          // Rectangle object
+          shapeObject.setAlpha(enabled ? 0.7 : 0);
+
+          if (typeof shapeObject.setStrokeStyle === 'function') {
+            if (enabled && area?.color) {
+              shapeObject.setStrokeStyle(2, Phaser.Display.Color.HexStringToColor(area.color).color);
+            } else if (!enabled) {
+              shapeObject.setStrokeStyle(0);
+            }
           }
         }
+      }
 
-        if (text) {
-          // Update text visibility
-          text.setAlpha(enabled ? 1.0 : 0);
-        }
+      if (text && typeof text.setAlpha === 'function') {
+        text.setAlpha(enabled ? 1.0 : 0);
       }
     });
 
-    // Update collision areas visibility
+    // Update collision areas visibility (legacy impassableAreas)
     this.collisionAreaObjects.forEach((obj: any) => {
       if (!obj) return;
 
       const area = obj.mapElementData;
 
       // Check if it's a polygon (Graphics object) or rectangle
-      if (area && area.type === 'impassable-polygon' && obj.clear) {
+      if (area && area.type === 'polygon' && obj.clear) {
         // It's a Graphics object (polygon) - redraw with new alpha
         obj.clear();
 
@@ -802,47 +889,72 @@ export class PhaserMapRenderer {
           obj.fillPath();
           obj.strokePath();
         }
-      } else if (obj.setAlpha && obj.setStrokeStyle) {
+      } else if (typeof obj.setAlpha === 'function') {
         // It's a Rectangle object
         const fillAlpha = enabled ? 1.0 : 0;
         const strokeAlpha = enabled ? 1.0 : 0;
 
         obj.setAlpha(fillAlpha);
-        obj.setStrokeStyle(2, 0xff0000, strokeAlpha);
+        if (typeof obj.setStrokeStyle === 'function') {
+          obj.setStrokeStyle(2, 0xff0000, strokeAlpha);
+        }
       }
     });
+  }
+
+  /**
+   * Check if renderer is in a valid state for operations
+   */
+  private isSceneValid(): boolean {
+    return !this.isDestroyed &&
+           !!this.scene &&
+           !!(this.scene as any).sys?.game?.renderer;
   }
 
   /**
    * Cleanup resources (Enhanced with texture cache management)
    */
   public destroy(): void {
+    // Mark as destroyed FIRST to prevent async callbacks from executing
+    this.isDestroyed = true;
+
     // Remove event listeners
     this.eventListeners.forEach(cleanup => cleanup());
     this.eventListeners = [];
 
-    // Clean up texture cache (simplified)
-    // Removed: Non-critical destroying texture cache log.
-
-    // Remove all cached textures
-    this.textureCache.forEach((entry) => {
-      if (this.scene.textures.exists(entry.key)) {
-        this.scene.textures.remove(entry.key);
-      }
-    });
-
+    // Clean up texture cache with safety checks
+    try {
+      this.textureCache.forEach((entry) => {
+        if (this.scene?.textures?.exists?.(entry.key)) {
+          this.scene.textures.remove(entry.key);
+        }
+      });
+    } catch (error) {
+      logger.warn('[PhaserMapRenderer] Error cleaning texture cache during destroy', error);
+    }
     this.textureCache.clear();
 
-    // Clear groups
-    this.backgroundGroup.destroy(true);
-    this.assetsGroup.destroy(true);
-    this.interactiveAreasGroup.destroy(true);
-    this.collisionAreasGroup.destroy(true);
+    // Clear groups with safety checks
+    try {
+      if (this.backgroundGroup?.scene) {
+        this.backgroundGroup.destroy(true);
+      }
+      if (this.assetsGroup?.scene) {
+        this.assetsGroup.destroy(true);
+      }
+      if (this.interactiveAreasGroup?.scene) {
+        this.interactiveAreasGroup.destroy(true);
+      }
+      if (this.collisionAreasGroup?.scene) {
+        this.collisionAreasGroup.destroy(true);
+      }
+    } catch (error) {
+      logger.warn('[PhaserMapRenderer] Error destroying groups during cleanup', error);
+    }
 
     // Clear tracking maps
     this.interactiveAreaObjects.clear();
     this.collisionAreaObjects.clear();
-
-    // Removed: Non-critical cleanup complete log.
+    this.assetObjects.clear();
   }
 }

@@ -1,18 +1,21 @@
 /**
  * Unsaved Changes Warning Component
- * 
+ *
  * This component prevents data loss by warning users about unsaved changes
  * before they navigate away from the Map Editor or close the browser tab.
- * 
+ *
  * Features:
  * - Browser beforeunload event handling
  * - React Router navigation blocking
  * - Customizable warning messages
- * - Integration with SharedMapSystem save state
+ * - Integration with Redux mapSlice save state
+ *
+ * REFACTORED (2025-12-15): Removed SharedMapSystem dependency.
+ * Now uses Redux store for save state.
  */
 
 import React, { useEffect, useCallback } from 'react';
-import { SharedMapSystem } from '../shared/SharedMapSystem';
+import { useMapStore } from '../stores/useMapStore';
 
 interface UnsavedChangesWarningProps {
   enabled?: boolean;
@@ -25,15 +28,13 @@ export const UnsavedChangesWarning: React.FC<UnsavedChangesWarningProps> = ({
   customMessage = 'You have unsaved changes. Are you sure you want to leave?',
   onNavigationAttempt
 }) => {
-  const mapSystem = SharedMapSystem.getInstance();
+  const { isDirty, saveMap } = useMapStore();
 
   // Check if there are unsaved changes
   const hasUnsavedChanges = useCallback(() => {
     if (!enabled) return false;
-    
-    const saveState = mapSystem.getSaveState();
-    return saveState.hasUnsavedChanges;
-  }, [enabled, mapSystem]);
+    return isDirty;
+  }, [enabled, isDirty]);
 
   // Handle browser beforeunload event
   useEffect(() => {
@@ -128,17 +129,16 @@ export const UnsavedChangesWarning: React.FC<UnsavedChangesWarningProps> = ({
 
 // Hook for programmatic unsaved changes checking
 export const useUnsavedChangesWarning = (enabled = true) => {
-  const mapSystem = SharedMapSystem.getInstance();
+  const { isDirty, saveMap } = useMapStore();
 
   const hasUnsavedChanges = useCallback(() => {
     if (!enabled) return false;
-    const saveState = mapSystem.getSaveState();
-    return saveState.hasUnsavedChanges;
-  }, [enabled, mapSystem]);
+    return isDirty;
+  }, [enabled, isDirty]);
 
   const confirmNavigation = useCallback((message?: string) => {
     if (!hasUnsavedChanges()) return true;
-    
+
     return window.confirm(
       message || 'You have unsaved changes. Are you sure you want to continue?'
     );
@@ -147,7 +147,7 @@ export const useUnsavedChangesWarning = (enabled = true) => {
   const saveBeforeNavigation = useCallback(async () => {
     if (hasUnsavedChanges()) {
       try {
-        await mapSystem.saveMapData();
+        await saveMap();
         return true;
       } catch (error) {
         console.error('Failed to save before navigation:', error);
@@ -155,7 +155,7 @@ export const useUnsavedChangesWarning = (enabled = true) => {
       }
     }
     return true;
-  }, [hasUnsavedChanges, mapSystem]);
+  }, [hasUnsavedChanges, saveMap]);
 
   return {
     hasUnsavedChanges,

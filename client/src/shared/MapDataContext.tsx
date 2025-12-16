@@ -158,7 +158,9 @@ export interface ImpassableArea {
   name?: string;
 
   // Extended properties for polygon support
-  type?: 'rectangle' | 'impassable-polygon';
+  /** Shape type: 'rectangle' for standard boxes, 'polygon' for custom polygon shapes */
+  type?: 'rectangle' | 'polygon';
+  /** Polygon vertices (only used when type is 'polygon') */
   points?: { x: number; y: number }[];
   color?: string;
 }
