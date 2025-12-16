@@ -87,6 +87,16 @@ export class GameScene extends Phaser.Scene {
       this.mapRenderer.updateMapData(mapData);
       logger.debug('[GameScene] Updated map data from Redux');
     }
+    
+    // Update world bounds when map dimensions are available
+    if (mapData && mapData.worldDimensions) {
+      this.worldBoundsManager.updateWorldBounds(
+        mapData.worldDimensions.width,
+        mapData.worldDimensions.height,
+        'redux-map-data'
+      );
+      logger.debug('[GameScene] Updated world bounds from map dimensions');
+    }
   }
 
   create(): void {
