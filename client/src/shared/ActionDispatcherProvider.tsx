@@ -51,7 +51,7 @@ export const ActionDispatcherProvider: React.FC<ActionDispatcherProviderProps> =
       dispatcherRef.current?.stop();
       logger.info('[ActionDispatcherProvider] Dispatcher stopped');
     };
-  }, [eventBus]); // Only recreate when eventBus changes
+  }, [eventBus, mapData]); // Recreate when eventBus or mapData changes
 
   // Update the getAreaById function when mapData changes
   useEffect(() => {

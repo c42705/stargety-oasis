@@ -94,8 +94,7 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <EventBusProvider>
-      <div className="App" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="App" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
         <Layout.Header style={{
           background: 'var(--color-bg-secondary)',
@@ -269,8 +268,7 @@ const AppContent: React.FC = () => {
           <PeopleTab />
         </Modal>
       </div>
-    </EventBusProvider>
-  );
+    );
 };
 
 // Main App wrapper component with authentication

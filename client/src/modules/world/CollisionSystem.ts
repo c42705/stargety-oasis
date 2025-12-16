@@ -214,11 +214,35 @@ export class CollisionSystem {
     // Find which area player is currently in
     areas.forEach(area => {
       // Check if player is within area bounds
-      if (player.x >= area.x &&
+      const isWithinBounds = player.x >= area.x &&
           player.x <= area.x + area.width &&
           player.y >= area.y &&
-          player.y <= area.y + area.height) {
+          player.y <= area.y + area.height;
+      
+      // For polygon areas, use precise collision detection
+      let isActuallyInArea = isWithinBounds;
+      if (area.shapeType === 'polygon' && area.points && area.points.length > 0) {
+        isActuallyInArea = this.checkPolygonCollision(
+          area.points,
+          player.x - 16, // player size / 2
+          player.x + 16, // player size / 2
+          player.y - 16, // player size / 2
+          player.y + 16  // player size / 2
+        );
+      }
+      
+      if (isActuallyInArea) {
         currentlyInArea = area.id;
+        logger.debug('[Collision] Player entered area', {
+          areaId: area.id,
+          areaName: area.name,
+          shapeType: area.shapeType,
+          actionType: area.actionType,
+          playerPos: { x: player.x, y: player.y },
+          areaBounds: { x: area.x, y: area.y, width: area.width, height: area.height },
+          isPolygon: area.shapeType === 'polygon',
+          hasPoints: !!(area.points && area.points.length > 0)
+        });
       }
     });
 

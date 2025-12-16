@@ -1,0 +1,290 @@
+WorldModule.tsx:163      Phaser v3.90.0 (WebGL | Web Audio)  https://phaser.io/v390
+VideoCommunicationPanel.tsx:33 🎬 VideoCommunicationPanel MOUNTED
+ActionDispatcherProvider.tsx:25 🚀 [ActionDispatcherProvider] Initializing dispatcher with map data: {interactiveAreasCount: 0, areas: Array(0)}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:27.479Z', message: '[ActionDispatcher] Started listening to area events'}
+ActionDispatcherProvider.tsx:45 ✅ [ActionDispatcherProvider] Dispatcher started
+logger.ts:49 [info] {ts: '2025-12-16T00:49:27.480Z', message: '[ActionDispatcherProvider] Dispatcher started'}
+installHook.js:1 🛑 [ActionDispatcherProvider] Cleaning up dispatcher
+installHook.js:1 [info] {ts: '2025-12-16T00:49:27.491Z', message: '[ActionDispatcher] Stopped listening to area events'}
+installHook.js:1 [info] {ts: '2025-12-16T00:49:27.492Z', message: '[ActionDispatcherProvider] Dispatcher stopped'}
+installHook.js:1 🔴 VideoCommunicationPanel UNMOUNTING
+installHook.js:1      Phaser v3.90.0 (WebGL | Web Audio)  https://phaser.io/v390
+installHook.js:1 🎬 VideoCommunicationPanel MOUNTED
+installHook.js:1 🚀 [ActionDispatcherProvider] Initializing dispatcher with map data: {interactiveAreasCount: 0, areas: Array(0)}
+installHook.js:1 [info] {ts: '2025-12-16T00:49:27.538Z', message: '[ActionDispatcher] Started listening to area events'}
+installHook.js:1 ✅ [ActionDispatcherProvider] Dispatcher started
+installHook.js:1 [info] {ts: '2025-12-16T00:49:27.540Z', message: '[ActionDispatcherProvider] Dispatcher started'}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:27.739Z', message: '[GameScene] Initializing multiplayer for room:', meta: 'Stargety-Oasis-1'}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:27.739Z', message: '[RemotePlayerManager] Initialized'}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:27.741Z', message: '[WorldSocket] Initialized socket connection'}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:27.815Z', message: '[GameScene] Initializing multiplayer for room:', meta: 'Stargety-Oasis-1'}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:27.815Z', message: '[RemotePlayerManager] Initialized'}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:27.816Z', message: '[WorldSocket] Already initialized, reusing connection'}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:27.935Z', message: 'SETTINGS LOADED FROM API', meta: {…}}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:27.935Z', message: 'MAP LOADED FROM DATABASE', meta: {…}}
+PhaserMapRenderer.ts:489 🎨 [WorldMap] Rendering collision areas: {totalAreas: 0, areas: Array(0)}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:28.071Z', message: 'SETTINGS LOADED FROM API', meta: {…}}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:28.202Z', message: 'ACTIVE CHARACTER LOADED FROM API', meta: {…}}
+installHook.js:1 [warn] {ts: '2025-12-16T00:49:28.202Z', message: 'API returned invalid activeSlot, falling back to 1', meta: {…}}
+overrideMethod @ installHook.js:1
+warn @ logger.ts:55
+getActiveCharacterAsync @ CharacterStorage.ts:498
+await in getActiveCharacterAsync
+initializePlayerAsync @ PlayerManager.ts:99
+initialize @ PlayerManager.ts:82
+create @ GameScene.ts:140
+create @ phaser.js:198302
+loadComplete @ phaser.js:198209
+emit @ phaser.js:200
+loadComplete @ phaser.js:119950
+start @ phaser.js:119727
+bootScene @ phaser.js:198187
+start @ phaser.js:198947
+bootQueue @ phaser.js:197942
+emit @ phaser.js:218
+texturesReady @ phaser.js:17122
+emit @ phaser.js:218
+updatePending @ phaser.js:216452
+emit @ phaser.js:199
+(anonymous) @ phaser.js:216598
+logger.ts:49 [info] {ts: '2025-12-16T00:49:28.205Z', message: 'ACTIVE CHARACTER LOADED FROM API', meta: {…}}
+installHook.js:1 [warn] {ts: '2025-12-16T00:49:28.206Z', message: 'API returned invalid activeSlot, falling back to 1', meta: {…}}
+overrideMethod @ installHook.js:1
+warn @ logger.ts:55
+getActiveCharacterAsync @ CharacterStorage.ts:498
+await in getActiveCharacterAsync
+initializePlayerAsync @ PlayerManager.ts:99
+initialize @ PlayerManager.ts:82
+create @ GameScene.ts:140
+create @ phaser.js:198302
+loadComplete @ phaser.js:198209
+emit @ phaser.js:200
+loadComplete @ phaser.js:119950
+start @ phaser.js:119727
+bootScene @ phaser.js:198187
+start @ phaser.js:198947
+bootQueue @ phaser.js:197942
+emit @ phaser.js:218
+texturesReady @ phaser.js:17122
+emit @ phaser.js:218
+updatePending @ phaser.js:216452
+emit @ phaser.js:199
+(anonymous) @ phaser.js:216598
+logger.ts:49 [info] {ts: '2025-12-16T00:49:28.246Z', message: '[WorldSocket] Connected to server'}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:28.246Z', message: '[GameScene] Socket connected, joining world room:', meta: 'Stargety-Oasis-1'}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:28.246Z', message: '[GameScene] Socket connected, joining world room:', meta: 'Stargety-Oasis-1'}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:28.251Z', message: '[WorldSocket] Joined world room: Stargety-Oasis-1 as admin at (960, 540)'}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:28.257Z', message: '[WorldSocket] Already joined this room, skipping duplicate join'}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:28.340Z', message: 'CHARACTER LOADED FROM API', meta: {…}}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:28.354Z', message: 'CHARACTER LOADED FROM API', meta: {…}}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:28.372Z', message: 'ACTIVE CHARACTER LOADED FROM API', meta: {…}}
+installHook.js:1 [warn] {ts: '2025-12-16T00:49:28.372Z', message: 'API returned invalid activeSlot, falling back to 1', meta: {…}}
+overrideMethod @ installHook.js:1
+warn @ logger.ts:55
+getActiveCharacterAsync @ CharacterStorage.ts:498
+await in getActiveCharacterAsync
+getActiveCharacterSlotAsync @ CharacterStorage.ts:559
+(anonymous) @ AvatarRenderer.ts:91
+measure @ PerformanceMonitor.ts:159
+loadCharacterTexture @ AvatarRenderer.ts:68
+createOrUpdateSprite @ AvatarRenderer.ts:499
+initializePlayerAsync @ PlayerManager.ts:121
+await in initializePlayerAsync
+initialize @ PlayerManager.ts:82
+create @ GameScene.ts:140
+create @ phaser.js:198302
+loadComplete @ phaser.js:198209
+emit @ phaser.js:200
+loadComplete @ phaser.js:119950
+start @ phaser.js:119727
+bootScene @ phaser.js:198187
+start @ phaser.js:198947
+bootQueue @ phaser.js:197942
+emit @ phaser.js:218
+texturesReady @ phaser.js:17122
+emit @ phaser.js:218
+updatePending @ phaser.js:216452
+emit @ phaser.js:199
+(anonymous) @ phaser.js:216598
+logger.ts:49 [info] {ts: '2025-12-16T00:49:28.373Z', message: 'ACTIVE CHARACTER LOADED FROM API', meta: {…}}
+installHook.js:1 [warn] {ts: '2025-12-16T00:49:28.374Z', message: 'API returned invalid activeSlot, falling back to 1', meta: {…}}
+overrideMethod @ installHook.js:1
+warn @ logger.ts:55
+getActiveCharacterAsync @ CharacterStorage.ts:498
+await in getActiveCharacterAsync
+getActiveCharacterSlotAsync @ CharacterStorage.ts:559
+(anonymous) @ AvatarRenderer.ts:91
+measure @ PerformanceMonitor.ts:159
+loadCharacterTexture @ AvatarRenderer.ts:68
+createOrUpdateSprite @ AvatarRenderer.ts:499
+initializePlayerAsync @ PlayerManager.ts:121
+await in initializePlayerAsync
+initialize @ PlayerManager.ts:82
+create @ GameScene.ts:140
+create @ phaser.js:198302
+loadComplete @ phaser.js:198209
+emit @ phaser.js:200
+loadComplete @ phaser.js:119950
+start @ phaser.js:119727
+bootScene @ phaser.js:198187
+start @ phaser.js:198947
+bootQueue @ phaser.js:197942
+emit @ phaser.js:218
+texturesReady @ phaser.js:17122
+emit @ phaser.js:218
+updatePending @ phaser.js:216452
+emit @ phaser.js:199
+(anonymous) @ phaser.js:216598
+logger.ts:49 [info] {ts: '2025-12-16T00:49:28.388Z', message: 'CHARACTER LOADED FROM API', meta: {…}}
+installHook.js:1 [error] {ts: '2025-12-16T00:49:28.395Z', message: '[AvatarRenderer] Cannot add sprite sheet: Phaser renderer or texture manager not ready', meta: {…}}
+overrideMethod @ installHook.js:1
+error @ logger.ts:61
+loadGridSpriteSheet @ AvatarRenderer.ts:254
+loadSpriteSheet @ AvatarRenderer.ts:194
+await in loadSpriteSheet
+(anonymous) @ AvatarRenderer.ts:132
+await in (anonymous)
+measure @ PerformanceMonitor.ts:159
+loadCharacterTexture @ AvatarRenderer.ts:68
+createOrUpdateSprite @ AvatarRenderer.ts:499
+initializePlayerAsync @ PlayerManager.ts:121
+await in initializePlayerAsync
+initialize @ PlayerManager.ts:82
+create @ GameScene.ts:140
+create @ phaser.js:198302
+loadComplete @ phaser.js:198209
+emit @ phaser.js:200
+loadComplete @ phaser.js:119950
+start @ phaser.js:119727
+bootScene @ phaser.js:198187
+start @ phaser.js:198947
+bootQueue @ phaser.js:197942
+emit @ phaser.js:218
+texturesReady @ phaser.js:17122
+emit @ phaser.js:218
+updatePending @ phaser.js:216452
+emit @ phaser.js:199
+(anonymous) @ phaser.js:216598
+installHook.js:1 [error] {ts: '2025-12-16T00:49:28.396Z', message: '[AvatarRenderer] Failed to load sprite sheet into Phaser'}
+overrideMethod @ installHook.js:1
+error @ logger.ts:61
+(anonymous) @ AvatarRenderer.ts:136
+await in (anonymous)
+measure @ PerformanceMonitor.ts:159
+loadCharacterTexture @ AvatarRenderer.ts:68
+createOrUpdateSprite @ AvatarRenderer.ts:499
+initializePlayerAsync @ PlayerManager.ts:121
+await in initializePlayerAsync
+initialize @ PlayerManager.ts:82
+create @ GameScene.ts:140
+create @ phaser.js:198302
+loadComplete @ phaser.js:198209
+emit @ phaser.js:200
+loadComplete @ phaser.js:119950
+start @ phaser.js:119727
+bootScene @ phaser.js:198187
+start @ phaser.js:198947
+bootQueue @ phaser.js:197942
+emit @ phaser.js:218
+texturesReady @ phaser.js:17122
+emit @ phaser.js:218
+updatePending @ phaser.js:216452
+emit @ phaser.js:199
+(anonymous) @ phaser.js:216598
+installHook.js:1 [error] {ts: '2025-12-16T00:49:28.397Z', message: '[AvatarRenderer] FAILED at Step 1: Texture loading failed:', meta: 'Failed to load sprite sheet into Phaser'}
+overrideMethod @ installHook.js:1
+error @ logger.ts:61
+createOrUpdateSprite @ AvatarRenderer.ts:503
+await in createOrUpdateSprite
+initializePlayerAsync @ PlayerManager.ts:121
+await in initializePlayerAsync
+initialize @ PlayerManager.ts:82
+create @ GameScene.ts:140
+create @ phaser.js:198302
+loadComplete @ phaser.js:198209
+emit @ phaser.js:200
+loadComplete @ phaser.js:119950
+start @ phaser.js:119727
+bootScene @ phaser.js:198187
+start @ phaser.js:198947
+bootQueue @ phaser.js:197942
+emit @ phaser.js:218
+texturesReady @ phaser.js:17122
+emit @ phaser.js:218
+updatePending @ phaser.js:216452
+emit @ phaser.js:199
+(anonymous) @ phaser.js:216598
+installHook.js:1 [warn] {ts: '2025-12-16T00:49:28.399Z', message: '[PlayerManager] ⚠️ V2 sprite is null, using default sprite'}
+overrideMethod @ installHook.js:1
+warn @ logger.ts:55
+initializePlayerAsync @ PlayerManager.ts:159
+await in initializePlayerAsync
+initialize @ PlayerManager.ts:82
+create @ GameScene.ts:140
+create @ phaser.js:198302
+loadComplete @ phaser.js:198209
+emit @ phaser.js:200
+loadComplete @ phaser.js:119950
+start @ phaser.js:119727
+bootScene @ phaser.js:198187
+start @ phaser.js:198947
+bootQueue @ phaser.js:197942
+emit @ phaser.js:218
+texturesReady @ phaser.js:17122
+emit @ phaser.js:218
+updatePending @ phaser.js:216452
+emit @ phaser.js:199
+(anonymous) @ phaser.js:216598
+logger.ts:49 [info] {ts: '2025-12-16T00:49:28.453Z', message: 'CHARACTER LOADED FROM API', meta: {…}}
+logger.ts:49 [info] {ts: '2025-12-16T00:49:28.483Z', message: '[PlayerManager] Player initialized with V2 character system'}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
+CollisionSystem.ts:236 🔍 [Collision] Player entered area: 256e5f17-aa48-4d16-acb4-dc6f6fbf1fe9 (jitsi room) - polygon {playerPos: {…}, areaBounds: {…}, isPolygon: true, hasPoints: true}
