@@ -18,6 +18,8 @@ import { LoginModule } from './modules/login/LoginModule';
 import { SplitLayoutComponent } from './components/SplitLayoutComponent';
 import { VideoCommunicationPanel } from './components/VideoCommunicationPanel';
 import { PersistentChatPanel } from './components/PersistentChatPanel';
+import { PersistentChatPanelEnhanced } from './components/PersistentChatPanelEnhanced';
+import { ChatDemo } from './modules/chat/ChatDemo';
 import { QuickAvatarBuilder } from './components/avatar/AvatarBuilderLauncher';
 
 import { PeopleTab } from './components/panel-tabs/PeopleTab';
@@ -152,6 +154,12 @@ const AppContent: React.FC = () => {
                     icon: <TeamOutlined />,
                     onClick: handlePeopleClick
                   },
+                  {
+                    key: 'chat-demo',
+                    label: 'Chat Demo',
+                    icon: <TeamOutlined />,
+                    onClick: () => window.open('/chat-demo', '_blank')
+                  },
                   // Admin-only Settings menu item
                   ...(user.isAdmin ? [{
                     key: 'settings',
@@ -207,6 +215,19 @@ const AppContent: React.FC = () => {
                 Map Editor
               </Button>
             )}
+            
+            <Button
+              type="default"
+              icon={<TeamOutlined size={16} />}
+              onClick={() => window.open('/chat-demo', '_blank')}
+              style={{
+                backgroundColor: 'var(--color-bg-tertiary)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)'
+              }}
+            >
+              Chat Demo
+            </Button>
           </Space>
         </Layout.Header>
 
@@ -330,6 +351,12 @@ const App: React.FC = () => {
       <Route
         path="/konva-test-suite"
         element={<KonvaTestSuitePage />}
+      />
+
+      {/* Chat Demo Route - Phase 0 Enhanced Chat System */}
+      <Route
+        path="/chat-demo"
+        element={<ChatDemo />}
       />
 
       {/* Main App Route */}
