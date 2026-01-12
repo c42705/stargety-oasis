@@ -175,6 +175,16 @@ export class ChatDbController {
       const dbRoom = await prisma.chatRoom.findUnique({ where: { roomId } });
       if (!dbRoom) return null;
 
+      // Validate authorId exists in database before using it
+      // If not found, set to null (authorName is stored in content anyway)
+      let validAuthorId: string | null = null;
+      if (data.authorId) {
+        const user = await prisma.user.findUnique({ where: { id: data.authorId } });
+        if (user) {
+          validAuthorId = user.id;
+        }
+      }
+
       const content: MessageContent & { authorName: string } = {
         text: data.text,
         authorName: data.authorName,
@@ -183,7 +193,7 @@ export class ChatDbController {
       const message = await prisma.message.create({
         data: {
           roomId: dbRoom.id,
-          authorId: data.authorId ?? null,
+          authorId: validAuthorId,
           content: content as object,
           expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000), // 8 hours TTL
         },

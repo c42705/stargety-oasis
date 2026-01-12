@@ -4,7 +4,6 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
-import { ChatController } from './chat/chatController';
 import { initChatDbController, ChatDbController } from './chat/chatDbController';
 import { WorldController } from './world/worldController';
 import { VideoCallController } from './video-call/videoCallController';
@@ -83,22 +82,6 @@ app.get('/health', (req, res) => {
 });
 
 // API Routes
-app.get('/api/chat/rooms/:roomId/messages', (req, res) => {
-  const { roomId } = req.params;
-  const limit = parseInt(req.query.limit as string) || 50;
-  const messages = chatController.getRoomMessages(roomId, limit);
-  res.json({ success: true, data: messages });
-});
-
-app.get('/api/chat/rooms/:roomId', (req, res) => {
-  const { roomId } = req.params;
-  const room = chatController.getRoomInfo(roomId);
-  if (!room) {
-    return res.status(404).json({ success: false, error: 'Room not found' });
-  }
-  res.json({ success: true, data: room });
-});
-
 app.get('/api/world/rooms/:roomId', (req, res) => {
   const { roomId } = req.params;
   const worldState = worldController.getWorldState(roomId);
@@ -608,8 +591,7 @@ app.post('/api/characters/:userId/upload', uploadCharacterAsset.single('file'), 
 });
 
 // Initialize controllers
-const chatController = new ChatController(io);
-chatDbController = initChatDbController(io); // DB-backed chat controller
+chatDbController = initChatDbController(io);
 const worldController = new WorldController(io);
 const videoCallController = new VideoCallController(io);
 const mapController = new MapController(io);
@@ -618,12 +600,11 @@ const mapController = new MapController(io);
 io.on('connection', (socket) => {
   logger.info(`User connected: ${socket.id}`);
 
-  // Chat events (legacy in-memory controller)
-  socket.on('join-room', (data) => chatController.handleJoinRoom(socket, data));
-  socket.on('send-message', (data) => chatController.handleSendMessage(socket, data));
-  socket.on('typing', (data) => chatController.handleTyping(socket, data));
-
-  // Chat events (DB-backed controller) - use 'chat:' prefix for new events
+  // Chat events (DB-backed controller)
+  socket.on('join-room', (data) => chatDbController.handleJoinRoom(socket, data));
+  socket.on('send-message', (data) => chatDbController.handleSendMessage(socket, data));
+  socket.on('typing', (data) => chatDbController.handleTyping(socket, data));
+  // Also support 'chat:' prefix for new clients
   socket.on('chat:join', (data) => chatDbController.handleJoinRoom(socket, data));
   socket.on('chat:message', (data) => chatDbController.handleSendMessage(socket, data));
   socket.on('chat:typing', (data) => chatDbController.handleTyping(socket, data));
@@ -645,7 +626,6 @@ io.on('connection', (socket) => {
   // Handle disconnection
   socket.on('disconnect', () => {
     logger.info(`User disconnected: ${socket.id}`);
-    chatController.handleDisconnect(socket);
     chatDbController.handleDisconnect(socket);
     worldController.handleDisconnect(socket);
     videoCallController.handleDisconnect(socket);
