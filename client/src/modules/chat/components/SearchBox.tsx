@@ -1,440 +1,204 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { 
-  Input, 
-  Button, 
-  Select, 
-  Space, 
-  Typography, 
-  Card,
-  Tag,
-  Tooltip,
-  Spin
-} from 'antd';
-import {
-  SearchOutlined,
-  FilterOutlined,
-  UserOutlined,
-  CalendarOutlined,
-  TagOutlined,
-  FileTextOutlined,
-  FileImageOutlined,
-  PlayCircleOutlined,
-  AudioOutlined
-} from '@ant-design/icons';
-import { Message } from '../../../types/chat';
+import React, { useState, useCallback } from 'react';
+import { Input, Button, Space, Dropdown, Menu, DatePicker, Select } from 'antd';
+import { SearchOutlined, FilterOutlined, ClearOutlined } from '@ant-design/icons';
+import type { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
 
-const { Search: SearchInput } = Input;
-const { Option } = Select;
-const { Text } = Typography;
+const { RangePicker } = DatePicker;
 
 interface SearchBoxProps {
-  onSearch: (query: string, filters: SearchFilters) => void;
-  onSearchResults?: (results: Message[]) => void;
-  placeholder?: string;
-  className?: string;
-  disabled?: boolean;
+  onSearch: (params: {
+    query: string;
+    userId?: string;
+    startDate?: Date;
+    endDate?: Date;
+    fileType?: string;
+  }) => void;
+  onClear?: () => void;
+  loading?: boolean;
+  users?: Array<{ id: string; username: string }>;
+  fileTypes?: Array<{ label: string; value: string }>;
 }
 
-interface SearchFilters {
-  dateRange?: {
-    start: Date;
-    end: Date;
-  };
-  fileType?: string;
-  authorId?: string;
-  hasReactions?: boolean;
-  hasAttachments?: boolean;
-  messageType?: 'text' | 'file' | 'reaction' | 'thread';
-}
-
-interface SearchSuggestion {
-  text: string;
-  type: 'recent' | 'popular' | 'user';
-  icon?: React.ReactNode;
-  count?: number;
-}
+const FILE_TYPE_OPTIONS = [
+  { label: 'All Files', value: '' },
+  { label: 'Images', value: 'image/*' },
+  { label: 'PDF', value: 'application/pdf' },
+  { label: 'Documents', value: 'application/*' },
+  { label: 'Text', value: 'text/*' },
+];
 
 export const SearchBox: React.FC<SearchBoxProps> = ({
   onSearch,
-  onSearchResults,
-  placeholder = "Search messages...",
-  className = '',
-  disabled = false
+  onClear,
+  loading = false,
+  users = [],
+  fileTypes = FILE_TYPE_OPTIONS
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
+  const [query, setQuery] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<string | undefined>();
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
+  const [selectedFileType, setSelectedFileType] = useState<string | undefined>();
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState<SearchFilters>({});
 
-  // Mock search suggestions (in real app, these would come from backend)
-  const searchSuggestions: SearchSuggestion[] = useMemo(() => [
-    { text: 'meeting notes', type: 'popular', icon: <FileTextOutlined />, count: 12 },
-    { text: 'project update', type: 'recent', icon: <CalendarOutlined />, count: 5 },
-    { text: 'alice', type: 'user', icon: <UserOutlined />, count: 23 },
-    { text: 'design feedback', type: 'popular', icon: <TagOutlined />, count: 8 },
-    { text: 'deadline', type: 'recent', icon: <CalendarOutlined />, count: 3 }
-  ], []);
+  const handleSearch = useCallback(() => {
+    if (!query.trim()) return;
 
-  // Mock search results (in real app, these would come from backend)
-  const mockSearchResults = useCallback((query: string, searchFilters: SearchFilters): Message[] => {
-    // This is a mock implementation - in real app, this would be an API call
-    return [
-      {
-        id: '1',
-        content: { text: `Found message containing "${query}"` },
-        author: { id: 'user1', username: 'Alice', avatar: '', online: true },
-        authorId: 'user1',
-        roomId: 'general',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        expiresAt: new Date(Date.now() + 28800000), // 8 hours from now
-        type: 'text',
-        reactions: [],
-        attachments: [],
-        isEdited: false,
-        threadId: undefined,
-        parentId: undefined
-      },
-      {
-        id: '2',
-        content: { text: `Another message with "${query}" here` },
-        author: { id: 'user2', username: 'Bob', avatar: '', online: true },
-        authorId: 'user2',
-        roomId: 'general',
-        createdAt: new Date(Date.now() - 3600000),
-        updatedAt: new Date(Date.now() - 3600000),
-        expiresAt: new Date(Date.now() + 25200000), // 7 hours from now
-        type: 'text',
-        reactions: [{ id: 'reaction1', emoji: '👍', userId: 'user1', user: { id: 'user1', username: 'Alice', avatar: '', online: true }, createdAt: new Date() }],
-        attachments: [],
-        isEdited: false,
-        threadId: undefined,
-        parentId: undefined
-      }
-    ];
-  }, []);
+    const params: any = {
+      query: query.trim(),
+    };
 
-  // Handle search
-  const handleSearch = useCallback(async (query: string = searchQuery) => {
-    if (!query.trim() && Object.keys(filters).length === 0) return;
-
-    setIsSearching(true);
-    try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const results = mockSearchResults(query, filters);
-      onSearch(query, filters);
-      onSearchResults?.(results);
-    } catch (error) {
-      console.error('Search error:', error);
-    } finally {
-      setIsSearching(false);
+    if (selectedUserId) {
+      params.userId = selectedUserId;
     }
-  }, [searchQuery, filters, onSearch, onSearchResults, mockSearchResults]);
 
-  // Handle filter change
-  const handleFilterChange = useCallback((key: keyof SearchFilters, value: any) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value || undefined
-    }));
-  }, []);
+    if (dateRange) {
+      params.startDate = dateRange[0].toDate();
+      params.endDate = dateRange[1].toDate();
+    }
 
-  // Clear all filters
-  const handleClearFilters = useCallback(() => {
-    setFilters({});
-    setSearchQuery('');
-    onSearch('', {});
-    onSearchResults?.([]);
-  }, [onSearch, onSearchResults]);
+    if (selectedFileType) {
+      params.fileType = selectedFileType;
+    }
 
-  // Handle keyboard shortcuts
-  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
+    onSearch(params);
+  }, [query, selectedUserId, dateRange, selectedFileType, onSearch]);
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
       handleSearch();
     }
-  }, [handleSearch]);
-
-  // Get file type icon
-  const getFileTypeIcon = (fileType?: string) => {
-    if (!fileType) return null;
-    
-    switch (fileType) {
-      case 'image':
-        return <FileImageOutlined style={{ fontSize: '12px', color: '#1890ff' }} />;
-      case 'video':
-        return <PlayCircleOutlined style={{ fontSize: '12px', color: '#722ed1' }} />;
-      case 'audio':
-        return <AudioOutlined style={{ fontSize: '12px', color: '#52c41a' }} />;
-      case 'document':
-        return <FileTextOutlined style={{ fontSize: '12px', color: '#fa8c16' }} />;
-      default:
-        return <FileTextOutlined style={{ fontSize: '12px', color: '#8c8c8c' }} />;
-    }
   };
 
-  // Get filter label
-  const getFilterLabel = (key: keyof SearchFilters, value: any) => {
-    switch (key) {
-      case 'dateRange':
-        return 'Date Range';
-      case 'fileType':
-        return getFileTypeIcon(value);
-      case 'authorId':
-        return `By: ${value}`;
-      case 'hasReactions':
-        return value ? 'Has Reactions' : 'No Reactions';
-      case 'hasAttachments':
-        return value ? 'Has Attachments' : 'No Attachments';
-      case 'messageType':
-        return value?.charAt(0).toUpperCase() + value?.slice(1);
-      default:
-        return value;
+  const handleClear = useCallback(() => {
+    setQuery('');
+    setSelectedUserId(undefined);
+    setDateRange(null);
+    setSelectedFileType(undefined);
+    if (onClear) {
+      onClear();
     }
-  };
+  }, [onClear]);
+
+  const hasActiveFilters = selectedUserId || dateRange || selectedFileType;
+
+  const filterMenu = (
+    <Menu style={{ padding: 16, minWidth: 300 }}>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 8, fontWeight: 500 }}>Filter by User</div>
+        <Select
+          style={{ width: '100%' }}
+          placeholder="Select user"
+          allowClear
+          value={selectedUserId}
+          onChange={setSelectedUserId}
+          options={users.map(user => ({
+            label: user.username,
+            value: user.id,
+          }))}
+        />
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 8, fontWeight: 500 }}>Date Range</div>
+        <RangePicker
+          style={{ width: '100%' }}
+          value={dateRange}
+          onChange={(dates) => setDateRange(dates as [Dayjs, Dayjs] | null)}
+        />
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 8, fontWeight: 500 }}>File Type</div>
+        <Select
+          style={{ width: '100%' }}
+          placeholder="Select file type"
+          allowClear
+          value={selectedFileType}
+          onChange={setSelectedFileType}
+          options={fileTypes}
+        />
+      </div>
+
+      <Button
+        type="primary"
+        block
+        onClick={() => setShowFilters(false)}
+      >
+        Apply Filters
+      </Button>
+    </Menu>
+  );
 
   return (
-    <div className={`search-box ${className}`} style={{ width: '100%' }}>
-      {/* Main Search Bar */}
-      <Card size="small" style={{ marginBottom: '12px' }}>
-        <Space direction="vertical" style={{ width: '100%' }} size="small">
-          {/* Search Input */}
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <div style={{ flex: 1, position: 'relative' }}>
-              <SearchInput
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder={placeholder}
-                disabled={disabled}
-                loading={isSearching}
-                style={{
-                  borderRadius: '6px',
-                  fontSize: '14px'
-                }}
-              />
-              
-              {/* Search Suggestions */}
-              {searchQuery && !isSearching && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  backgroundColor: 'var(--color-bg-secondary)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '6px',
-                  marginTop: '4px',
-                  zIndex: 1000,
-                  maxHeight: '200px',
-                  overflow: 'auto'
-                }}>
-                  {searchSuggestions
-                    .filter(suggestion => 
-                      suggestion.text.toLowerCase().includes(searchQuery.toLowerCase())
-                    )
-                    .slice(0, 5)
-                    .map((suggestion, index) => (
-                      <div
-                        key={index}
-                        style={{
-                          padding: '8px 12px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          fontSize: '12px',
-                          color: 'var(--color-text-primary)'
-                        }}
-                        onClick={() => {
-                          setSearchQuery(suggestion.text);
-                          handleSearch(suggestion.text);
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-primary)'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                      >
-                        {suggestion.icon}
-                        <span>{suggestion.text}</span>
-                        {suggestion.count && (
-                          <Text type="secondary" style={{ fontSize: '10px' }}>
-                            ({suggestion.count})
-                          </Text>
-                        )}
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
-
-            {/* Search Button */}
-            <Button
-              type="primary"
-              icon={<SearchOutlined />}
-              onClick={() => handleSearch()}
-              loading={isSearching}
-              disabled={disabled}
-              style={{
-                borderRadius: '6px'
-              }}
-            />
-
-            {/* Filters Button */}
-            <Button
-              type="text"
-              icon={<FilterOutlined />}
-              onClick={() => setShowFilters(!showFilters)}
-              disabled={disabled}
-              style={{
-                borderRadius: '6px',
-                color: 'var(--color-text-secondary)'
-              }}
-            />
-          </div>
-
-          {/* Active Filters */}
-          {Object.keys(filters).length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-              {Object.entries(filters).map(([key, value]) => {
-                if (!value) return null;
-                
-                return (
-                  <Tag
-                    key={key}
-                    closable
-                    onClose={() => handleFilterChange(key as keyof SearchFilters, undefined)}
-                    style={{
-                      fontSize: '11px',
-                      padding: '2px 6px',
-                      borderRadius: '4px'
-                    }}
-                  >
-                    {getFilterLabel(key as keyof SearchFilters, value)}
-                  </Tag>
-                );
-              })}
-              <Button
-                type="text"
-                size="small"
-                onClick={handleClearFilters}
-                style={{ fontSize: '11px', padding: '2px 4px' }}
-              >
-                Clear All
-              </Button>
-            </div>
-          )}
-        </Space>
-      </Card>
-
-      {/* Filters Panel */}
-      {showFilters && (
-        <Card 
-          size="small" 
-          style={{ 
-            backgroundColor: 'var(--color-bg-secondary)',
-            border: '1px solid var(--color-border-light)'
-          }}
+    <div className="search-box">
+      <Space.Compact style={{ width: '100%' }}>
+        <Input
+          placeholder="Search messages..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyPress={handleKeyPress}
+          prefix={<SearchOutlined />}
+          allowClear
+          disabled={loading}
+        />
+        <Dropdown
+          overlay={filterMenu}
+          trigger={['click']}
+          visible={showFilters}
+          onVisibleChange={setShowFilters}
         >
-          <Space direction="vertical" style={{ width: '100%' }} size="middle">
-            {/* Date Range Filter */}
-            <div>
-              <Text style={{ fontSize: '12px', fontWeight: '500', marginBottom: '4px', display: 'block' }}>
-                Date Range
-              </Text>
-              <Select
-                placeholder="Select date range"
-                style={{ width: '100%' }}
-                allowClear
-                onChange={(value) => handleFilterChange('dateRange', value)}
-                disabled={disabled}
-              >
-                <Option value="today">Today</Option>
-                <Option value="week">This Week</Option>
-                <Option value="month">This Month</Option>
-                <Option value="year">This Year</Option>
-              </Select>
-            </div>
+          <Button
+            icon={<FilterOutlined />}
+            type={hasActiveFilters ? 'primary' : 'default'}
+          >
+            Filters
+          </Button>
+        </Dropdown>
+        <Button
+          type="primary"
+          icon={<SearchOutlined />}
+          onClick={handleSearch}
+          loading={loading}
+          disabled={!query.trim()}
+        >
+          Search
+        </Button>
+        {(query || hasActiveFilters) && (
+          <Button
+            icon={<ClearOutlined />}
+            onClick={handleClear}
+            disabled={loading}
+          >
+            Clear
+          </Button>
+        )}
+      </Space.Compact>
 
-            {/* File Type Filter */}
-            <div>
-              <Text style={{ fontSize: '12px', fontWeight: '500', marginBottom: '4px', display: 'block' }}>
-                File Type
-              </Text>
-              <Select
-                placeholder="Filter by file type"
-                style={{ width: '100%' }}
-                allowClear
-                onChange={(value) => handleFilterChange('fileType', value)}
-                disabled={disabled}
-              >
-                <Option value="image">Images</Option>
-                <Option value="video">Videos</Option>
-                <Option value="audio">Audio</Option>
-                <Option value="document">Documents</Option>
-              </Select>
-            </div>
-
-            {/* Message Type Filter */}
-            <div>
-              <Text style={{ fontSize: '12px', fontWeight: '500', marginBottom: '4px', display: 'block' }}>
-                Message Type
-              </Text>
-              <Select
-                placeholder="Filter by message type"
-                style={{ width: '100%' }}
-                allowClear
-                onChange={(value) => handleFilterChange('messageType', value)}
-                disabled={disabled}
-              >
-                <Option value="text">Text Messages</Option>
-                <Option value="file">File Messages</Option>
-                <Option value="reaction">Reactions</Option>
-                <Option value="thread">Thread Messages</Option>
-              </Select>
-            </div>
-
-            {/* Advanced Filters */}
-            <div>
-              <Text style={{ fontSize: '12px', fontWeight: '500', marginBottom: '4px', display: 'block' }}>
-                Advanced Filters
-              </Text>
-              <Space wrap style={{ width: '100%' }}>
-                <Button
-                  type={filters.hasReactions ? 'primary' : 'default'}
-                  size="small"
-                  onClick={() => handleFilterChange('hasReactions', !filters.hasReactions)}
-                  disabled={disabled}
-                >
-                  Has Reactions
-                </Button>
-                <Button
-                  type={filters.hasAttachments ? 'primary' : 'default'}
-                  size="small"
-                  onClick={() => handleFilterChange('hasAttachments', !filters.hasAttachments)}
-                  disabled={disabled}
-                >
-                  Has Attachments
-                </Button>
-              </Space>
-            </div>
-
-            {/* Search Button */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button
-                type="primary"
-                icon={<SearchOutlined />}
-                onClick={() => handleSearch()}
-                loading={isSearching}
-                disabled={disabled}
-                size="small"
-              >
-                Apply Filters
-              </Button>
-            </div>
+      {/* Active Filters Display */}
+      {hasActiveFilters && (
+        <div style={{ marginTop: 8 }}>
+          <Space size={4} wrap>
+            {selectedUserId && (
+              <span style={{ fontSize: 12, color: '#1890ff' }}>
+                User: {users.find(u => u.id === selectedUserId)?.username}
+              </span>
+            )}
+            {dateRange && (
+              <span style={{ fontSize: 12, color: '#1890ff' }}>
+                {dateRange[0].format('MMM D')} - {dateRange[1].format('MMM D')}
+              </span>
+            )}
+            {selectedFileType && (
+              <span style={{ fontSize: 12, color: '#1890ff' }}>
+                Type: {fileTypes.find(t => t.value === selectedFileType)?.label}
+              </span>
+            )}
           </Space>
-        </Card>
+        </div>
       )}
     </div>
   );
 };
+
+export default SearchBox;

@@ -284,13 +284,13 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
   }, [currentUser]);
 
   // Handle search
-  const handleSearch = useCallback((query: string, filters: any) => {
+  const handleSearch = useCallback((params: { query: string; userId?: string; startDate?: Date; endDate?: Date; fileType?: string }) => {
     setIsSearching(true);
     
     // Simulate search delay
     setTimeout(() => {
-      const results = messages.filter(message => 
-        message.content.text?.toLowerCase().includes(query.toLowerCase())
+      const results = messages.filter(message =>
+        message.content.text?.toLowerCase().includes(params.query.toLowerCase())
       );
       setSearchResults(results);
       setIsSearching(false);
@@ -418,9 +418,12 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
   }, []);
 
   // Handle reply to message
-  const handleReplyToMessage = useCallback((messageId: string, content: string) => {
-    setNewMessage(`@${messages.find(m => m.id === messageId)?.author.username} ${content}`);
-    setReplyToMessageId(messageId);
+  const handleReplyToMessage = useCallback((messageId: string) => {
+    const message = messages.find(m => m.id === messageId);
+    if (message) {
+      setNewMessage(`@${message.author.username} ${message.content.text || ''}`);
+      setReplyToMessageId(messageId);
+    }
   }, [messages]);
 
   // Handle thread view
@@ -502,8 +505,6 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
             {showSearch && (
               <SearchBox
                 onSearch={handleSearch}
-                onSearchResults={handleSearchResults}
-                placeholder="Search messages..."
               />
             )}
             <Button
@@ -546,14 +547,10 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
                 <MessageItem
                   key={message.id}
                   message={message}
-                  currentUser={currentUser}
-                  onEditMessage={handleMessageEdit}
-                  onDeleteMessage={handleMessageDelete}
-                  onAddReaction={handleReactionAdd}
-                  onRemoveReaction={handleReactionRemove}
-                  onReplyToMessage={handleReplyToMessage}
-                  isEditing={editingMessage === message.id}
-                  onToggleEdit={setEditingMessage}
+                  isCurrentUser={message.authorId === currentUser.id}
+                  onEdit={handleMessageEdit}
+                  onDelete={handleMessageDelete}
+                  onReply={handleReplyToMessage}
                 />
               ))}
               <div ref={messagesEndRef} />
@@ -571,7 +568,11 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
               {/* File Upload */}
               <FileUpload
-                onFileSelect={handleFileSelect}
+                roomId={currentRoomId}
+                onFileUploaded={(attachment) => {
+                  // Handle file upload completion
+                  console.log('File uploaded:', attachment);
+                }}
                 maxFileSize={10}
                 maxFiles={5}
               />
@@ -598,11 +599,11 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
             </Space>
           )}
 
-          {activeTab === 'thread' && (
+          {activeTab === 'thread' && threadMessages.length > 0 && (
             <ThreadView
-              messageId={threadMessages[0]?.id || ''}
-              messages={threadMessages}
-              currentUser={currentUser}
+              threadRootMessage={threadMessages[0]}
+              threadMessages={threadMessages.slice(1)}
+              currentUserId={currentUser.id}
               onReply={handleReplyToMessage}
             />
           )}

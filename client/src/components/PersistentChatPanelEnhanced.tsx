@@ -337,33 +337,19 @@ export const PersistentChatPanelEnhanced: React.FC<PersistentChatPanelEnhancedPr
     }
   };
 
-  // Header actions menu
-  const headerActionsMenu = (
-    <Menu>
-      <Menu.Item key="notifications" icon={<BellOutlined />}>
-        Notifications
-      </Menu.Item>
-      <Menu.Item key="settings" icon={<SettingOutlined />}>
-        Settings
-      </Menu.Item>
-      <Menu.Item key="history" icon={<HistoryOutlined />}>
-        Chat History
-      </Menu.Item>
-      <Menu.Item key="starred" icon={<StarOutlined />}>
-        Starred Messages
-      </Menu.Item>
-      <Menu.Divider />
-      <Menu.Item key="minimize" icon={<ClearOutlined />}>
-        {isMinimized ? 'Restore' : 'Minimize'}
-      </Menu.Item>
-      <Menu.Item key="maximize" icon={<FolderOpenOutlined />}>
-        {isMaximized ? 'Restore' : 'Maximize'}
-      </Menu.Item>
-      <Menu.Item key="close" icon={<ClearOutlined />} danger>
-        Close
-      </Menu.Item>
-    </Menu>
-  );
+  // Header actions menu items
+  const headerActionsMenuItems = [
+    { key: 'notifications', icon: <BellOutlined />, label: 'Notifications' },
+    { key: 'settings', icon: <SettingOutlined />, label: 'Settings' },
+    { key: 'history', icon: <HistoryOutlined />, label: 'Chat History' },
+    { key: 'starred', icon: <StarOutlined />, label: 'Starred Messages' },
+    { type: 'divider' as const },
+    { key: 'minimize', icon: <ClearOutlined />, label: isMinimized ? 'Restore' : 'Minimize' },
+    { key: 'maximize', icon: <FolderOpenOutlined />, label: isMaximized ? 'Restore' : 'Maximize' },
+    { key: 'close', icon: <ClearOutlined />, label: 'Close', danger: true },
+  ];
+
+  const headerActionsMenu = <Menu items={headerActionsMenuItems} />;
 
   if (!visible && !isMinimized) return null;
 

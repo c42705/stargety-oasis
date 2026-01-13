@@ -1,373 +1,203 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { 
-  Upload, 
-  Button, 
-  Progress, 
-  Space, 
-  Typography, 
-  Card,
-  Tooltip,
-  message,
-  Modal
-} from 'antd';
-import {
-  UploadOutlined,
-  FileOutlined,
-  DeleteOutlined,
-  InboxOutlined,
-  PaperClipOutlined,
-  FileImageOutlined,
-  FileTextOutlined,
-  PlayCircleOutlined,
-  AudioOutlined,
-  PictureOutlined
-} from '@ant-design/icons';
-import type { UploadFile, UploadProps } from 'antd/es/upload/interface';
+import React, { useState, useRef } from 'react';
+import { Upload, Button, message, Progress, Space, Typography, List, Tag } from 'antd';
+import { UploadOutlined, FileOutlined, FileImageOutlined, FilePdfOutlined, FileTextOutlined, DeleteOutlined } from '@ant-design/icons';
+import type { UploadProps, UploadFile } from 'antd';
+import { Attachment } from '../../../redux/types/chat';
+import { useAppDispatch } from '../../../redux/hooks';
+import { chatThunks } from '../../../redux/slices/chatSlice';
 
-const { Dragger } = Upload;
-const { Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 interface FileUploadProps {
-  onFileSelect: (files: File[]) => void;
-  onFileUpload?: (file: File, progress: number) => void;
-  onFileComplete?: (file: File, url: string) => void;
-  onFileError?: (file: File, error: string) => void;
-  maxFileSize?: number; // in MB
+  roomId: string;
+  onFileUploaded?: (attachment: Attachment) => void;
+  maxFileSize?: number; // in bytes, default 10MB
+  allowedFileTypes?: string[];
   maxFiles?: number;
-  acceptedTypes?: string[];
-  className?: string;
-  disabled?: boolean;
-}
-
-interface UploadedFile {
-  file: File;
-  progress: number;
-  status: 'uploading' | 'completed' | 'error';
-  error?: string;
-  url?: string;
 }
 
 export const FileUpload: React.FC<FileUploadProps> = ({
-  onFileSelect,
-  onFileUpload,
-  onFileComplete,
-  onFileError,
-  maxFileSize = 10, // 10MB default
-  maxFiles = 5,
-  acceptedTypes = [
-    'image/*',
-    'application/pdf',
-    'text/*',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'video/*',
-    'audio/*'
-  ],
-  className = '',
-  disabled = false
+  roomId,
+  onFileUploaded,
+  maxFileSize = 10 * 1024 * 1024, // 10MB
+  allowedFileTypes = ['image/*', 'application/pdf', 'text/*', '.doc', '.docx'],
+  maxFiles = 5
 }) => {
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dispatch = useAppDispatch();
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Validate file type
-  const isValidFileType = (file: File): boolean => {
-    if (acceptedTypes.includes('*/*')) return true;
-    return acceptedTypes.some(type => {
-      if (type.endsWith('/*')) {
-        const category = type.split('/*')[0];
-        return file.type.startsWith(category);
-      }
-      return file.type === type;
-    });
+  const getFileIcon = (fileType: string) => {
+    if (fileType.startsWith('image/')) return <FileImageOutlined />;
+    if (fileType === 'application/pdf') return <FilePdfOutlined />;
+    if (fileType.startsWith('text/')) return <FileTextOutlined />;
+    return <FileOutlined />;
   };
 
-  // Validate file size
-  const isValidFileSize = (file: File): boolean => {
-    return file.size <= maxFileSize * 1024 * 1024;
-  };
-
-  // Get file icon based on type
-  const getFileIcon = (file: File) => {
-    if (file.type.startsWith('image/')) {
-      return <PictureOutlined style={{ fontSize: '16px', color: '#1890ff' }} />;
-    }
-    if (file.type.startsWith('video/')) {
-      return <PlayCircleOutlined style={{ fontSize: '16px', color: '#722ed1' }} />;
-    }
-    if (file.type.startsWith('audio/')) {
-      return <AudioOutlined style={{ fontSize: '16px', color: '#52c41a' }} />;
-    }
-    if (file.type.includes('pdf')) {
-      return <FileTextOutlined style={{ fontSize: '16px', color: '#fa8c16' }} />;
-    }
-    return <FileOutlined style={{ fontSize: '16px', color: '#8c8c8c' }} />;
-  };
-
-  // Format file size
-  const formatFileSize = (bytes: number): string => {
+  const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   };
 
-  // Handle file selection
-  const handleFileSelect = useCallback((files: FileList | File[]) => {
-    const fileArray = Array.from(files);
-    const validFiles: File[] = [];
-    const errors: string[] = [];
+  const beforeUpload = (file: File) => {
+    // Check file size
+    if (file.size > maxFileSize) {
+      message.error(`File size must be less than ${formatFileSize(maxFileSize)}`);
+      return false;
+    }
 
-    fileArray.forEach(file => {
-      if (!isValidFileType(file)) {
-        errors.push(`${file.name}: Unsupported file type`);
-        return;
+    // Check file type
+    const isAllowed = allowedFileTypes.some(type => {
+      if (type.startsWith('.')) {
+        return file.name.toLowerCase().endsWith(type);
       }
-      if (!isValidFileSize(file)) {
-        errors.push(`${file.name}: File size exceeds ${maxFileSize}MB limit`);
-        return;
-      }
-      validFiles.push(file);
+      return file.type.match(type);
     });
 
-    if (errors.length > 0) {
-      message.error(errors.join('\n'));
+    if (!isAllowed) {
+      message.error('File type not allowed');
+      return false;
     }
 
-    if (validFiles.length > 0) {
-      const newUploadedFiles = validFiles.map(file => ({
-        file,
-        progress: 0,
-        status: 'uploading' as const
-      }));
-
-      setUploadedFiles(prev => [...prev, ...newUploadedFiles]);
-      onFileSelect(validFiles);
-
-      // Simulate upload progress
-      newUploadedFiles.forEach(uploadedFile => {
-        simulateFileUpload(uploadedFile);
-      });
+    // Check max files
+    if (fileList.length >= maxFiles) {
+      message.error(`Maximum ${maxFiles} files allowed`);
+      return false;
     }
-  }, [maxFileSize, acceptedTypes, onFileSelect]);
 
-  // Simulate file upload (in real app, this would be actual API call)
-  const simulateFileUpload = useCallback((uploadedFile: UploadedFile) => {
-    const interval = setInterval(() => {
-      setUploadedFiles(prev => prev.map(f => {
-        if (f.file === uploadedFile.file) {
-          const newProgress = Math.min(f.progress + Math.random() * 20, 100);
-          
-          if (newProgress < 100) {
-            onFileUpload?.(f.file, newProgress);
-            return { ...f, progress: newProgress };
-          } else {
-            clearInterval(interval);
-            const url = URL.createObjectURL(f.file); // In real app, this would be server URL
-            onFileComplete?.(f.file, url);
-            return { ...f, progress: 100, status: 'completed', url };
-          }
-        }
-        return f;
-      }));
-    }, 500);
-  }, [onFileUpload, onFileComplete]);
+    return true;
+  };
 
-  // Handle drag events
-  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
+  const handleUpload = async (file: File) => {
+    setUploading(true);
+    const fileId = file.name + Date.now();
     
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFileSelect(e.dataTransfer.files);
-    }
-  }, [handleFileSelect]);
+    try {
+      // Simulate upload progress
+      let progress = 0;
+      const progressInterval = setInterval(() => {
+        progress += 10;
+        setUploadProgress(prev => ({ ...prev, [fileId]: progress }));
+        if (progress >= 90) clearInterval(progressInterval);
+      }, 100);
 
-  // Handle file input change
-  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      handleFileSelect(e.target.files);
-    }
-  }, [handleFileSelect]);
-
-  // Remove file
-  const handleRemoveFile = useCallback((file: File) => {
-    setUploadedFiles(prev => prev.filter(f => f.file !== file));
-    onFileSelect([]); // Notify parent that selection changed
-  }, [onFileSelect]);
-
-  // Upload props for Ant Design Upload component
-  const uploadProps: UploadProps = {
-    multiple: true,
-    accept: acceptedTypes.join(','),
-    beforeUpload: () => false, // Prevent automatic upload
-    onChange: (info) => {
-      if (info.fileList.length > 0) {
-        handleFileSelect(info.fileList.map(item => item.originFileObj as File));
+      const attachment = await dispatch(chatThunks.uploadFile({ file, roomId })).unwrap();
+      
+      clearInterval(progressInterval);
+      setUploadProgress(prev => ({ ...prev, [fileId]: 100 }));
+      
+      message.success(`${file.name} uploaded successfully`);
+      
+      if (onFileUploaded) {
+        onFileUploaded(attachment);
       }
+
+      // Remove from file list after successful upload
+      // Use file name + size as unique identifier since native File doesn't have uid
+      setFileList(prev => prev.filter(f => !(f.name === file.name && f.size === file.size)));
+    } catch (error) {
+      message.error(`Failed to upload ${file.name}`);
+      setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
+    } finally {
+      setUploading(false);
+      setTimeout(() => {
+        setUploadProgress(prev => {
+          const newProgress = { ...prev };
+          delete newProgress[fileId];
+          return newProgress;
+        });
+      }, 1000);
     }
+  };
+
+  const handleRemove = (file: UploadFile) => {
+    setFileList(prev => prev.filter(f => f.uid !== file.uid));
+  };
+
+  const uploadProps: UploadProps = {
+    beforeUpload,
+    onRemove: handleRemove,
+    fileList,
+    multiple: true,
+    showUploadList: false,
+    customRequest: ({ file }) => {
+      const uploadFile = file as File;
+      handleUpload(uploadFile);
+    },
   };
 
   return (
-    <div className={`file-upload ${className}`} style={{ width: '100%' }}>
-      {/* Drag and Drop Area */}
-      <Card
-        size="small"
-        style={{
-          border: isDragging ? '2px dashed #1890ff' : '2px dashed var(--color-border)',
-          backgroundColor: isDragging ? 'rgba(24, 144, 255, 0.05)' : 'var(--color-bg-secondary)',
-          transition: 'all 0.3s ease',
-          cursor: disabled ? 'not-allowed' : 'pointer'
-        }}
-        onMouseEnter={handleDragEnter}
-        onMouseLeave={handleDragLeave}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-        onClick={() => !disabled && fileInputRef.current?.click()}
-      >
-        <div style={{ 
-          padding: '24px', 
-          textAlign: 'center',
-          pointerEvents: disabled ? 'none' : 'auto'
-        }}>
-          <InboxOutlined 
-            style={{ 
-              fontSize: '48px', 
-              color: isDragging ? '#1890ff' : 'var(--color-text-secondary)',
-              marginBottom: '12px'
-            }} 
-          />
-          <Text style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>
-            Drag & drop files here or click to browse
-          </Text>
-          <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginTop: '4px' }}>
-            Supported formats: {acceptedTypes.join(', ')} • Max size: {maxFileSize}MB • Max files: {maxFiles}
-          </Text>
-        </div>
-      </Card>
+    <div className="file-upload">
+      <Upload {...uploadProps}>
+        <Button 
+          icon={<UploadOutlined />} 
+          disabled={uploading || fileList.length >= maxFiles}
+          loading={uploading}
+        >
+          {uploading ? 'Uploading...' : `Upload File (${fileList.length}/${maxFiles})`}
+        </Button>
+      </Upload>
 
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        accept={acceptedTypes.join(',')}
-        onChange={handleFileInputChange}
-        style={{ display: 'none' }}
-        disabled={disabled}
-      />
-
-      {/* Uploaded Files List */}
-      {uploadedFiles.length > 0 && (
-        <div style={{ marginTop: '12px' }}>
-          <Text strong style={{ fontSize: '12px', marginBottom: '8px', display: 'block' }}>
-            Selected Files ({uploadedFiles.length}/{maxFiles})
-          </Text>
-          
-          <Space direction="vertical" style={{ width: '100%' }} size="small">
-            {uploadedFiles.map((uploadedFile, index) => (
-              <Card
-                key={index}
-                size="small"
-                style={{ 
-                  backgroundColor: 'var(--color-bg-secondary)',
-                  border: '1px solid var(--color-border-light)'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {/* File Icon */}
-                  {getFileIcon(uploadedFile.file)}
-                  
-                  {/* File Info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <Text 
-                      ellipsis 
-                      style={{ fontSize: '12px', display: 'block' }}
-                      title={uploadedFile.file.name}
-                    >
-                      {uploadedFile.file.name}
-                    </Text>
-                    <Text type="secondary" style={{ fontSize: '11px' }}>
-                      {formatFileSize(uploadedFile.file.size)}
-                    </Text>
-                  </div>
-
-                  {/* Progress */}
-                  {uploadedFile.status === 'uploading' && (
-                    <Progress
-                      percent={uploadedFile.progress}
-                      size="small"
-                      style={{ width: '60px' }}
+      {fileList.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <Text type="secondary">Files to upload:</Text>
+          <List
+            size="small"
+            dataSource={fileList}
+            renderItem={(file) => {
+              const fileId = file.name + file.uid;
+              const progress = uploadProgress[fileId] || 0;
+              
+              return (
+                <List.Item
+                  actions={[
+                    <Button 
+                      type="text" 
+                      danger 
+                      icon={<DeleteOutlined />} 
+                      onClick={() => handleRemove(file)}
+                      disabled={uploading}
+                    />
+                  ]}
+                >
+                  <List.Item.Meta
+                    avatar={getFileIcon(file.type || '')}
+                    title={
+                      <Space>
+                        <Text ellipsis style={{ maxWidth: 200 }}>{file.name}</Text>
+                        <Tag color="blue">{formatFileSize(file.size || 0)}</Tag>
+                      </Space>
+                    }
+                  />
+                  {progress > 0 && progress < 100 && (
+                    <Progress 
+                      percent={progress} 
+                      size="small" 
+                      style={{ width: 100 }}
                     />
                   )}
-
-                  {/* Status */}
-                  {uploadedFile.status === 'completed' && (
-                    <Text type="success" style={{ fontSize: '11px' }}>
-                      ✓ Uploaded
-                    </Text>
+                  {progress === 100 && (
+                    <Text type="success">✓</Text>
                   )}
-
-                  {uploadedFile.status === 'error' && (
-                    <Text type="danger" style={{ fontSize: '11px' }}>
-                      ✗ Error
-                    </Text>
-                  )}
-
-                  {/* Remove Button */}
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<DeleteOutlined />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveFile(uploadedFile.file);
-                    }}
-                    style={{ 
-                      fontSize: '10px',
-                      color: 'var(--color-text-secondary)'
-                    }}
-                  />
-                </div>
-              </Card>
-            ))}
-          </Space>
+                </List.Item>
+              );
+            }}
+          />
         </div>
       )}
 
-      {/* Upload Button Alternative */}
-      {!disabled && (
-        <div style={{ marginTop: '8px', textAlign: 'center' }}>
-          <Button
-            type="text"
-            icon={<UploadOutlined />}
-            onClick={() => fileInputRef.current?.click()}
-            size="small"
-            style={{ fontSize: '12px' }}
-          >
-            Browse Files
-          </Button>
-        </div>
-      )}
+      <div style={{ marginTop: 8 }}>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          Max file size: {formatFileSize(maxFileSize)} • Allowed: {allowedFileTypes.join(', ')}
+        </Text>
+      </div>
     </div>
   );
 };
+
+export default FileUpload;

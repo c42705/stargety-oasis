@@ -1,329 +1,288 @@
-// API Service for chat functionality
-// Mobile-first design for integration with Jitsi video call side panel
-import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import { Message, Reaction, ChatRoom, Attachment, MessageEnum } from '../../redux/types/chat';
+import { apiFetch, apiUpload } from './apiClient';
 
-// Import types from chat slice
-import {
-  Message,
-  ChatRoom,
-  User,
-  Reaction,
-  Attachment
-} from '../../redux/slices/chatSlice';
-
-// API base URL - will be configured based on environment
-const API_BASE_URL = (import.meta as unknown as { env: Record<string, string> }).env?.VITE_API_URL || 'http://localhost:3001';
-
-// Backend message format
-interface BackendMessage {
-  id: string;
-  content: { text: string; authorName?: string; mentions?: string[]; attachments?: Array<{ url: string; type: string; name: string }> };
-  authorId: string | null;
-  authorName: string;
+export interface SendMessageParams {
   roomId: string;
-  createdAt: string;
+  content: string;
+  type?: MessageEnum;
+  parentId?: string;
+  threadId?: string;
 }
 
-// Backend room format
-interface BackendRoom {
-  id: string;
-  name: string;
+export interface EditMessageParams {
+  messageId: string;
+  content: string;
+}
+
+export interface ReactionParams {
+  messageId: string;
+  emoji: string;
+}
+
+export interface SearchMessagesParams {
   roomId: string;
-  description: string | null;
-  createdAt: string;
+  query: string;
+  userId?: string;
+  startDate?: Date;
+  endDate?: Date;
+  fileType?: string;
+  page?: number;
+  limit?: number;
 }
 
-// Transform backend message to frontend Message format
-function transformMessage(backendMsg: BackendMessage): Message {
-  return {
-    id: backendMsg.id,
-    content: backendMsg.content.text,
-    type: 'text',
-    roomId: backendMsg.roomId,
-    authorId: backendMsg.authorId || 'anonymous',
-    author: {
-      id: backendMsg.authorId || 'anonymous',
-      displayName: backendMsg.authorName || backendMsg.content.authorName || 'Anonymous',
-    },
-    isEdited: false,
-    reactions: [],
-    attachments: (backendMsg.content.attachments || []).map((att, idx) => ({
-      id: `${backendMsg.id}-att-${idx}`,
-      filename: att.name,
-      mimetype: att.type,
-      size: 0,
-      url: att.url,
-      uploadedAt: new Date(backendMsg.createdAt),
-    })),
-    expiresAt: new Date(new Date(backendMsg.createdAt).getTime() + 8 * 60 * 60 * 1000),
-    createdAt: new Date(backendMsg.createdAt),
-  };
+export interface LoadMessagesParams {
+  roomId: string;
+  page?: number;
+  limit?: number;
 }
 
-// Transform backend room to frontend ChatRoom format
-function transformRoom(backendRoom: BackendRoom): ChatRoom {
-  return {
-    id: backendRoom.roomId,
-    name: backendRoom.name,
-    description: backendRoom.description || undefined,
-    unreadCount: 0,
-    lastActivity: new Date(backendRoom.createdAt),
-  };
-}
-
-// API client instance
-const api = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
-  timeout: 10000, // 10 seconds timeout
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Request interceptor for adding auth token
-api.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error: AxiosError) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor for error handling
-api.interceptors.response.use(
-  (response: AxiosResponse) => response,
-  (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      // Handle unauthorized access
-      localStorage.removeItem('authToken');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
-
-// Chat API Service class
 class ChatApiService {
-  // REST API methods
-
-  /**
-   * Get all available chat rooms
-   */
+  // Room operations
   async getRooms(): Promise<ChatRoom[]> {
-    try {
-      const response = await api.get<{ success: boolean; data: BackendRoom[] }>('/chat/rooms');
-      if (response.data.success && response.data.data) {
-        return response.data.data.map(transformRoom);
-      }
-      return [];
-    } catch (error) {
-      console.error('Error fetching chat rooms:', error);
-      throw error;
+    const response = await apiFetch<ChatRoom[]>('/api/chat/rooms');
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to fetch rooms');
+    }
+    return response.data;
+  }
+
+  async getRoom(roomId: string): Promise<ChatRoom> {
+    const response = await apiFetch<ChatRoom>(`/api/chat/rooms/${roomId}`);
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to fetch room');
+    }
+    return response.data;
+  }
+
+  async createRoom(roomData: Partial<ChatRoom>): Promise<ChatRoom> {
+    const response = await apiFetch<ChatRoom>('/api/chat/rooms', {
+      method: 'POST',
+      body: JSON.stringify(roomData),
+    });
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to create room');
+    }
+    return response.data;
+  }
+
+  async updateRoom(roomId: string, roomData: Partial<ChatRoom>): Promise<ChatRoom> {
+    const response = await apiFetch<ChatRoom>(`/api/chat/rooms/${roomId}`, {
+      method: 'PUT',
+      body: JSON.stringify(roomData),
+    });
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to update room');
+    }
+    return response.data;
+  }
+
+  async deleteRoom(roomId: string): Promise<void> {
+    const response = await apiFetch<void>(`/api/chat/rooms/${roomId}`, {
+      method: 'DELETE',
+    });
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to delete room');
     }
   }
 
-  /**
-   * Get messages for a specific room (paginated)
-   */
-  async getMessages(params: { roomId: string; page?: number; limit?: number }): Promise<{
-    messages: Message[];
-    hasMore: boolean;
-    page: number;
-  }> {
-    try {
-      const response = await api.get<{ success: boolean; data: { messages: BackendMessage[]; hasMore: boolean } }>(
-        `/chat/${params.roomId}/messages`,
-        { params: { limit: params.limit || 50 } }
-      );
-      if (response.data.success && response.data.data) {
-        return {
-          messages: response.data.data.messages.map(transformMessage),
-          hasMore: response.data.data.hasMore,
-          page: params.page || 1,
-        };
-      }
-      return { messages: [], hasMore: false, page: params.page || 1 };
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-      throw error;
+  // Message operations
+  async getMessages(params: LoadMessagesParams): Promise<Message[]> {
+    const { roomId, page = 1, limit = 50 } = params;
+    const queryParams = new URLSearchParams({ page: page.toString(), limit: limit.toString() });
+    const response = await apiFetch<Message[]>(`/api/chat/${roomId}/messages?${queryParams}`);
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to fetch messages');
     }
+    return response.data;
   }
 
-  /**
-   * Send a new message to a room
-   */
-  async sendMessage(params: {
-    roomId: string;
-    content: string;
-    authorName?: string;
-    authorId?: string;
-  }): Promise<Message> {
-    try {
-      const response = await api.post<{ success: boolean; data: BackendMessage }>(
-        `/chat/${params.roomId}/messages`,
-        { text: params.content, authorName: params.authorName || 'Anonymous', authorId: params.authorId }
-      );
-      if (response.data.success && response.data.data) {
-        return transformMessage(response.data.data);
-      }
-      throw new Error('Failed to send message');
-    } catch (error) {
-      console.error('Error sending message:', error);
-      throw error;
+  async sendMessage(params: SendMessageParams): Promise<Message> {
+    const { roomId, content, type = MessageEnum.TEXT, parentId, threadId } = params;
+    const response = await apiFetch<Message>(`/api/chat/${roomId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({
+        content,
+        type,
+        parentId,
+        threadId,
+      }),
+    });
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to send message');
     }
+    return response.data;
   }
-  
-  /**
-   * Edit an existing message
-   */
-  async editMessage(params: { messageId: string; content: string }): Promise<Message> {
-    try {
-      const response = await api.put(`/chat/messages/${params.messageId}`, params);
-      return response.data;
-    } catch (error) {
-      console.error('Error editing message:', error);
-      throw error;
+
+  async editMessage(params: EditMessageParams): Promise<Message> {
+    const { messageId, content } = params;
+    const response = await apiFetch<Message>(`/api/chat/messages/${messageId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+    });
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to edit message');
     }
+    return response.data;
   }
-  
-  /**
-   * Delete a message
-   */
+
   async deleteMessage(messageId: string): Promise<void> {
-    try {
-      await api.delete(`/chat/messages/${messageId}`);
-    } catch (error) {
-      console.error('Error deleting message:', error);
-      throw error;
+    const response = await apiFetch<void>(`/api/chat/messages/${messageId}`, {
+      method: 'DELETE',
+    });
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to delete message');
     }
   }
-  
-  /**
-   * Add a reaction to a message
-   */
-  async addReaction(params: { messageId: string; emoji: string }): Promise<Reaction> {
-    try {
-      const response = await api.post(`/chat/messages/${params.messageId}/reactions`, params);
-      return response.data;
-    } catch (error) {
-      console.error('Error adding reaction:', error);
-      throw error;
+
+  async getMessage(messageId: string): Promise<Message> {
+    const response = await apiFetch<Message>(`/api/chat/messages/${messageId}`);
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to fetch message');
+    }
+    return response.data;
+  }
+
+  // Reactions
+  async addReaction(params: ReactionParams): Promise<Message> {
+    const { messageId, emoji } = params;
+    const response = await apiFetch<Message>(`/api/chat/messages/${messageId}/reactions`, {
+      method: 'POST',
+      body: JSON.stringify({ emoji }),
+    });
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to add reaction');
+    }
+    return response.data;
+  }
+
+  async removeReaction(params: ReactionParams): Promise<void> {
+    const { messageId, emoji } = params;
+    const response = await apiFetch<void>(`/api/chat/messages/${messageId}/reactions/${emoji}`, {
+      method: 'DELETE',
+    });
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to remove reaction');
     }
   }
-  
-  /**
-   * Remove a reaction from a message
-   */
-  async removeReaction(params: { messageId: string; emoji: string }): Promise<void> {
-    try {
-      await api.delete(`/chat/messages/${params.messageId}/reactions/${params.emoji}`);
-    } catch (error) {
-      console.error('Error removing reaction:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Upload a file to a chat room
-   */
+
+  // File attachments
   async uploadFile(file: File, roomId: string): Promise<Attachment> {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const response = await api.post(`/chat/${roomId}/files`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      throw error;
+    const response = await apiUpload<Attachment>(`/api/chat/${roomId}/files`, file);
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to upload file');
+    }
+    return response.data;
+  }
+
+  async getAttachment(attachmentId: string): Promise<Attachment> {
+    const response = await apiFetch<Attachment>(`/api/chat/attachments/${attachmentId}`);
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to fetch attachment');
+    }
+    return response.data;
+  }
+
+  async deleteAttachment(attachmentId: string): Promise<void> {
+    const response = await apiFetch<void>(`/api/chat/attachments/${attachmentId}`, {
+      method: 'DELETE',
+    });
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to delete attachment');
     }
   }
-  
-  /**
-   * Search messages in a room
-   */
-  async searchMessages(params: { roomId: string; query: string; page?: number; limit?: number }): Promise<{
-    messages: Message[];
-    hasMore: boolean;
-    page: number;
+
+  // Search functionality
+  async searchMessages(params: SearchMessagesParams): Promise<Message[]> {
+    const { 
+      roomId, 
+      query, 
+      userId, 
+      startDate, 
+      endDate, 
+      fileType, 
+      page = 1, 
+      limit = 50 
+    } = params;
+    
+    const searchParams: Record<string, string> = { 
+      query, 
+      page: page.toString(), 
+      limit: limit.toString() 
+    };
+    
+    if (userId) searchParams.userId = userId;
+    if (startDate) searchParams.startDate = startDate.toISOString();
+    if (endDate) searchParams.endDate = endDate.toISOString();
+    if (fileType) searchParams.fileType = fileType;
+
+    const queryParams = new URLSearchParams(searchParams);
+    const response = await apiFetch<Message[]>(`/api/chat/${roomId}/search?${queryParams}`);
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to search messages');
+    }
+    return response.data;
+  }
+
+  // Typing indicators
+  async sendTypingIndicator(roomId: string, isTyping: boolean): Promise<void> {
+    const response = await apiFetch<void>(`/api/chat/${roomId}/typing`, {
+      method: 'POST',
+      body: JSON.stringify({ isTyping }),
+    });
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to send typing indicator');
+    }
+  }
+
+  // Message history/export
+  async exportMessages(roomId: string, format: 'json' | 'txt' = 'json'): Promise<Blob> {
+    const url = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/chat/${roomId}/export?format=${format}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to export messages: ${response.status}`);
+    }
+    return response.blob();
+  }
+
+  // Message statistics
+  async getMessageStats(roomId: string): Promise<{
+    totalMessages: number;
+    totalUsers: number;
+    messagesByDay: Record<string, number>;
+    topUsers: Array<{ userId: string; messageCount: number }>;
   }> {
-    try {
-      const response = await api.get(`/chat/${params.roomId}/search`, {
-        params: {
-          query: params.query,
-          page: params.page || 1,
-          limit: params.limit || 50,
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error searching messages:', error);
-      throw error;
+    const response = await apiFetch<{
+      totalMessages: number;
+      totalUsers: number;
+      messagesByDay: Record<string, number>;
+      topUsers: Array<{ userId: string; messageCount: number }>;
+    }>(`/api/chat/${roomId}/stats`);
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to fetch message stats');
     }
+    return response.data;
   }
-  
-  /**
-   * Join a chat room
-   */
-  async joinRoom(roomId: string): Promise<void> {
-    try {
-      await api.post(`/chat/rooms/${roomId}/join`);
-    } catch (error) {
-      console.error('Error joining room:', error);
-      throw error;
+
+  // Real-time connection status
+  async getConnectionStatus(): Promise<{
+    connected: boolean;
+    lastPing: Date | null;
+    reconnectAttempts: number;
+  }> {
+    const response = await apiFetch<{
+      connected: boolean;
+      lastPing: Date | null;
+      reconnectAttempts: number;
+    }>('/api/chat/status');
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to fetch connection status');
     }
-  }
-  
-  /**
-   * Leave a chat room
-   */
-  async leaveRoom(roomId: string): Promise<void> {
-    try {
-      await api.post(`/chat/rooms/${roomId}/leave`);
-    } catch (error) {
-      console.error('Error leaving room:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Get online users in a room
-   */
-  async getOnlineUsers(roomId: string): Promise<User[]> {
-    try {
-      const response = await api.get(`/chat/${roomId}/users/online`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching online users:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Get typing users in a room
-   */
-  async getTypingUsers(roomId: string): Promise<string[]> {
-    try {
-      const response = await api.get(`/chat/${roomId}/users/typing`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching typing users:', error);
-      throw error;
-    }
+    return response.data;
   }
 }
 
 // Export singleton instance
 export const chatApiService = new ChatApiService();
 
-// Export for direct use if needed
-export default ChatApiService;
+// Export class for testing or custom instances
+export { ChatApiService };

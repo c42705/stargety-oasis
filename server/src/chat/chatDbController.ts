@@ -161,6 +161,33 @@ export class ChatDbController {
   }
 
   /**
+   * Get a single message by ID
+   */
+  async getMessage(messageId: string): Promise<ChatMessageData | null> {
+    try {
+      const message = await prisma.message.findUnique({
+        where: { id: messageId },
+        include: { room: true },
+      });
+
+      if (!message) return null;
+
+      const content = message.content as unknown as MessageContent;
+      return {
+        id: message.id,
+        content,
+        authorId: message.authorId,
+        authorName: (content as MessageContent & { authorName?: string }).authorName || 'Unknown',
+        roomId: message.room.roomId,
+        createdAt: message.createdAt,
+      };
+    } catch (error) {
+      logger.error('Error getting message:', error);
+      return null;
+    }
+  }
+
+  /**
    * Create a new message (persists to DB)
    */
   async createMessage(
@@ -305,6 +332,301 @@ export class ChatDbController {
    */
   handleTyping(socket: Socket, data: { user: string; isTyping: boolean; roomId: string }) {
     socket.to(data.roomId).emit('user-typing', data);
+  }
+
+  // --------------------------------------------------------------------------
+  // MESSAGE EDITING & DELETION
+  // --------------------------------------------------------------------------
+
+  /**
+   * Edit an existing message
+   */
+  async editMessage(messageId: string, newContent: string): Promise<ChatMessageData | null> {
+    try {
+      const message = await prisma.message.findUnique({
+        where: { id: messageId },
+        include: { room: true },
+      });
+
+      if (!message) {
+        logger.error(`Message not found: ${messageId}`);
+        return null;
+      }
+
+      // Update content and mark as edited
+      const updatedMessage = await prisma.message.update({
+        where: { id: messageId },
+        data: {
+          content: {
+            ...(message.content as object),
+            text: newContent,
+          },
+          isEdited: true,
+          editedAt: new Date(),
+        },
+      });
+
+      // Broadcast edit event to room
+      this.io.to(message.room.roomId).emit('message:edited', {
+        messageId: updatedMessage.id,
+        content: newContent,
+        editedAt: updatedMessage.editedAt,
+      });
+
+      return {
+        id: updatedMessage.id,
+        content: updatedMessage.content as unknown as MessageContent,
+        authorId: updatedMessage.authorId,
+        authorName: (updatedMessage.content as unknown as MessageContent & { authorName?: string }).authorName ?? 'Anonymous',
+        roomId: message.room.roomId,
+        createdAt: updatedMessage.createdAt,
+      };
+    } catch (error) {
+      logger.error('Error editing message:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete a message (soft delete with tombstone)
+   */
+  async deleteMessage(messageId: string): Promise<boolean> {
+    try {
+      const message = await prisma.message.findUnique({
+        where: { id: messageId },
+        include: { room: true },
+      });
+
+      if (!message) {
+        logger.error(`Message not found: ${messageId}`);
+        return false;
+      }
+
+      // Soft delete: replace content with tombstone
+      await prisma.message.update({
+        where: { id: messageId },
+        data: {
+          content: {
+            text: '[Message deleted]',
+            isDeleted: true,
+          },
+        },
+      });
+
+      // Broadcast delete event to room
+      this.io.to(message.room.roomId).emit('message:deleted', {
+        messageId,
+      });
+
+      logger.debug(`Message deleted: ${messageId}`);
+      return true;
+    } catch (error) {
+      logger.error('Error deleting message:', error);
+      return false;
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // REACTIONS
+  // --------------------------------------------------------------------------
+
+  /**
+   * Add a reaction to a message
+   */
+  async addReaction(messageId: string, emoji: string, userId: string): Promise<boolean> {
+    try {
+      const message = await prisma.message.findUnique({
+        where: { id: messageId },
+        include: { room: true },
+      });
+
+      if (!message) {
+        logger.error(`Message not found: ${messageId}`);
+        return false;
+      }
+
+      // Check if reaction already exists
+      const existingReaction = await prisma.reaction.findUnique({
+        where: {
+          emoji_userId_messageId: {
+            emoji,
+            userId,
+            messageId,
+          },
+        },
+      });
+
+      if (existingReaction) {
+        // Reaction already exists, do nothing
+        return false;
+      }
+
+      // Create new reaction
+      await prisma.reaction.create({
+        data: {
+          emoji,
+          userId,
+          messageId,
+        },
+      });
+
+      // Broadcast reaction added event
+      this.io.to(message.room.roomId).emit('reaction:added', {
+        messageId,
+        emoji,
+        userId,
+      });
+
+      logger.debug(`Reaction added: ${emoji} to message ${messageId} by user ${userId}`);
+      return true;
+    } catch (error) {
+      logger.error('Error adding reaction:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Remove a reaction from a message
+   */
+  async removeReaction(messageId: string, emoji: string, userId: string): Promise<boolean> {
+    try {
+      const message = await prisma.message.findUnique({
+        where: { id: messageId },
+        include: { room: true },
+      });
+
+      if (!message) {
+        logger.error(`Message not found: ${messageId}`);
+        return false;
+      }
+
+      // Delete reaction
+      await prisma.reaction.deleteMany({
+        where: {
+          emoji,
+          userId,
+          messageId,
+        },
+      });
+
+      // Broadcast reaction removed event
+      this.io.to(message.room.roomId).emit('reaction:removed', {
+        messageId,
+        emoji,
+        userId,
+      });
+
+      logger.debug(`Reaction removed: ${emoji} from message ${messageId} by user ${userId}`);
+      return true;
+    } catch (error) {
+      logger.error('Error removing reaction:', error);
+      return false;
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // SEARCH FUNCTIONALITY
+  // --------------------------------------------------------------------------
+
+  /**
+   * Search messages in a room
+   */
+  async searchMessages(
+    roomId: string,
+    query: string,
+    options: { limit?: number; userId?: string; startDate?: Date; endDate?: Date } = {}
+  ): Promise<ChatMessageData[]> {
+    const { limit = 50, userId, startDate, endDate } = options;
+
+    try {
+      // Get room
+      const room = await prisma.chatRoom.findUnique({ where: { roomId } });
+      if (!room) {
+        return [];
+      }
+
+      // Build where clause
+      const whereClause: Record<string, unknown> = {
+        roomId: room.id,
+      };
+
+      // Text search (case-insensitive)
+      if (query) {
+        whereClause.content = {
+          path: ['text'],
+          string_contains: query,
+        };
+      }
+
+      // User filter
+      if (userId) {
+        whereClause.authorId = userId;
+      }
+
+      // Date range filter
+      if (startDate || endDate) {
+        whereClause.createdAt = {};
+        if (startDate) {
+          (whereClause.createdAt as Record<string, Date>).gte = startDate;
+        }
+        if (endDate) {
+          (whereClause.createdAt as Record<string, Date>).lte = endDate;
+        }
+      }
+
+      const messages = await prisma.message.findMany({
+        where: whereClause,
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        include: { author: { select: { username: true } } },
+      });
+
+      return messages.map((m) => ({
+        id: m.id,
+        content: m.content as unknown as MessageContent,
+        authorId: m.authorId,
+        authorName: (m.content as unknown as MessageContent & { authorName?: string }).authorName
+          ?? m.author?.username ?? 'Anonymous',
+        roomId,
+        createdAt: m.createdAt,
+      }));
+    } catch (error) {
+      logger.error('Error searching messages:', error);
+      return [];
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // FILE ATTACHMENTS
+  // --------------------------------------------------------------------------
+
+  /**
+   * Add file attachment to a message
+   */
+  async addAttachment(
+    messageId: string,
+    attachment: {
+      filename: string;
+      mimetype: string;
+      size: number;
+      url: string;
+      thumbnailUrl?: string;
+    }
+  ): Promise<boolean> {
+    try {
+      await prisma.attachment.create({
+        data: {
+          ...attachment,
+          messageId,
+        },
+      });
+
+      logger.debug(`Attachment added to message ${messageId}: ${attachment.filename}`);
+      return true;
+    } catch (error) {
+      logger.error('Error adding attachment:', error);
+      return false;
+    }
   }
 
   /**

@@ -8,6 +8,7 @@ import { CameraController } from './CameraController';
 import { DebugDiagnostics } from './DebugDiagnostics';
 import { RemotePlayerManager } from './RemotePlayerManager';
 import { WorldSocketService } from '../../services/WorldSocketService';
+import { worldChatIntegration } from '../../services/integration/WorldChatIntegration';
 import { shouldBlockBackgroundInteractions } from '../../shared/ModalStateManager';
 import { logger } from '../../shared/logger';
 

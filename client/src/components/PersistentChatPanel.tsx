@@ -1,21 +1,21 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { List, Input, Button, Space, Typography, Badge, Avatar, Popover, Card } from 'antd';
+import { List, Input, Button, Space, Typography, Badge, Avatar, Popover, Card, Switch, Tooltip } from 'antd';
 import type { InputRef } from 'antd';
-import { SendOutlined, SmileOutlined, UserOutlined, TeamOutlined, SettingOutlined } from '@ant-design/icons';
+import { SendOutlined, SmileOutlined, UserOutlined, TeamOutlined, SettingOutlined, VideoCameraOutlined, PhoneOutlined } from '@ant-design/icons';
 import { Smile, Laugh, Heart, ThumbsUp, ThumbsDown, PartyPopper, Frown } from 'lucide-react';
 import { useAuth } from '../shared/AuthContext';
 import { useAppDispatch, useAppSelector } from '../redux/hooks';
 import {
-  chatActions,
   chatThunks,
+  setCurrentRoom,
   selectCurrentRoom,
   selectRooms,
   selectMessagesByRoom,
-  selectTypingUsers,
-  Message as ChatMessage,
-  ChatRoom as ChatRoomType
+  selectTypingUsers
 } from '../redux/slices/chatSlice';
+import { Message, ChatRoom } from '../redux/types/chat';
 import { chatSocketService } from '../services/socket/ChatSocketService';
+import { jitsiChatIntegration, ChatRoomWithVideo } from '../services/integration/JitsiChatIntegration';
 
 const { Text } = Typography;
 
@@ -51,6 +51,11 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
   const [isConnected, setIsConnected] = useState(chatSocketService.isConnected());
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showRoomList, setShowRoomList] = useState(false);
+  const [autoJoinVideo, setAutoJoinVideo] = useState(true);
+  
+  // Jitsi integration state
+  const videoCallState = jitsiChatIntegration.getVideoCallState();
+  const hasVideoCallEnabled = jitsiChatIntegration.hasVideoCallEnabled(currentRoom);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -119,9 +124,7 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
     // Also dispatch to Redux for API persistence
     dispatch(chatThunks.sendMessage({
       roomId: currentRoom,
-      content: inputMessage.trim(),
-      authorName: currentUser,
-      authorId: userId
+      content: inputMessage.trim()
     }));
 
     setInputMessage('');
@@ -169,17 +172,31 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
     dispatch(chatThunks.leaveRoom(currentRoom));
 
     // Join new room
-    dispatch(chatActions.setCurrentRoom(newRoomId));
+    dispatch(setCurrentRoom(newRoomId));
     dispatch(chatThunks.joinRoom(newRoomId));
     chatSocketService.joinRoom(newRoomId, currentUser);
     dispatch(chatThunks.loadMessages({ roomId: newRoomId }));
 
+    // Handle Jitsi integration
+    jitsiChatIntegration.handleChatRoomChange(newRoomId);
+
     setShowRoomList(false);
     onRoomChange?.(newRoomId);
   }, [currentRoom, currentUser, dispatch, onRoomChange]);
+  
+  // Handle video call toggle
+  const handleVideoCallToggle = useCallback(() => {
+    jitsiChatIntegration.toggleVideoCall();
+  }, []);
+  
+  // Handle auto-join video toggle
+  const handleAutoJoinVideoToggle = useCallback((checked: boolean) => {
+    setAutoJoinVideo(checked);
+    jitsiChatIntegration.setAutoJoin(currentRoom, checked);
+  }, [currentRoom]);
 
-  // Render message item using Redux ChatMessage type
-  const renderMessage = (message: ChatMessage) => {
+  // Render message item using Redux Message type
+  const renderMessage = (message: Message) => {
     const isSystemMessage = message.authorId === 'system';
     const timestamp = message.createdAt instanceof Date
       ? message.createdAt
@@ -199,7 +216,6 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
             {!isSystemMessage && (
               <Avatar
                 size="small"
-                src={message.author?.avatar}
                 icon={<UserOutlined />}
                 style={{ flexShrink: 0 }}
               />
@@ -211,7 +227,7 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
                   type={isSystemMessage ? 'secondary' : undefined}
                   style={{ fontSize: '12px' }}
                 >
-                  {message.author?.displayName || 'Anonymous'}
+                  {message.authorId || 'Anonymous'}
                 </Text>
                 <Text type="secondary" style={{ fontSize: '10px' }}>
                   {timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -223,7 +239,7 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
                 )}
               </div>
               <Text style={{ fontSize: '13px', wordBreak: 'break-word' }}>
-                {message.content}
+                {message.content.text || ''}
               </Text>
             </div>
           </div>
@@ -236,10 +252,10 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
   const renderRoomSelector = () => {
     // Use default rooms if none loaded from API
     const displayRooms = chatRooms.length > 0 ? chatRooms : [
-      { id: 'general', name: 'General', unreadCount: 0 },
-      { id: 'team-alpha', name: 'Team Alpha', unreadCount: 0 },
-      { id: 'random', name: 'Random', unreadCount: 0 }
-    ];
+      { id: 'general', name: 'General', createdAt: new Date(), expiresAt: new Date() },
+      { id: 'team-alpha', name: 'Team Alpha', createdAt: new Date(), expiresAt: new Date() },
+      { id: 'random', name: 'Random', createdAt: new Date(), expiresAt: new Date() }
+    ] as ChatRoom[];
 
     return (
       <div style={{ padding: '8px 12px' }}>
@@ -262,15 +278,7 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
                 <Text style={{ fontSize: '12px', fontWeight: room.id === currentRoom ? 500 : 400 }}>
                   {room.name}
                 </Text>
-                {room.unreadCount > 0 && (
-                  <Badge count={room.unreadCount} size="small" />
-                )}
               </div>
-              {room.lastMessage && (
-                <Text type="secondary" style={{ fontSize: '10px' }}>
-                  {room.lastMessage}
-                </Text>
-              )}
             </div>
           ))}
         </Space>
@@ -305,6 +313,32 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
             )}
           </div>
           <Space size="small">
+            {/* Video Call Button */}
+            {hasVideoCallEnabled && (
+              <Tooltip title={videoCallState.isActive ? 'Leave Video Call' : 'Join Video Call'}>
+                <Button
+                  type={videoCallState.isActive ? 'primary' : 'default'}
+                  icon={<VideoCameraOutlined />}
+                  size="small"
+                  onClick={handleVideoCallToggle}
+                  style={{
+                    backgroundColor: videoCallState.isActive ? 'var(--color-primary)' : undefined
+                  }}
+                />
+              </Tooltip>
+            )}
+            
+            {/* Auto-Join Video Toggle */}
+            {hasVideoCallEnabled && (
+              <Tooltip title="Auto-join video call when entering room">
+                <Switch
+                  size="small"
+                  checked={autoJoinVideo}
+                  onChange={handleAutoJoinVideoToggle}
+                />
+              </Tooltip>
+            )}
+            
             <Popover
               content={renderRoomSelector()}
               title="Switch Room"
@@ -407,5 +441,3 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
     </div>
   );
 };
-
-export default PersistentChatPanel;

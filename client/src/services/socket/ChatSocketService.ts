@@ -2,7 +2,16 @@
 // Mobile-first design for integration with Jitsi video call side panel
 import { io, Socket } from 'socket.io-client';
 import { store } from '../../redux/store';
-import { chatActions, Message } from '../../redux/slices/chatSlice';
+import {
+  setError,
+  addMessage,
+  addOnlineUser,
+  setMessages,
+  removeOnlineUser,
+  addTypingUser,
+  removeTypingUser
+} from '../../redux/slices/chatSlice';
+import { Message } from '../../redux/types/chat';
 
 // Event handler type for Socket.IO
 type SocketEventHandler = (...args: unknown[]) => void;
@@ -137,7 +146,7 @@ class ChatSocketService {
   private handleDisconnect(reason: string) {
     console.log('Disconnected from chat server:', reason);
     // Update UI to show disconnected state
-    store.dispatch(chatActions.setError('Connection lost'));
+    store.dispatch(setError('Connection lost'));
   }
   
   /**
@@ -145,7 +154,7 @@ class ChatSocketService {
    */
   private handleConnectError(error: Error) {
     console.error('Connection error:', error);
-    store.dispatch(chatActions.setError('Connection failed'));
+    store.dispatch(setError('Connection failed'));
   }
   
   /**
@@ -165,21 +174,18 @@ class ChatSocketService {
     // Transform backend format to frontend Message format
     const message: Message = {
       id: data.id,
-      content: data.message,
-      type: 'text',
+      content: { text: data.message },
+      type: 'TEXT' as any,
       roomId: data.roomId,
       authorId: data.userId || 'anonymous',
-      author: {
-        id: data.userId || 'anonymous',
-        displayName: data.user,
-      },
       isEdited: false,
       reactions: [],
       attachments: [],
       expiresAt: new Date(new Date(data.timestamp).getTime() + 8 * 60 * 60 * 1000),
       createdAt: new Date(data.timestamp),
+      updatedAt: new Date(data.timestamp),
     };
-    store.dispatch(chatActions.addMessage(message));
+    store.dispatch(addMessage({ roomId: data.roomId, message }));
   }
 
   /**
@@ -201,26 +207,23 @@ class ChatSocketService {
     console.log('Room joined:', data);
     // Set online users from participants
     data.participants.forEach(user => {
-      store.dispatch(chatActions.addUserOnline(user));
+      store.dispatch(addOnlineUser(user));
     });
     // Transform and set message history
     const messages: Message[] = data.messageHistory.map(msg => ({
       id: msg.id,
-      content: msg.content.text,
-      type: 'text' as const,
+      content: msg.content,
+      type: 'TEXT' as any,
       roomId: data.roomId,
       authorId: msg.authorId || 'anonymous',
-      author: {
-        id: msg.authorId || 'anonymous',
-        displayName: msg.authorName || msg.content.authorName || 'Anonymous',
-      },
       isEdited: false,
       reactions: [],
       attachments: [],
       expiresAt: new Date(new Date(msg.createdAt).getTime() + 8 * 60 * 60 * 1000),
       createdAt: new Date(msg.createdAt),
+      updatedAt: new Date(msg.createdAt),
     }));
-    store.dispatch(chatActions.setMessages({ roomId: data.roomId, messages }));
+    store.dispatch(setMessages({ roomId: data.roomId, messages }));
   }
 
   /**
@@ -228,7 +231,7 @@ class ChatSocketService {
    */
   private handleUserJoined(user: string) {
     console.log('User joined chat:', user);
-    store.dispatch(chatActions.addUserOnline(user));
+    store.dispatch(addOnlineUser(user));
   }
 
   /**
@@ -236,7 +239,7 @@ class ChatSocketService {
    */
   private handleUserLeft(user: string) {
     console.log('User left chat:', user);
-    store.dispatch(chatActions.removeUserOnline(user));
+    store.dispatch(removeOnlineUser(user));
   }
 
   /**
@@ -247,10 +250,10 @@ class ChatSocketService {
     // Clear and reset online users
     const currentState = store.getState();
     currentState.chat.onlineUsers.forEach(userId => {
-      store.dispatch(chatActions.removeUserOnline(userId));
+      store.dispatch(removeOnlineUser(userId));
     });
     users.forEach(user => {
-      store.dispatch(chatActions.addUserOnline(user));
+      store.dispatch(addOnlineUser(user));
     });
   }
 
@@ -262,9 +265,9 @@ class ChatSocketService {
     console.log('Typing event:', data);
     const { roomId, user, isTyping } = data;
     if (isTyping) {
-      store.dispatch(chatActions.addTypingUser({ roomId, userId: user }));
+      store.dispatch(addTypingUser({ roomId, userId: user }));
     } else {
-      store.dispatch(chatActions.removeTypingUser({ roomId, userId: user }));
+      store.dispatch(removeTypingUser({ roomId, userId: user }));
     }
   }
   
@@ -273,7 +276,7 @@ class ChatSocketService {
    */
   private handleError(error: Error) {
     console.error('Socket error:', error);
-    store.dispatch(chatActions.setError(error.message));
+    store.dispatch(setError(error.message));
   }
   
   // Public methods

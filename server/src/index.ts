@@ -452,18 +452,21 @@ app.get('/api/chat/:roomId/messages', async (req, res) => {
 // Post a new message (REST alternative to Socket.IO)
 app.post('/api/chat/:roomId/messages', async (req, res) => {
   const { roomId } = req.params;
-  const { text, authorName, authorId } = req.body;
+  // Support both 'text' and 'content' field names for flexibility
+  const { text, content, authorName, authorId } = req.body;
+  const messageText = text || content;
 
   try {
     if (!chatDbController) {
       return res.status(503).json({ success: false, error: 'Chat service not initialized' });
     }
-    if (!text || !authorName) {
-      return res.status(400).json({ success: false, error: 'text and authorName are required' });
+    if (!messageText) {
+      return res.status(400).json({ success: false, error: 'text or content is required' });
     }
+    // authorName is optional - use 'Anonymous' as fallback
     const message = await chatDbController.createMessage(roomId, {
-      text,
-      authorName,
+      text: messageText,
+      authorName: authorName || 'Anonymous',
       authorId,
     });
     if (!message) {
@@ -473,6 +476,68 @@ app.post('/api/chat/:roomId/messages', async (req, res) => {
   } catch (error) {
     logger.error('Error creating chat message:', error);
     res.status(500).json({ success: false, error: 'Failed to create message' });
+  }
+});
+
+// Edit a message
+app.put('/api/chat/messages/:messageId', async (req, res) => {
+  const { messageId } = req.params;
+  const { content, text } = req.body;
+  const newContent = content || text;
+
+  try {
+    if (!chatDbController) {
+      return res.status(503).json({ success: false, error: 'Chat service not initialized' });
+    }
+    if (!newContent) {
+      return res.status(400).json({ success: false, error: 'content is required' });
+    }
+    const message = await chatDbController.editMessage(messageId, newContent);
+    if (!message) {
+      return res.status(404).json({ success: false, error: 'Message not found' });
+    }
+    res.json({ success: true, data: message });
+  } catch (error) {
+    logger.error('Error editing chat message:', error);
+    res.status(500).json({ success: false, error: 'Failed to edit message' });
+  }
+});
+
+// Delete a message
+app.delete('/api/chat/messages/:messageId', async (req, res) => {
+  const { messageId } = req.params;
+
+  try {
+    if (!chatDbController) {
+      return res.status(503).json({ success: false, error: 'Chat service not initialized' });
+    }
+    const success = await chatDbController.deleteMessage(messageId);
+    if (!success) {
+      return res.status(404).json({ success: false, error: 'Message not found' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('Error deleting chat message:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete message' });
+  }
+});
+
+// Get a single message
+app.get('/api/chat/messages/:messageId', async (req, res) => {
+  const { messageId } = req.params;
+
+  try {
+    if (!chatDbController) {
+      return res.status(503).json({ success: false, error: 'Chat service not initialized' });
+    }
+    const message = await chatDbController.getMessage(messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, error: 'Message not found' });
+    }
+    res.json({ success: true, data: message });
+  } catch (error) {
+    logger.error('Error getting chat message:', error);
+    res.status(500).json({ success: false, error: 'Failed to get message' });
   }
 });
 
