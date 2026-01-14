@@ -41,6 +41,7 @@ export interface Message {
   type: MessageEnum;
   roomId: string;
   authorId: string;
+  authorName?: string;
   parentId?: string;
   threadId?: string;
   isEdited: boolean;

@@ -328,14 +328,29 @@ const chatSlice = createSlice({
       .addCase(chatThunks.sendMessage.pending, (state, action) => {
         const { roomId, content, type, parentId, threadId } = action.meta.arg;
         const tempId = `temp-${Date.now()}`;
-        
+
+        // Try to read current user info from sessionStorage for optimistic message
+        let finalAuthorName: string | undefined = undefined;
+        let finalAuthorId: string | undefined = undefined;
+        try {
+          const savedAuth = sessionStorage.getItem('stargetyOasisAuth');
+          if (savedAuth) {
+            const authData = JSON.parse(savedAuth);
+            finalAuthorName = authData.displayName || authData.username || undefined;
+            finalAuthorId = authData.id || undefined;
+          }
+        } catch {
+          // ignore
+        }
+
         // Create optimistic message
         const optimisticMessage: Message = {
           id: tempId,
-          content: { text: content },
+          content: { text: content, metadata: { } } as any,
           type: type || MessageEnum.TEXT,
           roomId,
-          authorId: 'current-user', // Will be replaced with actual user ID
+          authorId: finalAuthorId || 'current-user', // best-effort authorId
+          authorName: finalAuthorName,
           parentId,
           threadId,
           isEdited: false,

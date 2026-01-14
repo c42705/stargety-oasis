@@ -19,6 +19,7 @@ import { SplitLayoutComponent } from './components/SplitLayoutComponent';
 import { VideoCommunicationPanel } from './components/VideoCommunicationPanel';
 import { PersistentChatPanel } from './components/PersistentChatPanel';
 import { PersistentChatPanelEnhanced } from './components/PersistentChatPanelEnhanced';
+import MinimalChatPanel from './components/MinimalChatPanel';
 import { ChatDemo } from './modules/chat/ChatDemo';
 import { QuickAvatarBuilder } from './components/avatar/AvatarBuilderLauncher';
 
@@ -249,10 +250,10 @@ const AppContent: React.FC = () => {
               />
             }
             rightBottomPanel={
-              <PersistentChatPanel
+              <MinimalChatPanel
                 roomId={currentChatRoom}
-                onRoomChange={handleChatRoomChange}
-                className="chat-panel"
+                currentUserId={user.username}
+                currentUsername={user.displayName}
               />
             }
             className="main-split-layout"

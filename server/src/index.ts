@@ -673,6 +673,19 @@ io.on('connection', (socket) => {
   socket.on('chat:join', (data) => chatDbController.handleJoinRoom(socket, data));
   socket.on('chat:message', (data) => chatDbController.handleSendMessage(socket, data));
   socket.on('chat:typing', (data) => chatDbController.handleTyping(socket, data));
+  // Reaction events
+  socket.on('chat:reaction:add', (data) => {
+    const { messageId, emoji, userId } = data;
+    if (messageId && emoji && userId) {
+      chatDbController.addReaction(messageId, emoji, userId);
+    }
+  });
+  socket.on('chat:reaction:remove', (data) => {
+    const { messageId, emoji, userId } = data;
+    if (messageId && emoji && userId) {
+      chatDbController.removeReaction(messageId, emoji, userId);
+    }
+  });
 
   // World events
   socket.on('player-joined-world', (data) => worldController.handlePlayerJoinedWorld(socket, data).catch((error) => logger.error('Error in player-joined-world handler:', error)));

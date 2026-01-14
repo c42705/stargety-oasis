@@ -90,7 +90,8 @@ export class GameScene extends Phaser.Scene {
     }
     
     // Update world bounds when map dimensions are available
-    if (mapData && mapData.worldDimensions) {
+    // Only update if worldBoundsManager is initialized (after create() is called)
+    if (mapData && mapData.worldDimensions && this.worldBoundsManager) {
       this.worldBoundsManager.updateWorldBounds(
         mapData.worldDimensions.width,
         mapData.worldDimensions.height,

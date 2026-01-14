@@ -7,6 +7,8 @@ export interface SendMessageParams {
   type?: MessageEnum;
   parentId?: string;
   threadId?: string;
+  authorName?: string;
+  authorId?: string;
 }
 
 export interface EditMessageParams {
@@ -97,7 +99,25 @@ class ChatApiService {
   }
 
   async sendMessage(params: SendMessageParams): Promise<Message> {
-    const { roomId, content, type = MessageEnum.TEXT, parentId, threadId } = params;
+    const { roomId, content, type = MessageEnum.TEXT, parentId, threadId, authorName, authorId } = params;
+    
+    // Get user info from sessionStorage if not provided
+    let finalAuthorName = authorName;
+    let finalAuthorId = authorId;
+    
+    if (!finalAuthorName || !finalAuthorId) {
+      try {
+        const savedAuth = sessionStorage.getItem('stargetyOasisAuth');
+        if (savedAuth) {
+          const authData = JSON.parse(savedAuth);
+          finalAuthorName = finalAuthorName || authData.displayName || authData.username || 'Anonymous';
+          finalAuthorId = finalAuthorId || authData.id || 'anonymous';
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+    
     const response = await apiFetch<Message>(`/api/chat/${roomId}/messages`, {
       method: 'POST',
       body: JSON.stringify({
@@ -105,6 +125,8 @@ class ChatApiService {
         type,
         parentId,
         threadId,
+        authorName: finalAuthorName || 'Anonymous',
+        authorId: finalAuthorId,
       }),
     });
     if (!response.success || !response.data) {

@@ -2,6 +2,7 @@
 // Mobile-first design for integration with Jitsi video call side panel
 import { io, Socket } from 'socket.io-client';
 import { store } from '../../redux/store';
+import { logger } from '../../shared/logger';
 import {
   setError,
   addMessage,
@@ -9,7 +10,8 @@ import {
   setMessages,
   removeOnlineUser,
   addTypingUser,
-  removeTypingUser
+  removeTypingUser,
+  updateMessage
 } from '../../redux/slices/chatSlice';
 import { Message } from '../../redux/types/chat';
 
@@ -70,7 +72,7 @@ class ChatSocketService {
       this.setupReconnectionHandlers();
 
     } catch (error) {
-      console.error('Error initializing Socket.IO connection:', error);
+      logger.error('Error initializing Socket.IO connection:', error);
     }
   }
   
@@ -98,6 +100,10 @@ class ChatSocketService {
     // Typing events (backend uses 'user-typing')
     this.socket.on('user-typing', this.handleTyping.bind(this));
 
+    // Reaction events
+    this.socket.on('reaction:added', this.handleReactionAdded.bind(this));
+    this.socket.on('reaction:removed', this.handleReactionRemoved.bind(this));
+
     // Error events
     this.socket.on('error', this.handleError.bind(this));
   }
@@ -109,12 +115,12 @@ class ChatSocketService {
     if (!this.socket) return;
     
     this.socket.on('reconnect_attempt', (attempt) => {
-      console.log(`Reconnection attempt ${attempt}`);
+      logger.debug(`Reconnection attempt ${attempt}`);
       this.reconnectAttempts = attempt;
     });
     
     this.socket.on('reconnect', () => {
-      console.log('Reconnected to server');
+      logger.info('Reconnected to server');
       this.reconnectAttempts = 0;
       // Rejoin current room if any
       const currentRoom = store.getState().chat.currentRoom;
@@ -124,7 +130,7 @@ class ChatSocketService {
     });
     
     this.socket.on('reconnect_failed', () => {
-      console.error('Reconnection failed');
+      logger.error('Reconnection failed');
       this.reconnectAttempts = 0;
     });
   }
@@ -133,7 +139,7 @@ class ChatSocketService {
    * Handle connection established
    */
   private handleConnect() {
-    console.log('Connected to chat server');
+    logger.info('Connected to chat server');
     const currentRoom = store.getState().chat.currentRoom;
     if (currentRoom) {
       this.joinRoom(currentRoom);
@@ -144,7 +150,7 @@ class ChatSocketService {
    * Handle connection lost
    */
   private handleDisconnect(reason: string) {
-    console.log('Disconnected from chat server:', reason);
+    logger.warn('Disconnected from chat server:', reason);
     // Update UI to show disconnected state
     store.dispatch(setError('Connection lost'));
   }
@@ -153,7 +159,7 @@ class ChatSocketService {
    * Handle connection error
    */
   private handleConnectError(error: Error) {
-    console.error('Connection error:', error);
+    logger.error('Connection error:', error);
     store.dispatch(setError('Connection failed'));
   }
   
@@ -170,7 +176,7 @@ class ChatSocketService {
     type: string;
     roomId: string
   }) {
-    console.log('New message received:', data);
+    logger.debug('New message received:', data);
     // Transform backend format to frontend Message format
     const message: Message = {
       id: data.id,
@@ -204,7 +210,7 @@ class ChatSocketService {
       createdAt: string;
     }>;
   }) {
-    console.log('Room joined:', data);
+    logger.debug('Room joined:', data);
     // Set online users from participants
     data.participants.forEach(user => {
       store.dispatch(addOnlineUser(user));
@@ -230,7 +236,7 @@ class ChatSocketService {
    * Handle user joined event from backend 'user-joined'
    */
   private handleUserJoined(user: string) {
-    console.log('User joined chat:', user);
+    logger.debug('User joined chat:', user);
     store.dispatch(addOnlineUser(user));
   }
 
@@ -238,7 +244,7 @@ class ChatSocketService {
    * Handle user left event from backend 'user-left'
    */
   private handleUserLeft(user: string) {
-    console.log('User left chat:', user);
+    logger.debug('User left chat:', user);
     store.dispatch(removeOnlineUser(user));
   }
 
@@ -246,7 +252,7 @@ class ChatSocketService {
    * Handle users list update from backend 'users-list'
    */
   private handleUsersList(users: string[]) {
-    console.log('Users list updated:', users);
+    logger.debug('Users list updated:', users);
     // Clear and reset online users
     const currentState = store.getState();
     currentState.chat.onlineUsers.forEach(userId => {
@@ -262,7 +268,7 @@ class ChatSocketService {
    * Backend format: { user, isTyping, roomId }
    */
   private handleTyping(data: { user: string; isTyping: boolean; roomId: string }) {
-    console.log('Typing event:', data);
+    logger.debug('Typing event:', data);
     const { roomId, user, isTyping } = data;
     if (isTyping) {
       store.dispatch(addTypingUser({ roomId, userId: user }));
@@ -270,12 +276,69 @@ class ChatSocketService {
       store.dispatch(removeTypingUser({ roomId, userId: user }));
     }
   }
+
+  /**
+   * Handle reaction added event from backend 'reaction:added'
+   * Backend format: { messageId, emoji, userId }
+   */
+  private handleReactionAdded(data: { messageId: string; emoji: string; userId: string }) {
+    logger.debug('Reaction added:', data);
+    const { messageId, emoji, userId } = data;
+    
+    // Find the message and update it
+    const state = store.getState();
+    Object.keys(state.chat.messages).forEach(roomId => {
+      const messageIndex = state.chat.messages[roomId].findIndex(m => m.id === messageId);
+      if (messageIndex !== -1) {
+        const message = state.chat.messages[roomId][messageIndex];
+        const existingReaction = message.reactions?.find(r => r.emoji === emoji && r.userId === userId);
+        
+        if (!existingReaction) {
+          store.dispatch(updateMessage({
+            roomId,
+            messageId,
+            updates: {
+              reactions: [
+                ...(message.reactions || []),
+                { emoji, userId, createdAt: new Date() }
+              ]
+            }
+          }));
+        }
+      }
+    });
+  }
+
+  /**
+   * Handle reaction removed event from backend 'reaction:removed'
+   * Backend format: { messageId, emoji, userId }
+   */
+  private handleReactionRemoved(data: { messageId: string; emoji: string; userId: string }) {
+    logger.debug('Reaction removed:', data);
+    const { messageId, emoji, userId } = data;
+    
+    // Find the message and update it
+    const state = store.getState();
+    Object.keys(state.chat.messages).forEach(roomId => {
+      const messageIndex = state.chat.messages[roomId].findIndex(m => m.id === messageId);
+      if (messageIndex !== -1) {
+        const message = state.chat.messages[roomId][messageIndex];
+        store.dispatch(updateMessage({
+          roomId,
+          messageId,
+          updates: {
+            reactions: message.reactions?.filter(r => !(r.emoji === emoji && r.userId === userId)) || []
+          }
+        }));
+      }
+    });
+  }
   
   /**
    * Handle socket error
    */
   private handleError(error: Error) {
-    console.error('Socket error:', error);
+    logger.error('Socket error:', error);
     store.dispatch(setError(error.message));
   }
   

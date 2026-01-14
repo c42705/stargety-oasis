@@ -4,7 +4,8 @@ import { MoreOutlined, EditOutlined, DeleteOutlined, MessageOutlined, CheckOutli
 import { Message as ModuleMessage } from '../../../types/chat';
 import { Message as ReduxMessage } from '../../../redux/types/chat';
 import { useAppDispatch } from '../../../redux/hooks';
-import { chatThunks } from '../../../redux/slices/chatSlice';
+import { chatThunks, updateMessage } from '../../../redux/slices/chatSlice';
+import { chatSocketService } from '../../../services/socket/ChatSocketService';
 import '../../../animations/chat-animations.css';
 
 // MessageItem accepts either module types or redux types for flexibility
@@ -32,6 +33,20 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const [editContent, setEditContent] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const dispatch = useAppDispatch();
+  
+  // Get current user ID from sessionStorage (where AuthContext stores it)
+  const getCurrentUserId = useCallback(() => {
+    try {
+      const savedAuth = sessionStorage.getItem('stargetyOasisAuth');
+      if (savedAuth) {
+        const authData = JSON.parse(savedAuth);
+        return authData.id || 'anonymous';
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    return 'anonymous';
+  }, []);
 
   // Initialize edit content when entering edit mode
   React.useEffect(() => {
@@ -62,15 +77,47 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   }, [message, dispatch, onDelete]);
 
   const handleReaction = useCallback((emoji: string) => {
-    const currentUserId = 'current-user'; // TODO: Get from auth context
+    const currentUserId = getCurrentUserId();
     const existingReaction = message.reactions?.find(r => r.emoji === emoji && r.userId === currentUserId);
     
     if (existingReaction) {
-      dispatch(chatThunks.removeReaction({ messageId: message.id, emoji }));
+      // Remove reaction via Socket.IO
+      // Note: Backend doesn't have a Socket.IO endpoint for removing reactions yet
+      // For now, we'll just update the local state optimistically
+      dispatch(updateMessage({
+        roomId: message.roomId,
+        messageId: message.id,
+        updates: {
+          reactions: message.reactions?.filter(r => !(r.emoji === emoji && r.userId === currentUserId)) || []
+        }
+      }));
     } else {
-      dispatch(chatThunks.addReaction({ messageId: message.id, emoji }));
+      // Add reaction via Socket.IO
+      // Emit reaction event to backend
+      // Note: Backend expects Socket.IO event, not REST API
+      // We'll emit directly to the socket
+      const socket = (chatSocketService as any).socket;
+      if (socket && socket.connected) {
+        socket.emit('add-reaction', {
+          messageId: message.id,
+          emoji,
+          userId: currentUserId
+        });
+      }
+      
+      // Optimistically update local state
+      dispatch(updateMessage({
+        roomId: message.roomId,
+        messageId: message.id,
+        updates: {
+          reactions: [
+            ...(message.reactions || []),
+            { emoji, userId: currentUserId, createdAt: new Date() }
+          ]
+        }
+      }));
     }
-  }, [message, dispatch]);
+  }, [message, dispatch, getCurrentUserId]);
 
   const formatTimestamp = (timestamp: Date) => {
     const date = new Date(timestamp);
@@ -104,7 +151,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     return acc;
   }, {}) || {};
 
-  const currentUserId = 'current-user'; // TODO: Get from auth context
+  const currentUserId = getCurrentUserId();
+
+  const authorDisplay: string = (message as any).authorName || (message.content as any)?.authorName || message.authorId || 'Unknown User';
 
   const reactionMenu = (
     <Menu>
@@ -178,16 +227,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   return (
     <div className={`message-item ${isCurrentUser ? 'current-user' : ''}`}>
       <div className="message-avatar">
-        <Avatar
-          size="small"
-        >
-          {message.authorId?.charAt(0).toUpperCase() || 'U'}
-        </Avatar>
+        <Avatar size="small">{authorDisplay.charAt(0).toUpperCase() || 'U'}</Avatar>
       </div>
       
       <div className="message-content">
         <div className="message-header">
-          <span className="message-author">{message.authorId || 'Unknown User'}</span>
+          <span className="message-author">{authorDisplay}</span>
           <span className="message-timestamp">{formatTimestamp(message.createdAt)}</span>
           {message.isEdited && message.editedAt && (
             <span className="message-edited">
