@@ -117,30 +117,8 @@ export const SplitLayoutComponent: React.FC<SplitLayoutComponentProps> = ({
                 position: 'relative'
               }}
             >
-              {/* Chat Panel Header */}
-              <div style={{
-                position: 'absolute',
-                top: 8,
-                left: 8,
-                zIndex: 10
-              }}>
-                <Typography.Text
-                  strong
-                  style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    border: '1px solid var(--color-border-light)',
-                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-                  }}
-                >
-                  💬 Chat
-                </Typography.Text>
-              </div>
-
               {/* Chat Panel Content */}
-              <div style={{ height: '100%', width: '100%', paddingTop: 40 }}>
+              <div style={{ height: '100%', width: '100%' }}>
                 {rightBottomPanel}
               </div>
             </Splitter.Panel>

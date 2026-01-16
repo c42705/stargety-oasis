@@ -1,12 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Input, Button, message, Spin, Empty } from 'antd';
-import { SendOutlined, SmileOutlined } from '@ant-design/icons';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { Layout, Input, Button, message, Spin, Empty, Space, List, Divider } from 'antd';
+import { SendOutlined } from '@ant-design/icons';
 import { useAppDispatch, useAppSelector } from '../redux/hooks';
 import { chatThunks, setCurrentRoom, addMessage, selectMessagesByRoom, selectIsLoading, selectError } from '../redux/slices/chatSlice';
 import { chatSocketService } from '../services/socket/ChatSocketService';
 import { Message } from '../redux/types/chat';
 import MessageItem from '../modules/chat/components/MessageItem';
+import { useTheme } from '../shared/ThemeContext';
 
+const { Content, Footer } = Layout;
 const { TextArea } = Input;
 
 interface MinimalChatPanelProps {
@@ -20,11 +22,44 @@ const MinimalChatPanel: React.FC<MinimalChatPanelProps> = ({ roomId, currentUser
   const messages = useAppSelector(selectMessagesByRoom(roomId));
   const isLoading = useAppSelector(selectIsLoading(roomId));
   const error = useAppSelector(selectError);
-  
+  const { currentTheme } = useTheme();
+
   const [inputText, setInputText] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+
+  // Memoize theme-aware styles to prevent unnecessary recalculations
+  const styles = useMemo(() => ({
+    container: {
+      height: '100%',
+      backgroundColor: currentTheme.cssVariables['--color-bg-primary'],
+    },
+    messagesArea: {
+      flex: 1,
+      overflowY: 'auto' as const,
+      padding: currentTheme.cssVariables['--spacing-md'],
+      backgroundColor: currentTheme.cssVariables['--color-bg-secondary'],
+    },
+    emojiPicker: {
+      marginTop: currentTheme.cssVariables['--spacing-sm'],
+      padding: currentTheme.cssVariables['--spacing-sm'],
+      backgroundColor: currentTheme.cssVariables['--color-bg-elevated'],
+      borderRadius: currentTheme.cssVariables['--border-radius'],
+      boxShadow: currentTheme.cssVariables['--shadow-md'],
+    },
+    inputArea: {
+      padding: currentTheme.cssVariables['--spacing-md'],
+      borderTop: `1px solid ${currentTheme.cssVariables['--color-border-light']}`,
+      backgroundColor: currentTheme.cssVariables['--color-bg-primary'],
+    },
+    errorArea: {
+      padding: `${currentTheme.cssVariables['--spacing-sm']} ${currentTheme.cssVariables['--spacing-md']}`,
+      backgroundColor: currentTheme.cssVariables['--color-error'],
+      color: currentTheme.cssVariables['--color-text-inverse'],
+      fontSize: '12px',
+    },
+  }), [currentTheme]);
 
   // Common emojis for quick reactions
   const commonEmojis = ['👍', '❤️', '😂', '😮', '😢', '🎉', '🔥', '👏'];
@@ -72,103 +107,90 @@ const MinimalChatPanel: React.FC<MinimalChatPanelProps> = ({ roomId, currentUser
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
   };
 
-  const handleReply = (messageId: string) => {
+  const handleReply = () => {
     // For MVP, just focus on input (can be enhanced later)
     setInputText(`Replying to message...`);
   };
 
-  const handleEdit = (messageId: string, content: string) => {
+  const handleEdit = () => {
     // Edit is handled by MessageItem component internally
   };
 
-  const handleDelete = (messageId: string) => {
+  const handleDelete = () => {
     // Delete is handled by MessageItem component internally
-  };
-
-  const toggleEmojiPicker = (messageId: string) => {
-    if (selectedMessageId === messageId) {
-      setShowEmojiPicker(!showEmojiPicker);
-    } else {
-      setSelectedMessageId(messageId);
-      setShowEmojiPicker(true);
-    }
   };
 
   if (isLoading && messages.length === 0) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-        <Spin size="large" tip="Loading messages..." />
-      </div>
+      <Layout style={{ height: '100%' }}>
+        <Content style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <Spin size="large" tip="Loading messages..." />
+        </Content>
+      </Layout>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <Layout style={styles.container}>
       {/* Messages Area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', backgroundColor: '#f5f5f5' }}>
+      <Content style={styles.messagesArea}>
         {messages.length === 0 ? (
           <Empty description="No messages yet. Start the conversation!" />
         ) : (
-          <>
-            {messages.map((msg) => (
-              <div key={msg.id} style={{ marginBottom: '16px' }}>
-                <MessageItem
-                  message={msg}
-                  isCurrentUser={msg.authorId === currentUserId}
-                  onReply={handleReply}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                />
-                {/* Emoji Picker */}
-                {showEmojiPicker && selectedMessageId === msg.id && (
-                  <div style={{
-                    marginTop: '8px',
-                    padding: '8px',
-                    backgroundColor: 'white',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                    display: 'flex',
-                    gap: '8px',
-                    flexWrap: 'wrap'
-                  }}>
-                    {commonEmojis.map((emoji) => (
-                      <Button
-                        key={emoji}
-                        type="text"
-                        size="small"
-                        onClick={() => {
-                          dispatch(chatThunks.addReaction({ messageId: msg.id, emoji }));
-                          setShowEmojiPicker(false);
-                          setSelectedMessageId(null);
-                        }}
-                        style={{ fontSize: '20px', padding: '4px 8px' }}
-                      >
-                        {emoji}
-                      </Button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </>
+          <List
+            dataSource={messages}
+            renderItem={(msg) => (
+              <List.Item key={msg.id} style={{ padding: 0, marginBottom: currentTheme.cssVariables['--spacing-md'] }}>
+                <div style={{ width: '100%' }}>
+                  <MessageItem
+                    message={msg}
+                    isCurrentUser={msg.authorId === currentUserId}
+                    onReply={handleReply}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
+                  {/* Emoji Picker */}
+                  {showEmojiPicker && selectedMessageId === msg.id && (
+                    <Space style={styles.emojiPicker} wrap>
+                      {commonEmojis.map((emoji) => (
+                        <Button
+                          key={emoji}
+                          type="text"
+                          size="small"
+                          onClick={() => {
+                            dispatch(chatThunks.addReaction({ messageId: msg.id, emoji }));
+                            setShowEmojiPicker(false);
+                            setSelectedMessageId(null);
+                          }}
+                          style={{ fontSize: '20px' }}
+                        >
+                          {emoji}
+                        </Button>
+                      ))}
+                    </Space>
+                  )}
+                </div>
+              </List.Item>
+            )}
+          />
         )}
-      </div>
+        <div ref={messagesEndRef} />
+      </Content>
 
       {/* Input Area */}
-      <div style={{ padding: '16px', borderTop: '1px solid #e8e8e8', backgroundColor: 'white' }}>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+      <Footer style={styles.inputArea}>
+        <Space.Compact style={{ width: '100%' }}>
           <TextArea
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyDown}
             placeholder="Type a message... (Enter to send, Shift+Enter for new line)"
             autoSize={{ minRows: 1, maxRows: 4 }}
             style={{ flex: 1 }}
@@ -181,15 +203,18 @@ const MinimalChatPanel: React.FC<MinimalChatPanelProps> = ({ roomId, currentUser
           >
             Send
           </Button>
-        </div>
-      </div>
+        </Space.Compact>
+      </Footer>
 
       {error && (
-        <div style={{ padding: '8px 16px', backgroundColor: '#fff2f0', color: '#ff4d4f', fontSize: '12px' }}>
-          {error}
-        </div>
+        <>
+          <Divider style={{ margin: 0 }} />
+          <div style={styles.errorArea}>
+            {error}
+          </div>
+        </>
       )}
-    </div>
+    </Layout>
   );
 };
 
