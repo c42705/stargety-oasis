@@ -250,28 +250,6 @@ async function main() {
   });
   console.log('✅ Set active character slot to 1');
 
-  // Create sample Jitsi room mappings
-  const jitsiMappings = [
-    { areaId: 'meeting-room-1', jitsiRoomName: 'meeting-room-1', displayName: 'Meeting Room' },
-    { areaId: 'presentation-hall-1', jitsiRoomName: 'presentation-hall-1', displayName: 'Presentation Hall' },
-    { areaId: 'coffee-corner-1', jitsiRoomName: 'coffee-corner-1', displayName: 'Coffee Corner' },
-    { areaId: 'game-zone-1', jitsiRoomName: 'game-zone-1', displayName: 'Game Zone' }
-  ];
-
-  for (const mapping of jitsiMappings) {
-    await prisma.jitsiRoomMapping.upsert({
-      where: { areaId: mapping.areaId },
-      update: {},
-      create: {
-        areaId: mapping.areaId,
-        jitsiRoomName: mapping.jitsiRoomName,
-        displayName: mapping.displayName,
-        isCustom: false
-      }
-    });
-  }
-  console.log('✅ Created', jitsiMappings.length, 'Jitsi room mappings');
-
   // Create default chat room
   await prisma.chatRoom.upsert({
     where: { roomId: 'general' },

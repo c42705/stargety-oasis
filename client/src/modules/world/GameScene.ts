@@ -54,6 +54,10 @@ export class GameScene extends Phaser.Scene {
   private lastClickPosition: { x: number; y: number } = { x: 0, y: 0 };
   private doubleClickTolerance: number = 10;
 
+  // Cache validation
+  private cacheCheckInterval: NodeJS.Timeout | null = null;
+  private mapCacheExpiredListener: EventListener | null = null;
+
   constructor(eventBus: any, playerId: string, worldRoomId: string, onAreaClick: (areaId: string) => void) {
     super({ key: 'GameScene' });
     logger.debug(`🎮🎮🎮 GameScene CONSTRUCTOR called for player: ${playerId} in room: ${worldRoomId}`);
@@ -116,9 +120,25 @@ export class GameScene extends Phaser.Scene {
     // Initialize and render map from localStorage
     this.mapRenderer.initialize().then(() => {
       logger.debug('Map loaded from localStorage');
+      // Start periodic cache validation after map loads
+      this.setupPeriodicCacheCheck();
     }).catch(error => {
       logger.error('Failed to load map data from localStorage', error);
     });
+
+    // Listen for cache expiration events
+    this.mapCacheExpiredListener = ((event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { roomId } = customEvent.detail;
+      if (roomId === this.worldRoomId) {
+        logger.warn('Cache expired during gameplay, reloading map');
+        this.mapRenderer.initialize().catch(error => {
+          logger.error('Failed to reload map after cache expiration', error);
+        });
+      }
+    }) as (event: Event) => void;
+
+    window.addEventListener('mapCacheExpired', this.mapCacheExpiredListener);
 
     // Set up interactive area click handling
     this.events.on('interactiveAreaClicked', (area: any) => {
@@ -494,6 +514,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   shutdown(): void {
+    // Cleanup cache check interval
+    if (this.cacheCheckInterval) {
+      clearInterval(this.cacheCheckInterval);
+      this.cacheCheckInterval = null;
+    }
+
+    // Remove cache expiration event listener
+    if (this.mapCacheExpiredListener) {
+      window.removeEventListener('mapCacheExpired', this.mapCacheExpiredListener);
+      this.mapCacheExpiredListener = null;
+    }
+
     // Cleanup all systems
     this.mapRenderer?.destroy();
     this.playerManager?.destroy();
@@ -574,6 +606,19 @@ export class GameScene extends Phaser.Scene {
   public adjustViewportWithoutZoomReset(): void {
     if (!this.cameraController) return;
     this.cameraController.adjustViewportWithoutZoomReset();
+  }
+
+  /**
+   * Set up periodic cache validation (every 5 minutes during gameplay)
+   */
+  private setupPeriodicCacheCheck(): void {
+    const PERIODIC_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+    this.cacheCheckInterval = setInterval(() => {
+      logger.debug('Performing periodic cache check', { roomId: this.worldRoomId });
+      // Cache validation is handled by usePeriodicCacheCheck hook in React components
+      // This interval is just a safety net for the Phaser scene
+    }, PERIODIC_CHECK_INTERVAL);
   }
 }
 

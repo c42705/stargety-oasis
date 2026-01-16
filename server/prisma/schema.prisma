@@ -45,11 +45,13 @@ model Map {
   name      String
   data      Json     // JSONB - stores full map data structure (areas, collision, dimensions)
   version   Int      @default(1)
+  cachedAt  DateTime? // Timestamp when map was last cached on client
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  assets MapAsset[]
+  assets       MapAsset[]
+  syncMetadata MapSyncMetadata?
 
   @@map("maps")
 }
@@ -71,6 +73,24 @@ model MapAsset {
 
   @@index([mapId])
   @@map("map_assets")
+}
+
+// Map sync metadata - tracks cache validation and synchronization state
+model MapSyncMetadata {
+  id                String   @id @default(cuid())
+  mapId             String   @unique
+  lastClientCacheAt DateTime? // When client last cached this map
+  lastValidatedAt   DateTime? // When cache was last validated
+  cacheVersion      Int      @default(1) // Incremented when cache should be invalidated
+  totalPackageSize  Int      @default(0) // Size of complete package (map + avatars + assets) in bytes
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  map Map @relation(fields: [mapId], references: [id], onDelete: Cascade)
+
+  @@index([mapId])
+  @@map("map_sync_metadata")
 }
 
 // ============================================================================

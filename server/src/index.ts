@@ -215,6 +215,38 @@ app.delete('/api/maps/:roomId/assets/:assetId', async (req, res) => {
   }
 });
 
+// Get map sync metadata for cache validation
+// Returns: map data + cache metadata (version, cachedAt, lastModified)
+app.get('/api/maps/:roomId/sync', async (req, res) => {
+  const { roomId } = req.params;
+  try {
+    const syncData = await mapController.getMapSyncMetadata(roomId);
+    if (!syncData) {
+      return res.status(404).json({ success: false, error: 'Map not found' });
+    }
+    res.json(syncData);
+  } catch (error) {
+    logger.error('Error fetching map sync metadata:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch map sync metadata' });
+  }
+});
+
+// Get complete map package: map data + all avatars + map assets
+// Used for initial load to cache everything needed for gameplay
+app.get('/api/maps/:roomId/package', async (req, res) => {
+  const { roomId } = req.params;
+  try {
+    const packageData = await mapController.getMapPackage(roomId);
+    if (!packageData) {
+      return res.status(404).json({ success: false, error: 'Map not found' });
+    }
+    res.json(packageData);
+  } catch (error) {
+    logger.error('Error fetching map package:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch map package' });
+  }
+});
+
 // ============================================================================
 // CHARACTER API ROUTES
 // ============================================================================
