@@ -126,6 +126,35 @@ export class MapController {
   }
 
   /**
+   * Get map sync metadata for cache validation
+   * Returns: map data + cache metadata (version, cachedAt, lastModified)
+   */
+  async getMapSyncMetadata(roomId: string) {
+    try {
+      const map = await prisma.map.findUnique({
+        where: { roomId },
+      });
+
+      if (!map) {
+        return null;
+      }
+
+      return {
+        success: true,
+        data: map.data,
+        metadata: {
+          version: map.version,
+          updatedAt: map.updatedAt,
+          cacheVersion: 1,
+        },
+      };
+    } catch (error) {
+      logger.error('Error getting map sync metadata:', error);
+      return null;
+    }
+  }
+
+  /**
    * Create or update map (upsert)
    */
   async saveMap(roomId: string, mapData: MapData): Promise<MapData | null> {
@@ -254,6 +283,75 @@ export class MapController {
     } catch (error) {
       logger.error('Error getting map assets:', error);
       return [];
+    }
+  }
+
+  /**
+   * Get complete map package: map data + all avatars + map assets
+   * Used for initial load to cache everything needed for gameplay
+   */
+  async getMapPackage(roomId: string) {
+    try {
+      const map = await prisma.map.findUnique({
+        where: { roomId },
+        include: { assets: true },
+      });
+
+      if (!map) {
+        return null;
+      }
+
+      // Get all available characters (avatars) for rendering other players
+      const allCharacters = await prisma.character.findMany({
+        where: { isEmpty: false },
+        select: {
+          id: true,
+          userId: true,
+          name: true,
+          spriteSheet: true,
+          thumbnailPath: true,
+          texturePath: true,
+        },
+      });
+
+      // Transform assets to include URLs
+      const assets = map.assets.map((asset: any) => {
+        const meta = asset.metadata as Record<string, unknown> || {};
+        return {
+          id: asset.id,
+          mapId: asset.mapId,
+          name: asset.fileName,
+          filePath: asset.filePath,
+          fileUrl: `/uploads/${asset.filePath.split('/uploads/')[1] || asset.filePath}`,
+          fileSize: asset.fileSize,
+          mimeType: asset.mimeType,
+          width: (meta.width as number) || undefined,
+          height: (meta.height as number) || undefined,
+          metadata: meta,
+          createdAt: asset.createdAt,
+        };
+      });
+
+      // Calculate total package size
+      const totalSize = assets.reduce((sum: number, asset: any) => sum + asset.fileSize, 0);
+
+      return {
+        success: true,
+        data: {
+          map: map.data,
+          avatars: allCharacters,
+          assets: assets,
+          metadata: {
+            version: map.version,
+            updatedAt: map.updatedAt,
+            cacheVersion: 1,
+            totalPackageSize: totalSize,
+          },
+        },
+      };
+    } catch (error) {
+      logger.error('Error getting map package:', error);
+      return null;
     }
   }
 

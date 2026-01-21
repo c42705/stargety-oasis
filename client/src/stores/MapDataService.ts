@@ -17,6 +17,10 @@
 import { MapData, InteractiveArea, ImpassableArea, Asset } from '../shared/MapDataContext';
 import { MapApiService } from '../services/api/MapApiService';
 import { logger } from '../shared/logger';
+import { MapCacheManager, MapCacheData } from '../shared/MapCacheManager';
+import { MapCacheValidator } from '../shared/MapCacheValidator';
+import { getDatabaseRoomId } from '../shared/RoomMapping';
+import { WorldRoomId } from '../shared/WorldRoomContext';
 
 // Extended map data structure for the new system
 export interface ExtendedMapData extends MapData {
@@ -84,6 +88,10 @@ export class MapDataService {
         localStorage.setItem(STORAGE_KEYS.MAP_BACKUP, JSON.stringify(dataToSave));
       }
 
+      // Invalidate cache when map is edited (forces refresh on next load)
+      MapCacheManager.invalidateMapCache(roomId);
+      logger.info('MAP_CACHE_INVALIDATED_ON_EDIT', { roomId });
+
       // Emit save event
       this.emit('map:saved', dataToSave);
 
@@ -94,19 +102,51 @@ export class MapDataService {
   }
 
   /**
-   * Load map data from PostgreSQL (with localStorage fallback - editor only)
-   * For gameplay: throws if API fails, don't silently fall back to stale localStorage
+   * Load map data by world room ID (converts to database room ID)
+   * Convenience method for gameplay that handles room ID mapping
+   */
+  static async loadMapDataByWorldRoom(worldRoomId: WorldRoomId, forGameplay: boolean = true): Promise<ExtendedMapData | null> {
+    try {
+      const databaseRoomId = getDatabaseRoomId(worldRoomId);
+      logger.info('LOADING_MAP_FOR_WORLD_ROOM', { worldRoomId, databaseRoomId });
+      return this.loadMapData(databaseRoomId, forGameplay);
+    } catch (error) {
+      logger.error('FAILED_TO_LOAD_MAP_BY_WORLD_ROOM', { worldRoomId, error });
+      return null;
+    }
+  }
+
+  /**
+   * Load map data from PostgreSQL with cache validation
+   * For gameplay: checks cache freshness before API calls
+   * For editor: less frequent cache validation
+   *
+   * @param roomId - Database room ID (e.g., 'room_001')
+   * @param forGameplay - Whether this is for gameplay (stricter cache validation)
    */
   static async loadMapData(roomId: string = DEFAULT_ROOM_ID, forGameplay: boolean = true): Promise<ExtendedMapData | null> {
     try {
-      // Try to load from API first
+      // GAMEPLAY MODE: Check cache freshness first
+      if (forGameplay) {
+        const cacheValidation = MapCacheValidator.validateCache(roomId);
+
+        if (cacheValidation.isValid) {
+          logger.info('USING_CACHED_MAP', { roomId, age: cacheValidation.age });
+          const cachedData = MapCacheManager.getMapCache(roomId);
+          if (cachedData) {
+            return this.convertCacheDataToMapData(cachedData);
+          }
+        }
+      }
+
+      // Cache is stale or missing - fetch from API
       try {
         const result = await MapApiService.loadMap(roomId);
 
         if (result.success && result.data) {
           logger.info('MAP LOADED FROM DATABASE', { roomId });
 
-          // Convert API response to ExtendedMapData (cast types for compatibility)
+          // Convert API response to ExtendedMapData
           const mapData: ExtendedMapData = {
             interactiveAreas: (result.data.interactiveAreas || []) as InteractiveArea[],
             impassableAreas: (result.data.impassableAreas || []) as ImpassableArea[],
@@ -123,37 +163,38 @@ export class MapDataService {
             },
           };
 
-          return this.validateAndSanitizeMapData(mapData);
+          const validatedData = this.validateAndSanitizeMapData(mapData);
+
+          // Update cache with fresh data
+          if (forGameplay) {
+            this.updateMapCache(roomId, validatedData, result.data);
+          }
+
+          return validatedData;
         }
       } catch (apiError) {
         logger.warn('API LOAD FAILED', { apiError, forGameplay, roomId });
-        
-        // For gameplay: fail hard to force default map creation (don't use stale localStorage)
+
+        // For gameplay: fail hard (don't use stale cache)
         if (forGameplay) {
-          logger.warn('[MapDataService] API load failed during gameplay - will use default map');
-          return null; // This will trigger createDefaultMap in the caller
+          logger.warn('API load failed during gameplay - will use default map');
+          return null;
         }
       }
 
       // For editor mode: fallback to localStorage (allows offline editing)
       if (!forGameplay) {
         const storedData = localStorage.getItem(STORAGE_KEYS.MAP_DATA);
-
         if (!storedData) {
           return null;
         }
 
         const parsedData = JSON.parse(storedData);
-
-        // Convert date strings to Date objects
         if (parsedData.lastModified) {
           parsedData.lastModified = new Date(parsedData.lastModified);
         }
 
-        // Validate and sanitize data
-        const validatedData = this.validateAndSanitizeMapData(parsedData);
-
-        return validatedData;
+        return this.validateAndSanitizeMapData(parsedData);
       }
 
       return null;
@@ -161,6 +202,53 @@ export class MapDataService {
     } catch (error) {
       logger.error('FAILED TO LOAD MAP DATA', error);
       return null;
+    }
+  }
+
+  /**
+   * Convert cached map data to ExtendedMapData format
+   */
+  private static convertCacheDataToMapData(cacheData: MapCacheData): ExtendedMapData {
+    return {
+      interactiveAreas: cacheData.mapData.interactiveAreas || [],
+      impassableAreas: cacheData.mapData.impassableAreas || [],
+      assets: cacheData.assets || [],
+      worldDimensions: cacheData.mapData.worldDimensions || { width: 1920, height: 1080 },
+      backgroundImage: cacheData.mapData.backgroundImage,
+      backgroundImageDimensions: cacheData.mapData.backgroundImageDimensions,
+      version: cacheData.metadata.version,
+      lastModified: new Date(cacheData.metadata.updatedAt),
+      metadata: {
+        name: cacheData.mapData.metadata?.name || 'Stargety Oasis',
+        description: cacheData.mapData.metadata?.description || '',
+        tags: cacheData.mapData.metadata?.tags || [],
+      },
+    };
+  }
+
+  /**
+   * Update map cache with fresh data from API
+   */
+  private static updateMapCache(roomId: string, mapData: ExtendedMapData, apiData: any): void {
+    try {
+      const cacheData: MapCacheData = {
+        mapData: apiData,
+        avatars: [], // Will be populated by MapPackageService
+        assets: mapData.assets || [],
+        metadata: {
+          version: mapData.version,
+          cachedAt: mapData.lastModified.toISOString(),
+          updatedAt: mapData.lastModified.toISOString(),
+          cacheVersion: 1,
+          totalPackageSize: 0,
+        },
+        timestamp: Date.now(),
+      };
+
+      MapCacheManager.setMapCache(roomId, cacheData);
+      logger.info('MAP_CACHE_UPDATED', { roomId });
+    } catch (error) {
+      logger.warn('FAILED_TO_UPDATE_MAP_CACHE', { roomId, error });
     }
   }
 

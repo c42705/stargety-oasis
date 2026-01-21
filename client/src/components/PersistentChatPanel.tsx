@@ -1,8 +1,21 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { List, Input, Button, Space, Typography, Badge, Avatar, Popover, Card } from 'antd';
-import { SendOutlined, SmileOutlined, UserOutlined, TeamOutlined, SettingOutlined } from '@ant-design/icons';
+import { List, Input, Button, Space, Typography, Badge, Avatar, Popover, Card, Switch, Tooltip } from 'antd';
+import type { InputRef } from 'antd';
+import { SendOutlined, SmileOutlined, UserOutlined, TeamOutlined, SettingOutlined, VideoCameraOutlined, PhoneOutlined } from '@ant-design/icons';
 import { Smile, Laugh, Heart, ThumbsUp, ThumbsDown, PartyPopper, Frown } from 'lucide-react';
 import { useAuth } from '../shared/AuthContext';
+import { useAppDispatch, useAppSelector } from '../redux/hooks';
+import {
+  chatThunks,
+  setCurrentRoom,
+  selectCurrentRoom,
+  selectRooms,
+  selectMessagesByRoom,
+  selectTypingUsers
+} from '../redux/slices/chatSlice';
+import { Message, ChatRoom } from '../redux/types/chat';
+import { chatSocketService } from '../services/socket/ChatSocketService';
+import { jitsiChatIntegration, ChatRoomWithVideo } from '../services/integration/JitsiChatIntegration';
 
 const { Text } = Typography;
 
@@ -12,60 +25,42 @@ interface PersistentChatPanelProps {
   onRoomChange?: (roomId: string) => void;
 }
 
-interface Message {
-  id: string;
-  user: string;
-  message: string;
-  timestamp: Date;
-  type: 'user' | 'system';
-  avatar?: string;
-}
-
-interface ChatRoom {
-  id: string;
-  name: string;
-  unreadCount: number;
-  lastMessage?: string;
-  lastActivity?: Date;
-}
-
 /**
  * Persistent Chat Panel Component
  * Real-time chat interface for the bottom-right panel
+ * Uses Redux state and Socket.IO for real-time updates
  */
 export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
   className = '',
   roomId = 'general',
   onRoomChange
 }) => {
+  const dispatch = useAppDispatch();
   const { user } = useAuth();
   const currentUser = user?.displayName || user?.username || 'Anonymous';
+  const userId = user?.id;
 
-  // State management
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      user: 'System',
-      message: `Welcome to the chat, ${currentUser}! Start a conversation...`,
-      timestamp: new Date(),
-      type: 'system'
-    }
-  ]);
+  // Redux state
+  const currentRoom = useAppSelector(selectCurrentRoom) || roomId;
+  const chatRooms = useAppSelector(selectRooms);
+  const reduxMessages = useAppSelector(selectMessagesByRoom(currentRoom));
+  const typingUsers = useAppSelector(selectTypingUsers(currentRoom));
+
+  // Local state
   const [inputMessage, setInputMessage] = useState('');
-  const [isConnected] = useState(true);
-  const [activeRoom, setActiveRoom] = useState(roomId);
-  const [chatRooms] = useState<ChatRoom[]>([
-    { id: 'general', name: 'General', unreadCount: 0, lastMessage: 'Welcome to the chat!', lastActivity: new Date() },
-    { id: 'team-alpha', name: 'Team Alpha', unreadCount: 2, lastMessage: 'Meeting at 3pm', lastActivity: new Date() },
-    { id: 'team-beta', name: 'Team Beta', unreadCount: 0, lastMessage: 'Project update', lastActivity: new Date() },
-    { id: 'random', name: 'Random', unreadCount: 1, lastMessage: 'Coffee break?', lastActivity: new Date() }
-  ]);
+  const [isConnected, setIsConnected] = useState(chatSocketService.isConnected());
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showRoomList, setShowRoomList] = useState(false);
+  const [autoJoinVideo, setAutoJoinVideo] = useState(true);
+  
+  // Jitsi integration state
+  const videoCallState = jitsiChatIntegration.getVideoCallState();
+  const hasVideoCallEnabled = jitsiChatIntegration.hasVideoCallEnabled(currentRoom);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<any>(null);
+  const inputRef = useRef<InputRef>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Common emoji icons for quick access
   const commonEmojiIcons = [
@@ -85,47 +80,83 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, scrollToBottom]);
+  }, [reduxMessages, scrollToBottom]);
 
-  // Handle sending messages
-  const handleSendMessage = useCallback(() => {
-    if (!inputMessage.trim()) return;
+  // Initialize: fetch rooms and join default room
+  useEffect(() => {
+    // Ensure socket is connected (reconnect if needed after login)
+    if (!chatSocketService.isConnected()) {
+      chatSocketService.reconnect();
+    }
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      user: currentUser,
-      message: inputMessage.trim(),
-      timestamp: new Date(),
-      type: 'user',
-      avatar: undefined // TODO: Add avatar support to User type
+    // Initial connection status check
+    setIsConnected(chatSocketService.isConnected());
+
+    dispatch(chatThunks.fetchRooms());
+    dispatch(chatThunks.joinRoom(currentRoom));
+    chatSocketService.joinRoom(currentRoom, currentUser);
+    dispatch(chatThunks.loadMessages({ roomId: currentRoom }));
+
+    // Check connection status periodically
+    const connectionCheck = setInterval(() => {
+      const connected = chatSocketService.isConnected();
+      setIsConnected(connected);
+
+      // Try to reconnect if disconnected
+      if (!connected) {
+        chatSocketService.reconnect();
+      }
+    }, 3000);
+
+    return () => {
+      clearInterval(connectionCheck);
+      chatSocketService.leaveRoom(currentRoom);
     };
+  }, [dispatch, currentRoom, currentUser]);
 
-    setMessages(prev => [...prev, newMessage]);
+  // Handle sending messages via Socket.IO
+  const handleSendMessage = useCallback(() => {
+    if (!inputMessage.trim() || !isConnected) return;
+
+    // Send via Socket.IO for real-time delivery
+    chatSocketService.sendMessage(currentRoom, inputMessage.trim(), currentUser, userId);
+
+    // Also dispatch to Redux for API persistence
+    dispatch(chatThunks.sendMessage({
+      roomId: currentRoom,
+      content: inputMessage.trim()
+    }));
+
     setInputMessage('');
 
-    // Simulate response (in real app, this would be handled by WebSocket/API)
-    setTimeout(() => {
-      const responses = [
-        "That's interesting!",
-        "I agree with that.",
-        "Thanks for sharing!",
-        "Good point!",
-        "Let me think about that...",
-        "Sounds good to me!"
-      ];
-      
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-      const responseMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        user: 'Alice',
-        message: randomResponse,
-        timestamp: new Date(),
-        type: 'user'
-      };
-      
-      setMessages(prev => [...prev, responseMessage]);
-    }, 1000 + Math.random() * 2000);
-  }, [inputMessage, currentUser]);
+    // Stop typing indicator
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    chatSocketService.sendTypingIndicator(currentRoom, false, currentUser);
+  }, [inputMessage, currentRoom, currentUser, userId, isConnected, dispatch]);
+
+  // Handle typing indicator
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputMessage(e.target.value);
+
+    // Send typing indicator
+    chatSocketService.sendTypingIndicator(currentRoom, true, currentUser);
+
+    // Clear previous timeout and set new one
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    typingTimeoutRef.current = setTimeout(() => {
+      chatSocketService.sendTypingIndicator(currentRoom, false, currentUser);
+    }, 2000);
+  }, [currentRoom, currentUser]);
+
+  // Stop keyboard events from propagating to game (Phaser.js captures spacebar, arrows, etc.)
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+  }, []);
 
   // Handle emoji selection
   const handleEmojiSelect = useCallback((emoji: string) => {
@@ -136,106 +167,132 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
 
   // Handle room change
   const handleRoomChange = useCallback((newRoomId: string) => {
-    setActiveRoom(newRoomId);
+    // Leave current room
+    chatSocketService.leaveRoom(currentRoom);
+    dispatch(chatThunks.leaveRoom(currentRoom));
+
+    // Join new room
+    dispatch(setCurrentRoom(newRoomId));
+    dispatch(chatThunks.joinRoom(newRoomId));
+    chatSocketService.joinRoom(newRoomId, currentUser);
+    dispatch(chatThunks.loadMessages({ roomId: newRoomId }));
+
+    // Handle Jitsi integration
+    jitsiChatIntegration.handleChatRoomChange(newRoomId);
+
     setShowRoomList(false);
     onRoomChange?.(newRoomId);
-    
-    // Clear messages and add welcome message for new room
-    const roomName = chatRooms.find(r => r.id === newRoomId)?.name || newRoomId;
-    setMessages([
-      {
-        id: Date.now().toString(),
-        user: 'System',
-        message: `Switched to ${roomName} chat room`,
-        timestamp: new Date(),
-        type: 'system'
-      }
-    ]);
-  }, [chatRooms, onRoomChange]);
+  }, [currentRoom, currentUser, dispatch, onRoomChange]);
+  
+  // Handle video call toggle
+  const handleVideoCallToggle = useCallback(() => {
+    jitsiChatIntegration.toggleVideoCall();
+  }, []);
+  
+  // Handle auto-join video toggle
+  const handleAutoJoinVideoToggle = useCallback((checked: boolean) => {
+    setAutoJoinVideo(checked);
+    jitsiChatIntegration.setAutoJoin(currentRoom, checked);
+  }, [currentRoom]);
 
-  // Render message item
-  const renderMessage = (message: Message) => (
-    <List.Item
-      key={message.id}
-      style={{
-        padding: '8px 12px',
-        borderBottom: 'none',
-        backgroundColor: message.type === 'system' ? 'var(--color-bg-secondary)' : 'transparent'
-      }}
-    >
-      <div style={{ width: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-          {message.type === 'user' && (
-            <Avatar
-              size="small"
-              src={message.avatar}
-              icon={<UserOutlined />}
-              style={{ flexShrink: 0 }}
-            />
-          )}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-              <Text
-                strong={message.type === 'user'}
-                type={message.type === 'system' ? 'secondary' : undefined}
-                style={{ fontSize: '12px' }}
-              >
-                {message.user}
-              </Text>
-              <Text type="secondary" style={{ fontSize: '10px' }}>
-                {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+  // Render message item using Redux Message type
+  const renderMessage = (message: Message) => {
+    const isSystemMessage = message.authorId === 'system';
+    const timestamp = message.createdAt instanceof Date
+      ? message.createdAt
+      : new Date(message.createdAt);
+
+    return (
+      <List.Item
+        key={message.id}
+        style={{
+          padding: '8px 12px',
+          borderBottom: 'none',
+          backgroundColor: isSystemMessage ? 'var(--color-bg-secondary)' : 'transparent'
+        }}
+      >
+        <div style={{ width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            {!isSystemMessage && (
+              <Avatar
+                size="small"
+                icon={<UserOutlined />}
+                style={{ flexShrink: 0 }}
+              />
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                <Text
+                  strong={!isSystemMessage}
+                  type={isSystemMessage ? 'secondary' : undefined}
+                  style={{ fontSize: '12px' }}
+                >
+                  {message.authorId || 'Anonymous'}
+                </Text>
+                <Text type="secondary" style={{ fontSize: '10px' }}>
+                  {timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+                {message.isEdited && (
+                  <Text type="secondary" style={{ fontSize: '10px', fontStyle: 'italic' }}>
+                    (edited)
+                  </Text>
+                )}
+              </div>
+              <Text style={{ fontSize: '13px', wordBreak: 'break-word' }}>
+                {message.content.text || ''}
               </Text>
             </div>
-            <Text style={{ fontSize: '13px', wordBreak: 'break-word' }}>
-              {message.message}
-            </Text>
           </div>
         </div>
-      </div>
-    </List.Item>
-  );
+      </List.Item>
+    );
+  };
 
   // Render room selector
-  const renderRoomSelector = () => (
-    <div style={{ padding: '8px 12px' }}>
-      <Space direction="vertical" style={{ width: '100%' }} size="small">
-        <Text strong style={{ fontSize: '12px' }}>Chat Rooms</Text>
-        {chatRooms.map(room => (
-          <div
-            key={room.id}
-            onClick={() => handleRoomChange(room.id)}
-            style={{
-              padding: '6px 8px',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              backgroundColor: room.id === activeRoom ? 'var(--color-primary-light)' : 'transparent',
-              border: room.id === activeRoom ? '1px solid var(--color-primary)' : '1px solid transparent',
-              transition: 'all 0.2s'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: '12px', fontWeight: room.id === activeRoom ? 500 : 400 }}>
-                {room.name}
-              </Text>
-              {room.unreadCount > 0 && (
-                <Badge count={room.unreadCount} size="small" />
-              )}
+  const renderRoomSelector = () => {
+    // Use default rooms if none loaded from API
+    const displayRooms = chatRooms.length > 0 ? chatRooms : [
+      { id: 'general', name: 'General', createdAt: new Date(), expiresAt: new Date() },
+      { id: 'team-alpha', name: 'Team Alpha', createdAt: new Date(), expiresAt: new Date() },
+      { id: 'random', name: 'Random', createdAt: new Date(), expiresAt: new Date() }
+    ] as ChatRoom[];
+
+    return (
+      <div style={{ padding: '8px 12px' }}>
+        <Space direction="vertical" style={{ width: '100%' }} size="small">
+          <Text strong style={{ fontSize: '12px' }}>Chat Rooms</Text>
+          {displayRooms.map(room => (
+            <div
+              key={room.id}
+              onClick={() => handleRoomChange(room.id)}
+              style={{
+                padding: '6px 8px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                backgroundColor: room.id === currentRoom ? 'var(--color-primary-light)' : 'transparent',
+                border: room.id === currentRoom ? '1px solid var(--color-primary)' : '1px solid transparent',
+                transition: 'all 0.2s'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: '12px', fontWeight: room.id === currentRoom ? 500 : 400 }}>
+                  {room.name}
+                </Text>
+              </div>
             </div>
-            {room.lastMessage && (
-              <Text type="secondary" style={{ fontSize: '10px' }}>
-                {room.lastMessage}
-              </Text>
-            )}
-          </div>
-        ))}
-      </Space>
-    </div>
-  );
+          ))}
+        </Space>
+      </div>
+    );
+  };
+
+  // Get current room name
+  const currentRoomName = chatRooms.find(r => r.id === currentRoom)?.name || currentRoom;
 
   return (
-    <div className={`persistent-chat-panel ${className}`} style={{ 
-      height: '100%', 
-      display: 'flex', 
+    <div className={`persistent-chat-panel ${className}`} style={{
+      height: '100%',
+      display: 'flex',
       flexDirection: 'column',
       backgroundColor: 'var(--color-bg-primary)'
     }}>
@@ -245,10 +302,43 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Badge status={isConnected ? 'success' : 'error'} />
             <Text strong style={{ fontSize: '14px' }}>
-              {chatRooms.find(r => r.id === activeRoom)?.name || 'Chat'}
+              {currentRoomName}
             </Text>
+            {typingUsers.length > 0 && (
+              <Text type="secondary" style={{ fontSize: '11px', fontStyle: 'italic' }}>
+                {typingUsers.length === 1
+                  ? `${typingUsers[0]} is typing...`
+                  : `${typingUsers.length} people typing...`}
+              </Text>
+            )}
           </div>
           <Space size="small">
+            {/* Video Call Button */}
+            {hasVideoCallEnabled && (
+              <Tooltip title={videoCallState.isActive ? 'Leave Video Call' : 'Join Video Call'}>
+                <Button
+                  type={videoCallState.isActive ? 'primary' : 'default'}
+                  icon={<VideoCameraOutlined />}
+                  size="small"
+                  onClick={handleVideoCallToggle}
+                  style={{
+                    backgroundColor: videoCallState.isActive ? 'var(--color-primary)' : undefined
+                  }}
+                />
+              </Tooltip>
+            )}
+            
+            {/* Auto-Join Video Toggle */}
+            {hasVideoCallEnabled && (
+              <Tooltip title="Auto-join video call when entering room">
+                <Switch
+                  size="small"
+                  checked={autoJoinVideo}
+                  onChange={handleAutoJoinVideoToggle}
+                />
+              </Tooltip>
+            )}
+            
             <Popover
               content={renderRoomSelector()}
               title="Switch Room"
@@ -275,24 +365,25 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
       </Card>
 
       {/* Messages Area */}
-      <div style={{ 
-        flex: 1, 
+      <div style={{
+        flex: 1,
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         margin: '0 8px'
       }}>
-        <div style={{ 
-          flex: 1, 
+        <div style={{
+          flex: 1,
           overflowY: 'auto',
           backgroundColor: 'var(--color-bg-primary)',
           border: '1px solid var(--color-border-light)',
           borderRadius: '6px'
         }}>
           <List
-            dataSource={messages}
+            dataSource={reduxMessages}
             renderItem={renderMessage}
             style={{ padding: 0 }}
+            locale={{ emptyText: 'No messages yet. Start the conversation!' }}
           />
           <div ref={messagesEndRef} />
         </div>
@@ -304,9 +395,10 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
           <Input
             ref={inputRef}
             value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
             onPressEnter={handleSendMessage}
-            placeholder={`Message ${chatRooms.find(r => r.id === activeRoom)?.name || 'chat'}...`}
+            placeholder={`Message ${currentRoomName}...`}
             disabled={!isConnected}
             style={{ fontSize: '13px' }}
           />
@@ -349,5 +441,3 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
     </div>
   );
 };
-
-export default PersistentChatPanel;

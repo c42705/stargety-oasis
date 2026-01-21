@@ -26,6 +26,7 @@ model User {
 
   // Relations
   messages   Message[]
+  reactions  Reaction[]
   ownedRooms ChatRoom[]    @relation("RoomOwner")
   characters Character[]
   settings   UserSettings?
@@ -44,11 +45,13 @@ model Map {
   name      String
   data      Json     // JSONB - stores full map data structure (areas, collision, dimensions)
   version   Int      @default(1)
+  cachedAt  DateTime? // Timestamp when map was last cached on client
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  assets MapAsset[]
+  assets       MapAsset[]
+  syncMetadata MapSyncMetadata?
 
   @@map("maps")
 }
@@ -70,6 +73,24 @@ model MapAsset {
 
   @@index([mapId])
   @@map("map_assets")
+}
+
+// Map sync metadata - tracks cache validation and synchronization state
+model MapSyncMetadata {
+  id                String   @id @default(cuid())
+  mapId             String   @unique
+  lastClientCacheAt DateTime? // When client last cached this map
+  lastValidatedAt   DateTime? // When cache was last validated
+  cacheVersion      Int      @default(1) // Incremented when cache should be invalidated
+  totalPackageSize  Int      @default(0) // Size of complete package (map + avatars + assets) in bytes
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  map Map @relation(fields: [mapId], references: [id], onDelete: Cascade)
+
+  @@index([mapId])
+  @@map("map_sync_metadata")
 }
 
 // ============================================================================
@@ -182,17 +203,68 @@ model ChatRoom {
 model Message {
   id        String   @id @default(cuid())
   content   Json     // JSONB - text, mentions, attachments, etc.
+  type      String   @default("TEXT") // TEXT | FILE | REACTION | THREAD
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   expiresAt DateTime // for 8hr TTL cleanup
+  isEdited  Boolean  @default(false)
+  editedAt  DateTime?
+
+  // Thread support - self-referencing relations
+  parentId       String?
+  parent         Message?   @relation("MessageReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies        Message[]  @relation("MessageReplies")
+  threadId       String?
+  thread         Message?   @relation("MessageThread", fields: [threadId], references: [id], onDelete: Cascade)
+  threadMessages Message[]  @relation("MessageThread")
 
   // Relations
-  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  room      ChatRoom   @relation(fields: [roomId], references: [id], onDelete: Cascade)
   roomId    String
-  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  author    User?      @relation(fields: [authorId], references: [id], onDelete: SetNull)
   authorId  String?
+  reactions Reaction[]
+  attachments Attachment[]
 
   @@index([roomId, createdAt])
   @@index([expiresAt])
+  @@index([parentId])
+  @@index([threadId])
   @@map("messages")
+}
+
+// Reaction model for emoji reactions on messages
+model Reaction {
+  id        String   @id @default(cuid())
+  emoji     String
+  createdAt DateTime @default(now())
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId String
+
+  @@unique([emoji, userId, messageId])
+  @@index([messageId])
+  @@map("reactions")
+}
+
+// Attachment model for file attachments
+model Attachment {
+  id           String   @id @default(cuid())
+  filename     String
+  mimetype     String
+  size         Int
+  url          String
+  thumbnailUrl String?
+  createdAt    DateTime @default(now())
+
+  // Relations
+  message      Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId    String
+
+  @@index([messageId])
+  @@map("attachments")
 }
 

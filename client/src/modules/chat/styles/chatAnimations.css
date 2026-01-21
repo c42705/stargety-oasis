@@ -1,0 +1,277 @@
+/**
+ * Chat Animations & Transitions
+ * 
+ * Provides smooth animations and transitions for chat components
+ * following Ant Design's animation principles
+ */
+
+/* Message Animations */
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes messageFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes messageHighlight {
+  0% {
+    background-color: rgba(24, 144, 255, 0.1);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* Reaction Animations */
+@keyframes reactionPop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes reactionBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+/* Typing Indicator Animation */
+@keyframes typingDot {
+  0%, 60%, 100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-8px);
+  }
+}
+
+/* File Upload Progress Animation */
+@keyframes progressPulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Thread Expand/Collapse Animation */
+@keyframes threadExpand {
+  from {
+    max-height: 0;
+    opacity: 0;
+  }
+  to {
+    max-height: 1000px;
+    opacity: 1;
+  }
+}
+
+@keyframes threadCollapse {
+  from {
+    max-height: 1000px;
+    opacity: 1;
+  }
+  to {
+    max-height: 0;
+    opacity: 0;
+  }
+}
+
+/* Search Highlight Animation */
+@keyframes searchHighlight {
+  0% {
+    background-color: rgba(250, 173, 20, 0.3);
+  }
+  100% {
+    background-color: rgba(250, 173, 20, 0.1);
+  }
+}
+
+/* Notification Animation */
+@keyframes notificationSlideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes notificationSlideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Room Switch Animation */
+@keyframes roomSwitch {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Apply Animations */
+.chat-message {
+  animation: messageSlideIn 0.3s ease-out;
+}
+
+.chat-message.highlighted {
+  animation: messageHighlight 1s ease-out;
+}
+
+.chat-reaction {
+  animation: reactionPop 0.3s ease-out;
+}
+
+.chat-reaction:hover {
+  animation: reactionBounce 0.3s ease-in-out;
+}
+
+.typing-indicator-dot {
+  animation: typingDot 1.4s infinite ease-in-out;
+}
+
+.typing-indicator-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-indicator-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-indicator-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.file-upload-progress {
+  animation: progressPulse 1.5s infinite;
+}
+
+.thread-view.expanded {
+  animation: threadExpand 0.3s ease-out;
+}
+
+.thread-view.collapsed {
+  animation: threadCollapse 0.3s ease-out;
+}
+
+.search-highlight {
+  animation: searchHighlight 0.5s ease-out;
+}
+
+.chat-notification {
+  animation: notificationSlideIn 0.3s ease-out;
+}
+
+.chat-notification.closing {
+  animation: notificationSlideOut 0.3s ease-in;
+}
+
+.room-switch {
+  animation: roomSwitch 0.3s ease-out;
+}
+
+/* Smooth Transitions */
+.chat-message,
+.chat-reaction,
+.thread-view,
+.search-highlight,
+.chat-notification {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Hover Effects */
+.chat-message:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.chat-reaction:hover {
+  transform: scale(1.1);
+}
+
+/* Focus States */
+.chat-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+/* Loading States */
+.chat-loading {
+  animation: messageFadeIn 0.3s ease-out;
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .chat-message:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+
+  .chat-input:focus {
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.4);
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .chat-message,
+  .chat-reaction,
+  .thread-view,
+  .search-highlight,
+  .chat-notification,
+  .room-switch {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Accessibility - High Contrast Mode */
+@media (prefers-contrast: high) {
+  .chat-message {
+    border: 1px solid currentColor;
+  }
+
+  .chat-reaction {
+    border: 1px solid currentColor;
+  }
+}

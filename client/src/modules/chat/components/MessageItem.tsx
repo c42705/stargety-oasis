@@ -1,344 +1,330 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import {
-  List,
-  Avatar,
-  Typography,
-  Space,
-  Button,
-  Popover,
-  Dropdown,
-  message as antMessage,
-  Tooltip,
-  Card,
-  Modal
-} from 'antd';
-import {
-  UserOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  MessageOutlined,
-  MoreOutlined,
-  HeartOutlined,
-  SmileOutlined,
-  MehOutlined,
-  EyeOutlined,
-  ClockCircleOutlined
-} from '@ant-design/icons';
-import { Smile, Laugh, Heart, ThumbsUp, ThumbsDown, Angry, Meh } from 'lucide-react';
-import { Message, User, Reaction } from '../../../types/chat';
-import { MessageEditor } from './MessageEditor';
-import { ReactionButton } from './ReactionButton';
-import { ThreadView } from './ThreadView';
+import React, { useState, useCallback } from 'react';
+import { Button, Dropdown, Popconfirm, Avatar, Tooltip, Space, Input, Badge, Card, Typography } from 'antd';
+import { MoreOutlined, EditOutlined, DeleteOutlined, MessageOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
+import { Message as ModuleMessage } from '../../../types/chat';
+import { Message as ReduxMessage } from '../../../redux/types/chat';
+import { useAppDispatch } from '../../../redux/hooks';
+import { chatThunks, updateMessage } from '../../../redux/slices/chatSlice';
+import { chatSocketService } from '../../../services/socket/ChatSocketService';
+import '../../../animations/chat-animations.css';
 
 const { Text } = Typography;
 
+// MessageItem accepts either module types or redux types for flexibility
+type ChatMessage = ModuleMessage | ReduxMessage;
+
 interface MessageItemProps {
-  message: Message;
-  currentUser: User;
-  onEditMessage: (messageId: string, content: string) => void;
-  onDeleteMessage: (messageId: string) => void;
-  onAddReaction: (messageId: string, emoji: string) => void;
-  onRemoveReaction: (messageId: string, emoji: string) => void;
-  onReplyToMessage: (messageId: string, content: string) => void;
-  isEditing?: boolean;
-  onToggleEdit?: (messageId: string | null) => void;
-  className?: string;
+  message: ChatMessage;
+  isCurrentUser: boolean;
+  onReply?: (messageId: string) => void;
+  onEdit?: (messageId: string, content: string) => void;
+  onDelete?: (messageId: string) => void;
 }
+
+// Common emoji reactions
+const COMMON_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🎉', '🔥', '👎'];
 
 export const MessageItem: React.FC<MessageItemProps> = ({
   message,
-  currentUser,
-  onEditMessage,
-  onDeleteMessage,
-  onAddReaction,
-  onRemoveReaction,
-  onReplyToMessage,
-  isEditing = false,
-  onToggleEdit,
-  className = ''
+  isCurrentUser,
+  onReply,
+  onEdit,
+  onDelete
 }) => {
-  const [isEditingLocal, setIsEditingLocal] = useState(isEditing);
-  const [showThread, setShowThread] = useState(false);
-  const [showReactions, setShowReactions] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const dispatch = useAppDispatch();
+  
+  // Get current user ID from sessionStorage (where AuthContext stores it)
+  const getCurrentUserId = useCallback(() => {
+    try {
+      const savedAuth = sessionStorage.getItem('stargetyOasisAuth');
+      if (savedAuth) {
+        const authData = JSON.parse(savedAuth);
+        return authData.id || 'anonymous';
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    return 'anonymous';
+  }, []);
 
-  const isOwnMessage = message.authorId === currentUser.id;
-  const hasReactions = message.reactions.length > 0;
-  const hasAttachments = message.attachments.length > 0;
-  const isEdited = message.isEdited && message.editedAt;
+  // Initialize edit content when entering edit mode
+  React.useEffect(() => {
+    if (isEditing) {
+      setEditContent(message.content.text || '');
+    }
+  }, [isEditing, message.content]);
 
-  // Common emoji reactions
-  const commonEmojis = [
-    { emoji: '❤️', icon: <Heart size={14} />, label: 'Heart' },
-    { emoji: '👍', icon: <ThumbsUp size={14} />, label: 'Thumbs Up' },
-    { emoji: '👎', icon: <ThumbsDown size={14} />, label: 'Thumbs Down' },
-    { emoji: '😂', icon: <Laugh size={14} />, label: 'Laugh' },
-    { emoji: '😡', icon: <Angry size={14} />, label: 'Angry' },
-    { emoji: '😐', icon: <Meh size={14} />, label: 'Meh' }
-  ];
-
-  // Check if user has reacted to this message
-  const userReaction = useMemo(() => {
-    return message.reactions.find(reaction => reaction.userId === currentUser.id);
-  }, [message.reactions, currentUser.id]);
-
-  // Format timestamp
-  const formatTimestamp = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  // Format edited time
-  const formatEditedTime = (date: Date) => {
-    return `Edited at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-  };
-
-  // Handle edit message
   const handleEdit = useCallback(() => {
-    if (isOwnMessage) {
-      setIsEditingLocal(true);
-      onToggleEdit?.(message.id);
-    }
-  }, [isOwnMessage, message.id, onToggleEdit]);
-
-  // Handle delete message
-  const handleDelete = useCallback(() => {
-    if (isOwnMessage) {
-      Modal.confirm({
-        title: 'Delete Message',
-        content: 'Are you sure you want to delete this message?',
-        onOk: () => {
-          onDeleteMessage(message.id);
-          antMessage.success('Message deleted');
-        }
-      });
-    }
-  }, [isOwnMessage, message.id, onDeleteMessage]);
-
-  // Handle save edit
-  const handleSaveEdit = useCallback((content: string) => {
-    onEditMessage(message.id, content);
-    setIsEditingLocal(false);
-    onToggleEdit?.(null);
-    antMessage.success('Message updated');
-  }, [message.id, onEditMessage, onToggleEdit]);
-
-  // Handle cancel edit
-  const handleCancelEdit = useCallback(() => {
-    setIsEditingLocal(false);
-    onToggleEdit?.(null);
-  }, [onToggleEdit]);
-
-  // Handle reply
-  const handleReply = useCallback(() => {
-    // This would typically open a reply interface or focus the input
-    onReplyToMessage(message.id, '');
-  }, [message.id, onReplyToMessage]);
-
-  // Handle reaction click
-  const handleReactionClick = useCallback((emoji: string) => {
-    if (userReaction?.emoji === emoji) {
-      onRemoveReaction(message.id, emoji);
+    if (isEditing && editContent.trim()) {
+      dispatch(chatThunks.editMessage({ messageId: message.id, content: editContent.trim() }));
+      setIsEditing(false);
+      if (onEdit) onEdit(message.id, editContent.trim());
     } else {
-      onAddReaction(message.id, emoji);
+      setIsEditing(true);
     }
-  }, [userReaction, message.id, onAddReaction, onRemoveReaction]);
+  }, [isEditing, editContent, message, dispatch, onEdit]);
 
-  // Message actions menu
-  const messageActions = [
-    {
-      key: 'reply',
-      icon: <MessageOutlined />,
-      label: 'Reply',
-      onClick: handleReply
-    },
-    ...(isOwnMessage ? [
+  const handleCancelEdit = useCallback(() => {
+    setIsEditing(false);
+    setEditContent('');
+  }, []);
+
+  const handleDelete = useCallback(() => {
+    setIsDeleting(true);
+    dispatch(chatThunks.deleteMessage(message.id));
+    if (onDelete) onDelete(message.id);
+  }, [message, dispatch, onDelete]);
+
+  const handleReaction = useCallback((emoji: string) => {
+    const currentUserId = getCurrentUserId();
+    const existingReaction = message.reactions?.find(r => r.emoji === emoji && r.userId === currentUserId);
+    
+    if (existingReaction) {
+      // Remove reaction via Socket.IO
+      // Note: Backend doesn't have a Socket.IO endpoint for removing reactions yet
+      // For now, we'll just update the local state optimistically
+      dispatch(updateMessage({
+        roomId: message.roomId,
+        messageId: message.id,
+        updates: {
+          reactions: message.reactions?.filter(r => !(r.emoji === emoji && r.userId === currentUserId)) || []
+        }
+      }));
+    } else {
+      // Add reaction via Socket.IO
+      // Emit reaction event to backend
+      // Note: Backend expects Socket.IO event, not REST API
+      // We'll emit directly to the socket
+      const socket = (chatSocketService as any).socket;
+      if (socket && socket.connected) {
+        socket.emit('add-reaction', {
+          messageId: message.id,
+          emoji,
+          userId: currentUserId
+        });
+      }
+      
+      // Optimistically update local state
+      dispatch(updateMessage({
+        roomId: message.roomId,
+        messageId: message.id,
+        updates: {
+          reactions: [
+            ...(message.reactions || []),
+            { emoji, userId: currentUserId, createdAt: new Date() }
+          ]
+        }
+      }));
+    }
+  }, [message, dispatch, getCurrentUserId]);
+
+  const formatTimestamp = (timestamp: Date) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  };
+
+  const formatEditTimestamp = (timestamp?: Date) => {
+    if (!timestamp) return '';
+    return `edited ${formatTimestamp(timestamp)}`;
+  };
+
+  // Group reactions by emoji - use explicit typing for compatibility with both message types
+  type ReactionItem = { emoji: string; userId: string; createdAt: Date };
+  const reactions = message.reactions as ReactionItem[] | undefined;
+  const groupedReactions = reactions?.reduce<Record<string, ReactionItem[]>>((acc, reaction) => {
+    if (!acc[reaction.emoji]) {
+      acc[reaction.emoji] = [];
+    }
+    acc[reaction.emoji].push(reaction);
+    return acc;
+  }, {}) || {};
+
+  const currentUserId = getCurrentUserId();
+
+  const authorDisplay: string = (message as any).authorName || (message.content as any)?.authorName || message.authorId || 'Unknown User';
+
+  const reactionMenuItems = COMMON_EMOJIS.map(emoji => {
+    const reactions = groupedReactions[emoji] || [];
+    const hasReacted = reactions.some(r => r.userId === currentUserId);
+
+    return {
+      key: emoji,
+      label: (
+        <Space>
+          <span>{emoji}</span>
+          {reactions.length > 0 && <span>{reactions.length}</span>}
+          {hasReacted && <CheckOutlined style={{ color: '#52c41a' }} />}
+        </Space>
+      ),
+      onClick: () => handleReaction(emoji)
+    };
+  });
+
+  const messageMenuItems = [
+    ...(isCurrentUser ? [
       {
         key: 'edit',
         icon: <EditOutlined />,
         label: 'Edit',
-        onClick: handleEdit
-      },
+        onClick: () => setIsEditing(true)
+      }
+    ] : []),
+    ...(isCurrentUser ? [
       {
         key: 'delete',
         icon: <DeleteOutlined />,
-        label: 'Delete',
-        onClick: handleDelete,
-        danger: true
+        label: (
+          <Popconfirm
+            title="Delete this message?"
+            description="This action cannot be undone."
+            onConfirm={handleDelete}
+            okText="Delete"
+            cancelText="Cancel"
+            okButtonProps={{ danger: true }}
+          >
+            Delete
+          </Popconfirm>
+        ),
+        disabled: isDeleting
       }
-    ] : [])
+    ] : []),
+    {
+      key: 'reply',
+      icon: <MessageOutlined />,
+      label: 'Reply',
+      onClick: () => onReply?.(message.id)
+    },
+    { type: 'divider' as const },
+    {
+      key: 'reactions',
+      label: 'Add Reaction',
+      icon: <span>😊</span>,
+      children: reactionMenuItems
+    }
   ];
 
-  // Render message content
-  const renderMessageContent = () => {
-    if (isEditingLocal) {
-      return (
-        <MessageEditor
-          initialValue={message.content.text || ''}
-          onSave={handleSaveEdit}
-          onCancel={handleCancelEdit}
-          placeholder="Edit your message..."
-          multiline={true}
-        />
-      );
-    }
-
-    return (
-      <div style={{ fontSize: '14px', lineHeight: '1.5', wordBreak: 'break-word' }}>
-        {message.content.text}
-        {hasAttachments && (
-          <div style={{ marginTop: '8px' }}>
-            <Text type="secondary" style={{ fontSize: '12px' }}>
-              {message.attachments.length} attachment{message.attachments.length > 1 ? 's' : ''}
-            </Text>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Render reactions
-  const renderReactions = () => {
-    if (!hasReactions) return null;
-
-    const reactionGroups = message.reactions.reduce((acc, reaction) => {
-      if (!acc[reaction.emoji]) {
-        acc[reaction.emoji] = [];
-      }
-      acc[reaction.emoji].push(reaction);
-      return acc;
-    }, {} as Record<string, Reaction[]>);
-
-    return (
-      <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-        {Object.entries(reactionGroups).map(([emoji, reactions]) => (
-          <ReactionButton
-            key={emoji}
-            emoji={emoji}
-            count={reactions.length}
-            isReacted={userReaction?.emoji === emoji}
-            onClick={() => handleReactionClick(emoji)}
-          />
-        ))}
-      </div>
-    );
-  };
-
-  // Render message metadata
-  const renderMessageMetadata = () => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-      <Text type="secondary" style={{ fontSize: '11px' }}>
-        {formatTimestamp(message.createdAt)}
-      </Text>
-      {isEdited && (
-        <Tooltip title={formatEditedTime(message.editedAt!)}>
-          <ClockCircleOutlined style={{ fontSize: '11px', color: '#999' }} />
-        </Tooltip>
-      )}
-      {message.type === 'file' && (
-        <EyeOutlined style={{ fontSize: '11px', color: '#1890ff' }} />
-      )}
-    </div>
-  );
-
   return (
-    <div className={`message-item ${className}`} style={{ width: '100%' }}>
-      <List.Item
-        style={{
-          padding: '12px 16px',
-          borderBottom: '1px solid var(--color-border-light)',
-          backgroundColor: 'transparent'
-        }}
-      >
-        <div style={{ width: '100%', display: 'flex', gap: '12px' }}>
-          {/* Avatar */}
-          <div style={{ flexShrink: 0 }}>
-            <Avatar
-              size="small"
-              src={message.author.avatar}
-              icon={<UserOutlined />}
-            >
-              {message.author.username.charAt(0).toUpperCase()}
-            </Avatar>
-          </div>
-
-          {/* Message Content */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <Text
-                strong
-                style={{ 
-                  fontSize: '13px',
-                  color: 'var(--color-text-primary)'
-                }}
-              >
-                {message.author.username}
+    <Card
+      className={`message-item ${isCurrentUser ? 'current-user' : ''}`}
+      style={{
+        marginBottom: 0,
+        borderRadius: '6px',
+      }}
+      styles={{ body: { padding: '12px' } }}
+    >
+      <Space direction="vertical" style={{ width: '100%' }} size="small">
+        {/* Message Header */}
+        <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+          <Space size="small">
+            <Avatar size="small">{authorDisplay.charAt(0).toUpperCase() || 'U'}</Avatar>
+            <Text strong>{authorDisplay}</Text>
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              {formatTimestamp(message.createdAt)}
+            </Text>
+            {message.isEdited && message.editedAt && (
+              <Text type="secondary" style={{ fontSize: '11px', fontStyle: 'italic' }}>
+                {formatEditTimestamp(message.editedAt)}
               </Text>
-              
-              <Dropdown
-                menu={{
-                  items: messageActions.map(action => ({
-                    key: action.key,
-                    icon: action.icon,
-                    label: action.label,
-                    onClick: action.onClick,
-                    danger: action.danger
-                  }))
-                }}
-                trigger={['click']}
-                placement="bottomRight"
-              >
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<MoreOutlined />}
-                  style={{ 
-                    color: 'var(--color-text-secondary)',
-                    fontSize: '12px'
-                  }}
-                />
-              </Dropdown>
-            </div>
+            )}
+          </Space>
+          {isCurrentUser && (
+            <Dropdown menu={{ items: messageMenuItems }} trigger={['click']} placement="topRight">
+              <Button type="text" size="small" icon={<MoreOutlined />} />
+            </Dropdown>
+          )}
+        </Space>
 
-            {/* Message Text */}
-            {renderMessageContent()}
+        {/* Message Content */}
+        {isEditing ? (
+          <Space.Compact style={{ width: '100%' }}>
+            <Input.TextArea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              rows={3}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleEdit();
+                }
+              }}
+            />
+          </Space.Compact>
+        ) : (
+          <Text>{message.content.text}</Text>
+        )}
 
-            {/* Reactions */}
-            {renderReactions()}
+        {/* Edit Actions */}
+        {isEditing && (
+          <Space>
+            <Button type="primary" size="small" onClick={handleEdit} icon={<CheckOutlined />}>
+              Save
+            </Button>
+            <Button size="small" onClick={handleCancelEdit} icon={<CloseOutlined />}>
+              Cancel
+            </Button>
+          </Space>
+        )}
 
-            {/* Metadata */}
-            {renderMessageMetadata()}
+        {/* Reactions Display */}
+        {!isEditing && Object.keys(groupedReactions).length > 0 && (
+          <Space wrap size="small">
+            {Object.entries(groupedReactions).map(([emoji, reactions]) => {
+              const hasReacted = reactions.some(r => r.userId === currentUserId);
+              return (
+                <Tooltip key={emoji} title={`${reactions.length} reaction${reactions.length > 1 ? 's' : ''}`}>
+                  <Badge count={reactions.length} size="small">
+                    <Button
+                      type={hasReacted ? 'primary' : 'default'}
+                      size="small"
+                      onClick={() => handleReaction(emoji)}
+                    >
+                      {emoji}
+                    </Button>
+                  </Badge>
+                </Tooltip>
+              );
+            })}
+          </Space>
+        )}
 
-            {/* Thread Button */}
-            {message.threadId && (
+        {/* Message Actions */}
+        {!isEditing && (
+          <Space size="small">
+            <Dropdown menu={{ items: reactionMenuItems }} trigger={['click']} placement="topLeft">
+              <Button type="text" size="small">
+                😊
+              </Button>
+            </Dropdown>
+            {onReply && (
               <Button
                 type="text"
                 size="small"
                 icon={<MessageOutlined />}
-                onClick={() => setShowThread(!showThread)}
-                style={{
-                  marginTop: '8px',
-                  fontSize: '11px',
-                  color: 'var(--color-text-secondary)'
-                }}
+                onClick={() => onReply(message.id)}
               >
-                View Thread ({message.reactions.length} replies)
+                Reply
               </Button>
             )}
-
-            {/* Thread View */}
-            {showThread && (
-              <div style={{ marginTop: '12px', marginLeft: '24px' }}>
-                <ThreadView
-                  messageId={message.id}
-                  messages={[]} // This would come from props in a real implementation
-                  currentUser={currentUser}
-                  onReply={onReplyToMessage}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      </List.Item>
-    </div>
+          </Space>
+        )}
+      </Space>
+    </Card>
   );
 };
+
+export default MessageItem;

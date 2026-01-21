@@ -10,35 +10,35 @@ import {
   Tabs,
   Popover,
   Dropdown,
-  Menu,
   message as antMessage,
   Modal,
   Spin,
   Empty,
-  Select
+  Select,
+  Divider,
+  Switch,
+  Row,
+  Col,
+  Menu
 } from 'antd';
-import { 
-  MessageOutlined, 
-  UserOutlined, 
-  SearchOutlined,
-  PlusOutlined,
+import {
+  UserOutlined,
   SettingOutlined,
-  TeamOutlined,
-  SendOutlined,
-  SmileOutlined,
-  PaperClipOutlined,
-  EllipsisOutlined,
-  VideoCameraOutlined,
-  PhoneOutlined,
-  MoreOutlined,
-  BellOutlined,
   ClearOutlined,
+  FolderOpenOutlined,
+  BellOutlined,
+  CheckOutlined,
+  CloseOutlined,
+  MessageOutlined,
+  SmileOutlined,
   HistoryOutlined,
   StarOutlined,
-  FolderOpenOutlined
+  VideoCameraOutlined,
+  MoreOutlined
 } from '@ant-design/icons';
 import { ChatModuleEnhanced } from '../modules/chat/ChatModuleEnhanced';
 import { Message, ChatRoom, User } from '../types/chat';
+import { useTheme } from '../shared/ThemeContext';
 
 const { Header, Content, Footer } = Layout;
 const { TabPane } = Tabs;
@@ -337,33 +337,17 @@ export const PersistentChatPanelEnhanced: React.FC<PersistentChatPanelEnhancedPr
     }
   };
 
-  // Header actions menu
-  const headerActionsMenu = (
-    <Menu>
-      <Menu.Item key="notifications" icon={<BellOutlined />}>
-        Notifications
-      </Menu.Item>
-      <Menu.Item key="settings" icon={<SettingOutlined />}>
-        Settings
-      </Menu.Item>
-      <Menu.Item key="history" icon={<HistoryOutlined />}>
-        Chat History
-      </Menu.Item>
-      <Menu.Item key="starred" icon={<StarOutlined />}>
-        Starred Messages
-      </Menu.Item>
-      <Menu.Divider />
-      <Menu.Item key="minimize" icon={<ClearOutlined />}>
-        {isMinimized ? 'Restore' : 'Minimize'}
-      </Menu.Item>
-      <Menu.Item key="maximize" icon={<FolderOpenOutlined />}>
-        {isMaximized ? 'Restore' : 'Maximize'}
-      </Menu.Item>
-      <Menu.Item key="close" icon={<ClearOutlined />} danger>
-        Close
-      </Menu.Item>
-    </Menu>
-  );
+  // Header actions menu items
+  const headerActionsMenuItems = [
+    { key: 'notifications', icon: <BellOutlined />, label: 'Notifications' },
+    { key: 'settings', icon: <SettingOutlined />, label: 'Settings' },
+    { key: 'history', icon: <HistoryOutlined />, label: 'Chat History' },
+    { key: 'starred', icon: <StarOutlined />, label: 'Starred Messages' },
+    { type: 'divider' as const },
+    { key: 'minimize', icon: <ClearOutlined />, label: isMinimized ? 'Restore' : 'Minimize' },
+    { key: 'maximize', icon: <FolderOpenOutlined />, label: isMaximized ? 'Restore' : 'Maximize' },
+    { key: 'close', icon: <ClearOutlined />, label: 'Close', danger: true },
+  ];
 
   if (!visible && !isMinimized) return null;
 
@@ -400,7 +384,7 @@ export const PersistentChatPanelEnhanced: React.FC<PersistentChatPanelEnhancedPr
             />
           )}
           
-          <Dropdown overlay={headerActionsMenu} trigger={['click']}>
+          <Dropdown menu={{ items: headerActionsMenuItems }} trigger={['click']}>
             <Button
               type="text"
               size="small"
@@ -412,8 +396,8 @@ export const PersistentChatPanelEnhanced: React.FC<PersistentChatPanelEnhancedPr
       </Header>
 
       {/* Content */}
-      <Content style={{ 
-        flex: 1, 
+      <Content style={{
+        flex: 1,
         overflow: 'hidden',
         display: isMinimized ? 'none' : 'flex',
         flexDirection: 'column'
@@ -422,10 +406,6 @@ export const PersistentChatPanelEnhanced: React.FC<PersistentChatPanelEnhancedPr
         <Tabs
           activeKey={activeTab}
           onChange={setActiveTab}
-          style={{ 
-            backgroundColor: 'var(--color-bg-secondary)',
-            borderBottom: '1px solid var(--color-border-light)'
-          }}
         >
           <TabPane tab="Chat" key="chat">
             <ChatModuleEnhanced
@@ -435,17 +415,17 @@ export const PersistentChatPanelEnhanced: React.FC<PersistentChatPanelEnhancedPr
               showSearch={showSearch}
             />
           </TabPane>
-          
-          <TabPane 
+
+          <TabPane
             tab={
               <Badge count={notifications.filter(n => !n.read).length} dot>
                 <span>Notifications</span>
               </Badge>
-            } 
+            }
             key="notifications"
           >
-            <div style={{ padding: '16px', height: '100%', overflow: 'auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <Space direction="vertical" style={{ width: '100%', padding: '16px' }} size="middle">
+              <Space style={{ width: '100%', justifyContent: 'space-between' }}>
                 <Title level={5} style={{ margin: 0, fontSize: '14px' }}>
                   Notifications
                 </Title>
@@ -467,7 +447,7 @@ export const PersistentChatPanelEnhanced: React.FC<PersistentChatPanelEnhancedPr
                     Clear all
                   </Button>
                 </Space>
-              </div>
+              </Space>
 
               {notifications.length === 0 ? (
                 <Empty
@@ -484,91 +464,66 @@ export const PersistentChatPanelEnhanced: React.FC<PersistentChatPanelEnhancedPr
                     <Card
                       key={notification.id}
                       size="small"
-                      style={{
-                        backgroundColor: notification.read ? 'var(--color-bg-primary)' : 'var(--color-bg-secondary)',
-                        border: notification.read ? '1px solid var(--color-border-light)' : '1px solid var(--color-accent)',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                      }}
+                      hoverable
                       onClick={() => handleNotificationClick(notification)}
+                      styles={{
+                        body: { padding: '12px' }
+                      }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                        <div style={{ 
-                          flexShrink: 0,
-                          marginTop: '2px'
-                        }}>
+                      <Space direction="vertical" style={{ width: '100%' }} size={0}>
+                        <Space size="small">
                           {getNotificationIcon(notification.type)}
-                        </div>
-                        
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                            <Text
-                              strong
-                              style={{ 
-                                fontSize: '12px',
-                                color: notification.read ? 'var(--color-text-secondary)' : 'var(--color-text-primary)'
-                              }}
-                            >
-                              {notification.title}
-                            </Text>
-                            <Text 
-                              type="secondary" 
-                              style={{ fontSize: '10px' }}
-                            >
-                              {formatTimeAgo(notification.timestamp)}
-                            </Text>
-                          </div>
-                          
                           <Text
-                            style={{
-                              fontSize: '12px',
-                              color: notification.read ? 'var(--color-text-secondary)' : 'var(--color-text-primary)'
-                            }}
+                            strong
+                            style={{ fontSize: '12px' }}
                           >
-                            {notification.message}
+                            {notification.title}
                           </Text>
-                        </div>
-                        
-                        {!notification.read && (
-                          <div style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: getNotificationColor(notification.type),
-                            flexShrink: 0
-                          }} />
-                        )}
-                      </div>
+                          <Text
+                            type="secondary"
+                            style={{ fontSize: '10px' }}
+                          >
+                            {formatTimeAgo(notification.timestamp)}
+                          </Text>
+                          {!notification.read && (
+                            <Badge
+                              color={getNotificationColor(notification.type)}
+                              style={{ width: '8px', height: '8px' }}
+                            />
+                          )}
+                        </Space>
+
+                        <Text style={{ fontSize: '12px' }}>
+                          {notification.message}
+                        </Text>
+                      </Space>
                     </Card>
                   ))}
                 </Space>
               )}
-            </div>
+            </Space>
           </TabPane>
         </Tabs>
       </Content>
 
       {/* Footer */}
       <Footer style={{
-        backgroundColor: 'var(--color-bg-secondary)',
-        borderTop: '1px solid var(--color-border-light)',
         padding: '8px 16px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Avatar 
-            size="small" 
+        <Space size="small">
+          <Avatar
+            size="small"
             icon={<UserOutlined />}
-            style={{ backgroundColor: 'var(--color-accent)' }}
           >
             {currentUser.username.charAt(0).toUpperCase()}
           </Avatar>
-          <Text style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}>
+          <Text style={{ fontSize: '12px' }}>
             {currentUser.username}
           </Text>
-        </div>
+        </Space>
 
         <Space>
           <Button
@@ -576,14 +531,12 @@ export const PersistentChatPanelEnhanced: React.FC<PersistentChatPanelEnhancedPr
             size="small"
             icon={<SettingOutlined />}
             onClick={() => setShowSettingsModal(true)}
-            style={{ color: 'var(--color-text-secondary)' }}
           />
           <Button
             type="text"
             size="small"
             icon={isMinimized ? <FolderOpenOutlined /> : <ClearOutlined />}
             onClick={handleMinimize}
-            style={{ color: 'var(--color-text-secondary)' }}
           />
         </Space>
       </Footer>
@@ -596,92 +549,111 @@ export const PersistentChatPanelEnhanced: React.FC<PersistentChatPanelEnhancedPr
         footer={null}
         width={600}
       >
-        <div style={{ padding: '16px' }}>
-          <div style={{ marginBottom: '24px' }}>
+        <Space direction="vertical" style={{ width: '100%' }} size="large">
+          {/* Notifications Section */}
+          <div>
             <Title level={5} style={{ marginBottom: '16px' }}>
               Notifications
             </Title>
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
               {Object.entries(chatSettings.notifications).map(([key, value]) => (
-                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: '14px' }}>
-                    {key.charAt(0).toUpperCase() + key.slice(1)} notifications
-                  </Text>
-                  <Button
-                    type={value ? 'primary' : 'default'}
-                    size="small"
-                    onClick={() => handleSettingsChange({
-                      notifications: { ...chatSettings.notifications, [key]: !value }
-                    })}
-                  >
-                    {value ? 'On' : 'Off'}
-                  </Button>
-                </div>
+                <Row key={key} justify="space-between" align="middle">
+                  <Col>
+                    <Text>
+                      {key.charAt(0).toUpperCase() + key.slice(1)} notifications
+                    </Text>
+                  </Col>
+                  <Col>
+                    <Switch
+                      checked={value}
+                      onChange={() => handleSettingsChange({
+                        notifications: { ...chatSettings.notifications, [key]: !value }
+                      })}
+                    />
+                  </Col>
+                </Row>
               ))}
             </Space>
           </div>
 
-          <div style={{ marginBottom: '24px' }}>
+          <Divider />
+
+          {/* Appearance Section */}
+          <div>
             <Title level={5} style={{ marginBottom: '16px' }}>
               Appearance
             </Title>
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: '14px' }}>Theme</Text>
-                <Select
-                  value={chatSettings.appearance.theme}
-                  onChange={(value) => handleSettingsChange({
-                    appearance: { ...chatSettings.appearance, theme: value }
-                  })}
-                  style={{ width: 120 }}
-                >
-                  <Select.Option value="light">Light</Select.Option>
-                  <Select.Option value="dark">Dark</Select.Option>
-                  <Select.Option value="auto">Auto</Select.Option>
-                </Select>
-              </div>
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: '14px' }}>Font Size</Text>
-                <Select
-                  value={chatSettings.appearance.fontSize}
-                  onChange={(value) => handleSettingsChange({
-                    appearance: { ...chatSettings.appearance, fontSize: value }
-                  })}
-                  style={{ width: 120 }}
-                >
-                  <Select.Option value="small">Small</Select.Option>
-                  <Select.Option value="medium">Medium</Select.Option>
-                  <Select.Option value="large">Large</Select.Option>
-                </Select>
-              </div>
+              <Row justify="space-between" align="middle">
+                <Col>
+                  <Text>Theme</Text>
+                </Col>
+                <Col>
+                  <Select
+                    value={chatSettings.appearance.theme}
+                    onChange={(value) => handleSettingsChange({
+                      appearance: { ...chatSettings.appearance, theme: value }
+                    })}
+                    style={{ width: 120 }}
+                    options={[
+                      { label: 'Light', value: 'light' },
+                      { label: 'Dark', value: 'dark' },
+                      { label: 'Auto', value: 'auto' }
+                    ]}
+                  />
+                </Col>
+              </Row>
+
+              <Row justify="space-between" align="middle">
+                <Col>
+                  <Text>Font Size</Text>
+                </Col>
+                <Col>
+                  <Select
+                    value={chatSettings.appearance.fontSize}
+                    onChange={(value) => handleSettingsChange({
+                      appearance: { ...chatSettings.appearance, fontSize: value }
+                    })}
+                    style={{ width: 120 }}
+                    options={[
+                      { label: 'Small', value: 'small' },
+                      { label: 'Medium', value: 'medium' },
+                      { label: 'Large', value: 'large' }
+                    ]}
+                  />
+                </Col>
+              </Row>
             </Space>
           </div>
 
-          <div style={{ marginBottom: '24px' }}>
+          <Divider />
+
+          {/* Behavior Section */}
+          <div>
             <Title level={5} style={{ marginBottom: '16px' }}>
               Behavior
             </Title>
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
               {Object.entries(chatSettings.behavior).map(([key, value]) => (
-                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: '14px' }}>
-                    {key.charAt(0).toUpperCase() + key.slice(1)}
-                  </Text>
-                  <Button
-                    type={value ? 'primary' : 'default'}
-                    size="small"
-                    onClick={() => handleSettingsChange({
-                      behavior: { ...chatSettings.behavior, [key]: !value }
-                    })}
-                  >
-                    {value ? 'On' : 'Off'}
-                  </Button>
-                </div>
+                <Row key={key} justify="space-between" align="middle">
+                  <Col>
+                    <Text>
+                      {key.charAt(0).toUpperCase() + key.slice(1)}
+                    </Text>
+                  </Col>
+                  <Col>
+                    <Switch
+                      checked={value}
+                      onChange={() => handleSettingsChange({
+                        behavior: { ...chatSettings.behavior, [key]: !value }
+                      })}
+                    />
+                  </Col>
+                </Row>
               ))}
             </Space>
           </div>
-        </div>
+        </Space>
       </Modal>
     </div>
   );

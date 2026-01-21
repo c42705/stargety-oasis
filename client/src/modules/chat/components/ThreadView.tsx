@@ -1,229 +1,173 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { 
-  List, 
-  Avatar, 
-  Typography, 
-  Space, 
-  Button, 
-  Input, 
-  Card,
-  Divider
-} from 'antd';
-import { 
-  UserOutlined, 
-  SendOutlined, 
-  MessageOutlined,
-  ArrowLeftOutlined
-} from '@ant-design/icons';
-import { Message, User } from '../../../types/chat';
-import { MessageEditor } from './MessageEditor';
+import React, { useState, useRef, useEffect } from 'react';
+import { Button, Space, Typography, Divider, Collapse, Avatar, Input, Empty } from 'antd';
+import { MessageOutlined, CloseOutlined, SendOutlined } from '@ant-design/icons';
+import { Message as ModuleMessage } from '../../../types/chat';
+import { Message as ReduxMessage } from '../../../redux/types/chat';
+import { useAppDispatch } from '../../../redux/hooks';
+import { chatThunks } from '../../../redux/slices/chatSlice';
+import MessageItem from './MessageItem';
 
 const { Text } = Typography;
+const { TextArea } = Input;
+
+// ThreadView accepts either module types or redux types for flexibility
+type ThreadMessage = ModuleMessage | ReduxMessage;
 
 interface ThreadViewProps {
-  messageId: string;
-  messages: Message[];
-  currentUser: User;
-  onReply: (messageId: string, content: string) => void;
-  onAddReaction?: (messageId: string, emoji: string) => void;
-  onRemoveReaction?: (messageId: string, emoji: string) => void;
-  className?: string;
+  threadRootMessage: ThreadMessage;
+  threadMessages: ThreadMessage[];
+  currentUserId?: string;
+  onReply?: (messageId: string) => void;
+  onClose?: () => void;
+  isExpanded?: boolean;
 }
 
 export const ThreadView: React.FC<ThreadViewProps> = ({
-  messageId,
-  messages,
-  currentUser,
+  threadRootMessage,
+  threadMessages,
+  currentUserId = 'current-user',
   onReply,
-  onAddReaction,
-  onRemoveReaction,
-  className = ''
+  onClose,
+  isExpanded = false
 }) => {
+  const dispatch = useAppDispatch();
   const [replyContent, setReplyContent] = useState('');
-  const [isReplying, setIsReplying] = useState(false);
-  const [expanded, setExpanded] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Filter messages that belong to this thread
-  const threadMessages = useMemo(() => {
-    return messages.filter(msg => msg.threadId === messageId || msg.parentId === messageId);
-  }, [messages, messageId]);
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [threadMessages]);
 
-  // Get the root message (the one this thread is replying to)
-  const rootMessage = useMemo(() => {
-    return messages.find(msg => msg.id === messageId);
-  }, [messages, messageId]);
+  const handleSendReply = async () => {
+    if (!replyContent.trim() || isSubmitting) return;
 
-  const handleSendReply = useCallback(() => {
-    if (!replyContent.trim()) return;
-    
-    onReply(messageId, replyContent.trim());
-    setReplyContent('');
-    setIsReplying(false);
-  }, [messageId, replyContent, onReply]);
+    setIsSubmitting(true);
+    try {
+      await dispatch(chatThunks.sendMessage({
+        roomId: threadRootMessage.roomId,
+        content: replyContent.trim(),
+        parentId: threadRootMessage.id,
+        threadId: threadRootMessage.threadId || threadRootMessage.id
+      })).unwrap();
 
-  const handleCancelReply = useCallback(() => {
-    setReplyContent('');
-    setIsReplying(false);
-  }, []);
-
-  const formatTimestamp = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setReplyContent('');
+    } catch (error) {
+      console.error('Failed to send reply:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const renderThreadMessage = (message: Message) => (
-    <div key={message.id} style={{ marginBottom: '12px' }}>
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-        <Avatar
-          size="small"
-          src={message.author.avatar}
-          icon={<UserOutlined />}
-        >
-          {message.author.username.charAt(0).toUpperCase()}
-        </Avatar>
-        
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <Text
-              strong
-              style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}
-            >
-              {message.author.username}
-            </Text>
-            <Text type="secondary" style={{ fontSize: '10px' }}>
-              {formatTimestamp(message.createdAt)}
-            </Text>
-          </div>
-          
-          <Text style={{ fontSize: '13px', lineHeight: '1.4', wordBreak: 'break-word' }}>
-            {message.content.text}
-          </Text>
-          
-          {/* Reactions placeholder */}
-          {message.reactions.length > 0 && (
-            <div style={{ marginTop: '4px', fontSize: '11px', color: '#999' }}>
-              {message.reactions.length} reaction{message.reactions.length > 1 ? 's' : ''}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendReply();
+    }
+  };
 
-  if (!expanded) {
+  const replyCount = threadMessages.length;
+  const lastReply = threadMessages[threadMessages.length - 1];
+
+  if (!isExpanded) {
     return (
-      <Card 
-        size="small" 
-        style={{ 
-          marginTop: '8px', 
-          backgroundColor: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border-light)'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Text style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-            Thread ({threadMessages.length + 1} messages)
-          </Text>
-          <Button
-            type="text"
-            size="small"
-            icon={<ArrowLeftOutlined />}
-            onClick={() => setExpanded(true)}
-            style={{ fontSize: '10px' }}
-          >
-            View
-          </Button>
-        </div>
-      </Card>
-    );
-  }
-
-  return (
-    <div className={`thread-view ${className}`} style={{ width: '100%' }}>
-      {/* Thread Header */}
-      <Card 
-        size="small" 
-        style={{ 
-          marginBottom: '12px', 
-          backgroundColor: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border-light)'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <MessageOutlined style={{ fontSize: '12px', color: '#1890ff' }} />
-            <Text strong style={{ fontSize: '12px' }}>
-              Conversation Thread
-            </Text>
-            <Text type="secondary" style={{ fontSize: '11px' }}>
-              ({threadMessages.length + 1} messages)
-            </Text>
-          </div>
-          
-          <Button
-            type="text"
-            size="small"
-            icon={<ArrowLeftOutlined />}
-            onClick={() => setExpanded(false)}
-            style={{ fontSize: '10px' }}
-          >
-            Collapse
-          </Button>
-        </div>
-        
-        {/* Root Message Preview */}
-        {rootMessage && (
-          <div style={{ marginTop: '8px', padding: '8px', backgroundColor: 'var(--color-bg-primary)', borderRadius: '4px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-              <Avatar size="small" src={rootMessage.author.avatar} icon={<UserOutlined />}>
-                {rootMessage.author.username.charAt(0).toUpperCase()}
-              </Avatar>
-              <Text style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                {rootMessage.author.username} • {formatTimestamp(rootMessage.createdAt)}
-              </Text>
-            </div>
-            <Text style={{ fontSize: '12px', lineHeight: '1.3' }}>
-              {rootMessage.content.text}
-            </Text>
-          </div>
-        )}
-      </Card>
-
-      {/* Thread Messages */}
-      <div style={{ marginBottom: '12px' }}>
-        {threadMessages.map(renderThreadMessage)}
-      </div>
-
-      {/* Reply Input */}
-      {!isReplying ? (
+      <div className="thread-preview" style={{ marginTop: 8 }}>
         <Button
           type="text"
           size="small"
           icon={<MessageOutlined />}
-          onClick={() => setIsReplying(true)}
-          style={{
-            width: '100%',
-            justifyContent: 'flex-start',
-            fontSize: '12px',
-            color: 'var(--color-text-secondary)'
-          }}
+          onClick={() => onReply?.(threadRootMessage.id)}
         >
-          Reply to thread
+          <Text type="secondary">
+            {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+            {lastReply && ` • Last reply ${new Date(lastReply.createdAt).toLocaleDateString()}`}
+          </Text>
         </Button>
-      ) : (
-        <div style={{ marginTop: '8px' }}>
-          <MessageEditor
-            initialValue={replyContent}
-            onSave={handleSendReply}
-            onCancel={handleCancelReply}
-            placeholder="Reply to this thread..."
-            multiline={false}
-            maxLength={500}
-            autoFocus={true}
-          />
-        </div>
-      )}
+      </div>
+    );
+  }
 
-      <Divider style={{ margin: '12px 0' }} />
+  return (
+    <div className="thread-view" style={{ 
+      marginLeft: 48, 
+      marginTop: 8, 
+      padding: '12px 16px',
+      backgroundColor: '#f5f5f5',
+      borderRadius: 8,
+      border: '1px solid #d9d9d9'
+    }}>
+      {/* Thread Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <Space>
+          <MessageOutlined />
+          <Text strong>Thread ({replyCount} {replyCount === 1 ? 'reply' : 'replies'})</Text>
+        </Space>
+        {onClose && (
+          <Button
+            type="text"
+            size="small"
+            icon={<CloseOutlined />}
+            onClick={onClose}
+          />
+        )}
+      </div>
+
+      {/* Thread Root Message */}
+      <div style={{ marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid #e8e8e8' }}>
+        <MessageItem
+          message={threadRootMessage}
+          isCurrentUser={threadRootMessage.authorId === currentUserId}
+          onReply={onReply}
+        />
+      </div>
+
+      {/* Thread Replies */}
+      <div className="thread-replies" style={{ maxHeight: 400, overflowY: 'auto' }}>
+        {threadMessages.length === 0 ? (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="No replies yet"
+            style={{ padding: '20px 0' }}
+          />
+        ) : (
+          threadMessages.map((message) => (
+            <div key={message.id} style={{ marginBottom: 8 }}>
+              <MessageItem
+                message={message}
+                isCurrentUser={message.authorId === currentUserId}
+                onReply={onReply}
+              />
+            </div>
+          ))
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Reply Input */}
+      <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #e8e8e8' }}>
+        <Space.Compact style={{ width: '100%' }}>
+          <TextArea
+            value={replyContent}
+            onChange={(e) => setReplyContent(e.target.value)}
+            onKeyDown={handleKeyPress}
+            placeholder="Write a reply..."
+            autoSize={{ minRows: 1, maxRows: 4 }}
+            disabled={isSubmitting}
+          />
+          <Button
+            type="primary"
+            icon={<SendOutlined />}
+            onClick={handleSendReply}
+            disabled={!replyContent.trim() || isSubmitting}
+            loading={isSubmitting}
+          >
+            Reply
+          </Button>
+        </Space.Compact>
+      </div>
     </div>
   );
 };
+
+export default ThreadView;

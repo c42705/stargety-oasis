@@ -4,7 +4,6 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
-import { ChatController } from './chat/chatController';
 import { initChatDbController, ChatDbController } from './chat/chatDbController';
 import { WorldController } from './world/worldController';
 import { VideoCallController } from './video-call/videoCallController';
@@ -83,22 +82,6 @@ app.get('/health', (req, res) => {
 });
 
 // API Routes
-app.get('/api/chat/rooms/:roomId/messages', (req, res) => {
-  const { roomId } = req.params;
-  const limit = parseInt(req.query.limit as string) || 50;
-  const messages = chatController.getRoomMessages(roomId, limit);
-  res.json({ success: true, data: messages });
-});
-
-app.get('/api/chat/rooms/:roomId', (req, res) => {
-  const { roomId } = req.params;
-  const room = chatController.getRoomInfo(roomId);
-  if (!room) {
-    return res.status(404).json({ success: false, error: 'Room not found' });
-  }
-  res.json({ success: true, data: room });
-});
-
 app.get('/api/world/rooms/:roomId', (req, res) => {
   const { roomId } = req.params;
   const worldState = worldController.getWorldState(roomId);
@@ -229,6 +212,38 @@ app.delete('/api/maps/:roomId/assets/:assetId', async (req, res) => {
   } catch (error) {
     logger.error('Error deleting asset:', error);
     res.status(500).json({ success: false, error: 'Failed to delete asset' });
+  }
+});
+
+// Get map sync metadata for cache validation
+// Returns: map data + cache metadata (version, cachedAt, lastModified)
+app.get('/api/maps/:roomId/sync', async (req, res) => {
+  const { roomId } = req.params;
+  try {
+    const syncData = await mapController.getMapSyncMetadata(roomId);
+    if (!syncData) {
+      return res.status(404).json({ success: false, error: 'Map not found' });
+    }
+    res.json(syncData);
+  } catch (error) {
+    logger.error('Error fetching map sync metadata:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch map sync metadata' });
+  }
+});
+
+// Get complete map package: map data + all avatars + map assets
+// Used for initial load to cache everything needed for gameplay
+app.get('/api/maps/:roomId/package', async (req, res) => {
+  const { roomId } = req.params;
+  try {
+    const packageData = await mapController.getMapPackage(roomId);
+    if (!packageData) {
+      return res.status(404).json({ success: false, error: 'Map not found' });
+    }
+    res.json(packageData);
+  } catch (error) {
+    logger.error('Error fetching map package:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch map package' });
   }
 });
 
@@ -469,18 +484,21 @@ app.get('/api/chat/:roomId/messages', async (req, res) => {
 // Post a new message (REST alternative to Socket.IO)
 app.post('/api/chat/:roomId/messages', async (req, res) => {
   const { roomId } = req.params;
-  const { text, authorName, authorId } = req.body;
+  // Support both 'text' and 'content' field names for flexibility
+  const { text, content, authorName, authorId } = req.body;
+  const messageText = text || content;
 
   try {
     if (!chatDbController) {
       return res.status(503).json({ success: false, error: 'Chat service not initialized' });
     }
-    if (!text || !authorName) {
-      return res.status(400).json({ success: false, error: 'text and authorName are required' });
+    if (!messageText) {
+      return res.status(400).json({ success: false, error: 'text or content is required' });
     }
+    // authorName is optional - use 'Anonymous' as fallback
     const message = await chatDbController.createMessage(roomId, {
-      text,
-      authorName,
+      text: messageText,
+      authorName: authorName || 'Anonymous',
       authorId,
     });
     if (!message) {
@@ -490,6 +508,68 @@ app.post('/api/chat/:roomId/messages', async (req, res) => {
   } catch (error) {
     logger.error('Error creating chat message:', error);
     res.status(500).json({ success: false, error: 'Failed to create message' });
+  }
+});
+
+// Edit a message
+app.put('/api/chat/messages/:messageId', async (req, res) => {
+  const { messageId } = req.params;
+  const { content, text } = req.body;
+  const newContent = content || text;
+
+  try {
+    if (!chatDbController) {
+      return res.status(503).json({ success: false, error: 'Chat service not initialized' });
+    }
+    if (!newContent) {
+      return res.status(400).json({ success: false, error: 'content is required' });
+    }
+    const message = await chatDbController.editMessage(messageId, newContent);
+    if (!message) {
+      return res.status(404).json({ success: false, error: 'Message not found' });
+    }
+    res.json({ success: true, data: message });
+  } catch (error) {
+    logger.error('Error editing chat message:', error);
+    res.status(500).json({ success: false, error: 'Failed to edit message' });
+  }
+});
+
+// Delete a message
+app.delete('/api/chat/messages/:messageId', async (req, res) => {
+  const { messageId } = req.params;
+
+  try {
+    if (!chatDbController) {
+      return res.status(503).json({ success: false, error: 'Chat service not initialized' });
+    }
+    const success = await chatDbController.deleteMessage(messageId);
+    if (!success) {
+      return res.status(404).json({ success: false, error: 'Message not found' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('Error deleting chat message:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete message' });
+  }
+});
+
+// Get a single message
+app.get('/api/chat/messages/:messageId', async (req, res) => {
+  const { messageId } = req.params;
+
+  try {
+    if (!chatDbController) {
+      return res.status(503).json({ success: false, error: 'Chat service not initialized' });
+    }
+    const message = await chatDbController.getMessage(messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, error: 'Message not found' });
+    }
+    res.json({ success: true, data: message });
+  } catch (error) {
+    logger.error('Error getting chat message:', error);
+    res.status(500).json({ success: false, error: 'Failed to get message' });
   }
 });
 
@@ -608,8 +688,7 @@ app.post('/api/characters/:userId/upload', uploadCharacterAsset.single('file'), 
 });
 
 // Initialize controllers
-const chatController = new ChatController(io);
-chatDbController = initChatDbController(io); // DB-backed chat controller
+chatDbController = initChatDbController(io);
 const worldController = new WorldController(io);
 const videoCallController = new VideoCallController(io);
 const mapController = new MapController(io);
@@ -618,15 +697,27 @@ const mapController = new MapController(io);
 io.on('connection', (socket) => {
   logger.info(`User connected: ${socket.id}`);
 
-  // Chat events (legacy in-memory controller)
-  socket.on('join-room', (data) => chatController.handleJoinRoom(socket, data));
-  socket.on('send-message', (data) => chatController.handleSendMessage(socket, data));
-  socket.on('typing', (data) => chatController.handleTyping(socket, data));
-
-  // Chat events (DB-backed controller) - use 'chat:' prefix for new events
+  // Chat events (DB-backed controller)
+  socket.on('join-room', (data) => chatDbController.handleJoinRoom(socket, data));
+  socket.on('send-message', (data) => chatDbController.handleSendMessage(socket, data));
+  socket.on('typing', (data) => chatDbController.handleTyping(socket, data));
+  // Also support 'chat:' prefix for new clients
   socket.on('chat:join', (data) => chatDbController.handleJoinRoom(socket, data));
   socket.on('chat:message', (data) => chatDbController.handleSendMessage(socket, data));
   socket.on('chat:typing', (data) => chatDbController.handleTyping(socket, data));
+  // Reaction events
+  socket.on('chat:reaction:add', (data) => {
+    const { messageId, emoji, userId } = data;
+    if (messageId && emoji && userId) {
+      chatDbController.addReaction(messageId, emoji, userId);
+    }
+  });
+  socket.on('chat:reaction:remove', (data) => {
+    const { messageId, emoji, userId } = data;
+    if (messageId && emoji && userId) {
+      chatDbController.removeReaction(messageId, emoji, userId);
+    }
+  });
 
   // World events
   socket.on('player-joined-world', (data) => worldController.handlePlayerJoinedWorld(socket, data).catch((error) => logger.error('Error in player-joined-world handler:', error)));
@@ -645,7 +736,6 @@ io.on('connection', (socket) => {
   // Handle disconnection
   socket.on('disconnect', () => {
     logger.info(`User disconnected: ${socket.id}`);
-    chatController.handleDisconnect(socket);
     chatDbController.handleDisconnect(socket);
     worldController.handleDisconnect(socket);
     videoCallController.handleDisconnect(socket);

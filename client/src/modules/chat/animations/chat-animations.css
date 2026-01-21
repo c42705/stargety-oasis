@@ -1,0 +1,522 @@
+/* Chat Animations - Phase 4 UI/UX Improvements */
+
+/* ============================================
+   Message Animations
+   ============================================ */
+
+/* Message entry animation - slide in from bottom */
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Message entry animation - fade in */
+@keyframes messageFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Message entry animation - scale in */
+@keyframes messageScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Message delete animation - fade out and slide down */
+@keyframes messageDelete {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+    max-height: 200px;
+    margin-bottom: 8px;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-20px);
+    max-height: 0;
+    margin-bottom: 0;
+    padding: 0;
+  }
+}
+
+/* Message edit highlight animation */
+@keyframes messageEditHighlight {
+  0% {
+    background-color: var(--color-accent-alpha-10);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* Message hover effect */
+.chat-message-item {
+  animation: messageSlideIn 0.3s ease-out;
+  transition: all 0.2s ease;
+}
+
+.chat-message-item:hover {
+  transform: translateX(2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.chat-message-item.deleting {
+  animation: messageDelete 0.3s ease-out forwards;
+}
+
+.chat-message-item.edited {
+  animation: messageEditHighlight 1s ease-out;
+}
+
+/* ============================================
+   Reaction Animations
+   ============================================ */
+
+/* Reaction pop animation */
+@keyframes reactionPop {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Reaction bounce animation */
+@keyframes reactionBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+/* Reaction button hover effect */
+.reaction-button {
+  transition: all 0.2s ease;
+}
+
+.reaction-button:hover {
+  transform: scale(1.1);
+}
+
+.reaction-button.added {
+  animation: reactionPop 0.3s ease-out;
+}
+
+.reaction-badge {
+  animation: reactionBounce 0.5s ease-out;
+}
+
+/* ============================================
+   Typing Indicator Animations
+   ============================================ */
+
+/* Typing dots animation */
+@keyframes typingDot {
+  0%, 60%, 100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-4px);
+  }
+}
+
+.typing-indicator-dot {
+  animation: typingDot 1.4s infinite ease-in-out;
+}
+
+.typing-indicator-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-indicator-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-indicator-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* Typing indicator fade in/out */
+@keyframes typingFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes typingFadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+.typing-indicator {
+  animation: typingFadeIn 0.3s ease-out;
+}
+
+.typing-indicator.hiding {
+  animation: typingFadeOut 0.3s ease-out forwards;
+}
+
+/* ============================================
+   File Upload Animations
+   ============================================ */
+
+/* File upload progress animation */
+@keyframes progressFill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: var(--progress-width, 100%);
+  }
+}
+
+.file-upload-progress-bar {
+  animation: progressFill 0.5s ease-out;
+}
+
+/* File upload success animation */
+@keyframes uploadSuccess {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.file-upload-success {
+  animation: uploadSuccess 0.5s ease-out;
+}
+
+/* File upload error shake animation */
+@keyframes uploadError {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+.file-upload-error {
+  animation: uploadError 0.3s ease-out;
+}
+
+/* Drag and drop zone animation */
+@keyframes dragOverPulse {
+  0%, 100% {
+    border-color: var(--color-border);
+    background-color: var(--color-bg-secondary);
+  }
+  50% {
+    border-color: var(--color-accent);
+    background-color: var(--color-accent-alpha-5);
+  }
+}
+
+.file-upload-zone.drag-over {
+  animation: dragOverPulse 1s infinite;
+}
+
+/* ============================================
+   Thread Animations
+   ============================================ */
+
+/* Thread expand/collapse animation */
+@keyframes threadExpand {
+  from {
+    max-height: 0;
+    opacity: 0;
+  }
+  to {
+    max-height: 1000px;
+    opacity: 1;
+  }
+}
+
+@keyframes threadCollapse {
+  from {
+    max-height: 1000px;
+    opacity: 1;
+  }
+  to {
+    max-height: 0;
+    opacity: 0;
+  }
+}
+
+.thread-replies {
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.thread-replies.expanding {
+  animation: threadExpand 0.3s ease-out forwards;
+}
+
+.thread-replies.collapsing {
+  animation: threadCollapse 0.3s ease-out forwards;
+}
+
+/* Thread reply highlight animation */
+@keyframes threadReplyHighlight {
+  0% {
+    background-color: var(--color-accent-alpha-10);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.thread-reply-item.new-reply {
+  animation: threadReplyHighlight 1s ease-out;
+}
+
+/* ============================================
+   Search Animations
+   ============================================ */
+
+/* Search results fade in */
+@keyframes searchResultsFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.search-results-container {
+  animation: searchResultsFadeIn 0.3s ease-out;
+}
+
+/* Search highlight animation */
+@keyframes searchHighlight {
+  0%, 100% {
+    background-color: var(--color-warning-alpha-30);
+  }
+  50% {
+    background-color: var(--color-warning-alpha-50);
+  }
+}
+
+.search-highlight {
+  animation: searchHighlight 1s ease-out;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* ============================================
+   Room Switch Animations
+   ============================================ */
+
+/* Room switch slide animation */
+@keyframes roomSwitchSlide {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.chat-room-switching {
+  animation: roomSwitchSlide 0.3s ease-out;
+}
+
+/* ============================================
+   Notification Animations
+   ============================================ */
+
+/* Notification slide in from right */
+@keyframes notificationSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Notification slide out to right */
+@keyframes notificationSlideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+.chat-notification {
+  animation: notificationSlideIn 0.3s ease-out;
+}
+
+.chat-notification.hiding {
+  animation: notificationSlideOut 0.3s ease-out forwards;
+}
+
+/* ============================================
+   Loading Animations
+   ============================================ */
+
+/* Skeleton loading shimmer */
+@keyframes skeletonShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-loader {
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-tertiary) 25%,
+    var(--color-bg-secondary) 50%,
+    var(--color-bg-tertiary) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.5s infinite;
+}
+
+/* ============================================
+   Accessibility - Reduced Motion
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================
+   Dark Mode Specific Animations
+   ============================================ */
+
+.theme-dark .chat-message-item:hover,
+.theme-stargety-oasis .chat-message-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.theme-light .chat-message-item:hover,
+.theme-ant-default .chat-message-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* ============================================
+   Utility Classes
+   ============================================ */
+
+/* Fade transition utility */
+.fade-enter {
+  opacity: 0;
+}
+
+.fade-enter-active {
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.fade-exit {
+  opacity: 1;
+}
+
+.fade-exit-active {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+/* Slide transition utility */
+.slide-enter {
+  transform: translateX(100%);
+}
+
+.slide-enter-active {
+  transform: translateX(0);
+  transition: transform 0.3s ease;
+}
+
+.slide-exit {
+  transform: translateX(0);
+}
+
+.slide-exit-active {
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+}
+
+/* Scale transition utility */
+.scale-enter {
+  transform: scale(0.9);
+  opacity: 0;
+}
+
+.scale-enter-active {
+  transform: scale(1);
+  opacity: 1;
+  transition: all 0.3s ease;
+}
+
+.scale-exit {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.scale-exit-active {
+  transform: scale(0.9);
+  opacity: 0;
+  transition: all 0.3s ease;
+}

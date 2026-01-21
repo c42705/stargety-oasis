@@ -1,10 +1,12 @@
 /* Redux Toolkit store scaffold: keep reducers empty until Phase 1 */
 import { configureStore } from '@reduxjs/toolkit';
 import mapReducer from './slices/mapSlice';
+import chatReducer from './slices/chatSlice';
 
 export const store = configureStore({
   reducer: {
     map: mapReducer,
+    chat: chatReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

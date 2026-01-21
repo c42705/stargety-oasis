@@ -1,0 +1,518 @@
+/**
+ * Accessibility Styles for Chat System
+ * Provides screen reader support, focus indicators, and accessibility utilities
+ */
+
+/* Screen Reader Only Content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Skip to Main Content Link */
+.skip-to-content {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #000;
+  color: #fff;
+  padding: 8px;
+  z-index: 100;
+  transition: top 0.3s;
+}
+
+.skip-to-content:focus {
+  top: 0;
+}
+
+/* Focus Indicators */
+*:focus-visible {
+  outline: 2px solid #1890ff;
+  outline-offset: 2px;
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: more) {
+  * {
+    border-color: #000 !important;
+  }
+  
+  .ant-btn-primary {
+    background-color: #000 !important;
+    color: #fff !important;
+    border: 2px solid #000 !important;
+  }
+  
+  .ant-input {
+    border: 2px solid #000 !important;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Dark Mode Accessibility */
+[data-theme='dark'] *:focus-visible {
+  outline: 2px solid #40a9ff;
+  outline-offset: 2px;
+}
+
+/* Chat Message Accessibility */
+.chat-message {
+  position: relative;
+}
+
+.chat-message:focus-within {
+  outline: 2px solid #1890ff;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Reaction Button Accessibility */
+.reaction-button {
+  position: relative;
+}
+
+.reaction-button[aria-pressed='true'] {
+  font-weight: bold;
+}
+
+.reaction-button:focus-visible {
+  outline: 2px solid #1890ff;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* File Upload Accessibility */
+.file-upload-dropzone {
+  position: relative;
+}
+
+.file-upload-dropzone:focus-within {
+  outline: 2px solid #1890ff;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Search Box Accessibility */
+.search-box:focus-within {
+  outline: 2px solid #1890ff;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Thread View Accessibility */
+.thread-view {
+  position: relative;
+}
+
+.thread-view:focus-within {
+  outline: 2px solid #1890ff;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Typing Indicator Accessibility */
+.typing-indicator {
+  position: relative;
+}
+
+.typing-indicator[aria-live] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* Progress Bar Accessibility */
+.progress-bar {
+  position: relative;
+}
+
+.progress-bar[role='progressbar'] {
+  min-height: 8px;
+}
+
+/* Notification Accessibility */
+.notification {
+  position: relative;
+}
+
+.notification[role='alert'] {
+  animation: none;
+}
+
+/* Modal Accessibility */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.modal-content {
+  position: relative;
+  z-index: 1001;
+}
+
+/* Keyboard Navigation Visual Feedback */
+.keyboard-navigable:focus {
+  outline: 2px solid #1890ff;
+  outline-offset: 2px;
+}
+
+/* Live Region Styles */
+.live-region {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Color Blindness Support */
+.colorblind-friendly {
+  /* Use patterns and shapes in addition to colors */
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(0, 0, 0, 0.1) 10px,
+    rgba(0, 0, 0, 0.1) 20px
+  );
+}
+
+/* Text Spacing for Readability */
+.readable-text {
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+  word-spacing: 0.05em;
+}
+
+/* Large Text Support */
+@media (prefers-reduced-data: reduce) {
+  .chat-message img {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+/* Touch Target Size */
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Link Accessibility */
+a:focus-visible {
+  outline: 2px solid #1890ff;
+  outline-offset: 2px;
+  text-decoration: underline;
+}
+
+/* Button Accessibility */
+button:focus-visible {
+  outline: 2px solid #1890ff;
+  outline-offset: 2px;
+}
+
+/* Input Accessibility */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid #1890ff;
+  outline-offset: 2px;
+}
+
+/* Table Accessibility */
+table {
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 8px;
+  border: 1px solid #ddd;
+}
+
+th[scope='col'] {
+  text-align: left;
+}
+
+th[scope='row'] {
+  text-align: left;
+}
+
+/* List Accessibility */
+ul,
+ol {
+  padding-left: 2em;
+}
+
+/* Form Accessibility */
+fieldset {
+  border: 1px solid #ddd;
+  padding: 1em;
+  margin: 1em 0;
+}
+
+legend {
+  font-weight: bold;
+  padding: 0 0.5em;
+}
+
+/* Error Message Accessibility */
+.error-message {
+  color: #ff4d4f;
+  font-weight: bold;
+}
+
+.error-message[role='alert'] {
+  animation: none;
+}
+
+/* Success Message Accessibility */
+.success-message {
+  color: #52c41a;
+  font-weight: bold;
+}
+
+.success-message[role='status'] {
+  animation: none;
+}
+
+/* Warning Message Accessibility */
+.warning-message {
+  color: #faad14;
+  font-weight: bold;
+}
+
+.warning-message[role='alert'] {
+  animation: none;
+}
+
+/* Info Message Accessibility */
+.info-message {
+  color: #1890ff;
+  font-weight: bold;
+}
+
+.info-message[role='status'] {
+  animation: none;
+}
+
+/* Tooltip Accessibility */
+.tooltip[role='tooltip'] {
+  position: absolute;
+  z-index: 1000;
+  background: #000;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* Menu Accessibility */
+menu[role='menu'] {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+menuitem[role='menuitem'] {
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+menuitem[role='menuitem']:focus {
+  background: #1890ff;
+  color: #fff;
+}
+
+/* Tablist Accessibility */
+[role='tablist'] {
+  display: flex;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+[role='tab'] {
+  padding: 8px 16px;
+  cursor: pointer;
+  border: 1px solid #ddd;
+  border-bottom: none;
+  background: #f5f5f5;
+}
+
+[role='tab'][aria-selected='true'] {
+  background: #fff;
+  border-bottom: 2px solid #1890ff;
+}
+
+[role='tab']:focus {
+  outline: 2px solid #1890ff;
+  outline-offset: -2px;
+}
+
+/* Combobox Accessibility */
+[role='combobox'] {
+  position: relative;
+}
+
+[role='combobox'] [role='listbox'] {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #ddd;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+[role='option'] {
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+[role='option'][aria-selected='true'] {
+  background: #1890ff;
+  color: #fff;
+}
+
+[role='option']:focus {
+  background: #40a9ff;
+  color: #fff;
+}
+
+/* Dialog Accessibility */
+[role='dialog'] {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  padding: 16px;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1001;
+}
+
+[role='dialog'][aria-modal='true'] {
+  z-index: 1001;
+}
+
+/* Alert Accessibility */
+[role='alert'] {
+  padding: 12px;
+  border-radius: 4px;
+  margin: 8px 0;
+}
+
+[role='alert'].alert-error {
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  color: #ff4d4f;
+}
+
+[role='alert'].alert-success {
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  color: #52c41a;
+}
+
+[role='alert'].alert-warning {
+  background: #fffbe6;
+  border: 1px solid #ffe58f;
+  color: #faad14;
+}
+
+[role='alert'].alert-info {
+  background: #e6f7ff;
+  border: 1px solid #91d5ff;
+  color: #1890ff;
+}
+
+/* Status Accessibility */
+[role='status'] {
+  padding: 8px;
+  border-radius: 4px;
+  margin: 4px 0;
+}
+
+/* Log Accessibility */
+[role='log'] {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+/* Marquee Accessibility (avoid using) */
+marquee {
+  display: none;
+}
+
+/* Blink Accessibility (avoid using) */
+blink {
+  animation: none;
+}
+
+/* Custom Scrollbar Accessibility */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Print Styles */
+@media print {
+  .no-print {
+    display: none;
+  }
+  
+  .chat-message {
+    page-break-inside: avoid;
+  }
+  
+  a[href]:after {
+    content: ' (' attr(href) ')';
+  }
+}

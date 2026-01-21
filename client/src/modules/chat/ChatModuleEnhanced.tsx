@@ -1,40 +1,30 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { 
-  Layout, 
-  Tabs, 
-  Space, 
-  Button, 
-  Badge, 
-  Avatar, 
-  Typography, 
-  Card,
+import {
+  Layout,
+  Space,
+  Button,
+  Avatar,
+  Typography,
   Spin,
   Empty,
   message as antMessage
 } from 'antd';
-import { 
-  MessageOutlined, 
-  UserOutlined, 
-  SearchOutlined,
+import {
+  UserOutlined,
   PlusOutlined,
   SettingOutlined,
-  TeamOutlined,
-  SendOutlined,
-  SmileOutlined,
-  PaperClipOutlined,
-  EllipsisOutlined
+  SendOutlined
 } from '@ant-design/icons';
-import { Message, ChatRoom, User, Reaction } from '../../types/chat';
+import { Message, ChatRoom, User } from '../../types/chat';
 import { MessageItem } from './components/MessageItem';
 import { MessageEditor } from './components/MessageEditor';
-import { ReactionButton } from './components/ReactionButton';
 import { ThreadView } from './components/ThreadView';
 import { ChatRoomList } from './components/ChatRoomList';
 import { FileUpload } from './components/FileUpload';
 import { SearchBox } from './components/SearchBox';
+import { useTheme } from '../../shared/ThemeContext';
 
-const { Sider, Content } = Layout;
-const { TabPane } = Tabs;
+const { Sider, Content, Header, Footer } = Layout;
 const { Text, Title } = Typography;
 
 interface ChatModuleEnhancedProps {
@@ -188,12 +178,11 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
   const [newMessage, setNewMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isTyping, setIsTyping] = useState(false);
-  const [onlineUsers, setOnlineUsers] = useState<string[]>(['user1', 'user2', 'user4', 'user6']);
+  const [onlineUsers] = useState<string[]>(['user1', 'user2', 'user4', 'user6']);
   const [replyToMessageId, setReplyToMessageId] = useState<string | null>(null);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Current room
   const currentRoom = useMemo(() => 
@@ -284,13 +273,13 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
   }, [currentUser]);
 
   // Handle search
-  const handleSearch = useCallback((query: string, filters: any) => {
+  const handleSearch = useCallback((params: { query: string; userId?: string; startDate?: Date; endDate?: Date; fileType?: string }) => {
     setIsSearching(true);
     
     // Simulate search delay
     setTimeout(() => {
-      const results = messages.filter(message => 
-        message.content.text?.toLowerCase().includes(query.toLowerCase())
+      const results = messages.filter(message =>
+        message.content.text?.toLowerCase().includes(params.query.toLowerCase())
       );
       setSearchResults(results);
       setIsSearching(false);
@@ -418,9 +407,12 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
   }, []);
 
   // Handle reply to message
-  const handleReplyToMessage = useCallback((messageId: string, content: string) => {
-    setNewMessage(`@${messages.find(m => m.id === messageId)?.author.username} ${content}`);
-    setReplyToMessageId(messageId);
+  const handleReplyToMessage = useCallback((messageId: string) => {
+    const message = messages.find(m => m.id === messageId);
+    if (message) {
+      setNewMessage(`@${message.author.username} ${message.content.text || ''}`);
+      setReplyToMessageId(messageId);
+    }
   }, [messages]);
 
   // Handle thread view
@@ -444,15 +436,17 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
     return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const { currentTheme } = useTheme();
+
   return (
-    <div className={`chat-module-enhanced ${className}`} style={{ height: '100%', display: 'flex' }}>
+    <Layout className={`chat-module-enhanced ${className}`} style={{ height: '100%' }}>
       {/* Room List Sidebar */}
       {showRoomList && (
-        <Sider 
-          width={300} 
-          style={{ 
-            backgroundColor: 'var(--color-bg-secondary)',
-            borderRight: '1px solid var(--color-border-light)'
+        <Sider
+          width={300}
+          style={{
+            backgroundColor: currentTheme.cssVariables['--color-bg-secondary'],
+            borderRight: `1px solid ${currentTheme.cssVariables['--color-border-light']}`
           }}
         >
           <ChatRoomList
@@ -471,62 +465,57 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
       {/* Main Chat Area */}
       <Layout style={{ flex: 1, minHeight: 0 }}>
         {/* Header */}
-        <div style={{
+        <Header style={{
           padding: '16px',
-          borderBottom: '1px solid var(--color-border-light)',
-          backgroundColor: 'var(--color-bg-secondary)',
+          borderBottom: `1px solid ${currentTheme.cssVariables['--color-border-light']}`,
+          backgroundColor: currentTheme.cssVariables['--color-bg-secondary'],
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Avatar 
-              size="small" 
+          <Space size="middle">
+            <Avatar
+              size="small"
               icon={<UserOutlined />}
-              style={{ backgroundColor: 'var(--color-accent)' }}
+              style={{ backgroundColor: currentTheme.cssVariables['--color-accent'] }}
             >
               {currentUser.username.charAt(0).toUpperCase()}
             </Avatar>
-            <div>
-              <Title level={4} style={{ margin: 0, color: 'var(--color-text-primary)' }}>
+            <Space direction="vertical" size={0}>
+              <Title level={4} style={{ margin: 0 }}>
                 {currentRoom?.name || 'Chat'}
               </Title>
               <Text type="secondary" style={{ fontSize: '12px' }}>
                 {onlineUsers.length} users online
                 {isTyping && ' • Someone is typing...'}
               </Text>
-            </div>
-          </div>
-          
+            </Space>
+          </Space>
+
           <Space>
             {showSearch && (
               <SearchBox
                 onSearch={handleSearch}
-                onSearchResults={handleSearchResults}
-                placeholder="Search messages..."
               />
             )}
             <Button
               type="text"
               icon={<SettingOutlined />}
-              style={{ color: 'var(--color-text-secondary)' }}
             />
           </Space>
-        </div>
+        </Header>
 
         {/* Content */}
-        <Content style={{ 
-          padding: '16px', 
-          overflow: 'auto', 
-          backgroundColor: 'var(--color-bg-primary)'
+        <Content style={{
+          padding: '16px',
+          overflow: 'auto',
+          backgroundColor: currentTheme.cssVariables['--color-bg-primary']
         }}>
           {isSearching ? (
-            <div style={{ textAlign: 'center', padding: '40px' }}>
+            <Space direction="vertical" style={{ width: '100%', textAlign: 'center', paddingTop: '40px' }}>
               <Spin size="large" />
-              <div style={{ marginTop: '16px' }}>
-                <Text type="secondary">Searching messages...</Text>
-              </div>
-            </div>
+              <Text type="secondary">Searching messages...</Text>
+            </Space>
           ) : currentMessages.length === 0 ? (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -541,37 +530,37 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
               </Button>
             </Empty>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
               {currentMessages.map((message) => (
                 <MessageItem
                   key={message.id}
                   message={message}
-                  currentUser={currentUser}
-                  onEditMessage={handleMessageEdit}
-                  onDeleteMessage={handleMessageDelete}
-                  onAddReaction={handleReactionAdd}
-                  onRemoveReaction={handleReactionRemove}
-                  onReplyToMessage={handleReplyToMessage}
-                  isEditing={editingMessage === message.id}
-                  onToggleEdit={setEditingMessage}
+                  isCurrentUser={message.authorId === currentUser.id}
+                  onEdit={handleMessageEdit}
+                  onDelete={handleMessageDelete}
+                  onReply={handleReplyToMessage}
                 />
               ))}
               <div ref={messagesEndRef} />
-            </div>
+            </Space>
           )}
         </Content>
 
         {/* Input Area */}
-        <div style={{
+        <Footer style={{
           padding: '16px',
-          borderTop: '1px solid var(--color-border-light)',
-          backgroundColor: 'var(--color-bg-secondary)'
+          borderTop: `1px solid ${currentTheme.cssVariables['--color-border-light']}`,
+          backgroundColor: currentTheme.cssVariables['--color-bg-secondary']
         }}>
           {activeTab === 'messages' && (
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
               {/* File Upload */}
               <FileUpload
-                onFileSelect={handleFileSelect}
+                roomId={currentRoomId}
+                onFileUploaded={(attachment) => {
+                  // Handle file upload completion
+                  console.log('File uploaded:', attachment);
+                }}
                 maxFileSize={10}
                 maxFiles={5}
               />
@@ -598,16 +587,16 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
             </Space>
           )}
 
-          {activeTab === 'thread' && (
+          {activeTab === 'thread' && threadMessages.length > 0 && (
             <ThreadView
-              messageId={threadMessages[0]?.id || ''}
-              messages={threadMessages}
-              currentUser={currentUser}
+              threadRootMessage={threadMessages[0]}
+              threadMessages={threadMessages.slice(1)}
+              currentUserId={currentUser.id}
               onReply={handleReplyToMessage}
             />
           )}
-        </div>
+        </Footer>
       </Layout>
-    </div>
+    </Layout>
   );
 };
