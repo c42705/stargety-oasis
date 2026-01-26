@@ -133,6 +133,106 @@ docker compose logs server --tail=50
 docker compose exec db psql -U stargety_user -d stargety_oasis
 ```
 
+## 🗄️ Database Management
+
+### Database Reset Script
+
+The database reset script allows you to completely wipe and reinitialize the database during development.
+
+**⚠️ WARNING:** This script is **ONLY** for development environments. Never use this in production!
+
+#### Usage
+
+```bash
+# From root directory
+npm run db:reset
+
+# Or from server directory
+cd server && npm run db:reset
+```
+
+#### What It Does
+
+1. **Prompts for confirmation** - Requires two separate confirmations to prevent accidental data loss
+2. **Drops all tables** - Completely wipes the database
+3. **Runs migrations** - Re-applies Prisma migrations to restore the schema
+4. **Optional seeding** - Prompts to populate with default test data
+
+#### Confirmation Process
+
+The script implements a two-step confirmation process:
+
+1. **First prompt:** `Are you sure you want to WIPE the database? This will DELETE ALL DATA. Type 'YES' to continue:`
+   - Must type exactly `YES` (case-sensitive)
+
+2. **Second prompt:** `This action is IRREVERSIBLE. Type 'WIPE DATABASE' to confirm:`
+   - Must type exactly `WIPE DATABASE` (case-sensitive)
+
+3. **Countdown:** 3-second countdown before execution begins
+   - Press `Ctrl+C` to cancel during countdown
+
+#### Example Session
+
+```bash
+$ npm run db:reset
+
+╔════════════════════════════════════════════════════════════════╗
+║                    ⚠️  DATABASE RESET WARNING  ⚠️               ║
+╚════════════════════════════════════════════════════════════════╝
+
+This action will:
+  1. DROP all tables in the database
+  2. DELETE ALL DATA permanently
+  3. Re-run Prisma migrations to restore schema
+
+Target Database:
+  postgresql://user:****@db:5432/stargety_oasis
+
+Are you sure you want to WIPE the database? This will DELETE ALL DATA. Type 'YES' to continue: YES
+This action is IRREVERSIBLE. Type 'WIPE DATABASE' to confirm: WIPE DATABASE
+
+Executing in 3 seconds... Press Ctrl+C to cancel.
+
+🔌 Connecting to database...
+✅ Database connected
+🗑️  Wiping all data from database...
+✅ All tables dropped
+🔄 Running Prisma migrations...
+✅ Migrations completed
+
+Do you want to seed the database with default data? (y/n): y
+🌱 Running seed script...
+✅ Seed completed
+
+╔════════════════════════════════════════════════════════════════╗
+║                   ✅ DATABASE RESET SUCCESSFUL ✅              ║
+╚════════════════════════════════════════════════════════════════╝
+```
+
+#### When to Use
+
+- **Development:** Resetting to a clean state for testing
+- **Testing:** Preparing a fresh database for test runs
+- **Debugging:** Clearing corrupted or test data
+- **Schema changes:** Starting fresh after major schema modifications
+
+#### Default Seed Data
+
+When you choose to seed the database, it creates:
+
+- **Test User:**
+  - Email: `test@stargety.io`
+  - Password: `password123`
+  - Username: `testuser`
+
+- **Default Map:** "Stargety Oasis" with interactive areas (Meeting Room, Presentation Hall, Coffee Corner, Game Zone)
+
+- **Character Slots:** 5 empty character slots for the test user
+
+- **User Settings:** Default theme and editor preferences
+
+- **Chat Room:** General chat room for testing
+
 ## 🙏 Technologies
 
 - [React](https://reactjs.org/) - Frontend framework

@@ -26,6 +26,7 @@
     "docker:logs:client": "docker compose logs -f client",
     "prisma:dev": "cd server && npm run prisma:migrate:dev",
     "prisma:studio": "cd server && npm run prisma:studio",
+    "db:reset": "cd server && npm run db:reset",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
