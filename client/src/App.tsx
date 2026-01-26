@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { logger } from './shared/logger';
 import { Routes, Route } from 'react-router-dom';
 import { ConfigProvider, Layout, Space, Button, Badge, Typography, Modal, Dropdown, Avatar, Switch, Tooltip, App as AntdApp } from 'antd';
@@ -37,11 +37,18 @@ import './App.css';
 const AppContent: React.FC = () => {
   const { user, logout } = useAuth();
   const [currentVideoRoom, setCurrentVideoRoom] = useState<string>('general');
-  const [currentChatRoom, setCurrentChatRoom] = useState<string>('general');
+  const [currentChatRoom, setCurrentChatRoom] = useState<string>(user?.worldRoomId || 'general');
   const [showProfile, setShowProfile] = useState(false);
   const [showPeople, setShowPeople] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showMapAreas, setShowMapAreas] = useState(false);
+
+  // Update chat room when user's world room changes
+  useEffect(() => {
+    if (user?.worldRoomId) {
+      setCurrentChatRoom(user.worldRoomId);
+    }
+  }, [user?.worldRoomId]);
 
   // If no user is authenticated, this shouldn't render
   if (!user) {

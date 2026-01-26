@@ -66,10 +66,13 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
 
   // Quick login with test account - auto-submit for faster loading
   const handleQuickLogin = async (testAccount: typeof testAccounts[0]) => {
+    // Get the currently selected worldRoomId from the form, or use default
+    const currentWorldRoomId = form.getFieldValue('worldRoomId') || 'Stargety-Oasis-1';
+
     form.setFieldsValue({
       username: testAccount.username,
       password: testAccount.password,
-      worldRoomId: 'Stargety-Oasis-1',
+      worldRoomId: currentWorldRoomId, // Preserve the selected world room
       rememberMe: rememberUsername
     });
     setLoginError('');
