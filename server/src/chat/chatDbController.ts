@@ -310,7 +310,7 @@ export class ChatDbController {
       }
 
       // Broadcast to room (including sender)
-      this.io.to(roomId).emit('chat-message', {
+      const broadcastData = {
         id: savedMessage.id,
         message: savedMessage.content.text,
         user: savedMessage.authorName,
@@ -318,7 +318,15 @@ export class ChatDbController {
         timestamp: savedMessage.createdAt,
         type: 'message',
         roomId,
+      };
+
+      logger.info(`📡 Broadcasting message to room "${roomId}":`, {
+        messageId: savedMessage.id,
+        user: savedMessage.authorName,
+        text: savedMessage.content.text
       });
+
+      this.io.to(roomId).emit('chat-message', broadcastData);
 
       logger.debug(`Message sent to room ${roomId} by ${user}`);
     } catch (error) {

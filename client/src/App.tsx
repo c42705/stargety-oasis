@@ -252,7 +252,7 @@ const AppContent: React.FC = () => {
             rightBottomPanel={
               <MinimalChatPanel
                 roomId={currentChatRoom}
-                currentUserId={user.username}
+                currentUserId={user.id}
                 currentUsername={user.displayName}
               />
             }

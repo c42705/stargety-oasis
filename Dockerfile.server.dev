@@ -28,6 +28,7 @@ RUN mkdir -p /tmp/uploads
 # Expose port
 EXPOSE 3001
 
-# Start with hot reload using nodemon
-CMD ["npm", "run", "dev"]
+# Start with hot reload using nodemon and Socket.IO debug logging
+# DEBUG=socket.io:* enables detailed Socket.IO debugging
+CMD ["sh", "-c", "DEBUG=socket.io:* npm run dev"]
 

@@ -44,6 +44,7 @@ services:
       PORT: 3001
       CLIENT_URL: http://localhost:3000
       DATABASE_URL: postgresql://stargety:stargety_dev_password@postgres:5432/stargety_oasis
+      DEBUG: socket.io:*
     volumes:
       - ./server:/app/server
       - /app/server/node_modules
