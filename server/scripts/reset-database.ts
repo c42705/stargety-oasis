@@ -95,16 +95,43 @@ async function resetDatabase(): Promise<void> {
 
     // Execute reset
     logger.info('🗑️  Wiping all data from database...');
+
+    // First, drop all application tables (excluding PostGIS system tables)
     await prisma.$executeRawUnsafe(`
       DO $$ DECLARE
         r RECORD;
       BEGIN
-        FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+        -- Drop all tables except PostGIS system tables
+        FOR r IN (
+          SELECT tablename
+          FROM pg_tables
+          WHERE schemaname = 'public'
+          AND tablename NOT IN ('spatial_ref_sys', 'geography_columns', 'geometry_columns', 'raster_columns', 'raster_overviews')
+        ) LOOP
           EXECUTE 'DROP TABLE IF EXISTS "' || r.tablename || '" CASCADE';
+        END LOOP;
+
+        -- Drop all sequences
+        FOR r IN (
+          SELECT sequence_name
+          FROM information_schema.sequences
+          WHERE sequence_schema = 'public'
+        ) LOOP
+          EXECUTE 'DROP SEQUENCE IF EXISTS "' || r.sequence_name || '" CASCADE';
+        END LOOP;
+
+        -- Drop all custom types (enums, etc.)
+        FOR r IN (
+          SELECT typname
+          FROM pg_type
+          WHERE typnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
+          AND typtype = 'e'
+        ) LOOP
+          EXECUTE 'DROP TYPE IF EXISTS "' || r.typname || '" CASCADE';
         END LOOP;
       END $$;
     `);
-    logger.info('✅ All tables dropped');
+    logger.info('✅ All application tables, sequences, and types dropped');
 
     // Run migrations
     logger.info('🔄 Running Prisma migrations...');
