@@ -1,21 +1,8 @@
 # Multi-stage Dockerfile for Stargety Oasis
+# NOTE: Client is pre-built locally and committed to git
+# This eliminates the 47+ minute React build in Docker
 
-# Stage 1: Build the client
-FROM node:18-alpine AS client-builder
-WORKDIR /app/client
-COPY client/package*.json ./
-RUN npm ci
-COPY client/ ./
-# Build with production environment variables
-ARG REACT_APP_API_URL=https://oasis.stargety.com/api
-ARG REACT_APP_SOCKET_URL=wss://oasis.stargety.com
-ARG REACT_APP_WS_URL=wss://oasis.stargety.com
-ENV REACT_APP_API_URL=${REACT_APP_API_URL}
-ENV REACT_APP_SOCKET_URL=${REACT_APP_SOCKET_URL}
-ENV REACT_APP_WS_URL=${REACT_APP_WS_URL}
-RUN npm run build
-
-# Stage 2: Build the server
+# Stage 1: Build the server
 FROM node:18-alpine AS server-builder
 WORKDIR /app/server
 COPY server/package*.json ./
@@ -25,7 +12,7 @@ RUN npm ci
 COPY server/src ./src
 RUN npm run build
 
-# Stage 3: Production image
+# Stage 2: Production image
 FROM node:18-alpine AS production
 WORKDIR /app
 
@@ -36,8 +23,8 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy built server
 COPY --from=server-builder /app/server/dist ./dist
 
-# Copy built client
-COPY --from=client-builder /app/client/build ./public
+# Copy pre-built client (built locally and committed to git)
+COPY client/build ./public
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \

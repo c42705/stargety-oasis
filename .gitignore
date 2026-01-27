@@ -8,7 +8,7 @@
 # Builds
 **/build/
 **/dist/
-**/client/build/
+# NOTE: client/build/ is committed for production deployments (pre-built)
 
 # Testing
 **/coverage/
@@ -47,7 +47,6 @@ server/node_modules/*
 server/dist/
 
 # Client-specific (CRA)
-client/build/
 client/node_modules/
 
 # Docs/Other
