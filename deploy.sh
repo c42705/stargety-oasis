@@ -31,6 +31,12 @@ check_env() {
 
 start_services() {
   log_info "Iniciando servicios en modo producción..."
+
+  # Limpiar contenedores duplicados si existen
+  log_info "Limpiando contenedores duplicados..."
+  docker-compose --profile production down --remove-orphans 2>/dev/null || true
+
+  # Iniciar servicios
   docker-compose --profile production up -d
   log_info "Servicios iniciados ✓"
   sleep 5
