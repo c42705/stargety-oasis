@@ -37,6 +37,103 @@ const MAX_2FA_ATTEMPTS = 3;
 const ATTEMPT_RESET_MINUTES = 15;
 
 /**
+ * Get default blob character sprite sheet for new users
+ * Returns a minimal sprite sheet definition with placeholder image
+ */
+function getDefaultBlobCharacterSpriteSheet(): any {
+  const now = new Date().toISOString();
+  // Minimal placeholder image (1x1 transparent pixel)
+  const placeholderImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+  return {
+    id: 'blob-character-sprite-sheet',
+    name: 'Blob Character',
+    description: 'Default blob character sprite',
+    source: {
+      id: 'blob-character-source',
+      name: 'Blob Character Source',
+      imageData: placeholderImage,
+      originalDimensions: { width: 32, height: 32 },
+      format: 'image/png',
+      fileSize: 1024,
+      uploadedAt: now
+    },
+    frames: [
+      {
+        id: 'blob-idle-0',
+        name: 'Blob Idle',
+        sourceRect: { x: 0, y: 0, width: 32, height: 32 },
+        outputRect: { x: 0, y: 0, width: 32, height: 32 },
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          flipX: false,
+          flipY: false
+        },
+        metadata: {
+          isEmpty: false,
+          hasTransparency: true,
+          tags: ['idle', 'blob']
+        },
+        animationProperties: {
+          category: 'IDLE',
+          sequenceIndex: 0
+        },
+        createdAt: now,
+        updatedAt: now
+      }
+    ],
+    gridLayout: {
+      frameWidth: 32,
+      frameHeight: 32,
+      spacing: { x: 0, y: 0 },
+      margin: { x: 0, y: 0 }
+    },
+    animations: [
+      {
+        id: 'blob-idle',
+        category: 'IDLE',
+        name: 'Idle',
+        description: 'Blob idle animation',
+        sequence: {
+          frameIds: ['blob-idle-0'],
+          frameRate: 8,
+          loop: true,
+          duration: 1000
+        },
+        priority: 1,
+        interruptible: true,
+        transitions: {},
+        createdAt: now,
+        updatedAt: now
+      }
+    ],
+    defaultSettings: {
+      frameRate: 8,
+      loop: true,
+      category: 'IDLE'
+    },
+    validation: {
+      isValid: true,
+      errors: [],
+      warnings: [],
+      lastValidated: now
+    },
+    exportSettings: {
+      format: 'png',
+      quality: 1,
+      optimization: false,
+      includeMetadata: true
+    },
+    version: '2.0.0',
+    createdAt: now,
+    updatedAt: now,
+    createdBy: 'system'
+  };
+}
+
+/**
  * POST /api/auth/register
  * Register a new user
  */
@@ -87,6 +184,32 @@ router.post('/register', async (req: Request, res: Response) => {
         password: hashedPassword,
         ntfy_topic_id: ntfyTopicId,
         two_fa_enabled: true,
+      },
+    });
+
+    // Initialize 5 character slots for new user
+    // Slot 1 gets the default blob character, others are empty
+    const defaultBlobCharacterSpriteSheet = getDefaultBlobCharacterSpriteSheet();
+
+    for (let slotNumber = 1; slotNumber <= 5; slotNumber++) {
+      await prisma.character.create({
+        data: {
+          userId: user.id,
+          slotNumber,
+          name: slotNumber === 1 ? 'Blob Character' : `Character ${slotNumber}`,
+          spriteSheet: slotNumber === 1 ? defaultBlobCharacterSpriteSheet : { layers: [] },
+          isEmpty: slotNumber !== 1,
+          thumbnailPath: null,
+          texturePath: null,
+        },
+      });
+    }
+
+    // Set active character to slot 1
+    await prisma.activeCharacter.create({
+      data: {
+        userId: user.id,
+        activeSlotNumber: 1,
       },
     });
 

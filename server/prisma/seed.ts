@@ -1,5 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const prisma = new PrismaClient();
 
@@ -155,26 +157,222 @@ const defaultUserSettings = {
   }
 };
 
-// Default character sprite sheet template
-const defaultSpriteSheet = {
-  version: 2,
-  layers: [],
-  frameWidth: 32,
-  frameHeight: 48,
-  animations: {
-    idle_down: { row: 0, frames: 1 },
-    idle_left: { row: 1, frames: 1 },
-    idle_right: { row: 2, frames: 1 },
-    idle_up: { row: 3, frames: 1 },
-    walk_down: { row: 0, frames: 4 },
-    walk_left: { row: 1, frames: 4 },
-    walk_right: { row: 2, frames: 4 },
-    walk_up: { row: 3, frames: 4 }
+/**
+ * Load blob character sprite sheet from asset file
+ * Converts the blob character.png to a V2 sprite sheet definition
+ */
+function loadBlobCharacterSpriteSheet(): any {
+  try {
+    // Path to blob character asset
+    const assetPath = path.join(__dirname, '../../client/src/assets/blob character.png');
+
+    if (!fs.existsSync(assetPath)) {
+      console.warn('⚠️ Blob character asset not found at:', assetPath);
+      return getDefaultFallbackSpriteSheet();
+    }
+
+    // Read the image file and convert to base64
+    const imageBuffer = fs.readFileSync(assetPath);
+    const base64Image = imageBuffer.toString('base64');
+    const imageDataUrl = `data:image/png;base64,${base64Image}`;
+
+    // Create a V2 sprite sheet definition for the blob character
+    // Assuming blob character is a simple sprite (adjust dimensions as needed)
+    const now = new Date().toISOString();
+
+    return {
+      id: 'blob-character-sprite-sheet',
+      name: 'Blob Character',
+      description: 'Default blob character sprite',
+      source: {
+        id: 'blob-character-source',
+        name: 'Blob Character Source',
+        imageData: imageDataUrl,
+        originalDimensions: { width: 128, height: 128 },
+        format: 'image/png',
+        fileSize: imageBuffer.length,
+        uploadedAt: now
+      },
+      frames: [
+        {
+          id: 'blob-idle-0',
+          name: 'Blob Idle',
+          sourceRect: { x: 0, y: 0, width: 32, height: 32 },
+          outputRect: { x: 0, y: 0, width: 32, height: 32 },
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            flipX: false,
+            flipY: false
+          },
+          metadata: {
+            isEmpty: false,
+            hasTransparency: true,
+            tags: ['idle', 'blob']
+          },
+          animationProperties: {
+            category: 'IDLE',
+            sequenceIndex: 0
+          },
+          createdAt: now,
+          updatedAt: now
+        }
+      ],
+      gridLayout: {
+        frameWidth: 32,
+        frameHeight: 32,
+        spacing: { x: 0, y: 0 },
+        margin: { x: 0, y: 0 }
+      },
+      animations: [
+        {
+          id: 'blob-idle',
+          category: 'IDLE',
+          name: 'Idle',
+          description: 'Blob idle animation',
+          sequence: {
+            frameIds: ['blob-idle-0'],
+            frameRate: 8,
+            loop: true,
+            duration: 1000
+          },
+          priority: 1,
+          interruptible: true,
+          transitions: {},
+          createdAt: now,
+          updatedAt: now
+        }
+      ],
+      defaultSettings: {
+        frameRate: 8,
+        loop: true,
+        category: 'IDLE'
+      },
+      validation: {
+        isValid: true,
+        errors: [],
+        warnings: [],
+        lastValidated: now
+      },
+      exportSettings: {
+        format: 'png',
+        quality: 1,
+        optimization: false,
+        includeMetadata: true
+      },
+      version: '2.0.0',
+      createdAt: now,
+      updatedAt: now,
+      createdBy: 'system'
+    };
+  } catch (error) {
+    console.error('❌ Error loading blob character sprite sheet:', error);
+    return getDefaultFallbackSpriteSheet();
   }
-};
+}
+
+/**
+ * Fallback sprite sheet if blob character cannot be loaded
+ */
+function getDefaultFallbackSpriteSheet(): any {
+  const now = new Date().toISOString();
+  const placeholderImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+  return {
+    id: 'default-fallback-sprite-sheet',
+    name: 'Default Character',
+    description: 'Fallback default character sprite',
+    source: {
+      id: 'default-fallback-source',
+      name: 'Default Fallback Source',
+      imageData: placeholderImage,
+      originalDimensions: { width: 32, height: 32 },
+      format: 'image/png',
+      fileSize: 1024,
+      uploadedAt: now
+    },
+    frames: [
+      {
+        id: 'default-idle-0',
+        name: 'Default Idle',
+        sourceRect: { x: 0, y: 0, width: 32, height: 32 },
+        outputRect: { x: 0, y: 0, width: 32, height: 32 },
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          flipX: false,
+          flipY: false
+        },
+        metadata: {
+          isEmpty: false,
+          hasTransparency: true,
+          tags: ['idle']
+        },
+        animationProperties: {
+          category: 'IDLE',
+          sequenceIndex: 0
+        },
+        createdAt: now,
+        updatedAt: now
+      }
+    ],
+    gridLayout: {
+      frameWidth: 32,
+      frameHeight: 32,
+      spacing: { x: 0, y: 0 },
+      margin: { x: 0, y: 0 }
+    },
+    animations: [
+      {
+        id: 'default-idle',
+        category: 'IDLE',
+        name: 'Idle',
+        description: 'Default idle animation',
+        sequence: {
+          frameIds: ['default-idle-0'],
+          frameRate: 8,
+          loop: true,
+          duration: 1000
+        },
+        priority: 1,
+        interruptible: true,
+        transitions: {},
+        createdAt: now,
+        updatedAt: now
+      }
+    ],
+    defaultSettings: {
+      frameRate: 8,
+      loop: true,
+      category: 'IDLE'
+    },
+    validation: {
+      isValid: true,
+      errors: [],
+      warnings: [],
+      lastValidated: now
+    },
+    exportSettings: {
+      format: 'png',
+      quality: 1,
+      optimization: false,
+      includeMetadata: true
+    },
+    version: '2.0.0',
+    createdAt: now,
+    updatedAt: now,
+    createdBy: 'system'
+  };
+}
 
 async function main() {
   console.log('🌱 Starting database seed...');
+
+  // Load blob character sprite sheet
+  const blobCharacterSpriteSheet = loadBlobCharacterSpriteSheet();
+  console.log('✅ Loaded blob character sprite sheet');
 
   // Create test user
   const hashedPassword = await bcrypt.hash('password123', 10);
@@ -229,8 +427,8 @@ async function main() {
       create: {
         userId: testUser.id,
         slotNumber,
-        name: slotNumber === 1 ? 'Default Character' : `Character ${slotNumber}`,
-        spriteSheet: slotNumber === 1 ? defaultSpriteSheet : {},
+        name: slotNumber === 1 ? 'Blob Character' : `Character ${slotNumber}`,
+        spriteSheet: slotNumber === 1 ? blobCharacterSpriteSheet : {},
         isEmpty: slotNumber !== 1,
         thumbnailPath: null,
         texturePath: null
