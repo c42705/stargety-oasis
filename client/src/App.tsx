@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { logger } from './shared/logger';
 import { Routes, Route } from 'react-router-dom';
 import { ConfigProvider, Layout, Space, Button, Badge, Typography, Modal, Dropdown, Avatar, Switch, Tooltip, App as AntdApp } from 'antd';
@@ -29,6 +29,7 @@ import { MyProfileTab } from './components/panel-tabs/MyProfileTab';
 import { MapSyncStatus } from './components/MapSyncStatus';
 import { MapEditorPage } from './pages/MapEditorPage';
 import { KonvaTestSuitePage } from './pages/KonvaTestSuitePage';
+import { PasswordRecoveryPage } from './pages/PasswordRecoveryPage';
 import ConsolidatedSettings from './components/settings/ConsolidatedSettings';
 
 import './App.css';
@@ -37,11 +38,18 @@ import './App.css';
 const AppContent: React.FC = () => {
   const { user, logout } = useAuth();
   const [currentVideoRoom, setCurrentVideoRoom] = useState<string>('general');
-  const [currentChatRoom, setCurrentChatRoom] = useState<string>('general');
+  const [currentChatRoom, setCurrentChatRoom] = useState<string>(user?.worldRoomId || 'general');
   const [showProfile, setShowProfile] = useState(false);
   const [showPeople, setShowPeople] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showMapAreas, setShowMapAreas] = useState(false);
+
+  // Update chat room when user's world room changes
+  useEffect(() => {
+    if (user?.worldRoomId) {
+      setCurrentChatRoom(user.worldRoomId);
+    }
+  }, [user?.worldRoomId]);
 
   // If no user is authenticated, this shouldn't render
   if (!user) {
@@ -252,7 +260,7 @@ const AppContent: React.FC = () => {
             rightBottomPanel={
               <MinimalChatPanel
                 roomId={currentChatRoom}
-                currentUserId={user.username}
+                currentUserId={user.id}
                 currentUsername={user.displayName}
               />
             }
@@ -316,13 +324,13 @@ const AuthenticatedApp: React.FC = () => {
 
 // Root App component with routing
 const App: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isLoading, isAuthenticated } = useAuth();
 
   // Show loading state
   if (isLoading) {
     return (
       <div className="app-loading">
-        <div className="loading-spinner">          
+        <div className="loading-spinner">
         </div>
       </div>
     );
@@ -358,6 +366,12 @@ const App: React.FC = () => {
       <Route
         path="/chat-demo"
         element={<ChatDemo />}
+      />
+
+      {/* Password Recovery Route */}
+      <Route
+        path="/password-recovery"
+        element={<PasswordRecoveryPage />}
       />
 
       {/* Main App Route */}

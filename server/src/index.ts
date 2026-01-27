@@ -10,6 +10,7 @@ import { VideoCallController } from './video-call/videoCallController';
 import { MapController } from './map/mapController';
 import { characterController } from './character/characterController';
 import { settingsController } from './settings/settingsController';
+import { authRouter } from './auth/authController';
 import { initializeDatabase, prisma } from './utils/prisma';
 import { logger } from './utils/logger';
 import {
@@ -30,12 +31,34 @@ ensureUploadDirs();
 
 const app = express();
 const server = createServer(app);
+
+// Enhanced Socket.IO configuration with detailed debugging
 const io = new Server(server, {
   cors: {
     origin: process.env.CLIENT_URL || "http://localhost:3000",
     methods: ["GET", "POST"],
     credentials: true
-  }
+  },
+  transports: ['websocket', 'polling'],
+  pingInterval: 25000,
+  pingTimeout: 60000,
+  allowUpgrades: true,
+  perMessageDeflate: false,
+  // Enhanced debugging
+  serveClient: true,
+  connectTimeout: 45000,
+  maxHttpBufferSize: 1e6
+});
+
+// Log Socket.IO configuration on startup
+logger.info('🔧 Socket.IO Configuration:', {
+  cors: {
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    credentials: true
+  },
+  transports: ['websocket', 'polling'],
+  pingInterval: 25000,
+  pingTimeout: 60000
 });
 
 const PORT = process.env.PORT || 3001;
@@ -45,6 +68,17 @@ app.use(cors({
   origin: process.env.CLIENT_URL || "http://localhost:3000",
   credentials: true
 }));
+
+// Request logging middleware for debugging
+app.use((req, res, next) => {
+  logger.debug(`📨 ${req.method} ${req.path}`, {
+    origin: req.get('origin'),
+    userAgent: req.get('user-agent'),
+    contentType: req.get('content-type')
+  });
+  next();
+});
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -81,7 +115,40 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Debug endpoint for Socket.IO status
+app.get('/debug/socket-io', (req, res) => {
+  const socketCount = io.engine.clientsCount;
+  const connectedSockets = Array.from(io.sockets.sockets.values()).map(socket => ({
+    id: socket.id,
+    transport: socket.conn.transport.name,
+    remoteAddress: socket.conn.remoteAddress,
+    connected: socket.connected
+  }));
+
+  res.json({
+    success: true,
+    socketIO: {
+      totalConnections: socketCount,
+      connectedSockets,
+      config: {
+        transports: ['websocket', 'polling'],
+        cors: {
+          origin: process.env.CLIENT_URL || "http://localhost:3000",
+          credentials: true
+        }
+      }
+    }
+  });
+});
+
+// ============================================================================
+// AUTHENTICATION API ROUTES
+// ============================================================================
+app.use('/api/auth', authRouter);
+
+// ============================================================================
 // API Routes
+// ============================================================================
 app.get('/api/world/rooms/:roomId', (req, res) => {
   const { roomId } = req.params;
   const worldState = worldController.getWorldState(roomId);
@@ -504,6 +571,26 @@ app.post('/api/chat/:roomId/messages', async (req, res) => {
     if (!message) {
       return res.status(500).json({ success: false, error: 'Failed to create message' });
     }
+
+    // Broadcast to Socket.IO clients (same as Socket.IO handler)
+    const broadcastData = {
+      id: message.id,
+      message: message.content.text,
+      user: message.authorName,
+      userId: message.authorId,
+      timestamp: message.createdAt,
+      type: 'message',
+      roomId,
+    };
+
+    logger.info(`📡 Broadcasting message to room "${roomId}" (via REST API):`, {
+      messageId: message.id,
+      user: message.authorName,
+      text: message.content.text
+    });
+
+    io.to(roomId).emit('chat-message', broadcastData);
+
     res.json({ success: true, data: message });
   } catch (error) {
     logger.error('Error creating chat message:', error);
@@ -693,9 +780,44 @@ const worldController = new WorldController(io);
 const videoCallController = new VideoCallController(io);
 const mapController = new MapController(io);
 
-// Socket.IO connection handling
+// Socket.IO error handling with detailed logging
+io.on('connect_error', (error) => {
+  logger.error(`❌ Socket.IO connection error:`, {
+    message: error.message,
+    code: (error as any).code,
+    type: error.constructor.name,
+    stack: error.stack
+  });
+});
+
+// Socket.IO connection handling with enhanced logging
 io.on('connection', (socket) => {
-  logger.info(`User connected: ${socket.id}`);
+  logger.info(`✅ User connected: ${socket.id}`, {
+    transport: socket.conn.transport.name,
+    remoteAddress: socket.conn.remoteAddress,
+    handshakeData: {
+      headers: socket.handshake.headers,
+      auth: socket.handshake.auth,
+      url: socket.handshake.url
+    }
+  });
+  logger.debug(`Socket transport: ${socket.conn.transport.name}`);
+
+  // Log transport upgrade attempts
+  socket.conn.on('upgrade', (transport) => {
+    logger.info(`🔄 Socket transport upgraded: ${socket.id}`, {
+      from: socket.conn.transport.name,
+      to: transport.name
+    });
+  });
+
+  // Log transport errors
+  socket.conn.on('error', (error) => {
+    logger.error(`❌ Socket connection error: ${socket.id}`, {
+      error: error.message,
+      transport: socket.conn.transport.name
+    });
+  });
 
   // Chat events (DB-backed controller)
   socket.on('join-room', (data) => chatDbController.handleJoinRoom(socket, data));

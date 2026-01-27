@@ -17,7 +17,7 @@ interface MinimalChatPanelProps {
   currentUsername: string;
 }
 
-const MinimalChatPanel: React.FC<MinimalChatPanelProps> = ({ roomId, currentUserId }) => {
+const MinimalChatPanel: React.FC<MinimalChatPanelProps> = ({ roomId, currentUserId, currentUsername }) => {
   const dispatch = useAppDispatch();
   const messages = useAppSelector(selectMessagesByRoom(roomId));
   const isLoading = useAppSelector(selectIsLoading(roomId));
@@ -97,10 +97,9 @@ const MinimalChatPanel: React.FC<MinimalChatPanelProps> = ({ roomId, currentUser
     if (!inputText.trim()) return;
 
     try {
-      await dispatch(chatThunks.sendMessage({
-        roomId,
-        content: inputText.trim(),
-      })).unwrap();
+      // Send via Socket.IO for real-time delivery
+      // Socket.IO handles both real-time broadcast and database persistence
+      chatSocketService.sendMessage(roomId, inputText.trim(), currentUsername, currentUserId);
       setInputText('');
     } catch (err) {
       message.error('Failed to send message');

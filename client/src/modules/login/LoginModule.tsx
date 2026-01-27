@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Form, Input, Button, Checkbox, Alert, Collapse, Space, Typography, Divider, Select } from 'antd';
 import { UserOutlined, LockOutlined, RocketOutlined, BulbOutlined, GlobalOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../shared/AuthContext';
 import { WORLD_ROOMS, WorldRoomId } from '../../shared/WorldRoomContext';
+import { TwoFactorInput } from '../auth/TwoFactorInput';
+import { RegisterModule } from '../auth/RegisterModule';
 import appLogo from '../../assets/app-logo.png';
 import magicalBg from '../../assets/magical_bg.png';
 
@@ -17,11 +20,15 @@ interface FormData {
   rememberMe: boolean;
 }
 
-export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
-  const { login, isLoading, rememberUsername, setRememberUsername, savedUsername } = useAuth();
+type AuthView = 'login' | 'register' | 'two-factor';
+
+export const LoginModule: React.FC<LoginModuleProps> = () => {
+  const navigate = useNavigate();
+  const { login, verify2FA, isLoading, requires2FA, pendingTopicId, rememberUsername, setRememberUsername, savedUsername } = useAuth();
   const [form] = Form.useForm();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string>('');
+  const [authView, setAuthView] = useState<AuthView>('login');
 
   // Test accounts for easy access
   const testAccounts = [
@@ -38,6 +45,13 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
     }
   }, [savedUsername, rememberUsername, form]);
 
+  // Auto-switch to 2FA view when 2FA is required
+  useEffect(() => {
+    if (requires2FA) {
+      setAuthView('two-factor');
+    }
+  }, [requires2FA]);
+
   // Handle form submission
   const handleSubmit = async (values: FormData) => {
     setIsSubmitting(true);
@@ -50,7 +64,10 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
         values.worldRoomId || 'Stargety-Oasis-1'
       );
 
-      if (!success) {
+      if (success) {
+        // Login successful, 2FA will be required
+        setAuthView('two-factor');
+      } else {
         setLoginError('Invalid username or password. Please try again.');
       }
 
@@ -64,12 +81,28 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
     }
   };
 
+  // Handle 2FA submission
+  const handle2FASubmit = async (code: string) => {
+    try {
+      const success = await verify2FA(code);
+      if (!success) {
+        throw new Error('Invalid code');
+      }
+      // Success - user will be redirected by AuthContext
+    } catch (error) {
+      throw error;
+    }
+  };
+
   // Quick login with test account - auto-submit for faster loading
   const handleQuickLogin = async (testAccount: typeof testAccounts[0]) => {
+    // Get the currently selected worldRoomId from the form, or use default
+    const currentWorldRoomId = form.getFieldValue('worldRoomId') || 'Stargety-Oasis-1';
+
     form.setFieldsValue({
       username: testAccount.username,
       password: testAccount.password,
-      worldRoomId: 'Stargety-Oasis-1',
+      worldRoomId: currentWorldRoomId, // Preserve the selected world room
       rememberMe: rememberUsername
     });
     setLoginError('');
@@ -83,20 +116,57 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
     }
   };
 
-  return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundImage: `linear-gradient(35deg, #667eea 0%, #764ba2 100%), url(${magicalBg})`,
-      backgroundBlendMode: 'overlay',
-      backgroundSize: 'cover, cover',
-      backgroundPosition: 'center, center',
-      backgroundRepeat: 'no-repeat, no-repeat',
-      padding: '0.5rem'
-    }}>
-      <Card
+  // Render different auth views
+  const renderAuthView = () => {
+    if (authView === 'register') {
+      return (
+        <RegisterModule
+          onSuccess={() => setAuthView('login')}
+          onSwitchToLogin={() => setAuthView('login')}
+        />
+      );
+    }
+
+    if (authView === 'two-factor') {
+      return (
+        <div style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundImage: `linear-gradient(35deg, #667eea 0%, #764ba2 100%), url(${magicalBg})`,
+          backgroundBlendMode: 'overlay',
+          backgroundSize: 'cover, cover',
+          backgroundPosition: 'center, center',
+          backgroundRepeat: 'no-repeat, no-repeat',
+          padding: '0.5rem'
+        }}>
+          <div style={{ width: '100%', maxWidth: 480 }}>
+            <TwoFactorInput
+              onSubmit={handle2FASubmit}
+              isLoading={isLoading}
+              topicId={pendingTopicId || undefined}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // Default login view
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundImage: `linear-gradient(35deg, #667eea 0%, #764ba2 100%), url(${magicalBg})`,
+        backgroundBlendMode: 'overlay',
+        backgroundSize: 'cover, cover',
+        backgroundPosition: 'center, center',
+        backgroundRepeat: 'no-repeat, no-repeat',
+        padding: '0.5rem'
+      }}>
+        <Card
         style={{
           width: '100%',
           maxWidth: 480,
@@ -295,7 +365,29 @@ export const LoginModule: React.FC<LoginModuleProps> = ({ className = '' }) => {
             </Typography.Text>
           </Space>
         </div>
+
+        <Divider />
+
+        <div style={{ textAlign: 'center' }}>
+          <Space direction="vertical" size="small">
+            <Typography.Text>Don't have an account?</Typography.Text>
+            <Button type="link" onClick={() => setAuthView('register')}>
+              Create one now
+            </Button>
+          </Space>
+        </div>
+
+        <Divider />
+
+        <div style={{ textAlign: 'center' }}>
+          <Button type="link" onClick={() => navigate('/password-recovery')}>
+            Forgot your password?
+          </Button>
+        </div>
       </Card>
     </div>
-  );
+    );
+  };
+
+  return renderAuthView();
 };

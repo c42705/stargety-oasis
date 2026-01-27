@@ -44,6 +44,12 @@ services:
       PORT: 3001
       CLIENT_URL: http://localhost:3000
       DATABASE_URL: postgresql://stargety:stargety_dev_password@postgres:5432/stargety_oasis
+      DEBUG: socket.io:*
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_EXPIRES_IN: 7d
+      TWO_FA_CODE_EXPIRY_MINUTES: 5
+      TWO_FA_MAX_ATTEMPTS: 3
+      NTFY_SERVER_URL: https://ntfy.sh
     volumes:
       - ./server:/app/server
       - /app/server/node_modules
@@ -101,6 +107,11 @@ services:
       PORT: 3001
       CLIENT_URL: http://localhost:3001
       DATABASE_URL: postgresql://stargety:stargety_dev_password@postgres:5432/stargety_oasis
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_EXPIRES_IN: 7d
+      TWO_FA_CODE_EXPIRY_MINUTES: 5
+      TWO_FA_MAX_ATTEMPTS: 3
+      NTFY_SERVER_URL: https://ntfy.sh
     volumes:
       - app_data:/app/data
       - uploads:/tmp/uploads

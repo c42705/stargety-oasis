@@ -119,13 +119,8 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
     if (!inputMessage.trim() || !isConnected) return;
 
     // Send via Socket.IO for real-time delivery
+    // Socket.IO handles both real-time broadcast and database persistence
     chatSocketService.sendMessage(currentRoom, inputMessage.trim(), currentUser, userId);
-
-    // Also dispatch to Redux for API persistence
-    dispatch(chatThunks.sendMessage({
-      roomId: currentRoom,
-      content: inputMessage.trim()
-    }));
 
     setInputMessage('');
 
@@ -135,7 +130,7 @@ export const PersistentChatPanel: React.FC<PersistentChatPanelProps> = ({
       typingTimeoutRef.current = null;
     }
     chatSocketService.sendTypingIndicator(currentRoom, false, currentUser);
-  }, [inputMessage, currentRoom, currentUser, userId, isConnected, dispatch]);
+  }, [inputMessage, currentRoom, currentUser, userId, isConnected]);
 
   // Handle typing indicator
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

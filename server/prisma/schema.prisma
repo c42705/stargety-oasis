@@ -24,6 +24,15 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // 2FA & Security
+  ntfy_topic_id              String?   @unique  // Cryptographically secure topic ID for ntfy.sh
+  two_fa_enabled             Boolean   @default(true)
+  two_fa_code_hash           String?   // Hash of current 2FA code
+  two_fa_code_expires_at     DateTime? // Expiration time for 2FA code
+  two_fa_attempts            Int       @default(0) // Failed attempts counter
+  password_reset_token       String?   @unique // Token for password reset
+  password_reset_expires_at  DateTime? // Expiration time for reset token
+
   // Relations
   messages   Message[]
   reactions  Reaction[]

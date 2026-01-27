@@ -176,7 +176,8 @@ class ChatSocketService {
     type: string;
     roomId: string
   }) {
-    logger.debug('New message received:', data);
+    logger.info('🔔 New message received from server:', { id: data.id, roomId: data.roomId, user: data.user, message: data.message });
+
     // Transform backend format to frontend Message format
     const message: Message = {
       id: data.id,
@@ -184,6 +185,7 @@ class ChatSocketService {
       type: 'TEXT' as any,
       roomId: data.roomId,
       authorId: data.userId || 'anonymous',
+      authorName: data.user || 'Anonymous',
       isEdited: false,
       reactions: [],
       attachments: [],
@@ -191,6 +193,8 @@ class ChatSocketService {
       createdAt: new Date(data.timestamp),
       updatedAt: new Date(data.timestamp),
     };
+
+    logger.info('📤 Dispatching addMessage to Redux:', { roomId: data.roomId, messageId: message.id, authorName: message.authorName });
     store.dispatch(addMessage({ roomId: data.roomId, message }));
   }
 
@@ -222,6 +226,7 @@ class ChatSocketService {
       type: 'TEXT' as any,
       roomId: data.roomId,
       authorId: msg.authorId || 'anonymous',
+      authorName: msg.authorName || 'Anonymous',
       isEdited: false,
       reactions: [],
       attachments: [],
