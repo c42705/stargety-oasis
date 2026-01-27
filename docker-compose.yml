@@ -100,18 +100,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: https://oasis.stargety.com/api
+        REACT_APP_SOCKET_URL: wss://oasis.stargety.com
+        REACT_APP_WS_URL: wss://oasis.stargety.com
     ports:
       - "3001:3001"
+    env_file:
+      - .env.production
     environment:
       NODE_ENV: production
       PORT: 3001
-      CLIENT_URL: http://localhost:3001
-      DATABASE_URL: postgresql://stargety:stargety_dev_password@postgres:5432/stargety_oasis
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
-      JWT_EXPIRES_IN: 7d
-      TWO_FA_CODE_EXPIRY_MINUTES: 5
-      TWO_FA_MAX_ATTEMPTS: 3
-      NTFY_SERVER_URL: https://ntfy.sh
     volumes:
       - app_data:/app/data
       - uploads:/tmp/uploads

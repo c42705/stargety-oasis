@@ -4,8 +4,15 @@
 FROM node:18-alpine AS client-builder
 WORKDIR /app/client
 COPY client/package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 COPY client/ ./
+# Build with production environment variables
+ARG REACT_APP_API_URL=https://oasis.stargety.com/api
+ARG REACT_APP_SOCKET_URL=wss://oasis.stargety.com
+ARG REACT_APP_WS_URL=wss://oasis.stargety.com
+ENV REACT_APP_API_URL=${REACT_APP_API_URL}
+ENV REACT_APP_SOCKET_URL=${REACT_APP_SOCKET_URL}
+ENV REACT_APP_WS_URL=${REACT_APP_WS_URL}
 RUN npm run build
 
 # Stage 2: Build the server
