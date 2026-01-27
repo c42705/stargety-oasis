@@ -20,6 +20,7 @@ FROM node:18-alpine AS server-builder
 WORKDIR /app/server
 COPY server/package*.json ./
 COPY server/tsconfig.json ./
+COPY server/prisma ./prisma/
 RUN npm ci
 COPY server/src ./src
 RUN npm run build
