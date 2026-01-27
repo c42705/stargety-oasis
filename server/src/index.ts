@@ -29,13 +29,24 @@ dotenv.config();
 // Ensure upload directories exist on startup
 ensureUploadDirs();
 
+// Parse CORS origins from environment
+const getCorsOrigins = (): string | string[] => {
+  const allowedOrigins = process.env.ALLOWED_ORIGINS || process.env.CLIENT_URL || "http://localhost:3000";
+  if (allowedOrigins.includes(',')) {
+    return allowedOrigins.split(',').map(origin => origin.trim());
+  }
+  return allowedOrigins;
+};
+
+const corsOrigins = getCorsOrigins();
+
 const app = express();
 const server = createServer(app);
 
 // Enhanced Socket.IO configuration with detailed debugging
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    origin: corsOrigins,
     methods: ["GET", "POST"],
     credentials: true
   },
@@ -65,7 +76,7 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors({
-  origin: process.env.CLIENT_URL || "http://localhost:3000",
+  origin: corsOrigins,
   credentials: true
 }));
 
@@ -900,7 +911,8 @@ async function startServer() {
     server.listen(PORT, () => {
       logger.info(`🚀 Stargety Oasis Server running on port ${PORT}`);
       logger.info(`📡 Socket.IO server ready for connections`);
-      logger.info(`🌐 CORS enabled for: ${process.env.CLIENT_URL || "http://localhost:3000"}`);
+      const corsOriginsList = Array.isArray(corsOrigins) ? corsOrigins.join(', ') : corsOrigins;
+      logger.info(`🌐 CORS enabled for: ${corsOriginsList}`);
       logger.info(`💾 Database: ${dbConnected ? 'Connected' : 'Not connected (localStorage mode)'}`);
     });
   } catch (error) {
