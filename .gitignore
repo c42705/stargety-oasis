@@ -8,7 +8,8 @@
 # Builds
 **/build/
 **/dist/
-# NOTE: client/build/ is committed for production deployments (pre-built)
+# EXCEPTION: client/build/ is committed for production deployments (pre-built)
+!client/build/
 
 # Testing
 **/coverage/
