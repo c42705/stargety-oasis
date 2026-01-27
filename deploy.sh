@@ -4,7 +4,6 @@
 
 set -e
 
-# Color definitions
 COLOR_GREEN='\033[0;32m'
 COLOR_YELLOW='\033[1;33m'
 COLOR_RED='\033[0;31m'
@@ -15,12 +14,10 @@ COLOR_WHITE='\033[1;37m'
 COLOR_GRAY='\033[0;90m'
 NC='\033[0m'
 
-# Progress indicators
 PROGRESS_CHAR="▓"
 EMPTY_CHAR="░"
 SPINNER=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
 
-# Detectar docker-compose o docker compose
 if command -v docker-compose &> /dev/null; then
   DC="docker-compose"
 elif command -v docker &> /dev/null && docker compose version &> /dev/null; then
