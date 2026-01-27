@@ -29,6 +29,7 @@ import { MyProfileTab } from './components/panel-tabs/MyProfileTab';
 import { MapSyncStatus } from './components/MapSyncStatus';
 import { MapEditorPage } from './pages/MapEditorPage';
 import { KonvaTestSuitePage } from './pages/KonvaTestSuitePage';
+import { PasswordRecoveryPage } from './pages/PasswordRecoveryPage';
 import ConsolidatedSettings from './components/settings/ConsolidatedSettings';
 
 import './App.css';
@@ -323,13 +324,13 @@ const AuthenticatedApp: React.FC = () => {
 
 // Root App component with routing
 const App: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isLoading, isAuthenticated } = useAuth();
 
   // Show loading state
   if (isLoading) {
     return (
       <div className="app-loading">
-        <div className="loading-spinner">          
+        <div className="loading-spinner">
         </div>
       </div>
     );
@@ -365,6 +366,12 @@ const App: React.FC = () => {
       <Route
         path="/chat-demo"
         element={<ChatDemo />}
+      />
+
+      {/* Password Recovery Route */}
+      <Route
+        path="/password-recovery"
+        element={<PasswordRecoveryPage />}
       />
 
       {/* Main App Route */}

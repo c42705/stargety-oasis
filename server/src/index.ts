@@ -10,6 +10,7 @@ import { VideoCallController } from './video-call/videoCallController';
 import { MapController } from './map/mapController';
 import { characterController } from './character/characterController';
 import { settingsController } from './settings/settingsController';
+import { authRouter } from './auth/authController';
 import { initializeDatabase, prisma } from './utils/prisma';
 import { logger } from './utils/logger';
 import {
@@ -140,7 +141,14 @@ app.get('/debug/socket-io', (req, res) => {
   });
 });
 
+// ============================================================================
+// AUTHENTICATION API ROUTES
+// ============================================================================
+app.use('/api/auth', authRouter);
+
+// ============================================================================
 // API Routes
+// ============================================================================
 app.get('/api/world/rooms/:roomId', (req, res) => {
   const { roomId } = req.params;
   const worldState = worldController.getWorldState(roomId);
