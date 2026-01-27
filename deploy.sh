@@ -9,6 +9,16 @@ COLOR_YELLOW='\033[1;33m'
 COLOR_RED='\033[0;31m'
 NC='\033[0m'
 
+# Detectar docker-compose o docker compose
+if command -v docker-compose &> /dev/null; then
+  DC="docker-compose"
+elif command -v docker &> /dev/null && docker compose version &> /dev/null; then
+  DC="docker compose"
+else
+  echo -e "${COLOR_RED}[ERROR]${NC} docker-compose no está instalado"
+  exit 1
+fi
+
 log_info() {
   echo -e "${COLOR_GREEN}[INFO]${NC} $1"
 }
@@ -29,23 +39,32 @@ check_env() {
   fi
 }
 
+check_docker() {
+  if ! command -v docker &> /dev/null; then
+    log_error "Docker no está instalado"
+    exit 1
+  fi
+}
+
 start_services() {
+  check_docker
   log_info "Iniciando servicios en modo producción..."
 
   # Limpiar contenedores duplicados si existen
   log_info "Limpiando contenedores duplicados..."
-  docker-compose --profile production down --remove-orphans 2>/dev/null || true
+  $DC --profile production down --remove-orphans 2>/dev/null || true
 
   # Iniciar servicios
-  docker-compose --profile production up -d
+  $DC --profile production up -d
   log_info "Servicios iniciados ✓"
   sleep 5
   health_check
 }
 
 stop_services() {
+  check_docker
   log_info "Deteniendo servicios..."
-  docker-compose --profile production down
+  $DC --profile production down
   log_info "Servicios detenidos ✓"
 }
 
@@ -57,13 +76,15 @@ restart_services() {
 }
 
 show_logs() {
+  check_docker
   log_info "Mostrando logs (Ctrl+C para salir)..."
-  docker-compose logs -f stargety-oasis
+  $DC logs -f stargety-oasis
 }
 
 health_check() {
+  check_docker
   log_info "Verificando salud de la aplicación..."
-  if docker-compose ps stargety-oasis | grep -q "Up"; then
+  if $DC ps stargety-oasis | grep -q "Up"; then
     sleep 3
     if curl -s http://localhost:3001/health > /dev/null; then
       log_info "✓ Aplicación saludable"
@@ -77,25 +98,28 @@ health_check() {
 }
 
 backup_database() {
+  check_docker
   log_info "Creando backup de la base de datos..."
   TIMESTAMP=$(date +%Y%m%d_%H%M%S)
   BACKUP_FILE="backups/stargety_oasis_${TIMESTAMP}.sql"
   mkdir -p backups
-  docker-compose exec -T postgres pg_dump -U stargety stargety_oasis > "$BACKUP_FILE"
+  $DC exec -T postgres pg_dump -U stargety stargety_oasis > "$BACKUP_FILE"
   log_info "Backup creado: $BACKUP_FILE ✓"
 }
 
 show_status() {
+  check_docker
   log_info "Estado de los servicios:"
-  docker-compose ps
+  $DC ps
   echo ""
   log_info "Uso de recursos:"
   docker stats --no-stream
 }
 
 run_migrations() {
+  check_docker
   log_info "Ejecutando migraciones de BD..."
-  docker-compose exec stargety-oasis npm run prisma:migrate:deploy
+  $DC exec stargety-oasis npm run prisma:migrate:deploy
   log_info "Migraciones completadas ✓"
 }
 
