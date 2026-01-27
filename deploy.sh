@@ -4,6 +4,18 @@
 
 set -e
 
+# Disable output buffering for real-time visibility in webhooks
+export PYTHONUNBUFFERED=1
+
+# Ensure all output is flushed immediately (line buffering)
+# This makes the script output visible in real-time to webhook callers
+if [ -z "$STDBUF_APPLIED" ]; then
+  export STDBUF_APPLIED=1
+  if command -v stdbuf &> /dev/null; then
+    exec stdbuf -oL -eL bash "$0" "$@"
+  fi
+fi
+
 COLOR_GREEN='\033[0;32m'
 COLOR_YELLOW='\033[1;33m'
 COLOR_RED='\033[0;31m'
@@ -29,24 +41,40 @@ fi
 
 log_info() {
   echo -e "${COLOR_GREEN}[✓]${NC} ${COLOR_WHITE}$1${NC}"
+  flush_output
 }
 
 log_warn() {
   echo -e "${COLOR_YELLOW}[⚠]${NC} ${COLOR_YELLOW}$1${NC}"
+  flush_output
 }
 
 log_error() {
   echo -e "${COLOR_RED}[✗]${NC} ${COLOR_RED}$1${NC}"
+  flush_output
 }
 
 log_stage() {
   echo -e "\n${COLOR_CYAN}╔════════════════════════════════════════╗${NC}"
   echo -e "${COLOR_CYAN}║${NC} ${COLOR_WHITE}$1${NC}"
   echo -e "${COLOR_CYAN}╚════════════════════════════════════════╝${NC}\n"
+  flush_output
 }
 
 log_substage() {
   echo -e "${COLOR_BLUE}→${NC} ${COLOR_CYAN}$1${NC}"
+  flush_output
+}
+
+flush_output() {
+  sync
+  sleep 0.1
+}
+
+log_timestamp() {
+  local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+  echo -e "${COLOR_GRAY}[${timestamp}]${NC} $1"
+  flush_output
 }
 
 progress_bar() {
@@ -60,6 +88,7 @@ progress_bar() {
   printf "%${filled}s" | tr ' ' "$PROGRESS_CHAR"
   printf "%$((width - filled))s" | tr ' ' "$EMPTY_CHAR"
   printf "]${NC} ${COLOR_WHITE}%3d%%${NC}\n" "$percentage"
+  flush_output
 }
 
 spinner() {
@@ -90,6 +119,7 @@ check_docker() {
 
 start_services() {
   check_docker
+  log_timestamp "Iniciando proceso de despliegue"
   log_stage "INICIANDO SERVICIOS EN PRODUCCIÓN"
 
   local step=1
@@ -98,6 +128,7 @@ start_services() {
   # Step 1: Limpiar contenedores duplicados
   log_substage "Limpiando contenedores duplicados..."
   progress_bar $step $total
+  log_timestamp "Ejecutando: $DC --profile production down --remove-orphans"
   $DC --profile production down --remove-orphans 2>/dev/null || true
   log_info "Contenedores limpios"
   ((step++))
@@ -106,6 +137,7 @@ start_services() {
   # Step 2: Iniciar servicios
   log_substage "Iniciando contenedores..."
   progress_bar $step $total
+  log_timestamp "Ejecutando: $DC --profile production up -d"
   $DC --profile production up -d &
   spinner $!
   log_info "Contenedores iniciados"
@@ -115,7 +147,9 @@ start_services() {
   # Step 3: Verificar salud
   log_substage "Verificando salud de la aplicación..."
   progress_bar $step $total
+  log_timestamp "Ejecutando health check"
   health_check
+  log_timestamp "Proceso de despliegue completado"
   echo ""
 }
 
