@@ -9,8 +9,11 @@ WORKDIR /app
 COPY server/package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
-# Copy Prisma schema and generated client (needed at runtime)
+# Copy Prisma schema (needed to generate client)
 COPY server/prisma ./prisma
+
+# Generate Prisma client (required at runtime)
+RUN npx prisma generate
 
 # Copy pre-built server (built locally and committed to git)
 COPY server/dist ./dist
