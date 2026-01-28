@@ -1,18 +1,7 @@
 # Multi-stage Dockerfile for Stargety Oasis
-# NOTE: Client is pre-built locally and committed to git
-# This eliminates the 47+ minute React build in Docker
+# NOTE: Both client and server are pre-built locally and committed to git
+# This eliminates the 47+ minute React build and TypeScript compilation in Docker
 
-# Stage 1: Build the server
-FROM node:18-alpine AS server-builder
-WORKDIR /app/server
-COPY server/package*.json ./
-COPY server/tsconfig.json ./
-COPY server/prisma ./prisma/
-RUN npm ci
-COPY server/src ./src
-RUN npm run build
-
-# Stage 2: Production image
 FROM node:18-alpine AS production
 WORKDIR /app
 
@@ -23,8 +12,8 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy Prisma schema and generated client (needed at runtime)
 COPY server/prisma ./prisma
 
-# Copy built server
-COPY --from=server-builder /app/server/dist ./dist
+# Copy pre-built server (built locally and committed to git)
+COPY server/dist ./dist
 
 # Copy pre-built client (built locally and committed to git)
 COPY client/build ./public

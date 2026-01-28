@@ -8,8 +8,9 @@
 # Builds
 **/build/
 **/dist/
-# EXCEPTION: client/build/ is committed for production deployments (pre-built)
+# EXCEPTIONS: pre-built artifacts committed for production deployments
 !client/build/
+!server/dist/
 
 # Testing
 **/coverage/
@@ -45,7 +46,6 @@ lxc-config/*.log
 
 # Server-specific (already partial)
 server/node_modules/*
-server/dist/
 
 # Client-specific (CRA)
 client/node_modules/

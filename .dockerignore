@@ -5,8 +5,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # Build outputs
-# NOTE: client/build is committed for production deployments (pre-built)
-server/dist
+# NOTE: client/build and server/dist are committed for production deployments (pre-built)
 *.tgz
 
 # Environment files
