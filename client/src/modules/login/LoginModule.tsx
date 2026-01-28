@@ -192,7 +192,7 @@ export const LoginModule: React.FC<LoginModuleProps> = () => {
           </Space>
         </div>
 
-        {/* Test Accounts Section */}
+        {/* Test Accounts Section
         <Collapse
           style={{ marginBottom: '1.5rem' }}
           items={[
@@ -244,7 +244,7 @@ export const LoginModule: React.FC<LoginModuleProps> = () => {
             }
           ]}
         />
-
+ */}
         {/* Login Form */}
         <div style={{ marginBottom: '1.5rem' }}>
           <Typography.Title level={3} style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
