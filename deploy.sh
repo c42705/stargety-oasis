@@ -31,9 +31,9 @@ EMPTY_CHAR="░"
 SPINNER=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
 
 if command -v docker-compose &> /dev/null; then
-  DC="docker-compose"
+  DC="docker-compose -f docker-compose.production.yml"
 elif command -v docker &> /dev/null && docker compose version &> /dev/null; then
-  DC="docker compose"
+  DC="docker compose -f docker-compose.production.yml"
 else
   echo -e "${COLOR_RED}[ERROR]${NC} docker-compose no está instalado"
   exit 1
@@ -128,8 +128,8 @@ start_services() {
   # Step 1: Limpiar contenedores duplicados
   log_substage "Limpiando contenedores duplicados..."
   progress_bar $step $total
-  log_timestamp "Ejecutando: $DC --profile production down --remove-orphans"
-  $DC --profile production down --remove-orphans 2>/dev/null || true
+  log_timestamp "Ejecutando: $DC down --remove-orphans"
+  $DC down --remove-orphans 2>/dev/null || true
   log_info "Contenedores limpios"
   ((step++))
   sleep 1
@@ -137,8 +137,8 @@ start_services() {
   # Step 2: Iniciar servicios
   log_substage "Iniciando contenedores..."
   progress_bar $step $total
-  log_timestamp "Ejecutando: $DC --profile production up -d"
-  $DC --profile production up -d &
+  log_timestamp "Ejecutando: $DC up -d"
+  $DC up -d &
   spinner $!
   log_info "Contenedores iniciados"
   ((step++))
@@ -159,7 +159,7 @@ stop_services() {
 
   log_substage "Deteniendo contenedores..."
   progress_bar 1 1
-  $DC --profile production down &
+  $DC down &
   spinner $!
   log_info "Servicios detenidos correctamente"
   echo ""

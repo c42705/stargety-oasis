@@ -1,0 +1,94 @@
+services:
+  # PostgreSQL with PostGIS for spatial data
+  postgres:
+    image: postgis/postgis:17-3.4
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: stargety
+      POSTGRES_PASSWORD: stargety_dev_password
+      POSTGRES_DB: stargety_oasis
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stargety -d stargety_oasis"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - stargety_network
+
+  # Main application service (production)
+  stargety-oasis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: https://oasis.stargety.com/api
+        REACT_APP_SOCKET_URL: wss://oasis.stargety.com
+        REACT_APP_WS_URL: wss://oasis.stargety.com
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+    volumes:
+      - app_data:/app/data
+      - uploads:/tmp/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - stargety_network
+
+  # Nginx reverse proxy (optional, for production)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - stargety-oasis
+    restart: unless-stopped
+    networks:
+      - stargety_network
+
+  # Redis (for session storage and caching)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - stargety_network
+
+volumes:
+  app_data:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  uploads:
+    driver: local
+
+networks:
+  stargety_network:
+    driver: bridge
+
