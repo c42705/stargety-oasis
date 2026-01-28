@@ -95,6 +95,31 @@ export const KonvaPerformanceBenchmark: React.FC = () => {
   const { layerRefs } = useKonvaLayers();
 
   // ==========================================================================
+  // BENCHMARK RECORDING
+  // ==========================================================================
+
+  const recordBenchmark = useCallback((shapeCount: number) => {
+    const fps = performance.metrics.fps;
+    let status: BenchmarkResults['status'] = 'excellent';
+    
+    if (fps < 30) status = 'poor';
+    else if (fps < 45) status = 'fair';
+    else if (fps < 55) status = 'good';
+
+    const result: BenchmarkResults = {
+      shapeCount,
+      avgFps: fps,
+      minFps: fps,
+      maxFps: fps,
+      avgRenderTime: performance.metrics.renderTime,
+      status,
+      timestamp: Date.now(),
+    };
+
+    setBenchmarkResults((prev) => [...prev, result]);
+  }, [performance.metrics]);
+
+  // ==========================================================================
   // SHAPE GENERATION
   // ==========================================================================
 
@@ -144,27 +169,6 @@ export const KonvaPerformanceBenchmark: React.FC = () => {
       recordBenchmark(count);
     }, 2000);
   }, [recordBenchmark]);
-
-  const recordBenchmark = useCallback((shapeCount: number) => {
-    const fps = performance.metrics.fps;
-    let status: BenchmarkResults['status'] = 'excellent';
-    
-    if (fps < 30) status = 'poor';
-    else if (fps < 45) status = 'fair';
-    else if (fps < 55) status = 'good';
-
-    const result: BenchmarkResults = {
-      shapeCount,
-      avgFps: fps,
-      minFps: fps,
-      maxFps: fps,
-      avgRenderTime: performance.metrics.renderTime,
-      status,
-      timestamp: Date.now(),
-    };
-
-    setBenchmarkResults((prev) => [...prev, result]);
-  }, [performance.metrics]);
 
   // ==========================================================================
   // RENDER
