@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Input, Button, Space, Typography } from 'antd';
+import { Input, Button, Space } from 'antd';
 import { SendOutlined, CloseOutlined } from '@ant-design/icons';
 
 const { TextArea } = Input;
@@ -48,14 +48,6 @@ export const MessageEditor: React.FC<MessageEditorProps> = ({
     }
   }, [maxLength]);
 
-  // Handle key press (Enter to send, Shift+Enter for new line)
-  const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSave();
-    }
-  }, [content]);
-
   // Handle save
   const handleSave = useCallback(async () => {
     if (!content.trim()) return;
@@ -67,6 +59,14 @@ export const MessageEditor: React.FC<MessageEditorProps> = ({
       setIsSubmitting(false);
     }
   }, [content, onSave]);
+
+  // Handle key press (Enter to send, Shift+Enter for new line)
+  const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSave();
+    }
+  }, [handleSave]);
 
   // Handle cancel
   const handleCancel = useCallback(() => {

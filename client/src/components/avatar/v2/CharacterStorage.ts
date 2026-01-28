@@ -21,7 +21,6 @@ import {
   isValidSlotNumber,
   isEmptySlot
 } from './types';
-import { AnimationCategory } from '../AvatarBuilderTypes';
 import { PerformanceMonitor } from './PerformanceMonitor';
 import { CharacterApiService } from '../../../services/api/CharacterApiService';
 import { logger } from '../../../shared/logger';

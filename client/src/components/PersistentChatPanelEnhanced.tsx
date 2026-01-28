@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Layout,
   Button,
@@ -8,18 +8,15 @@ import {
   Badge,
   Card,
   Tabs,
-  Popover,
   Dropdown,
   message as antMessage,
   Modal,
-  Spin,
   Empty,
   Select,
   Divider,
   Switch,
   Row,
-  Col,
-  Menu
+  Col
 } from 'antd';
 import {
   UserOutlined,
@@ -27,8 +24,6 @@ import {
   ClearOutlined,
   FolderOpenOutlined,
   BellOutlined,
-  CheckOutlined,
-  CloseOutlined,
   MessageOutlined,
   SmileOutlined,
   HistoryOutlined,
@@ -37,8 +32,7 @@ import {
   MoreOutlined
 } from '@ant-design/icons';
 import { ChatModuleEnhanced } from '../modules/chat/ChatModuleEnhanced';
-import { Message, ChatRoom, User } from '../types/chat';
-import { useTheme } from '../shared/ThemeContext';
+import { User } from '../types/chat';
 
 const { Header, Content, Footer } = Layout;
 const { TabPane } = Tabs;
@@ -117,7 +111,6 @@ export const PersistentChatPanelEnhanced: React.FC<PersistentChatPanelEnhancedPr
   // State management
   const [activeTab, setActiveTab] = useState('chat');
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [chatSettings, setChatSettings] = useState<ChatSettings>({
     notifications: {
@@ -140,10 +133,12 @@ export const PersistentChatPanelEnhanced: React.FC<PersistentChatPanelEnhancedPr
   });
   const [unreadCount, setUnreadCount] = useState(0);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [isMaximized, setIsMaximized] = useState(false);
 
-  // Refs
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Update unread count
+  const updateUnreadCount = useCallback(() => {
+    const count = notifications.filter(n => !n.read).length;
+    setUnreadCount(count);
+  }, [notifications]);
 
   // Generate mock notifications
   const generateMockNotifications = (): Notification[] => [
@@ -180,13 +175,7 @@ export const PersistentChatPanelEnhanced: React.FC<PersistentChatPanelEnhancedPr
   useEffect(() => {
     setNotifications(generateMockNotifications());
     updateUnreadCount();
-  }, []);
-
-  // Update unread count
-  const updateUnreadCount = useCallback(() => {
-    const count = notifications.filter(n => !n.read).length;
-    setUnreadCount(count);
-  }, [notifications]);
+  }, [updateUnreadCount]);
 
   // Handle notification click
   const handleNotificationClick = useCallback((notification: Notification) => {
@@ -234,15 +223,7 @@ export const PersistentChatPanelEnhanced: React.FC<PersistentChatPanelEnhancedPr
     setIsMinimized(!isMinimized);
   }, [isMinimized]);
 
-  const handleMaximize = useCallback(() => {
-    setIsMaximized(!isMaximized);
-  }, [isMaximized]);
-
-  // Handle close
-  const handleClose = useCallback(() => {
-    setIsMinimized(true);
-    onClose?.();
-  }, [onClose]);
+  
 
   // Get notification icon based on type
   const getNotificationIcon = (type: Notification['type']) => {
@@ -345,7 +326,7 @@ export const PersistentChatPanelEnhanced: React.FC<PersistentChatPanelEnhancedPr
     { key: 'starred', icon: <StarOutlined />, label: 'Starred Messages' },
     { type: 'divider' as const },
     { key: 'minimize', icon: <ClearOutlined />, label: isMinimized ? 'Restore' : 'Minimize' },
-    { key: 'maximize', icon: <FolderOpenOutlined />, label: isMaximized ? 'Restore' : 'Maximize' },
+    { key: 'maximize', icon: <FolderOpenOutlined />, label: 'Maximize' },
     { key: 'close', icon: <ClearOutlined />, label: 'Close', danger: true },
   ];
 

@@ -6,7 +6,6 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type {
-  Shape,
   UseKonvaHistoryParams,
   UseKonvaHistoryReturn,
   EditorState,
@@ -79,15 +78,7 @@ export function useKonvaHistory(
     return JSON.stringify(state);
   }, []);
 
-  /**
-   * Check if two states are equal
-   */
-  const statesEqual = useCallback(
-    (state1: EditorState, state2: EditorState): boolean => {
-      return serializeState(state1) === serializeState(state2);
-    },
-    [serializeState]
-  );
+  
 
   // ==========================================================================
   // HISTORY MANAGEMENT

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { Upload, Button, message, Progress, Space, Typography, List, Tag } from 'antd';
 import { UploadOutlined, FileOutlined, FileImageOutlined, FilePdfOutlined, FileTextOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { UploadProps, UploadFile } from 'antd';
@@ -27,7 +27,6 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const getFileIcon = (fileType: string) => {
     if (fileType.startsWith('image/')) return <FileImageOutlined />;

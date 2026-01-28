@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { logger } from './shared/logger';
 import { Routes, Route } from 'react-router-dom';
 import { ConfigProvider, Layout, Space, Button, Badge, Typography, Modal, Dropdown, Avatar, Switch, Tooltip, App as AntdApp } from 'antd';
 import { LogoutOutlined, UserOutlined, TeamOutlined, DownOutlined, SettingOutlined, EyeOutlined } from '@ant-design/icons';
@@ -17,8 +16,6 @@ import SimpleWorldModuleDemo from './modules/simple-world-test/SimpleWorldModule
 import { LoginModule } from './modules/login/LoginModule';
 import { SplitLayoutComponent } from './components/SplitLayoutComponent';
 import { VideoCommunicationPanel } from './components/VideoCommunicationPanel';
-import { PersistentChatPanel } from './components/PersistentChatPanel';
-import { PersistentChatPanelEnhanced } from './components/PersistentChatPanelEnhanced';
 import MinimalChatPanel from './components/MinimalChatPanel';
 import { ChatDemo } from './modules/chat/ChatDemo';
 import { QuickAvatarBuilder } from './components/avatar/AvatarBuilderLauncher';
@@ -72,10 +69,7 @@ const AppContent: React.FC = () => {
     setCurrentVideoRoom(roomId);
   };
 
-  // Handle chat room change
-  const handleChatRoomChange = (roomId: string) => {
-    setCurrentChatRoom(roomId);
-  };
+  
 
   // Handle settings
   const handleSettingsClick = () => {

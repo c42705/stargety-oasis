@@ -33,7 +33,6 @@ import { TransformablePolygon, TransformableRect, TransformableImage, Transforme
 import { AnimatedGifImage } from './AnimatedGifImage';
 import { SelectionRect } from './SelectionRect';
 import { PolygonEditor } from './PolygonEditor';
-import { logger } from '../../../shared/logger';
 
 interface EditorCanvasProps {
   // Refs

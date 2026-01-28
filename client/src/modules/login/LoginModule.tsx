@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Input, Button, Checkbox, Alert, Collapse, Space, Typography, Divider, Select } from 'antd';
+import { Card, Form, Input, Button, Checkbox, Alert, Space, Typography, Divider, Select } from 'antd';
 import { UserOutlined, LockOutlined, RocketOutlined, BulbOutlined, GlobalOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../shared/AuthContext';
@@ -29,14 +29,6 @@ export const LoginModule: React.FC<LoginModuleProps> = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string>('');
   const [authView, setAuthView] = useState<AuthView>('login');
-
-  // Test accounts for easy access
-  const testAccounts = [
-    { username: 'admin', password: 'admin123', type: 'Admin User', description: 'Full access to all features including settings' },
-    { username: 'john.doe', password: 'user123', type: 'Regular User', description: 'Standard user with chat, video, and world access' },
-    { username: 'jane.smith', password: 'user456', type: 'Regular User', description: 'Another standard user for testing collaboration' },
-    { username: 'mike.admin', password: 'admin789', type: 'Admin User', description: 'Another admin account for testing admin features' },
-  ];
 
   // Initialize form with saved username
   useEffect(() => {
@@ -94,27 +86,7 @@ export const LoginModule: React.FC<LoginModuleProps> = () => {
     }
   };
 
-  // Quick login with test account - auto-submit for faster loading
-  const handleQuickLogin = async (testAccount: typeof testAccounts[0]) => {
-    // Get the currently selected worldRoomId from the form, or use default
-    const currentWorldRoomId = form.getFieldValue('worldRoomId') || 'Stargety-Oasis-1';
-
-    form.setFieldsValue({
-      username: testAccount.username,
-      password: testAccount.password,
-      worldRoomId: currentWorldRoomId, // Preserve the selected world room
-      rememberMe: rememberUsername
-    });
-    setLoginError('');
-
-    // Automatically submit the form for faster loading
-    try {
-      await form.validateFields();
-      form.submit();
-    } catch (error) {
-      console.error('Form validation failed:', error);
-    }
-  };
+  
 
   // Render different auth views
   const renderAuthView = () => {

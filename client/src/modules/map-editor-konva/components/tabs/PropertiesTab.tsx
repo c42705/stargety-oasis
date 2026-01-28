@@ -9,11 +9,11 @@
  * - Empty state when nothing selected
  */
 
-import React, { useState, useCallback } from 'react';
-import { Empty, Typography, Card, Form, Input, Select, InputNumber, Divider, Space, Button, Tag, Switch, Tooltip } from 'antd';
-import { EditOutlined, DeleteOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons';
+import React from 'react';
+import { Empty, Typography, Card, Form, Input, Select, Divider, Space, Button, Tag } from 'antd';
+import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { InteractiveArea, ImpassableArea, InteractiveAreaActionType } from '../../../../shared/MapDataContext';
-import { ACTION_TYPE_COLORS, getColorForActionType } from '../../../../shared/MapDataContext';
+import { getColorForActionType } from '../../../../shared/MapDataContext';
 import type { Shape } from '../../types';
 
 const { Text, Title } = Typography;

@@ -32,8 +32,8 @@ export const EditorComparison: React.FC<EditorComparisonProps> = ({
   enablePerformanceComparison = true,
 }) => {
   const [syncViewports, setSyncViewports] = useState(true);
-  const [fabricPerf, setFabricPerf] = useState({ fps: 0, renderTime: 0 });
-  const [konvaPerf, setKonvaPerf] = useState({ fps: 0, renderTime: 0 });
+  const [fabricPerf] = useState({ fps: 0, renderTime: 0 });
+  const [konvaPerf] = useState({ fps: 0, renderTime: 0 });
 
   // Calculate performance difference
   const fpsDiff = konvaPerf.fps - fabricPerf.fps;

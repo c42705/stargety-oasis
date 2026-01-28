@@ -3,7 +3,7 @@
  * Handles password reset flow: email -> token -> new password
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, Form, Input, Button, Alert, Space, Steps, Typography, StepProps, List } from 'antd';
 import { MailOutlined, LockOutlined, CheckCircleOutlined, BellOutlined } from '@ant-design/icons';
 import { useAuth } from '../../shared/AuthContext';
@@ -25,8 +25,6 @@ export const PasswordRecoveryModule: React.FC<PasswordRecoveryModuleProps> = ({
   const [tokenForm] = Form.useForm();
   const [step, setStep] = useState<RecoveryStep>('email');
   const [error, setError] = useState('');
-  const [email, setEmail] = useState('');
-  const [token, setToken] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleRequestReset = async (values: { email: string }) => {
@@ -35,7 +33,6 @@ export const PasswordRecoveryModule: React.FC<PasswordRecoveryModuleProps> = ({
     try {
       const result = await requestPasswordReset(values.email);
       if (result.success) {
-        setEmail(values.email);
         setStep('token');
         logger.info('Password reset requested');
       } else {
@@ -61,7 +58,6 @@ export const PasswordRecoveryModule: React.FC<PasswordRecoveryModuleProps> = ({
     try {
       const result = await resetPassword(values.token, values.newPassword);
       if (result.success) {
-        setToken(values.token);
         setStep('success');
         logger.info('Password reset successfully');
       } else {

@@ -3,7 +3,6 @@ import { Button, Card, Space, Typography, Tooltip } from 'antd';
 import { BuildOutlined, UserOutlined } from '@ant-design/icons';
 import { AvatarBuilderModal } from './AvatarBuilderModal';
 import { CharacterStorage } from './v2/CharacterStorage';
-import type { CharacterSlot } from './v2/types';
 import { isEmptySlot } from './v2/types';
 import { SpriteSheetDefinition } from './AvatarBuilderTypes';
 

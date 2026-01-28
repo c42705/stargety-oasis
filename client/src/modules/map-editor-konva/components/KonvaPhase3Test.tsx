@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { Stage, Layer, Line, Rect, Circle } from 'react-konva';
+import { Stage, Layer, Line, Rect } from 'react-konva';
 import { Card, Space, Button, Switch, Radio, Typography, Row, Col, Alert, Tag } from 'antd';
 import {
   BorderOutlined,

@@ -6,7 +6,6 @@ import {
   Button,
   Input,
   Badge,
-  Card,
   Dropdown,
   Tag,
   Tooltip,
@@ -130,24 +129,14 @@ export const ChatRoomList: React.FC<ChatRoomListProps> = ({
   // Handle room actions
   const handleRoomActions = useCallback((room: ChatRoom): MenuProps['items'] => {
     const isAdmin = room.createdBy === currentUser.id;
-    const isMember = room.members?.some(member => member.id === currentUser.id);
 
     const menuItems: MenuProps['items'] = [
       {
         key: 'select',
         icon: <UserOutlined />,
         label: 'Join Room',
-        disabled: isMember,
         onClick: () => onRoomSelect(room.id)
       },
-      ...(isMember ? [
-        {
-          key: 'leave',
-          icon: <UserOutlined />,
-          label: 'Leave Room',
-          onClick: () => onRoomLeave(room.id)
-        }
-      ] : []),
       ...(isAdmin ? [
         {
           type: 'divider' as const,
@@ -173,7 +162,7 @@ export const ChatRoomList: React.FC<ChatRoomListProps> = ({
     ];
 
     return menuItems;
-  }, [currentUser, onRoomSelect, onRoomLeave, onRoomDelete]);
+  }, [currentUser, onRoomSelect, onRoomDelete]);
 
   // Get online members count
   const getOnlineMembersCount = (room: ChatRoom) => {
@@ -234,7 +223,6 @@ export const ChatRoomList: React.FC<ChatRoomListProps> = ({
           dataSource={filteredRooms}
           renderItem={(room) => {
             const isSelected = room.id === currentRoomId;
-            const isMember = room.members?.some(member => member.id === currentUser.id);
             const onlineCount = getOnlineMembersCount(room);
             const totalCount = getTotalMembersCount(room);
 

@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Stage, Layer, Line, Rect } from 'react-konva';
+import { Stage, Layer, Line } from 'react-konva';
 import { Card, Space, Button, Typography, Row, Col, Tag, Alert } from 'antd';
 import {
   DeleteOutlined,
@@ -38,7 +38,7 @@ export const KonvaPhase4Test: React.FC = () => {
   // ==========================================================================
 
   const [viewport, setViewport] = useState<Viewport>(VIEWPORT_DEFAULTS);
-  const [gridConfig, setGridConfig] = useState<GridConfig>(GRID_DEFAULTS);
+  const [gridConfig] = useState<GridConfig>(GRID_DEFAULTS);
   const [shapes, setShapes] = useState<Shape[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -53,7 +53,7 @@ export const KonvaPhase4Test: React.FC = () => {
   });
 
   // Pan hook (disabled for now, using select tool)
-  const { handleMouseDown: handlePanMouseDown, handleMouseMove: handlePanMouseMove, handleMouseUp: handlePanMouseUp } = useKonvaPan({
+  useKonvaPan({
     viewport,
     onViewportChange: setViewport,
     enabled: false,

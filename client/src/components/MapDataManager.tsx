@@ -14,7 +14,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { App, Alert, Button, Card, Space, Typography, Upload } from 'antd';
+import { App, Alert, Button, Card, Space, Upload } from 'antd';
 import { UploadOutlined, DownloadOutlined, InboxOutlined, CopyOutlined } from '@ant-design/icons';
 import { useMapStore } from '../stores/useMapStore';
 import { useMapStoreInit } from '../stores/useMapStoreInit';

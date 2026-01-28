@@ -8,7 +8,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Stage, Layer } from 'react-konva';
 import type Konva from 'konva';
-import type { StageRef, LayerRef, Viewport, GridConfig } from '../types';
+import type { Viewport, GridConfig } from '../types';
 import { CANVAS, VIEWPORT_DEFAULTS, GRID_DEFAULTS } from '../constants/konvaConstants';
 
 // ============================================================================
@@ -143,8 +143,8 @@ export const KonvaMapCanvas: React.FC<KonvaMapCanvasProps> = ({
   }, [updateDimensions]);
 
   /**
-   * Update dimensions when props change
-   */
+    * Update dimensions when props change
+    */
   useEffect(() => {
     if (propWidth !== undefined || propHeight !== undefined) {
       setDimensions({
@@ -152,7 +152,7 @@ export const KonvaMapCanvas: React.FC<KonvaMapCanvasProps> = ({
         height: propHeight || dimensions.height,
       });
     }
-  }, [propWidth, propHeight]);
+  }, [propWidth, propHeight, dimensions.width, dimensions.height]);
 
   // ==========================================================================
   // CANVAS INITIALIZATION

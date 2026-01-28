@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Card, Form, Input, Button, Alert, Space, Typography, Divider } from 'antd';
+import { Card, Form, Input, Button, Alert, Space, Divider } from 'antd';
 import { UserOutlined, MailOutlined, LockOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useAuth } from '../../shared/AuthContext';
 import { logger } from '../../shared/logger';

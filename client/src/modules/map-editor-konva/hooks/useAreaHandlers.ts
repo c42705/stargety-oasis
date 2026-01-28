@@ -39,10 +39,8 @@ interface UseAreaHandlersParams {
   shapesToDelete: string[];
   
   // MapData context functions
-  addInteractiveArea: (area: InteractiveArea) => void;
   updateInteractiveArea: (id: string, updates: Partial<InteractiveArea>) => void;
   removeInteractiveArea: (id: string) => void;
-  addCollisionArea: (area: any) => void;
   updateCollisionArea: (id: string, updates: any) => void;
   removeCollisionArea: (id: string) => void;
   
@@ -75,10 +73,8 @@ export function useAreaHandlers(params: UseAreaHandlersParams): AreaHandlersRetu
     areaToDelete,
     collisionAreaToDelete,
     shapesToDelete,
-    addInteractiveArea,
     updateInteractiveArea,
     removeInteractiveArea,
-    addCollisionArea,
     updateCollisionArea,
     removeCollisionArea,
     markDirty,

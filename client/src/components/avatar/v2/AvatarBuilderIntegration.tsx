@@ -6,23 +6,20 @@
  * @date 2025-11-06
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { message, Modal, Button, Space } from 'antd';
-import { AppstoreOutlined } from '@ant-design/icons';
+import React, { useState, useCallback } from 'react';
+import { message, Modal } from 'antd';
 import { AvatarBuilderModal } from '../AvatarBuilderModal';
 import { CharacterStorage } from './CharacterStorage';
 import { ThumbnailGenerator } from './ThumbnailGenerator';
 import { SpriteSheetValidator } from './SpriteSheetValidator';
 import { TemplateSelectorModal } from './TemplateSelectorModal';
-import { DefaultSpriteSheets, DefaultSpriteSheetTemplate } from './DefaultSpriteSheets';
+import { DefaultSpriteSheetTemplate } from './DefaultSpriteSheets';
 import {
   CharacterSlot,
-  EmptyCharacterSlot,
   AvatarBuilderIntegrationProps,
-  AVATAR_SYSTEM_CONSTANTS,
   isEmptySlot
 } from './types';
-import { SpriteSheetDefinition, AnimationCategory } from '../AvatarBuilderTypes';
+import { SpriteSheetDefinition } from '../AvatarBuilderTypes';
 
 /**
  * Avatar Builder Integration Component

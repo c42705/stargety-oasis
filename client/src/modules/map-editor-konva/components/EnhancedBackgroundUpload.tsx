@@ -16,8 +16,6 @@ import {
 } from 'antd';
 import {
   UploadOutlined,
-  CheckCircleOutlined,
-  ExclamationCircleOutlined,
   ReloadOutlined,
   SaveOutlined,
   EyeOutlined
@@ -25,7 +23,6 @@ import {
 import { useAppDispatch, useAppSelector } from '../../../redux/hooks';
 import {
   uploadBackgroundImage,
-  setUploadStatus,
   resetUploadStatus,
   saveMap
 } from '../../../redux/slices/mapSlice';
@@ -54,7 +51,6 @@ export const EnhancedBackgroundUpload: React.FC<EnhancedBackgroundUploadProps> =
 
   // Local state for Apply vs Save functionality
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
 
   // Reset upload status when component unmounts
   useEffect(() => {
@@ -186,20 +182,7 @@ export const EnhancedBackgroundUpload: React.FC<EnhancedBackgroundUploadProps> =
     message.info('Upload reset');
   }, [dispatch]);
 
-  // Get status icon and color
-  const getStatusIcon = () => {
-    switch (uploadStatus.status) {
-      case 'pending':
-      case 'in-progress':
-        return <UploadOutlined spin />;
-      case 'completed':
-        return <CheckCircleOutlined style={{ color: '#52c41a' }} />;
-      case 'failed':
-        return <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />;
-      default:
-        return <UploadOutlined />;
-    }
-  };
+  
 
   const getStatusColor = () => {
     switch (uploadStatus.status) {

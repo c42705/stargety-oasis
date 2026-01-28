@@ -171,15 +171,13 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [searchResults, setSearchResults] = useState<Message[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [activeTab, setActiveTab] = useState('messages');
+  const [activeTab] = useState('messages');
   const [showThread, setShowThread] = useState(false);
   const [threadMessages, setThreadMessages] = useState<Message[]>([]);
-  const [editingMessage, setEditingMessage] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [onlineUsers] = useState<string[]>(['user1', 'user2', 'user4', 'user6']);
-  const [replyToMessageId, setReplyToMessageId] = useState<string | null>(null);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -218,7 +216,6 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
   const handleRoomSelect = useCallback((roomId: string) => {
     setCurrentRoomId(roomId);
     setShowThread(false);
-    setEditingMessage(null);
     setNewMessage('');
     setSelectedFiles([]);
     setSearchResults([]);
@@ -285,11 +282,6 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
       setIsSearching(false);
     }, 500);
   }, [messages]);
-
-  // Handle search results
-  const handleSearchResults = useCallback((results: Message[]) => {
-    setSearchResults(results);
-  }, []);
 
   // Handle message send
   const handleSendMessage = useCallback(() => {
@@ -361,7 +353,6 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
         ? { ...message, content: { text: content }, isEdited: true, editedAt: new Date() }
         : message
     ));
-    setEditingMessage(null);
     antMessage.success('Message updated successfully!');
   }, []);
 
@@ -371,56 +362,13 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
     antMessage.success('Message deleted successfully!');
   }, []);
 
-  // Handle reaction add
-  const handleReactionAdd = useCallback((messageId: string, emoji: string) => {
-    setMessages(prev => prev.map(message => {
-      if (message.id === messageId) {
-        const existingReaction = message.reactions?.find(r => r.emoji === emoji && r.userId === currentUser.id);
-        if (existingReaction) {
-          return message;
-        }
-        return {
-          ...message,
-          reactions: [...(message.reactions || []), { id: `reaction-${Date.now()}`, emoji, userId: currentUser.id, user: currentUser, createdAt: new Date() }]
-        };
-      }
-      return message;
-    }));
-  }, [currentUser]);
-
-  // Handle reaction remove
-  const handleReactionRemove = useCallback((messageId: string, emoji: string) => {
-    setMessages(prev => prev.map(message => {
-      if (message.id === messageId) {
-        return {
-          ...message,
-          reactions: message.reactions?.filter(r => !(r.emoji === emoji && r.userId === currentUser.id)) || []
-        };
-      }
-      return message;
-    }));
-  }, [currentUser]);
-
-  // Handle file select
-  const handleFileSelect = useCallback((files: File[]) => {
-    setSelectedFiles(files);
-  }, []);
-
   // Handle reply to message
   const handleReplyToMessage = useCallback((messageId: string) => {
     const message = messages.find(m => m.id === messageId);
     if (message) {
       setNewMessage(`@${message.author.username} ${message.content.text || ''}`);
-      setReplyToMessageId(messageId);
     }
   }, [messages]);
-
-  // Handle thread view
-  const handleThreadView = useCallback((message: Message) => {
-    setShowThread(true);
-    setThreadMessages([message]);
-    setActiveTab('thread');
-  }, []);
 
   // Handle typing simulation
   useEffect(() => {
@@ -430,11 +378,6 @@ export const ChatModuleEnhanced: React.FC<ChatModuleEnhancedProps> = ({
       return () => clearTimeout(timer);
     }
   }, [newMessage]);
-
-  // Format timestamp
-  const formatTimestamp = (timestamp: Date) => {
-    return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
 
   const { currentTheme } = useTheme();
 

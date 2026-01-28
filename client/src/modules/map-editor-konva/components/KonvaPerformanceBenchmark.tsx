@@ -5,9 +5,9 @@
  * Measures FPS, render time, and interaction responsiveness.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Stage, Layer, Line } from 'react-konva';
-import { Card, Space, Button, Typography, Row, Col, Statistic, Alert, Select, Progress } from 'antd';
+import { Card, Space, Button, Typography, Row, Col, Statistic, Alert, Progress } from 'antd';
 import {
   ThunderboltOutlined,
   CheckCircleOutlined,
@@ -26,7 +26,6 @@ import { createRectangleShape, createPolygonShape } from '../utils/shapeFactorie
 import { VIEWPORT_DEFAULTS, GRID_DEFAULTS, CANVAS } from '../constants/konvaConstants';
 
 const { Title, Text } = Typography;
-const { Option } = Select;
 
 /**
  * Benchmark results
@@ -144,7 +143,7 @@ export const KonvaPerformanceBenchmark: React.FC = () => {
     setTimeout(() => {
       recordBenchmark(count);
     }, 2000);
-  }, []);
+  }, [recordBenchmark]);
 
   const recordBenchmark = useCallback((shapeCount: number) => {
     const fps = performance.metrics.fps;

@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Splitter, Typography } from 'antd';
+import { Splitter } from 'antd';
 import './SplitLayoutComponent.css';
 
 interface SplitLayoutComponentProps {

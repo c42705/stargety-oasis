@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Button, Space, Typography, Divider, Collapse, Avatar, Input, Empty } from 'antd';
+import { Button, Space, Typography, Input, Empty } from 'antd';
 import { MessageOutlined, CloseOutlined, SendOutlined } from '@ant-design/icons';
 import { Message as ModuleMessage } from '../../../types/chat';
 import { Message as ReduxMessage } from '../../../redux/types/chat';

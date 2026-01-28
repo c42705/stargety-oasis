@@ -2,7 +2,6 @@ import React, { useState, useCallback } from 'react';
 import { Input, Button, Space, Dropdown, Menu, DatePicker, Select } from 'antd';
 import { SearchOutlined, FilterOutlined, ClearOutlined } from '@ant-design/icons';
 import type { Dayjs } from 'dayjs';
-import dayjs from 'dayjs';
 
 const { RangePicker } = DatePicker;
 

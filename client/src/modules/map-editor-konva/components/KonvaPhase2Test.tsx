@@ -76,7 +76,6 @@ export const KonvaPhase2Test: React.FC = () => {
   const {
     gridLines,
     shouldRenderGrid,
-    snapToGrid,
   } = useKonvaGrid({
     config: gridConfig,
     canvasWidth: CANVAS.DEFAULT_WIDTH,
@@ -359,7 +358,6 @@ export const KonvaPhase2Test: React.FC = () => {
                 accept="image/*"
                 multiple={false}
                 openFileDialogOnClick={true}
-                action="javascript:void(0);"
               >
                 <Button icon={<UploadOutlined />} block>
                   Upload Background

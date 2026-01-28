@@ -43,7 +43,6 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
   // Sticky mode state
   const [stickyMode, setStickyMode] = useState(false);
   const [showStickyModal, setShowStickyModal] = useState(false);
-  const [pendingDisconnect, setPendingDisconnect] = useState(false);
 
   const handleDisconnect = () => {
     logger.info('Manually disconnecting from video call');
@@ -92,7 +91,6 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
         // If sticky mode is enabled, ask user before disconnecting
         if (stickyMode && currentAreaRoom) {
           setShowStickyModal(true);
-          setPendingDisconnect(true);
         } else {
           logger.info('[VideoCommunicationPanel] Clearing current area room');
           setCurrentAreaRoom(null);
@@ -112,7 +110,7 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
         clearTimeout(transitionTimeoutRef.current);
       }
     };
-  }, [eventBus, stickyMode, currentAreaRoom, onRoomChange]);
+  }, [eventBus, stickyMode, currentAreaRoom, onRoomChange, settings.jitsiServerUrl, user?.username]);
 
   // Simplified: Render idle message when not in an area
   const renderIdleState = () => (
@@ -191,12 +189,10 @@ export const VideoCommunicationPanel: React.FC<VideoCommunicationPanelProps> = (
         onOk={() => {
           setStickyMode(false);
           setShowStickyModal(false);
-          setPendingDisconnect(false);
           handleDisconnect();
         }}
         onCancel={() => {
           setShowStickyModal(false);
-          setPendingDisconnect(false);
         }}
         okText="Leave Call"
         cancelText="Stay Connected"

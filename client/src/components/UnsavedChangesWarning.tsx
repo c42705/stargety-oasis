@@ -28,7 +28,7 @@ export const UnsavedChangesWarning: React.FC<UnsavedChangesWarningProps> = ({
   customMessage = 'You have unsaved changes. Are you sure you want to leave?',
   onNavigationAttempt
 }) => {
-  const { isDirty, saveMap } = useMapStore();
+  const { isDirty } = useMapStore();
 
   // Check if there are unsaved changes
   const hasUnsavedChanges = useCallback(() => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Button, 
   Space, 
@@ -13,29 +13,18 @@ import {
 } from 'antd';
 import { 
   MessageOutlined, 
-  UserOutlined, 
   SearchOutlined,
-  PlusOutlined,
-  SettingOutlined,
   TeamOutlined,
   SendOutlined,
   SmileOutlined,
   PaperClipOutlined,
-  EllipsisOutlined,
-  VideoCameraOutlined,
-  PhoneOutlined,
-  MoreOutlined,
   BellOutlined,
-  ClearOutlined,
-  HistoryOutlined,
-  StarOutlined,
   FolderOpenOutlined,
-  PlayCircleOutlined,
   ReloadOutlined
 } from '@ant-design/icons';
 import { ChatModuleEnhanced } from './ChatModuleEnhanced';
 import { PersistentChatPanelEnhanced } from '../../components/PersistentChatPanelEnhanced';
-import { Message, ChatRoom, User } from '../../types/chat';
+import { User } from '../../types/chat';
 
 const { Title, Text, Paragraph } = Typography;
 const { TabPane } = Tabs;
@@ -56,56 +45,6 @@ export const ChatDemo: React.FC<ChatDemoProps> = ({ className = '' }) => {
     avatar: '',
     online: true
   });
-
-  // Mock data for demonstration
-  const mockRooms: ChatRoom[] = [
-    {
-      id: 'general',
-      name: 'General',
-      description: 'General discussion for everyone',
-      unreadCount: 3,
-      isPrivate: false,
-      createdBy: 'user1',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      members: [
-        { id: 'user1', username: 'Alice', avatar: '', online: true },
-        { id: 'user2', username: 'Bob', avatar: '', online: true },
-        { id: 'user3', username: 'Charlie', avatar: '', online: false }
-      ]
-    },
-    {
-      id: 'development',
-      name: 'Development',
-      description: 'Technical discussions and development updates',
-      tags: ['team', 'development'],
-      unreadCount: 0,
-      isPrivate: false,
-      createdBy: 'user1',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      members: [
-        { id: 'user1', username: 'Alice', avatar: '', online: true },
-        { id: 'user4', username: 'David', avatar: '', online: true },
-        { id: 'user5', username: 'Eve', avatar: '', online: false }
-      ]
-    },
-    {
-      id: 'design',
-      name: 'Design Team',
-      description: 'Design discussions and feedback',
-      tags: ['team', 'design'],
-      unreadCount: 7,
-      isPrivate: true,
-      createdBy: 'user2',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      members: [
-        { id: 'user2', username: 'Bob', avatar: '', online: true },
-        { id: 'user6', username: 'Frank', avatar: '', online: true }
-      ]
-    }
-  ];
 
   // Demo scenarios
   const demoScenarios = [

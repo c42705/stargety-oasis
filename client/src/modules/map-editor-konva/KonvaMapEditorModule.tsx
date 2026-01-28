@@ -216,7 +216,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [isSpacebarPressed]);
+  }, [isSpacebarPressed, setCursorStyle, setIsSpacebarPressed]);
 
   // Update cursor when panning
   useEffect(() => {
@@ -227,7 +227,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     } else {
       setCursorStyle('default');
     }
-  }, [pan.isPanning, isSpacebarPressed, currentTool]);
+  }, [pan.isPanning, isSpacebarPressed, currentTool, setCursorStyle]);
 
   // Grid
   const grid = useKonvaGrid({
@@ -489,7 +489,7 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
       mapData.assets || []
     );
     setShapes(konvaShapes);
-  }, [mapData.interactiveAreas, mapData.impassableAreas, mapData.assets]);
+  }, [mapData.interactiveAreas, mapData.impassableAreas, mapData.assets, setShapes]);
 
   // ===== HANDLER HOOKS (REFACTORED) =====
 
@@ -529,10 +529,8 @@ export const KonvaMapEditorModule: React.FC<KonvaMapEditorModuleProps> = ({
     areaToDelete,
     collisionAreaToDelete,
     shapesToDelete,
-    addInteractiveArea,
     updateInteractiveArea,
     removeInteractiveArea,
-    addCollisionArea,
     updateCollisionArea,
     removeCollisionArea,
     markDirty,

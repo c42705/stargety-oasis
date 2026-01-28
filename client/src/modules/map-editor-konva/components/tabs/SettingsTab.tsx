@@ -60,7 +60,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 }) => {
   const { mapData, updateInteractiveAreas } = useMapData();
   // Redux-based map store for persistence operations
-  const { setWorldDimensions, setBackgroundImage, saveMap } = useMapStore();
+  const { setWorldDimensions, setBackgroundImage } = useMapStore();
   const worldDimensions = useWorldDimensions();
   const [customMapSize, setCustomMapSize] = useState({
     width: mapData.worldDimensions.width,
@@ -69,7 +69,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [selectedPreset, setSelectedPreset] = useState<string>('custom');
   const [backgroundImageDimensions, setBackgroundImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [isApplyingBackgroundSize, setIsApplyingBackgroundSize] = useState(false);
-  const [uploadedImageDimensions, setUploadedImageDimensions] = useState<{ width: number; height: number } | null>(null);
 
   // Animated GIF settings
   const gifSettings = useAnimatedGifSettings();
@@ -486,7 +485,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           <Form.Item label="Background Image">
             <EnhancedBackgroundUpload
               onUploadComplete={(dimensions) => {
-                setUploadedImageDimensions(dimensions);
                 setBackgroundImageDimensions(dimensions);
               }}
               onError={(error) => {
@@ -503,7 +501,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   accept="image/*"
                   multiple={false}
                   openFileDialogOnClick={true}
-                  action="javascript:void(0);"
                 >
                   <Button icon={<UploadOutlined />}>
                     Upload Background Image (Legacy)

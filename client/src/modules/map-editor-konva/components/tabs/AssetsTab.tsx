@@ -211,7 +211,7 @@ export const AssetsTab: React.FC<AssetsTabProps> = ({ onAssetUpload, onPlaceAsse
     // Return a Promise that processes the file
     return new Promise<void>((resolve) => {
       try {
-        const imageData = getBase64(file).then((data) => {
+        getBase64(file).then((data) => {
           console.log('[AssetsTab] File converted to base64, length:', data.length);
 
           // Load image to get dimensions

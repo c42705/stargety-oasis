@@ -40,8 +40,6 @@ export const PolygonDrawingPreview: React.FC<PolygonDrawingPreviewProps> = ({
   isOriginHovered,
   category,
 }) => {
-  // Get style for category
-  const style = category === 'collision' ? SHAPE_STYLES.COLLISION_DEFAULT : SHAPE_STYLES.INTERACTIVE_DEFAULT;
 
   return (
     <>
