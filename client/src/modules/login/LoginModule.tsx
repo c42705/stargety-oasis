@@ -86,7 +86,7 @@ export const LoginModule: React.FC<LoginModuleProps> = () => {
     }
   };
 
-  
+
 
   // Render different auth views
   const renderAuthView = () => {
@@ -139,32 +139,32 @@ export const LoginModule: React.FC<LoginModuleProps> = () => {
         padding: '0.5rem'
       }}>
         <Card
-        style={{
-          width: '100%',
-          maxWidth: 480,
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
-          background: 'rgba(32, 32, 32, 0.27)',          
-          backdropFilter: 'blur(25px)'
-        }}
-      >
-        {/* Header */}
-        <div style={{
-          textAlign: 'center',
-          marginBottom: '1rem',
-          padding: '1rem 0'
-        }}>
-          <Space direction="vertical" size="small" align="center">
-            <img src={appLogo} alt="Stargety Oasis" width={128} height={128} style={{ borderRadius: 8 }} />
-            <Typography.Title level={2} style={{ margin: 0, color: '#667eea' }}>
-              Stargety Oasis
-            </Typography.Title>
-            <Typography.Text type="secondary">
-              Your collaborative digital workspace
-            </Typography.Text>
-          </Space>
-        </div>
+          style={{
+            width: '100%',
+            maxWidth: 480,
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
+            background: 'rgba(32, 32, 32, 0.27)',
+            backdropFilter: 'blur(25px)'
+          }}
+        >
+          {/* Header */}
+          <div style={{
+            textAlign: 'center',
+            marginBottom: '1rem',
+            padding: '1rem 0'
+          }}>
+            <Space direction="vertical" size="small" align="center">
+              <img src={appLogo} alt="Stargety Oasis" width={128} height={128} style={{ borderRadius: 8 }} />
+              <Typography.Title level={2} style={{ margin: 0, color: '#667eea' }}>
+                Stargety Oasis
+              </Typography.Title>
+              <Typography.Text type="secondary">
+                Your collaborative digital workspace
+              </Typography.Text>
+            </Space>
+          </div>
 
-        {/* Test Accounts Section
+          {/* Test Accounts Section
         <Collapse
           style={{ marginBottom: '1.5rem' }}
           items={[
@@ -217,147 +217,135 @@ export const LoginModule: React.FC<LoginModuleProps> = () => {
           ]}
         />
  */}
-        {/* Login Form */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <Typography.Title level={3} style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
-            Welcome Back
-          </Typography.Title>
-          <Typography.Text type="secondary" style={{ display: 'block', textAlign: 'center', marginBottom: '1.5rem' }}>
-            Sign in to access your workspace
-          </Typography.Text>
+          {/* Login Form */}
+          <div style={{ marginBottom: '1.5rem' }}>
+         
 
-          {/* General Error */}
-          {loginError && (
-            <Alert
-              message={loginError}
-              type="error"
-              showIcon
-              style={{ marginBottom: '1rem' }}
-            />
-          )}
-
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={handleSubmit}
-            initialValues={{
-              username: savedUsername || '',
-              password: '',
-              worldRoomId: 'Stargety-Oasis-1' as WorldRoomId,
-              rememberMe: rememberUsername
-            }}
-          >
-            {/* Username Field */}
-            <Form.Item
-              name="username"
-              label="Username"
-              rules={[
-                { required: true, message: 'Username is required' },
-                { min: 2, message: 'Username must be at least 2 characters' }
-              ]}
-            >
-              <Input
-                prefix={<UserOutlined />}
-                placeholder="Enter your username"
-                disabled={isSubmitting || isLoading}
-                autoComplete="username"
+            {/* General Error */}
+            {loginError && (
+              <Alert
+                message={loginError}
+                type="error"
+                showIcon
+                style={{ marginBottom: '1rem' }}
               />
-            </Form.Item>
+            )}
 
-            {/* Password Field */}
-            <Form.Item
-              name="password"
-              label="Password"
-              rules={[
-                { required: true, message: 'Password is required' },
-                { min: 3, message: 'Password must be at least 3 characters' }
-              ]}
+            <Form
+              form={form}
+              layout="vertical"
+              onFinish={handleSubmit}
+              initialValues={{
+                username: savedUsername || '',
+                password: '',
+                worldRoomId: 'Stargety-Oasis-1' as WorldRoomId,
+                rememberMe: rememberUsername
+              }}
             >
-              <Input.Password
-                prefix={<LockOutlined />}
-                placeholder="Enter your password"
-                disabled={isSubmitting || isLoading}
-                autoComplete="current-password"
-              />
-            </Form.Item>
-
-            {/* World Room Selector */}
-            <Form.Item
-              name="worldRoomId"
-              label={
-                <Space>
-                  <GlobalOutlined />
-                  <span>World Room</span>
-                </Space>
-              }
-            >
-              <Select
-                options={WORLD_ROOMS.map(room => ({
-                  value: room.id,
-                  label: room.label,
-                }))}
-                disabled={isSubmitting || isLoading}
-                placeholder="Select a world room"
-              />
-            </Form.Item>
-            <Typography.Text type="secondary" style={{ fontSize: '12px', marginTop: '-16px', display: 'block', marginBottom: '16px' }}>
-              Select which world room to join. Players in the same room can see each other.
-            </Typography.Text>
-
-            {/* Remember Username */}
-            <Form.Item name="rememberMe" valuePropName="checked">
-              <Checkbox disabled={isSubmitting || isLoading}>
-                Remember my username
-              </Checkbox>
-            </Form.Item>
-
-            {/* Submit Button */}
-            <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={isSubmitting || isLoading}
-                icon={<RocketOutlined />}
-                size="large"
-                style={{ width: '100%' }}
+              {/* Username Field */}
+              <Form.Item
+                name="username"
+                label="Username"
+                rules={[
+                  { required: true, message: 'Username is required' },
+                  { min: 2, message: 'Username must be at least 2 characters' }
+                ]}
               >
-                {isSubmitting || isLoading ? 'Signing in...' : 'Sign In'}
+                <Input
+                  prefix={<UserOutlined />}
+                  placeholder="Enter your username"
+                  disabled={isSubmitting || isLoading}
+                  autoComplete="username"
+                />
+              </Form.Item>
+
+              {/* Password Field */}
+              <Form.Item
+                name="password"
+                label="Password"
+                rules={[
+                  { required: true, message: 'Password is required' },
+                  { min: 3, message: 'Password must be at least 3 characters' }
+                ]}
+              >
+                <Input.Password
+                  prefix={<LockOutlined />}
+                  placeholder="Enter your password"
+                  disabled={isSubmitting || isLoading}
+                  autoComplete="current-password"
+                />
+              </Form.Item>
+
+              {/* Forgot Password Link */}
+              <div style={{ textAlign: 'right', marginBottom: '1rem' }}>
+                <Button type="link" onClick={() => navigate('/password-recovery')} style={{ padding: 0 }}>
+                  Forgot your password?
+                </Button>
+              </div>
+
+              {/* World Room Selector */}
+              <Form.Item
+                name="worldRoomId"
+                label={
+                  <Space>
+                    <GlobalOutlined />
+                    <span>World Room</span>
+                  </Space>
+                }
+              >
+                <Select
+                  options={WORLD_ROOMS.map(room => ({
+                    value: room.id,
+                    label: room.label,
+                  }))}
+                  disabled={isSubmitting || isLoading}
+                  placeholder="Select a world room"
+                />
+              </Form.Item>
+              <Typography.Text style={{ fontSize: '12px', marginTop: '-16px', display: 'block', marginBottom: '16px' }}>
+                Select which world room to join. Players in the same room can see each other.
+              </Typography.Text>
+
+              {/* Remember Username */}
+              <Form.Item name="rememberMe" valuePropName="checked">
+                <Checkbox disabled={isSubmitting || isLoading}>
+                  Remember my username
+                </Checkbox>
+              </Form.Item>
+
+              {/* Submit Button */}
+              <Form.Item>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={isSubmitting || isLoading}
+                  icon={<RocketOutlined />}
+                  size="large"
+                  style={{ width: '100%' }}
+                >
+                  {isSubmitting || isLoading ? 'Signing in...' : 'Sign In'}
+                </Button>
+              </Form.Item>
+            </Form>
+          </div>
+
+          {/* Footer */}
+
+          <Divider />
+
+          <div style={{ textAlign: 'center' }}>
+            <Space direction="vertical" size="small" style={{ width: '100%' }}>
+              <Typography.Text>Don't have an account?</Typography.Text>
+              <Button type="default" size="large"
+                style={{ width: '100%' }} onClick={() => setAuthView('register')}>
+                Create one now
               </Button>
-            </Form.Item>
-          </Form>
-        </div>
+            </Space>
+          </div>
 
-        {/* Footer */}
-        <Divider />
-        <div style={{ textAlign: 'center' }}>
-          <Space>
-            <BulbOutlined style={{ color: '#faad14' }} />
-            <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
-              <strong>Demo Mode:</strong> Any username/password combination works, or use the demo accounts above for testing specific features.
-            </Typography.Text>
-          </Space>
-        </div>
 
-        <Divider />
-
-        <div style={{ textAlign: 'center' }}>
-          <Space direction="vertical" size="small">
-            <Typography.Text>Don't have an account?</Typography.Text>
-            <Button type="link" onClick={() => setAuthView('register')}>
-              Create one now
-            </Button>
-          </Space>
-        </div>
-
-        <Divider />
-
-        <div style={{ textAlign: 'center' }}>
-          <Button type="link" onClick={() => navigate('/password-recovery')}>
-            Forgot your password?
-          </Button>
-        </div>
-      </Card>
-    </div>
+        </Card>
+      </div>
     );
   };
 
