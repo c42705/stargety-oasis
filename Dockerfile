@@ -5,6 +5,9 @@
 FROM node:18-alpine AS production
 WORKDIR /app
 
+# Install required system dependencies for Prisma and OpenSSL
+RUN apk add --no-cache openssl libc6-compat
+
 # Install production dependencies for server
 COPY server/package*.json ./
 RUN npm ci --only=production && npm cache clean --force
