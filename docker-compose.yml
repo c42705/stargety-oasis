@@ -28,13 +28,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.server.dev
-    develop:
-      watch:
-        - path: ./server/package.json
-          action: rebuild
-        - path: ./server
-          target: /app/server
-          action: sync
     ports:
       - "3001:3001"
     environment:
@@ -66,13 +59,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.client.dev
-    develop:
-      watch:
-        - path: ./client/package.json
-          action: rebuild
-        - path: ./client
-          target: /app/client
-          action: sync
     ports:
       - "3000:3000"
     environment:
